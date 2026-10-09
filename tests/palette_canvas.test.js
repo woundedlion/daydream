@@ -1,4 +1,4 @@
-import { fakeContext } from './helpers/fake_canvas.js';
+import { fakeContext, withPixelRatio } from './helpers/fake_canvas.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -132,22 +132,15 @@ test('changing the visible phase window rebuilds the strip cache', () => {
   assert.equal(palette.getCalls, 16);
 });
 
-test('the strip fits its backing buffer to the displayed size and pixel density', () => {
+test('the strip fits its backing buffer to the displayed size and pixel density', (t) => {
   const canvas = { width: 1024, height: 100, clientWidth: 400, clientHeight: 96 };
   const ctx = fakeContext();
   ctx.setTransform = (...args) => ctx.ops.push(['setTransform', ...args]);
   const { doc, created } = fakeDoc();
   const palette = fakePalette();
   const painter = createColorStripPainter({ canvas, ctx, doc });
-  const originalPixelRatio = globalThis.devicePixelRatio;
-  globalThis.devicePixelRatio = 2;
-
-  try {
-    painter.draw(palette);
-  } finally {
-    if (originalPixelRatio === undefined) delete globalThis.devicePixelRatio;
-    else globalThis.devicePixelRatio = originalPixelRatio;
-  }
+  withPixelRatio(t, 2);
+  painter.draw(palette);
 
   assert.deepEqual([canvas.width, canvas.height], [800, 192]);
   assert.deepEqual(ctx.ops[0], ['setTransform', 2, 0, 0, 2, 0, 0]);
@@ -158,18 +151,11 @@ test('the strip fits its backing buffer to the displayed size and pixel density'
     'the gradient must be blitted over the CSS-pixel box the transform scales by');
 });
 
-test('repeated strip draws leave an unlaid-out canvas its own size', () => {
+test('repeated strip draws leave an unlaid-out canvas its own size', (t) => {
   const { painter, canvas, ctx, palette } = stripSetup(2048, 512);
   ctx.setTransform = (...args) => ctx.ops.push(['setTransform', ...args]);
-  const originalPixelRatio = globalThis.devicePixelRatio;
-  globalThis.devicePixelRatio = 2;
-
-  try {
-    for (let i = 0; i < 5; i++) painter.draw(palette);
-  } finally {
-    if (originalPixelRatio === undefined) delete globalThis.devicePixelRatio;
-    else globalThis.devicePixelRatio = originalPixelRatio;
-  }
+  withPixelRatio(t, 2);
+  for (let i = 0; i < 5; i++) painter.draw(palette);
 
   assert.deepEqual([canvas.width, canvas.height], [2048, 512],
     'the backing store must not compound the pixel ratio on every draw');
@@ -203,20 +189,13 @@ test('the wave graph samples every column once for all three channels', () => {
   assert.equal(palette.getCalls, 0, 'the graph plots channel values, not colors');
 });
 
-test('the wave graph fits its backing buffer to the displayed size and pixel density', () => {
+test('the wave graph fits its backing buffer to the displayed size and pixel density', (t) => {
   const canvas = { width: 1024, height: 300, clientWidth: 400, clientHeight: 120 };
   const ctx = fakeContext();
   ctx.setTransform = (...args) => ctx.ops.push(['setTransform', ...args]);
   const palette = fakePalette();
-  const originalPixelRatio = globalThis.devicePixelRatio;
-  globalThis.devicePixelRatio = 2;
-
-  try {
-    drawWaveGraph({ canvas, ctx, palette });
-  } finally {
-    if (originalPixelRatio === undefined) delete globalThis.devicePixelRatio;
-    else globalThis.devicePixelRatio = originalPixelRatio;
-  }
+  withPixelRatio(t, 2);
+  drawWaveGraph({ canvas, ctx, palette });
 
   assert.deepEqual([canvas.width, canvas.height], [800, 240]);
   assert.deepEqual(ctx.ops[0], ['setTransform', 2, 0, 0, 2, 0, 0]);
@@ -224,19 +203,12 @@ test('the wave graph fits its backing buffer to the displayed size and pixel den
   assert.equal(palette.channelCalls, 400);
 });
 
-test('repeated wave-graph draws leave an unlaid-out canvas its own size', () => {
+test('repeated wave-graph draws leave an unlaid-out canvas its own size', (t) => {
   const canvas = { width: 2048, height: 512 };
   const ctx = fakeContext();
   ctx.setTransform = (...args) => ctx.ops.push(['setTransform', ...args]);
-  const originalPixelRatio = globalThis.devicePixelRatio;
-  globalThis.devicePixelRatio = 2;
-
-  try {
-    for (let i = 0; i < 5; i++) drawWaveGraph({ canvas, ctx, palette: fakePalette() });
-  } finally {
-    if (originalPixelRatio === undefined) delete globalThis.devicePixelRatio;
-    else globalThis.devicePixelRatio = originalPixelRatio;
-  }
+  withPixelRatio(t, 2);
+  for (let i = 0; i < 5; i++) drawWaveGraph({ canvas, ctx, palette: fakePalette() });
 
   assert.deepEqual([canvas.width, canvas.height], [2048, 512],
     'the backing store must not compound the pixel ratio on every draw');

@@ -29,3 +29,16 @@ export function fakeContext() {
     fillText: (...a) => ops.push(['fillText', ...a]),
   };
 }
+
+/**
+ * @param {import('node:test').TestContext} t - The test's cleanup context.
+ * @param {number} ratio - Device pixels per CSS pixel.
+ */
+export function withPixelRatio(t, ratio) {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'devicePixelRatio');
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'devicePixelRatio', previous);
+    else delete globalThis.devicePixelRatio;
+  });
+  globalThis.devicePixelRatio = ratio;
+}

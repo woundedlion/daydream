@@ -1,7 +1,7 @@
 // The palette tool's hue-key wheel, run end to end against a recording context
 // double: the gamut raster, the marker and label geometry laid over it, and the
 // pointer and keyboard arithmetic a key is moved by.
-import { fakeContext } from './helpers/fake_canvas.js';
+import { fakeContext, withPixelRatio } from './helpers/fake_canvas.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -312,12 +312,7 @@ test('a selection past the end of a shorter key set highlights its last key', ()
 });
 
 test('the wheel caps display density at two and caches the resized raster', (t) => {
-  const previous = Object.getOwnPropertyDescriptor(globalThis, 'devicePixelRatio');
-  t.after(() => {
-    if (previous) Object.defineProperty(globalThis, 'devicePixelRatio', previous);
-    else delete globalThis.devicePixelRatio;
-  });
-  globalThis.devicePixelRatio = 3;
+  withPixelRatio(t, 3);
   const { painter, canvas, ctx } = wheelSetup(256);
   canvas.clientWidth = 136;
   canvas.clientHeight = 136;
