@@ -115,11 +115,11 @@ test('every per-segment metric renders under its own column header', () => {
   new SegmentStatsView(doc).update(readyState(3));
 
   const { head, cell } = grid(stats);
-  assert.deepEqual(head, ['', 'Range', 'Compute', 'Scr A KiB', 'Scr B KiB', 'Persist KiB']);
+  assert.deepEqual(head, ['Segment', 'Range', 'Compute', 'Scr A KiB', 'Scr B KiB', 'Persist KiB']);
 
   for (let s = 0; s < 3; s++) {
     const row = s + 1; // row 0 is the header
-    assert.equal(cell(row, '').textContent, `Seg ${s}`);
+    assert.equal(cell(row, 'Segment').textContent, `Seg ${s}`);
     assert.equal(cell(row, 'Range').textContent,
       `x[${s * 10}–${s * 10 + 9}] y[${100 + s}–${200 + s}]`);
     assert.equal(cell(row, 'Compute').textContent, `${(s + 1).toFixed(1)} ms`);
@@ -128,9 +128,9 @@ test('every per-segment metric renders under its own column header', () => {
     assert.equal(cell(row, 'Persist KiB').textContent, `${(4 * (s + 1)).toFixed(1)}`);
   }
 
-  assert.equal(cell(4, '').textContent, 'max');
+  assert.equal(cell(4, 'Segment').textContent, 'max');
   assert.equal(cell(4, 'Compute').textContent, '3.0 ms');
-  assert.equal(cell(5, '').textContent, 'round-trip');
+  assert.equal(cell(5, 'Segment').textContent, 'round-trip');
   assert.equal(cell(5, 'Compute').textContent, '12.5 ms');
 });
 
@@ -171,15 +171,15 @@ test('a segment whose engine refused a write is marked with its notices', () => 
   // The notices describe the row header from a node outside the table, so the
   // row's own text stays the label and a screen reader still reaches them.
   const notice = (row) => stats.children[1].children[row - 1];
-  assert.equal(cell(1, '').textContent, 'Seg 0');
-  assert.equal(cell(1, '').className, 'seg-label');
+  assert.equal(cell(1, 'Segment').textContent, 'Seg 0');
+  assert.equal(cell(1, 'Segment').className, 'seg-label');
   assert.equal(notice(1).textContent, '');
-  assert.equal(cell(2, '').textContent, 'Seg 1 ⚠');
-  assert.equal(cell(2, '').className, 'seg-label seg-diverged');
-  assert.equal('title' in cell(2, ''), false,
+  assert.equal(cell(2, 'Segment').textContent, 'Seg 1 ⚠');
+  assert.equal(cell(2, 'Segment').className, 'seg-label seg-diverged');
+  assert.equal('title' in cell(2, 'Segment'), false,
     'the text is on a node assistive technology reads, not behind a pointer-only tooltip');
-  assert.equal(cell(2, '').getAttribute('title'), null);
-  assert.equal(cell(2, '').getAttribute('aria-describedby'), notice(2).id);
+  assert.equal(cell(2, 'Segment').getAttribute('title'), null);
+  assert.equal(cell(2, 'Segment').getAttribute('aria-describedby'), notice(2).id);
   assert.equal(notice(2).id, 'seg-notice-1');
   assert.equal(notice(2).parentNode.classList.contains('visually-hidden'), true);
   assert.equal(notice(2).textContent,
@@ -188,8 +188,8 @@ test('a segment whose engine refused a write is marked with its notices', () => 
 
   state.warnings = [null, null];
   view.update(state);
-  assert.equal(cell(2, '').textContent, 'Seg 1', 'a reconverged segment loses the mark');
-  assert.equal(cell(2, '').className, 'seg-label');
+  assert.equal(cell(2, 'Segment').textContent, 'Seg 1', 'a reconverged segment loses the mark');
+  assert.equal(cell(2, 'Segment').className, 'seg-label');
   assert.equal(notice(2).textContent, '');
 });
 
@@ -199,8 +199,8 @@ test('a state carrying no warnings marks nothing', () => {
   new SegmentStatsView(doc).update(readyState(2));
 
   const { cell } = grid(stats);
-  assert.equal(cell(1, '').textContent, 'Seg 0');
-  assert.equal(cell(2, '').className, 'seg-label');
+  assert.equal(cell(1, 'Segment').textContent, 'Seg 0');
+  assert.equal(cell(2, 'Segment').className, 'seg-label');
 });
 
 test('max time covers the live segments only, ignoring a stale tail entry', () => {
@@ -250,10 +250,11 @@ test('the generated table names itself and scopes its headers', () => {
   assert.equal(caption.tagName, 'CAPTION');
   assert.equal(caption.className, 'visually-hidden');
   assert.equal(caption.textContent,
-    'Per-segment compute time, scratch high-water marks and persistent usage');
+    'Per-segment range, compute time, scratch high-water marks and persistent usage');
   const { rows } = grid(stats);
   const headers = rows[0].children;
   assert.equal(headers.length, 6);
+  assert.equal(headers[0].textContent, 'Segment');
   for (const header of headers) {
     assert.equal(header.getAttribute('scope'), 'col');
   }
