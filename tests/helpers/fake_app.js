@@ -190,7 +190,7 @@ function buildGui(namespace, optionsReplaces, panel, hydrated, stored) {
       return value == null ? undefined : String(value);
     },
     writeStoredValue(prop, value) {
-      if (value == null) {
+      if (value == null || (typeof value === 'number' && !Number.isFinite(value))) {
         if (panel) delete stored[prop];
         else gui.stored.delete(prop);
       } else if (panel) stored[prop] = value;
