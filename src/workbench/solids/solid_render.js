@@ -27,7 +27,7 @@ export const MAX_INDEX_LABELS = 1000;
 
 /**
  * A mesh vertex: as much of THREE.Vector3's shape as the render reads.
- * @typedef {Point & {angleTo: (other: any) => number}} Vertex
+ * @typedef {Point & {angleTo: (other: Point) => number, dot: (other: Point) => number, lengthSq: () => number}} Vertex
  */
 
 /**
