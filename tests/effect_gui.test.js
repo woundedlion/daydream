@@ -525,6 +525,22 @@ test('a rejected chain snapshot is reported and announces no import', () => {
   assert.deepEqual(h.configNotices, ['The chain snapshot was rejected. Its original text remains preserved.']);
 });
 
+test('a rebuild over live restored state keeps it and re-persists it over the stored snapshot', () => {
+  const stored = chainSnapshot(1);
+  const live = chainSnapshot(0);
+  const h = makeHarness({
+    params: chainSnapshotParams(),
+    chainSnapshotEnabled: true,
+    chainSnapshot: live,
+    acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: JSON.stringify(stored) },
+  });
+
+  h.panel.build({ restoreStored: false });
+
+  assert.deepEqual(h.restoredChainSnapshots, []);
+  assert.equal(h.gui().stored[CHAIN_SNAPSHOT_STORAGE_KEY], JSON.stringify(live));
+});
+
 test('a stored snapshot that is not a config object never reaches the engine', () => {
   // JS rejects non-object URL values; the engine restore validates object members.
   for (const text of ['{not json', 'null', '[]', '"snapshot"', '7']) {

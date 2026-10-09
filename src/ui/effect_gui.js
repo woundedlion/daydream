@@ -1087,11 +1087,14 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     /**
      * Build the effect GUI for the engine's current effect and install it as the
      * active effect record.
+     * @param {{restoreStored?: boolean}} [options] - `restoreStored: false`
+     *   skips replaying the URL-stored effect state, for a caller that has
+     *   already restored the live state.
      * @returns {void}
      */
-    build() {
+    build({ restoreStored = true } = {}) {
       try {
-        activeEffect = createEffectRecord({ restoreAccepted: true });
+        activeEffect = createEffectRecord({ restoreAccepted: restoreStored });
       } catch (error) {
         if (moduleDead(error)) throw error;
         activeEffect = null;

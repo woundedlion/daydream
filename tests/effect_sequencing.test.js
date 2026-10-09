@@ -470,7 +470,10 @@ function makeApp({
     availableEffects: (label) => offers[label],
     effectGui: {
       destroy: () => log.push('effectGui.destroy'),
-      build: () => log.push('effectGui.build'),
+      build: (options) => {
+        log.push('effectGui.build');
+        if (options?.restoreStored === false) log.push('effectGui.build skipStoredRestore');
+      },
       mount: () => log.push('effectGui.mount'),
       applyAnimationPause: () => log.push('effectGui.applyAnimationPause'),
     },
@@ -732,6 +735,8 @@ test('resolution rebuild restores the chain runtime before rebuilding controls o
   assert.ok(app.log.includes('chain.restore'));
   assert.ok(app.log.indexOf('chain.capture') < app.log.findIndex((event) => event.startsWith('engine.setResolution')));
   assert.ok(app.log.indexOf('chain.restore') < app.log.indexOf('effectGui.build'));
+  assert.ok(app.log.includes('effectGui.build skipStoredRestore'),
+    'the rebuild does not replay the URL snapshot over the restored runtime');
   assert.ok(app.log.indexOf('chain.restore') < app.log.findIndex((event) => event.startsWith('segments.setEffect')));
   assert.equal(app.log.includes('clearEffectParamUrl'), false);
 });
