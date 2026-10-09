@@ -1833,8 +1833,6 @@ test('a chip control edit outside the parameter domain is announced, not stored'
   assert.equal(savedValues(harness)['sample.pattern-freq'], before);
 });
 
-// One history: the strip's Undo covers a chip control's edit, and a drag's
-// stream of writes is one step in it.
 test('a native refusal preserves saved values, links and coalesced undo history', async () => {
   const harness = await editorWorkbench();
   const before = savedValues(harness)['sample.pattern-freq'];
@@ -1856,6 +1854,8 @@ test('a native refusal preserves saved values, links and coalesced undo history'
   assert.equal(savedValues(harness)['sample.pattern-freq'], before);
 });
 
+// One history: the strip's Undo covers a chip control's edit, and a drag's
+// stream of writes is one step in it.
 test('a chip control edit joins the structural history and coalesces per control', async () => {
   const harness = await editorWorkbench();
   const strip = harness.elements.get('chain-strip');
