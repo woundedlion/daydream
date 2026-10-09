@@ -90,6 +90,37 @@ test('checks() keeps the misses and drops the passes', () => {
   assert.deepEqual(failures, ['a miss is kept verbatim', 'and so is the next one']);
 });
 
+test('the solids probe rejects an incomplete operation chain', async () => {
+  const clicks = [];
+  const media = [];
+  const tab = {
+    async $eval(selector) {
+      if (selector === '#labels') return 'true';
+      if (selector === '#arenaStats') return 'Live 1 Scratch A 2 Scratch B 3';
+      if (selector === '#toggleRotate') {
+        return clicks.includes(selector) ? 'true' : { checked: 'false', transition: '0s' };
+      }
+      if (selector === '#meshStats') return 'mesh';
+      assert.fail(`unexpected selector: ${selector}`);
+    },
+    async click(selector) { clicks.push(selector); },
+    async emulateMediaFeatures(features) { media.push(features); },
+    async waitForSelector() {},
+    async waitForFunction() {},
+    async $$eval(selector) {
+      assert.equal(selector, '#opsList .op-item .font-bold');
+      return ['KIS', 'AMBO'];
+    },
+  };
+  const failures = await probeChain(tab);
+  assert.deepEqual(failures, ['the chain builds as KIS, AMBO']);
+  assert.deepEqual(clicks, [
+    '#toggleRotate', '#addOpGrid [data-op="kis"]',
+    '#addOpGrid [data-op="ambo"]', '#addOpGrid [data-op="dual"]',
+  ]);
+  assert.deepEqual(media, [[{ name: 'prefers-reduced-motion', value: 'no-preference' }]]);
+});
+
 // A tab that refuses every call must surface as a thrown refusal, never as an
 // empty verdict.
 for (const [file, name, interaction] of PROBES) {
