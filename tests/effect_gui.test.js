@@ -499,6 +499,7 @@ test('an engine-rejected unversioned snapshot is reported before session control
   h.panel.build();
 
   assert.deepEqual(h.restoredChainSnapshots, [stored]);
+  assert.deepEqual(h.controllersAtRestore, [0], 'the snapshot is restored before any control is built');
   assert.deepEqual(h.configNotices, ['The chain snapshot was rejected. Its original text remains preserved.']);
   assert.deepEqual(h.warnings,
     ['Shader Workbench: chain snapshot was rejected: INVALID_VALUE']);

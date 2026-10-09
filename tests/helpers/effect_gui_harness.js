@@ -169,6 +169,7 @@ export function makeHarness({
   const writes = [];
   const warnings = [];
   const restoredChainSnapshots = [];
+  const controllersAtRestore = [];
   const configNotices = [];
   let paramDefinitionReads = 0;
   const guis = [];
@@ -222,6 +223,7 @@ export function makeHarness({
       snapshot: () => state.chainSnapshot,
       restore: (snapshot) => {
         restoredChainSnapshots.push(snapshot);
+        controllersAtRestore.push(guis.at(-1).controllers.length);
         return restoreChainSnapshotAccepted && snapshot.schemaVersion === 2
           ? ChainSnapshotRestoreResult.APPLIED : ChainSnapshotRestoreResult.INVALID_VALUE;
       },
@@ -252,7 +254,7 @@ export function makeHarness({
   });
 
   return { panel, state, writes, warnings, guis, dragTarget, container, engine,
-           restoredChainSnapshots, configNotices,
+           restoredChainSnapshots, controllersAtRestore, configNotices,
            paramDefinitionReads: () => paramDefinitionReads,
            gui: () => guis[guis.length - 1] };
 }
