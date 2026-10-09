@@ -706,7 +706,9 @@ test('Mobius preset descriptions retain AA contrast on hover', () => {
   const page = SERVED_PAGES.find(({ page }) => page === 'tools/mobius.html');
   assert.ok(page);
   const cascade = page.sheets.map((sheet) => read(...sheet)).join('\n');
-  assert.ok(contrast(cascade, '.preset-desc', '.preset-btn:hover') >= AA_CONTRAST);
+  assert.doesNotMatch(ruleBody(cascade, '.preset-btn:hover'),
+    /(?:^|;)\s*background(?:-color)?\s*:/);
+  assert.ok(contrast(cascade, '.preset-desc', '.preset-btn') >= AA_CONTRAST);
 });
 
 test('Mobius preset descriptions retain AA contrast when active', () => {
