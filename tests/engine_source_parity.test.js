@@ -48,13 +48,31 @@ const header = (path) => {
  * @param {string} source - File text.
  * @param {string} name - Function name.
  * @returns {string} Everything between the opening brace and the closing brace
- *   in column zero.
+ *   at the signature line's indentation.
  */
 function functionBody(source, name) {
-  const m = source.match(new RegExp(`\\b${name}\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)\\n\\}`));
-  assert.ok(m, `${name} not found — the parity reader is out of date with the source`);
-  return m[1];
+  const m = source.match(new RegExp(`^([\\t ]*)[^\\n]*?\\b${name}\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)\\n\\1\\}`, 'm'));
+  assert.ok(m, `${name} not found - the parity reader is out of date with the source`);
+  return m[2];
 }
+
+test('functionBody isolates indented members from later methods', () => {
+  const source = `class Engine {
+  bool setDisplayCaps(double top_percent, double bottom_percent) {
+    if (top_percent > 50) {
+      return false;
+    }
+    return bottom_percent <= 50;
+  }
+  bool later(double top_percent) {
+    return top_percent > 75;
+  }
+};`;
+  const body = functionBody(source, 'bool setDisplayCaps');
+  assert.match(body, /top_percent > 50/);
+  assert.match(body, /return bottom_percent <= 50/);
+  assert.doesNotMatch(body, /later|75/);
+});
 
 /**
  * Evaluates an `inline constexpr float` definition from an engine header.
