@@ -390,7 +390,7 @@ test('a schema rebuild moves focus nowhere when the panel never held it', () => 
 test('a refused edit republishes the warning it raised, and its withdrawal', () => {
   const projection = {
     name: 'Projection', value: 0, requestedValue: 0,
-    options: ['Stereographic', 'Bonne'], animated: true,
+    options: ['Stereographic', 'Bonne', 'Mercator'], animated: true,
   };
   const warning = 'Bonne needs a nonzero parallel.';
   const h = makeHarness({
@@ -402,9 +402,11 @@ test('a refused edit republishes the warning it raised, and its withdrawal', () 
     // effect, so the schema generation stands still.
     onEngineParam(name, value, state) {
       if (name !== 'Projection') return;
-      state.params = [value === 1
-        ? { ...projection, requestedValue: 1, warning }
-        : { ...projection, requestedValue: value }];
+      if (value === 1) {
+        state.params = [{ ...projection, warning }];
+        return false;
+      }
+      state.params = [{ ...projection, requestedValue: value }];
     },
   });
   h.panel.build();
@@ -415,6 +417,7 @@ test('a refused edit republishes the warning it raised, and its withdrawal', () 
   h.gui().ctrl('Projection').setValue(1);
   h.panel.sync();
 
+  assert.ok(!h.writes.includes('worker:Projection=1'), 'a refused value never reaches the workers');
   const controller = h.gui().ctrl('Projection');
   assert.equal(h.gui().closed, false, 'a warning rebuild keeps the panel open');
   assert.equal(controller.$select.focusCalls, 1);
@@ -426,7 +429,7 @@ test('a refused edit republishes the warning it raised, and its withdrawal', () 
   assert.equal(controller.$select.getAttribute('aria-describedby'), note.id);
   assert.deepEqual(h.container.children, [h.gui().domElement]);
 
-  controller.setValue(0);
+  controller.setValue(2);
   h.panel.sync();
 
   const cleared = h.gui().ctrl('Projection');
