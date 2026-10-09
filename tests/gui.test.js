@@ -677,11 +677,7 @@ test('a display folder does not push a later real folder off its own key', () =>
  * the shared timer fires both reach the URL.
  */
 test('makeUrlParamWriter merges multiple keys changed within the debounce window', () => {
-  let lastUrl = '/';
-  installWindow({
-    location: { search: '?keep=1' },
-    history: { replaceState(s, t, url) { lastUrl = url; } },
-  });
+  const url = installRecordingWindow('?keep=1');
   const setUrlParam = makeUrlParamWriter();
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -691,7 +687,7 @@ test('makeUrlParamWriter merges multiple keys changed within the debounce window
   } finally {
     mock.timers.reset();
   }
-  const q = new URL(lastUrl, 'http://x').searchParams;
+  const q = new URL(url.written(), 'http://x').searchParams;
   assert.equal(q.get('a'), '0.5');
   assert.equal(q.get('b'), 'two');
   assert.equal(q.get('keep'), '1');
@@ -701,11 +697,7 @@ test('makeUrlParamWriter merges multiple keys changed within the debounce window
  * The standalone-page fallback commit preserves location.hash.
  */
 test('makeUrlParamWriter preserves location.hash in the fallback commit', () => {
-  let lastUrl = '/';
-  installWindow({
-    location: { search: '?keep=1', hash: '#section' },
-    history: { replaceState(s, t, url) { lastUrl = url; } },
-  });
+  const url = installRecordingWindow('?keep=1', '#section');
   const setUrlParam = makeUrlParamWriter();
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -714,8 +706,8 @@ test('makeUrlParamWriter preserves location.hash in the fallback commit', () => 
   } finally {
     mock.timers.reset();
   }
-  assert.match(lastUrl, /#section$/, 'the fragment survives the URL rewrite');
-  assert.equal(new URL(lastUrl, 'http://x').searchParams.get('a'), 'one');
+  assert.match(url.written(), /#section$/, 'the fragment survives the URL rewrite');
+  assert.equal(new URL(url.written(), 'http://x').searchParams.get('a'), 'one');
 });
 
 /**
@@ -723,11 +715,7 @@ test('makeUrlParamWriter preserves location.hash in the fallback commit', () => 
  * significant digits, and a value with no URL form dropping its param.
  */
 test('makeUrlParamWriter serializes numbers and deletions like URLSync', () => {
-  let lastUrl = '/';
-  installWindow({
-    location: { search: '?keep=1&stale=9&gone=1' },
-    history: { replaceState(s, t, url) { lastUrl = url; } },
-  });
+  const url = installRecordingWindow('?keep=1&stale=9&gone=1');
   const write = makeUrlParamWriter();
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -739,7 +727,7 @@ test('makeUrlParamWriter serializes numbers and deletions like URLSync', () => {
   } finally {
     mock.timers.reset();
   }
-  const q = new URL(lastUrl, 'http://x').searchParams;
+  const q = new URL(url.written(), 'http://x').searchParams;
   assert.equal(q.get('speed'), '1.234567', 'a float is cut to 7 significant digits');
   assert.equal(q.get('count'), '42', 'an integer keeps no decimal tail');
   assert.equal(q.has('stale'), false, 'a non-finite number drops the param');
