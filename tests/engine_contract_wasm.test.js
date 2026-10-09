@@ -278,7 +278,7 @@ test('generated/holosphere_wasm.d.ts declares the engine statics the app calls',
   // Statics the app depends on, named outright: losing one from both sides
   // passes the two-way loop.
   assert.ok(declared.has('isLive'),
-    'daydream.js and segment_worker.js read this static before constructing an '
+    'daydream.js reads this static before constructing an '
     + 'engine; a second instantiation traps and kills the module');
   assert.ok(declared.has('getSupportedResolutions'),
     'daydream.js narrows its resolution presets through this static; a bare '
