@@ -740,7 +740,7 @@ test('makeUrlParamWriter serializes numbers and deletions like URLSync', () => {
     mock.timers.reset();
   }
   const q = new URL(lastUrl, 'http://x').searchParams;
-  assert.equal(q.get('speed'), '1.2346', 'a float is cut to 5 significant digits');
+  assert.equal(q.get('speed'), '1.234567', 'a float is cut to 7 significant digits');
   assert.equal(q.get('count'), '42', 'an integer keeps no decimal tail');
   assert.equal(q.has('stale'), false, 'a non-finite number drops the param');
   assert.equal(q.has('gone'), false, 'null removes the param');

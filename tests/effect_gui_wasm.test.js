@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createEffectGui } from '../src/ui/effect_gui.js';
 import { GUI } from '../src/ui/gui.js';
-import { AppState, URLSync } from '../src/app/state.js';
+import { AppState, URLSync, roundUrlNumber } from '../src/app/state.js';
 import { fakeGui } from './helpers/fake_app.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
@@ -178,4 +178,28 @@ test('authored stage rosters recognize the engine parameter definitions', async 
       }
     }
   } finally { engine.delete(); }
+});
+
+test('URL numbers resolve every implicit slider step in live effect ranges', async () => {
+  const { default: createModule } = await import('../generated/holosphere_wasm.js');
+  const module = await createModule({ print: () => {} });
+  const engine = new module.HolosphereEngine();
+  let checked = 0;
+  try {
+    engine.setResolution(96, 20);
+    for (const effect of Object.keys(engine.getEffectSizes())) {
+      assert.equal(engine.setEffect(effect), module.EffectSetResult.INSTALLED, effect);
+      for (const param of engine.getParameterDefinitions()) {
+        if (param.readonly || typeof param.value !== 'number' || param.step === 1 || param.options || !(param.max > param.min)) continue;
+        const step = (param.max - param.min) / 1000;
+        const seen = new Set(Array.from({ length: 1001 }, (_, k) =>
+          String(roundUrlNumber(param.min + k * step))));
+        assert.equal(seen.size, 1001, `${effect}.${param.name} loses URL slider steps`);
+        checked++;
+      }
+    }
+    assert.ok(checked > 0, 'no float slider ranges checked');
+  } finally {
+    engine.delete();
+  }
 });
