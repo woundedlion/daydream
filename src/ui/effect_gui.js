@@ -121,7 +121,6 @@ export function addParamControl(
   } else if (kind === 'enum') {
     controller = add(state, p.name, enumChoices(p.options ?? [], p.optionValues));
   } else if (kind === 'integer') {
-    // The engine truncates a fractional write, so offer only what it can hold.
     controller = add(state, p.name, p.min, p.max, 1).decimals(0);
   } else {
     controller = add(state, p.name, p.min, p.max)
