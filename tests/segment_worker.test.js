@@ -473,6 +473,23 @@ test('init with a rejected clip posts engineRejected, not ready', async () => {
     'a worker rendering no geometry must not report itself ready');
 });
 
+test('duplicate init is refused before creating another module', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  const firstEngine = engineInstance;
+  const firstModule = wasmModuleInstance;
+  assert.deepEqual(posted.map(({ msg }) => msg), [{ type: 'ready' }]);
+
+  await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 16, h: 8, effectName: 'Waves' });
+  assert.deepEqual(posted.map(({ msg }) => msg),
+    [{ type: 'ready' }, { type: 'engineRejected', reason: 'duplicate init' }]);
+  assert.equal(moduleCreations, 1);
+  assert.equal(wasmModuleInstance, firstModule);
+  assert.equal(engineInstance, firstEngine);
+  assert.equal(firstEngine.effect, 'Plasma');
+  assert.equal(firstEngine.curW, 8);
+  assert.equal(firstEngine.curH, 4);
+});
+
 /** render copies exactly this segment's quadrant rows out of the full buffer. */
 test('render extracts only this segment quadrant from the canvas buffer', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
@@ -559,6 +576,27 @@ test('render still posts a frame when getArenaMetrics throws', async () => {
   assert.equal(frame.msg.arenaMetrics, null);
 });
 
+/** A metrics call that trapped the module faults the worker instead of posting its pixels. */
+test('render faults when getArenaMetrics traps the module', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  engineInstance.metricsThrows = true;
+  wasmModuleInstance.HS_MODULE_DEAD = true;
+  posted.length = 0;
+  const captured = await captureTimeouts(async () => {
+    await dispatch({ type: 'render' });
+  });
+
+  assert.equal(posted.find((p) => p.msg.type === 'frame'), undefined,
+    'pixels from a trapped module must not reach the composite');
+  assert.equal(captured.length, 1, 'one rethrow task scheduled');
+  assert.throws(() => captured[0](), /binding gone/);
+  posted.length = 0;
+  const calls = engineInstance.calls.length;
+  await dispatch({ type: 'render' });
+  await dispatch({ type: 'setParameter', name: 'Alpha', value: 0.5 });
+  assert.deepEqual(posted, []);
+  assert.equal(engineInstance.calls.length, calls, 'a halted session ignores later messages');
+});
 
 test('render faults on a pixel buffer of the wrong length', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
@@ -889,6 +927,24 @@ test('init restores a ShaderChain snapshot', async () => {
   assert.deepEqual(engineInstance.params, []);
 });
 
+for (const fault of ['missing restore API', 'rejected restore']) {
+  test(`init rejects ${fault} before ready or replay`, async () => {
+    nextRestoreMissing = fault === 'missing restore API';
+    nextRestoreResult = fault === 'rejected restore'
+      ? ChainSnapshotRestoreResult.INVALID_VALUE : ChainSnapshotRestoreResult.APPLIED;
+    await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
+      effectName: 'ShaderChain', chainSnapshot: { schema_version: 1 }, paused: true,
+      params: [{ name: 'Speed', value: 0.5 }] });
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].msg.type, 'engineRejected');
+    const reason = nextRestoreMissing ? 'Shader chain snapshot restore API is unavailable'
+      : 'Shader chain snapshot restore rejected: INVALID_VALUE';
+    assert.equal(posted[0].msg.reason, reason);
+    assert.ok(!engineInstance.calls.some(([name]) => name === 'setAnimationsPaused'));
+    assert.deepEqual(engineInstance.params, []);
+  });
+}
+
 // synchronizePreset, not selectPreset: the carried index mirrors the main
 // engine, and the pause the init message carries is applied on its own.
 test('init selects the carried preset before applying tuned params', async () => {
@@ -990,6 +1046,30 @@ test('setEffect restores ShaderChain snapshot after rebuilding', async () => {
     ['restoreSnapshot', snapshot],
     ['setClip', 0, 4, 0, 4],
   ]);
+});
+
+test('rebuild retries a coupled write after its prerequisite without reporting divergence', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  const calls = [];
+  let ready = false;
+  engineInstance.setParameter = (name, value) => {
+    calls.push([name, value]);
+    if (name === 'A' && !ready) return ParamSetResult.INADMISSIBLE;
+    if (name === 'B') ready = true;
+    return ParamSetResult.APPLIED;
+  };
+  const capture = installConsoleCapture('error');
+  try {
+    await dispatch({ type: 'setEffect', name: 'Waves', params: [
+      { name: 'A', acceptedValue: 1, value: 2 },
+      { name: 'B', acceptedValue: 3, value: 4 },
+    ] });
+    assert.deepEqual(calls, [['A', 1], ['B', 3], ['A', 1], ['A', 2], ['B', 4]]);
+    assert.deepEqual(capture.messages, []);
+    posted.length = 0;
+    await dispatch({ type: 'render' });
+    assert.deepEqual(posted.find((p) => p.msg.type === 'frame').msg.warnings, undefined);
+  } finally { capture.restore(); }
 });
 
 for (const paused of [false, true]) test(`setEffect restores pause=${paused} after parameter replay`, async () => {
@@ -1320,86 +1400,4 @@ test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {
     + 'worker or glue faults, then re-pin the digest here');
   assert.equal(PROTOCOL_VERSION, PROTOCOL_SHAPE_PIN.version,
     'PROTOCOL_SHAPE_PIN.version tracks PROTOCOL_VERSION; re-pin both together');
-});
-
-/** A metrics call that trapped the module faults the worker instead of posting its pixels. */
-test('render faults when getArenaMetrics traps the module', async () => {
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  engineInstance.metricsThrows = true;
-  wasmModuleInstance.HS_MODULE_DEAD = true;
-  posted.length = 0;
-  const captured = await captureTimeouts(async () => {
-    await dispatch({ type: 'render' });
-  });
-
-  assert.equal(posted.find((p) => p.msg.type === 'frame'), undefined,
-    'pixels from a trapped module must not reach the composite');
-  assert.equal(captured.length, 1, 'one rethrow task scheduled');
-  assert.throws(() => captured[0](), /binding gone/);
-  posted.length = 0;
-  const calls = engineInstance.calls.length;
-  await dispatch({ type: 'render' });
-  await dispatch({ type: 'setParameter', name: 'Alpha', value: 0.5 });
-  assert.deepEqual(posted, []);
-  assert.equal(engineInstance.calls.length, calls, 'a halted session ignores later messages');
-});
-
-for (const fault of ['missing restore API', 'rejected restore']) {
-  test(`init rejects ${fault} before ready or replay`, async () => {
-    nextRestoreMissing = fault === 'missing restore API';
-    nextRestoreResult = fault === 'rejected restore'
-      ? ChainSnapshotRestoreResult.INVALID_VALUE : ChainSnapshotRestoreResult.APPLIED;
-    await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
-      effectName: 'ShaderChain', chainSnapshot: { schema_version: 1 }, paused: true,
-      params: [{ name: 'Speed', value: 0.5 }] });
-    assert.equal(posted.length, 1);
-    assert.equal(posted[0].msg.type, 'engineRejected');
-    const reason = nextRestoreMissing ? 'Shader chain snapshot restore API is unavailable'
-      : 'Shader chain snapshot restore rejected: INVALID_VALUE';
-    assert.equal(posted[0].msg.reason, reason);
-    assert.ok(!engineInstance.calls.some(([name]) => name === 'setAnimationsPaused'));
-    assert.deepEqual(engineInstance.params, []);
-  });
-}
-
-test('duplicate init is refused before creating another module', async () => {
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  const firstEngine = engineInstance;
-  const firstModule = wasmModuleInstance;
-  assert.deepEqual(posted.map(({ msg }) => msg), [{ type: 'ready' }]);
-
-  await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 16, h: 8, effectName: 'Waves' });
-  assert.deepEqual(posted.map(({ msg }) => msg),
-    [{ type: 'ready' }, { type: 'engineRejected', reason: 'duplicate init' }]);
-  assert.equal(moduleCreations, 1);
-  assert.equal(wasmModuleInstance, firstModule);
-  assert.equal(engineInstance, firstEngine);
-  assert.equal(firstEngine.effect, 'Plasma');
-  assert.equal(firstEngine.curW, 8);
-  assert.equal(firstEngine.curH, 4);
-});
-
-
-test('rebuild retries a coupled write after its prerequisite without reporting divergence', async () => {
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  const calls = [];
-  let ready = false;
-  engineInstance.setParameter = (name, value) => {
-    calls.push([name, value]);
-    if (name === 'A' && !ready) return ParamSetResult.INADMISSIBLE;
-    if (name === 'B') ready = true;
-    return ParamSetResult.APPLIED;
-  };
-  const capture = installConsoleCapture('error');
-  try {
-    await dispatch({ type: 'setEffect', name: 'Waves', params: [
-      { name: 'A', acceptedValue: 1, value: 2 },
-      { name: 'B', acceptedValue: 3, value: 4 },
-    ] });
-    assert.deepEqual(calls, [['A', 1], ['B', 3], ['A', 1], ['A', 2], ['B', 4]]);
-    assert.deepEqual(capture.messages, []);
-    posted.length = 0;
-    await dispatch({ type: 'render' });
-    assert.deepEqual(posted.find((p) => p.msg.type === 'frame').msg.warnings, undefined);
-  } finally { capture.restore(); }
 });
