@@ -17,7 +17,7 @@ import { errorDetail } from "../shared/banner.js";
  * @returns {string} The bare message for a plain `Error`, else `errorDetail`.
  */
 function recorderReason(err) {
-  return err?.name === 'Error' && typeof err.message === 'string'
+  return err instanceof Error && err.name === 'Error'
     ? err.message : errorDetail(err);
 }
 
