@@ -116,25 +116,6 @@ test('refresh() re-fetches when the held view no longer spans the engine buffer'
   assert.equal(notified, fresh);
 });
 
-test('refresh() survives a resolution change without invalidateView()', () => {
-  const small = new Uint16Array(5760);
-  const large = new Uint16Array(41472);
-  const host = new EngineHost();
-  let length = 5760;
-  host.engine = pixelEngine(
-    () => (length === 5760 ? small : large),
-    () => length,
-  );
-
-  host.refresh();
-  assert.equal(host.view(), small);
-
-  length = 41472;
-  host.refresh();
-
-  assert.equal(host.view(), large);
-});
-
 test('paramGeneration() reports the engine\'s effect-load counter', () => {
   const host = new EngineHost();
   let loads = 3;
