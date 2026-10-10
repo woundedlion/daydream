@@ -288,7 +288,7 @@ test('worker posts booted at module load', () => {
 /** A rejected display-cap write refuses init before other engine calls. */
 test('init reports rejected display caps before configuring the engine', async () => {
   nextCapsRejected = true;
-  await dispatch({ type: 'init', segId: 0, totalSegs: 1, w: 8, h: 4, effectName: 'Plasma' });
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   assert.deepEqual(posted.map(({ msg }) => msg),
     [{ type: 'engineRejected', reason: 'setDisplayCaps rejected' }]);
   assert.deepEqual(engineInstance.calls, [['setDisplayCaps', 0, 0]]);
@@ -434,7 +434,7 @@ test('init applies the segment clip and posts ready', async () => {
 /** An init whose setResolution is rejected posts no ready and an explicit engineRejected so the controller faults at once. */
 test('init with a rejected resolution posts engineRejected, not ready', async () => {
   nextResolutionOk = false;
-  await dispatch({ type: 'init', segId: 0, totalSegs: 1, w: 8, h: 4, effectName: 'Plasma' });
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
 
   assert.ok(engineInstance, 'engine constructed');
   assert.deepEqual(engineInstance.calls[1], ['setResolution', 8, 4], 'setResolution attempted');
