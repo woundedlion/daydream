@@ -15,7 +15,7 @@ export const ENGINE_METHODS = [
 ];
 
 /**
- * The rest of the documented engine surface (README §10.2): read through
+ * The rest of the documented engine surface (README §7.2): read through
  * optional calls, or driven by no fake at all.
  */
 export const ENGINE_OPTIONAL_METHODS = [
