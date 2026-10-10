@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
  * Recording stand-in for the schedule/cancel pair: it keeps the last callback
  * and delay handed to schedule(), hands back a fresh handle each time, and
  * records every handle passed to cancel(). One callback is pending at a time.
+ * @param {{repeat?: boolean}} [options] - `repeat` keeps the callback armed
+ *   across fires, as setInterval does.
  * @returns {Object} The recorder, carrying the schedule/cancel pair to inject.
  */
 export function fakeScheduler({ repeat = false } = {}) {
@@ -21,7 +23,7 @@ export function fakeScheduler({ repeat = false } = {}) {
     /** Runs the pending callback. @returns {void} */
     fire: () => {
       const fn = timer.fn;
-      if (!fn) return;
+      assert.ok(fn, 'a scheduled callback is pending');
       if (!repeat) timer.fn = null;
       fn();
     },
