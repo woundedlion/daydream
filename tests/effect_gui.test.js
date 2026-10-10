@@ -23,6 +23,7 @@ import {
   GLOW,
   TELEMETRY,
   wiring,
+  chainParams,
 } from './helpers/effect_gui_harness.js';
 
 restoreDocumentAfterEach();
@@ -150,6 +151,33 @@ test('an enumerated param becomes a dropdown of labels to engine indices', () =>
   assert.deepEqual({ ...controller.args[0] }, { Off: 0, On: 1, Auto: 2 });
   assert.equal(controller.isBoolean, false);
   assert.equal(controller.isContinuous, false);
+});
+
+test('sparse enum controls roundtrip numeric IDs and reject gaps before a write', () => {
+  const parameter = { name: 'Pattern', value: 0, requestedValue: 6, acceptedValue: 0,
+    options: ['Cubic', 'Octet Truss', 'Shells'], optionValues: [0, 1, 6], animated: true };
+  const h = makeHarness({ params: [parameter], engineValues: [6] });
+  h.panel.build();
+  const controller = h.gui().ctrl('Pattern');
+  assert.deepEqual({ ...controller.args[0] }, { Cubic: 0, 'Octet Truss': 1, Shells: 6 });
+  assert.equal(controller.getValue(), 6);
+  for (const value of [0, 1, 6]) {
+    controller.setValue(value);
+    assert.equal(controller.getValue(), value);
+  }
+  assert.ok(h.writes.includes('engine:Pattern=6'));
+  assert.ok(h.writes.includes('worker:Pattern=6'));
+  const before = h.writes.length;
+  controller.setValue(2);
+  assert.equal(controller.getValue(), 6);
+  assert.equal(h.writes.length, before);
+  parameter.requestedValue = 1;
+  h.panel.sync();
+  assert.equal(controller.getValue(), 1);
+  h.state.ownsDisplay = true;
+  h.state.segmentValues = [6];
+  h.panel.sync();
+  assert.equal(controller.getValue(), 6);
 });
 
 test('stage controls sharing a visible label keep distinct accessible names', () => {
@@ -431,6 +459,27 @@ test('build restores the last accepted value before replaying an invalid request
   assert.equal(h.gui().stored['__accepted.Planar Warp 1'], 0);
 });
 
+test('a failed initial panel build reports an unavailable control panel', () => {
+  const h = makeHarness({ params: null });
+  h.panel.build();
+  assert.equal(h.panel.active(), null);
+  assert.deepEqual(h.configNotices, ['Effect controls could not be built.']);
+  assert.match(h.warnings[0], /panel construction failed/);
+  assert.equal(h.guis[0].destroyed, 1);
+});
+
+for (const rebuild of [false, true]) test(`panel ${rebuild ? 'rebuild' : 'build'} propagates module death`, () => {
+  const deps = wiring();
+  const trap = new WebAssembly.RuntimeError('unreachable');
+  let dead = false;
+  deps.engine.getParameterDefinitions = () => { if (dead) throw trap; return []; };
+  deps.engine.paramGeneration = () => dead ? 2 : 1;
+  const panel = createEffectGui({ ...deps, moduleDead: (error) => error === trap });
+  if (rebuild) panel.build();
+  dead = true;
+  assert.throws(() => rebuild ? panel.sync() : panel.build(), (error) => error === trap);
+});
+
 // The engine reports a bool param's values as JS booleans, but the companion
 // deep-link key is read back through the URL number grammar, so it holds the
 // float form.
@@ -557,6 +606,15 @@ test('a stored snapshot that is not a config object never reaches the engine', (
   }
 });
 
+test('an applied chain restore clears the import notice', () => {
+  const stored = chainSnapshot();
+  const h = makeHarness({ params: chainParams(), chainSnapshotEnabled: true,
+    chainSnapshot: stored, acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: JSON.stringify(stored) } });
+  h.panel.build();
+  assert.deepEqual(h.restoredChainSnapshots, [stored]);
+  assert.deepEqual(h.configNotices, [null]);
+});
+
 test('Coverage weight to none persists the exhaustive snapshot bit-exactly', () => {
   const initial = chainSnapshot(1);
   const updated = chainSnapshot(0);
@@ -657,6 +715,31 @@ test('a readonly param is a session control with no engine write-back', () => {
   assert.equal(h.gui().ctrl('Frames').handler, null);
   assert.equal(h.gui().ctrl('Speed').session, undefined);
   assert.equal(typeof h.gui().ctrl('Speed').handler, 'function');
+});
+
+test('readonly enum type-ahead cannot move the visible selection', () => {
+  const h = makeHarness({ params: [{ name: 'Mode', value: 0,
+    options: ['Off', 'On', 'Auto'], readonly: true }] });
+  h.panel.build();
+  const control = h.gui().ctrl('Mode');
+  for (const key of ['a', 'O', '1', ' ']) {
+    assert.equal(control.$select.dispatch('keydown', { key }).defaultPrevented, true);
+  }
+  assert.equal(control.$select.dispatch('keydown', { key: 'Tab' }).defaultPrevented, false);
+  assert.equal(control.$select.dispatch('click').defaultPrevented, true);
+});
+
+test('readonly enum changes restore the display before target handlers run', () => {
+  const h = makeHarness({ params: [{ name: 'Mode', value: 0,
+    options: ['Off', 'On'], readonly: true }] });
+  h.panel.build();
+  const control = h.gui().ctrl('Mode');
+  let bubbled = false;
+  control.$select.addEventListener('change', () => { bubbled = true; });
+  const updates = control.displayUpdates;
+  control.$select.dispatch('change');
+  assert.equal(bubbled, false);
+  assert.equal(control.displayUpdates, updates + 1);
 });
 
 test('every parameter participates in rendered-value synchronization', () => {
