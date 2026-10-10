@@ -6,11 +6,13 @@
 import { focusWidget } from './effect_panel_view.js';
 
 const DRAG_END_EVENTS = ['pointerup', 'pointercancel', 'blur'];
+const TEXT_ENTRY_TYPES = new Set(['text', 'number']);
 
 /** Edit lifetime and persistence deferred until a slider gesture ends. */
 export class EffectPanelEdits {
   activeDragEnds = new Set();
   activeKeyEdits = new Set();
+  activeTextEntries = new Set();
   pending = null;
 
   /** @param {EventTarget} dragTarget @param {(edited: *) => void} persist */
@@ -19,9 +21,10 @@ export class EffectPanelEdits {
     this.write = persist;
   }
 
-  /** @returns {boolean} Whether a pointer or keyboard edit is held. */
+  /** @returns {boolean} Whether a pointer, keyboard or text-entry edit is held. */
   get active() {
-    return this.activeDragEnds.size > 0 || this.activeKeyEdits.size > 0;
+    return this.activeDragEnds.size > 0 || this.activeKeyEdits.size > 0
+      || this.activeTextEntries.size > 0;
   }
 
   /** @param {*} controller @param {*} edited */
@@ -55,7 +58,10 @@ export class EffectPanelEdits {
     });
   }
 
-  /** @param {*} controller - The control whose keyboard gesture is observed. */
+  /**
+   * Hold arrow-key steps until key release, and typed text entry until blur.
+   * @param {*} controller - The control whose keyboard gesture is observed.
+   */
   trackKeyboard(controller) {
     const widget = focusWidget(controller);
     if (!widget) return;
@@ -64,9 +70,14 @@ export class EffectPanelEdits {
         this.activeKeyEdits.add(controller);
       }
     });
-    const end = () => this.activeKeyEdits.delete(controller);
-    widget.addEventListener('keyup', end);
-    widget.addEventListener('blur', end);
+    if (TEXT_ENTRY_TYPES.has(/** @type {HTMLInputElement} */ (widget).type)) {
+      widget.addEventListener('input', () => this.activeTextEntries.add(controller));
+    }
+    widget.addEventListener('keyup', () => this.activeKeyEdits.delete(controller));
+    widget.addEventListener('blur', () => {
+      this.activeKeyEdits.delete(controller);
+      this.activeTextEntries.delete(controller);
+    });
   }
 
   /** Remove drag listeners and flush any held URL write. */
@@ -76,6 +87,7 @@ export class EffectPanelEdits {
     }
     this.activeDragEnds.clear();
     this.activeKeyEdits.clear();
+    this.activeTextEntries.clear();
     this.flush();
   }
 }

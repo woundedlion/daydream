@@ -49,3 +49,24 @@ test('keyboard-only edits persist immediately and release their rebuild guard on
   emit(controller.$input, 'blur');
   assert.equal(edits.active, false);
 });
+
+test('typed text entry holds the rebuild guard across keyup until blur', () => {
+  const edits = new EffectPanelEdits(new EventTarget(), () => {});
+  const $input = Object.assign(new EventTarget(), { type: 'text' });
+  const controller = { domElement: new EventTarget(), $input };
+  edits.trackKeyboard(controller);
+  $input.dispatchEvent(new Event('keydown'));
+  $input.dispatchEvent(new Event('input'));
+  $input.dispatchEvent(new Event('keyup'));
+  assert.equal(edits.active, true);
+  $input.dispatchEvent(new Event('blur'));
+  assert.equal(edits.active, false);
+});
+
+test('a checkbox toggle does not hold the rebuild guard', () => {
+  const edits = new EffectPanelEdits(new EventTarget(), () => {});
+  const $input = Object.assign(new EventTarget(), { type: 'checkbox' });
+  edits.trackKeyboard({ domElement: new EventTarget(), $input });
+  $input.dispatchEvent(new Event('input'));
+  assert.equal(edits.active, false);
+});
