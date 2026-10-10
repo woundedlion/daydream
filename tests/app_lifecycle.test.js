@@ -69,7 +69,7 @@ function makeAdapter({ ownsDisplay = false, active = false,
     host,
     driver,
     segments,
-    syncEffectGui: () => calls.push('effectGui.sync'),
+    syncEffectGui: (advanced) => calls.push(['effectGui.sync', advanced]),
     logError: (message) => errors.push(message),
   });
   return { adapter, calls, errors, driver, host, view };
@@ -89,9 +89,18 @@ test('a single-engine frame renders and republishes the view', () => {
 test('panel reconciliation is independent of drawing a simulation frame', () => {
   const a = makeAdapter();
 
-  a.adapter.sync();
+  a.adapter.sync(true);
 
-  assert.deepEqual(a.calls, ['effectGui.sync']);
+  assert.deepEqual(a.calls, [['effectGui.sync', true]]);
+});
+
+test('panel reconciliation forwards whether the simulation stepped', () => {
+  const a = makeAdapter();
+
+  a.adapter.sync(false);
+  a.adapter.sync(true);
+
+  assert.deepEqual(a.calls, [['effectGui.sync', false], ['effectGui.sync', true]]);
 });
 
 test('a spawning pool still renders the main engine and reports its progress', () => {
