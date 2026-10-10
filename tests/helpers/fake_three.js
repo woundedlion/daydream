@@ -1,8 +1,8 @@
 // Stand-in for three + three/addons/controls/OrbitControls.js, plus the
 // buffer-attribute doubles. three_loader_hooks.js redirects both specifiers here.
 
-// Ordered teardown sink: dispose(), Scene.clear() and forceContextLoss()
-// append to it.
+// Ordered teardown sink: Scene.clear(), forceContextLoss() and every dispose()
+// except BufferGeometry's, which counts disposals instead, append to it.
 export const log = [];
 
 export class Vector3 {
