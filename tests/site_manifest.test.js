@@ -102,7 +102,9 @@ const referencesOf = (path) => {
 test('every site manifest entry is tracked source or an installed engine asset', () => {
   const entries = manifestEntries();
   assert.ok(entries.length > 0, `${MANIFEST} lists nothing`);
-  assert.deepEqual([...new Set(entries)], entries, `${MANIFEST} repeats an entry`);
+  const lines = read(MANIFEST).split(/\r?\n/).map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'));
+  assert.deepEqual([...new Set(lines)], lines, `${MANIFEST} repeats an entry`);
   const tracked = [...trackedFiles()];
   const malformed = [];
   const absent = [];
