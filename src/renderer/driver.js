@@ -10,7 +10,6 @@ import { pixelToSpherical } from "./geometry.js";
 import { isViewLive } from "./pixel_view.js";
 import { FPS } from "./frame_constants.js";
 import { MOBILE_BREAKPOINT_PX } from "../shared/layout.js";
-export { MOBILE_BREAKPOINT_PX };
 
 /**
  * Reuses CSS2DObject label sprites across frames so axis labels can be
