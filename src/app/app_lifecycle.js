@@ -412,7 +412,7 @@ export function loadWithDeadline(load, {
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {() => ?{dispose: Function, disposed: () => boolean}} deps.teardown -
- *   Reads the app teardown; null when startup never built it.
+ *   Reads the app teardown, or null if none is set.
  * @param {(module: Object) => void} deps.start - Brings the app up on the
  *   loaded module.
  * @param {() => void} deps.discardStartup - Releases the engine, recorder, and

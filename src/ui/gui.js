@@ -99,9 +99,10 @@ const makeUrlParamWriter = (win = null) => {
 export { makeUrlParamWriter };
 
 /**
- * lil-gui wrapper that persists every control's value to URL query params,
- * giving the app shareable deep links. Wraps add/addFolder to hydrate
- * from the URL on creation and write back on change.
+ * lil-gui wrapper that deep-links controls added through add() and
+ * addUnhydrated() to URL query params, giving the app shareable links.
+ * add() hydrates from the URL on creation; both write back on change.
+ * addSession() controls and buttons are not persisted.
  */
 class DeepLinkGUI {
   /**
