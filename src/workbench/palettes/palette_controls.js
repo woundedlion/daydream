@@ -609,17 +609,54 @@ function harmonyRelationships(recipe) {
 }
 
 /**
- * @param {number[]} turns - Hue keys, in turns.
- * @returns {number[]} The same shape resampled to exactly three keys.
+ * @param {ReadonlyArray<number>} keys - Evenly spaced key values.
+ * @param {number} count - How many keys to resample to; at least two.
+ * @returns {number[]} The same shape linearly resampled to `count` keys.
  */
-function resampleThreeTurns(turns) {
-  if (turns.length === 1) return [turns[0], turns[0], turns[0]];
-  return [0, 0.5, 1].map((position) => {
-    const scaled = position * (turns.length - 1);
+function resampleKeys(keys, count) {
+  if (keys.length === 1) return new Array(count).fill(keys[0]);
+  return Array.from({ length: count }, (_, i) => {
+    const scaled = i / (count - 1) * (keys.length - 1);
     const left = Math.floor(scaled);
-    const right = Math.min(left + 1, turns.length - 1);
-    return turns[left] + (turns[right] - turns[left]) * (scaled - left);
+    const right = Math.min(left + 1, keys.length - 1);
+    return keys[left] + (keys[right] - keys[left]) * (scaled - left);
   });
+}
+
+/**
+ * Mirror of core/color/generative_palette.h control_key_count.
+ * @param {PaletteRecipe} recipe - A V4 palette recipe.
+ * @returns {number} How many hue keys, and CUSTOM axis points, the recipe reads.
+ */
+function controlKeyCount(recipe) {
+  if (recipe.hue.mode === PaletteV4.hueMode.SWEEP) return 2;
+  if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) return 3;
+  switch (recipe.hue.harmony) {
+    case PaletteV4.harmony.ANALOGOUS:
+    case PaletteV4.harmony.SPLIT_COMPLEMENTARY:
+    case PaletteV4.harmony.TRIADIC:
+      return 3;
+    case PaletteV4.harmony.ACCENTED_ANALOGOUS:
+    case PaletteV4.harmony.TETRADIC:
+    case PaletteV4.harmony.SQUARE:
+      return 4;
+    default:
+      return 2;
+  }
+}
+
+/**
+ * Resamples a CUSTOM axis' authored points onto a new key count and zeroes the
+ * slots past it.
+ * @param {PaletteAxis} axis - A recipe axis; rewritten in place.
+ * @param {number} from - The key count its points were authored for.
+ * @param {number} to - The key count the recipe now reads.
+ * @returns {void}
+ */
+function resampleCustomAxis(axis, from, to) {
+  if (axis.curve !== PaletteV4.curve.CUSTOM || from === to) return;
+  const points = resampleKeys(axis.custom.slice(0, from), to);
+  for (let i = 0; i < axis.custom.length; i++) axis.custom[i] = points[i] ?? 0;
 }
 
 /**
@@ -695,7 +732,7 @@ export function customHueKeyState(recipe) {
     turns = [recipe.hue.baseTurns, recipe.hue.baseTurns + step,
       recipe.hue.baseTurns + 2 * step];
   } else {
-    turns = resampleThreeTurns(directedHarmonyTurns(recipe));
+    turns = resampleKeys(directedHarmonyTurns(recipe), 3);
   }
 
   return hueKeyStateFromTurns(turns);
@@ -854,7 +891,8 @@ export function loopSweepTurns(turns) {
 
 /**
  * Marshals the generative tab's control readings into a V4 recipe.
- * A CUSTOM-curve axis retains the template's custom points and ignores endpoint readings.
+ * A CUSTOM-curve axis keeps the template's custom points, resampled when the
+ * hue readings change the key count, and ignores endpoint readings.
  * @param {PaletteRecipe} template - Recipe the reading is applied over; deep-cloned, never mutated.
  * @param {PaletteControlReadings} controls - The control readings.
  * @returns {PaletteRecipe} The recipe.
@@ -883,6 +921,7 @@ function applyAxisEndpoints(axis, endpoints) {
  * @throws {RangeError} When a reading names no PaletteV4 member of its group.
  */
 export function applyPaletteControls(recipe, controls) {
+  const templateKeyCount = controlKeyCount(recipe);
   recipe.input.offset = controls.window.offset;
   recipe.input.span = controls.window.span;
   recipe.domain = paletteEnumOrdinal('domain', controls.domain);
@@ -915,6 +954,9 @@ export function applyPaletteControls(recipe, controls) {
   recipe.chroma.curve = paletteEnumOrdinal('curve', controls.chromaCurve);
   applyAxisEndpoints(recipe.lightness, controls.lightness);
   applyAxisEndpoints(recipe.chroma, controls.chroma);
+  const keyCount = controlKeyCount(recipe);
+  resampleCustomAxis(recipe.lightness, templateKeyCount, keyCount);
+  resampleCustomAxis(recipe.chroma, templateKeyCount, keyCount);
   // The engine canonicalizes a falloff start outside a FALLOFF domain and the
   // headroom of an ABSOLUTE chroma basis.
   if (recipe.domain !== PaletteV4.domain.FALLOFF)

@@ -524,6 +524,33 @@ test('active recipe fields are marshalled from the controls', () => {
   });
 });
 
+/** A key-count change resamples CUSTOM axis points instead of reading a zeroed slot. */
+test('custom axis points are resampled onto the hue key count', () => {
+  const template = defaultPaletteRecipe();
+  template.hue.mode = PaletteV4.hueMode.CUSTOM;
+  template.lightness.curve = PaletteV4.curve.CUSTOM;
+  template.lightness.custom = [0.25, 0.6, 0.88, 0];
+  template.chroma.curve = PaletteV4.curve.CUSTOM;
+  template.chroma.custom = [0.65, 0.8, 0.35, 0];
+  const readings = {
+    ...CONTROL_READINGS, lightnessCurve: 'CUSTOM', chromaCurve: 'CUSTOM',
+  };
+  const close = (actual, expected) => expected.forEach((value, i) =>
+    assert.ok(Math.abs(actual[i] - value) < 1e-12, `${actual} vs ${expected}`));
+
+  const tetradic = paletteRecipeFromControls(template, { ...readings, harmony: 'TETRADIC' });
+  close(tetradic.lightness.custom, [0.25, 0.25 + 0.35 * 2 / 3, 0.6 + 0.28 / 3, 0.88]);
+  close(tetradic.chroma.custom, [0.65, 0.65 + 0.15 * 2 / 3, 0.8 - 0.45 / 3, 0.35]);
+
+  const complementary = paletteRecipeFromControls(template,
+    { ...readings, harmony: 'COMPLEMENTARY' });
+  assert.deepEqual(complementary.lightness.custom, [0.25, 0.88, 0, 0]);
+  assert.deepEqual(complementary.chroma.custom, [0.65, 0.35, 0, 0]);
+
+  const triadic = paletteRecipeFromControls(template, readings);
+  assert.deepEqual(triadic.lightness.custom, template.lightness.custom);
+});
+
 /** The readings name their controls by element id. */
 test('the generative tab carries every control the readings name', () => {
   const ids = Object.values(PALETTE_CONTROL_IDS);
