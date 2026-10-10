@@ -54,7 +54,6 @@ test('boolean: editing suppresses a flip', () => {
 });
 
 test('numeric: a NaN engine value never updates (no per-frame churn)', () => {
-  // NaN !== anything, so without the guard this would update (and write NaN) every frame.
   assert.deepEqual(resolveParamSync(0.5, NaN, false, false),
     { update: false, value: NaN });
   assert.deepEqual(resolveParamSync(NaN, NaN, false, false),
@@ -62,7 +61,6 @@ test('numeric: a NaN engine value never updates (no per-frame churn)', () => {
 });
 
 test('boolean: a NaN engine value never flips the toggle', () => {
-  // NaN coerces to false; without the guard a `true` toggle would write a spurious false every frame.
   assert.deepEqual(resolveParamSync(true, NaN, true, false),
     { update: false, value: false });
 });
@@ -98,7 +96,6 @@ test('enum: a label matching an Object.prototype member keeps its own name', () 
   assert.deepEqual(Object.keys(choices), ['toString', 'Warp', 'valueOf']);
 });
 
-// A plain object's inherited __proto__ setter discards numeric option values.
 test('enum: a __proto__ label is an option like any other', () => {
   const choices = enumChoices(['Warp', '__proto__', 'Sparkle']);
   assert.deepEqual(Object.keys(choices), ['Warp', '__proto__', 'Sparkle']);
