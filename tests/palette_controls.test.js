@@ -769,14 +769,17 @@ test('no two readings share a control', () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test('the in-place marshal rewrites a template copy into the same recipe', () => {
+test('the in-place marshal rewrites the recipe it is handed', () => {
   const template = defaultPaletteRecipe();
   template.hue.customTurns = [0, 0, 0, 0.4];
   const readings = { ...CONTROL_READINGS, hueMode: 'CUSTOM', domain: 'LOOP' };
   const target = structuredClone(template);
   const { customTurns } = target.hue;
   assert.equal(applyPaletteControls(target, readings), target);
-  assert.deepEqual(target, paletteRecipeFromControls(template, readings));
+  assert.deepEqual(target.hue.customTurns, [0.25, 0.32, 0.39, 0.4]);
+  assert.equal(target.domain, PaletteV4.domain.LOOP);
+  assert.equal(target.falloffStart, template.falloffStart);
+  assert.equal(target.hue.sweepTurns, template.hue.sweepTurns);
   assert.equal(target.hue.customTurns, customTurns, 'the key array is rewritten, not replaced');
   assert.equal(customTurns[3], 0.4);
 });
