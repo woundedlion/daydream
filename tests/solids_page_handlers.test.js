@@ -301,6 +301,32 @@ test('clearing saved solids requires confirmation and preserves cancelled cards'
   assert.equal(calls.length, 4);
 });
 
+test('loading a star pattern over several ops requires confirmation', async () => {
+  const ops = [{ op: 'ambo', params: {} }, { op: 'dual', params: {} }];
+  const state = { base: 'cube', ops };
+  let confirmed = false;
+  const prompts = [];
+  let queued;
+  const select = handler('selectBaseSolid', {
+    state, islamicStarPatterns: ['cube_hankin'], queueCommit: (fn) => { queued = fn; },
+    window: { confirm: (message) => { prompts.push(message); return confirmed; } },
+    meshOpsWasm: { getRecipe: () => ({ seed: 'icosahedron', ops: [] }) },
+    formatSolidName: (key) => key, opsFromRecipe: () => [],
+    chainIsValid: async () => ({ ok: true }), setOps: (next) => { state.ops = next; },
+    showGateMsg() {}, renderOps() {}, update() {}, renderBaseSolid() {}, highlightBaseSolid() {},
+  });
+  select('cube_hankin', {});
+  await queued();
+  assert.equal(prompts.length, 1);
+  assert.equal(state.ops, ops);
+  assert.equal(state.base, 'cube');
+  confirmed = true;
+  select('cube_hankin', {});
+  await queued();
+  assert.deepEqual(state.ops, []);
+  assert.equal(state.base, 'icosahedron');
+});
+
 test('a refused topology tick repaints the restored chain', async () => {
   let queued;
   const painted = [];
