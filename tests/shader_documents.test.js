@@ -27,7 +27,6 @@ import {
   restoreDocumentAfterEach,
 } from './helpers/fake_dom.js';
 
-// Section references identify Holosphere docs/specs/shader_workbench_chain_spec.md.
 const ownedEditors = new Set();
 afterEach(async () => {
   for (const controller of ownedEditors) await controller.dispose();
@@ -38,7 +37,7 @@ const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const WORKBENCH = readFileSync(new URL('../tools/shader.html', import.meta.url), 'utf8');
 const ENGINE_CATALOG = readFileSync(
   new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8');
-// §4.5: the document the workbench opens on, built from the same catalog the
+// The document the workbench opens on, built from the same catalog the
 // page fetches, so the fakes register exactly what the scratch chain would.
 const SCRATCH = scratchChainDocument(JSON.parse(ENGINE_CATALOG));
 
@@ -655,7 +654,7 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
 const onChange = (element) =>
   element.listeners.find((listener) => listener.type === 'change').handler;
 
-// §4.5: init() opens the scratch document, so every later assertion about the
+// init() opens the scratch document, so every later assertion about the
 // engine reads past the writes that opening preview made.
 const SCRATCH_WRITES = SCRATCH.descriptor.parameters.length;
 
@@ -732,7 +731,7 @@ test('a deep-linked document id opens that document', async () => {
     /Kaleidoscope Flowers · Noon/);
 });
 
-// §4.5: the scratch route names no document, and neither does a
+// The scratch route names no document, and neither does a
 // stale id, so both open the scratch chain.
 test('a deep link naming no catalog document opens the scratch chain', async () => {
   for (const initialEffect of ['ShaderChain', 'retired-pattern', null]) {
@@ -746,7 +745,7 @@ test('a deep link naming no catalog document opens the scratch chain', async () 
   }
 });
 
-// §4.6: no separate read-only mode. A shipped pattern previews through
+// No separate read-only mode. A shipped pattern previews through
 // the interpreter exactly as a scratch chain does; the digest match only arms
 // the parity toggle to the promoted build.
 test('choosing a catalog source previews it through the interpreter', async () => {
@@ -931,7 +930,7 @@ test('a compile that throws is reported and leaves the loaded document previewin
     'the loaded document is still the one Save writes');
 });
 
-// §4.4: every edit is a document edit, so Save serializes the document
+// Every edit is a document edit, so Save serializes the document
 // rather than capturing state only the engine holds.
 test('saving exports the document, harvesting nothing from the engine', async () => {
   const harness = workbench();
@@ -977,7 +976,7 @@ test('the workbench roster admits every effect the controller selects', async ()
   }
 });
 
-// §4.5: the scratch source is a document like any other — returning to it
+// The scratch source is a document like any other — returning to it
 // reopens the default chain on the interpreter, rendering from the first frame.
 test('returning to the scratch source reopens the default chain', async () => {
   const harness = workbench();
@@ -1164,7 +1163,7 @@ const displayedParameter = (harness, label, parameterId) => stripChips(harness)
   .find((row) => row.dataset.parameter === parameterId)
   .querySelector('.chain-param-value').value;
 
-// §4.5: the workbench opens on a valid, rendering document with the whole
+// The workbench opens on a valid, rendering document with the whole
 // authoring surface live — the scratch chain is edited exactly like a load.
 test('the scratch document opens as a live, editable chain', async () => {
   const harness = await editorWorkbench({ source: null });
@@ -1607,7 +1606,7 @@ test('preset and stage writes preserve the animation state', async () => {
     'an edit also preserves an intentional pause');
 });
 
-// §4.6: a descriptor edit breaks the match with the promoted
+// A descriptor edit breaks the match with the promoted
 // build and disarms the toggle. A bypass is a program-shape override and a chip
 // control edit of a declared parameter writes a preset value; neither changes the descriptor digest.
 test('the parity toggle disarms on a descriptor edit, not on a bypass', async () => {
@@ -1674,7 +1673,7 @@ test('a descriptor edit under the compiled build returns the preview to the inte
   assert.match(status.textContent, /back on the interpreter/);
 });
 
-// §4.5: Save has one format, and it is the canonicalizer's.
+// Save has one format, and it is the canonicalizer's.
 test('Save writes the canonical v2 serialization', async () => {
   const harness = await editorWorkbench();
 
@@ -1684,7 +1683,7 @@ test('Save writes the canonical v2 serialization', async () => {
   assert.equal(source, KALEIDOSCOPE_HEX_BRIGHT);
 });
 
-// §4.6: Save As is a copy, not a rename - the loaded document and the
+// Save As is a copy, not a rename - the loaded document and the
 // name plain Save re-exports over are both left alone.
 test('Save As writes a new document id and leaves the loaded one alone', async () => {
   const harness = await editorWorkbench();
@@ -1798,7 +1797,7 @@ const savedValues = (harness) => {
   return JSON.parse(harness.downloads.at(-1)[1]).preset_bank.presets[0].values;
 };
 
-// §4.4: a chip control's edit is a document edit, and the engine write is its
+// A chip control's edit is a document edit, and the engine write is its
 // side effect, so Save reads the document and nothing else.
 test('a chip control writes the active preset and survives Save without an engine read', async () => {
   const harness = await editorWorkbench();
