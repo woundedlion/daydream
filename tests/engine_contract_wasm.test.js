@@ -520,6 +520,24 @@ test('chain snapshots match fake key sets, decode refusals and runtime round tri
     { ...saved, paletteBank: { ...saved.paletteBank, cycles: [] } }])
     assert.equal(chainCall(fake, 'restoreSnapshot', snapshot).value,
       chainCall(engine, 'restoreSnapshot', snapshot).value);
+  const [write] = saved.parameters;
+  const enumName = fake.definitions.find((definition) => definition.options)?.name;
+  assert.ok(enumName, 'the default chain exposes an enum parameter');
+  const [entry] = saved.runtime;
+  for (const snapshot of [
+    { ...saved, parameters: [{ ...write, value: NaN }] },
+    { ...saved, parameters: [write, write] },
+    { ...saved, parameters: [{ name: 'unknown', value: 0 }] },
+    { ...saved, parameters: [{ ...write, value: 1e9 }] },
+    { ...saved, parameters: [{ name: enumName, value: 0.5 }] },
+    { ...saved, runtime: [] },
+    { ...saved, runtime: [...saved.runtime, entry] },
+    { ...saved, runtime: [...saved.runtime, { ...entry, instance: 'unknown' }] },
+    { ...saved, runtime: saved.runtime.map((item, index) => index ? item : { ...item, kind: 'phase-clock-v1', state: { phase: 0 } }) },
+  ]) {
+    assert.equal(chainCall(engine, 'restoreSnapshot', snapshot).value, ChainSnapshotRestoreResult.INVALID_VALUE.value);
+    assert.equal(chainCall(fake, 'restoreSnapshot', snapshot).value, ChainSnapshotRestoreResult.INVALID_VALUE.value);
+  }
   assert.equal(chainCall(fake, 'restoreSnapshot', saved), ChainSnapshotRestoreResult.APPLIED);
   assert.deepEqual(chainCall(fake, 'getSnapshot').runtime, saved.runtime);
   assert.deepEqual(chainCall(fake, 'getSnapshot').paletteBank, saved.paletteBank);
