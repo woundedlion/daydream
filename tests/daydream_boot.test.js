@@ -981,6 +981,16 @@ test('the preset selector preserves state on refusal and pauses an accepted pres
 });
 
 
+test('the recorder watches visibility on the injected document', async () => {
+  const decoy = fakeElement('document');
+  const app = await bootedApp({ loadModule: async () => {
+    globalThis.document = decoy;
+    return fakeWasmModule();
+  } });
+  assert.equal(decoy.listeners.some(({ type }) => type === 'visibilitychange'), false);
+  assert.equal(app.docListeners.some(({ type }) => type === 'visibilitychange'), true);
+});
+
 test('a pooled effect switch sizes the preset row from the incoming effect', async (t) => {
   const presetCounts = { IslamicStars: 24, Fishbowl: 1, Comets: 12 };
   const module = fakeWasmModule();
