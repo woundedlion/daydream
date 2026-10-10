@@ -202,6 +202,8 @@ test('a rejected switch alone is shown but not fatal', () => {
 
   app.appState.set('effect', 'Beta');
 
+  assert.deepEqual(app.notices,
+    ['Effect change was rejected. The previous value was restored.']);
   // A rejection carries no thrown value, so there is nothing to log either.
   assert.deepEqual(app.errors, []);
   assert.deepEqual(app.fatals, []);
