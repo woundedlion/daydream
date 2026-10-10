@@ -450,6 +450,8 @@ function selectBaseSolid(key, btn) {
         showGateMsg(`rejected: "${formatSolidName(key)}" has no authored chain to load`);
         return;
       }
+      if (state.ops.length > 1 && !window.confirm(
+        `Replace all ${state.ops.length} operations with the ${formatSolidName(key)} chain?`)) return;
       base = recipe.seed;
       ops = opsFromRecipe(recipe.ops);
     }
