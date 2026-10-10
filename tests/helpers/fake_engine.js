@@ -325,17 +325,17 @@ export class FakeChainEngine {
           if (!definition || names.has(write.name) || !Number.isFinite(write.value)
               || write.value < definition.min || write.value > definition.max
               || (definition.options && !Number.isInteger(write.value)))
-            return ChainSnapshotRestoreResult.INVALID_CHAIN;
+            return ChainSnapshotRestoreResult.INVALID_VALUE;
           names.add(write.name);
         }
         if (snapshot.runtime !== undefined) {
           const remaining = new Map(candidate.runtime.map((entry) => [entry.instance, entry.kind]));
           for (const entry of snapshot.runtime) {
             if (remaining.get(entry.instance) !== entry.kind)
-              return ChainSnapshotRestoreResult.INVALID_CHAIN;
+              return ChainSnapshotRestoreResult.INVALID_VALUE;
             remaining.delete(entry.instance);
           }
-          if (remaining.size) return ChainSnapshotRestoreResult.INVALID_CHAIN;
+          if (remaining.size) return ChainSnapshotRestoreResult.INVALID_VALUE;
         }
         const outcome = this.#setShaderChain(snapshot.chain);
         if (outcome.code !== 'APPLIED') return ChainSnapshotRestoreResult.INVALID_CHAIN;

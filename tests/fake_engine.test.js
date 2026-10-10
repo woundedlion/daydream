@@ -81,7 +81,7 @@ test('FakeChainEngine refuses invalid snapshot writes and runtime atomically', (
   assert.ok(enumDefinition, 'the default chain exposes an enum parameter');
   invalid.push({ ...before, parameters: [{ name: enumDefinition.name, value: 0.5 }] });
   for (const snapshot of invalid) {
-    assert.equal(bindings.restoreSnapshot(snapshot), ChainSnapshotRestoreResult.INVALID_CHAIN);
+    assert.equal(bindings.restoreSnapshot(snapshot), ChainSnapshotRestoreResult.INVALID_VALUE);
     assert.deepEqual(bindings.getSnapshot(), before);
   }
   assert.equal(bindings.restoreSnapshot(target), ChainSnapshotRestoreResult.APPLIED);
