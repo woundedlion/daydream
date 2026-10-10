@@ -979,6 +979,21 @@ test('focused links and their children retain Space and arrow keys', () => {
   assert.deepEqual(h.keys, []);
 });
 
+test('form controls retain Space and arrow keys', () => {
+  for (const tag of ['textarea', 'select', 'button']) {
+    const h = makeKeydownHandler();
+    const control = fakeElement(tag);
+    for (const key of [' ', 'ArrowLeft', 'ArrowRight']) h.handler({ key, target: control });
+    assert.deepEqual(h.keys, [], tag);
+  }
+});
+
+test('an anchor without href does not own the key', () => {
+  const h = makeKeydownHandler();
+  h.handler({ key: ' ', target: fakeElement('a') });
+  assert.deepEqual(h.keys, [' ']);
+});
+
 
 test('render adapters tolerate a missing pixel view', () => {
   const h = makeAdapter();
