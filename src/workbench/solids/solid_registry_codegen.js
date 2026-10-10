@@ -18,10 +18,12 @@ import {
   OP_DEFS,
   KNOWN_OPS,
   MAX_RECIPE_STEPS,
-  PARAMETERIZED_OPS,
   SIMPLE_SEEDS,
+  exactHankinDegrees,
   formatFloat,
   generateFuncAndRecipe,
+  opParams,
+  requireParams,
 } from './solid_codegen.js';
 import { engineHalted } from '../../shared/engine_halt.js';
 import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns } from '../../shared/cpp_format.js';
@@ -154,10 +156,8 @@ export function opStepCpp(o) {
     throw new Error(`opStepCpp: unknown op "${opName}" ` +
       `(expected one of ${[...KNOWN_OPS].join(', ')})`);
   }
-  if (PARAMETERIZED_OPS.has(opName) && (typeof o === 'string' || !o.params)) {
-    throw new Error(`opStepCpp: op "${opName}" requires a params object`);
-  }
-  const params = (typeof o === 'string' ? undefined : o.params) ?? {};
+  requireParams('opStepCpp', opName, o);
+  const params = opParams(o);
   if (opName === 'hankin') {
     if (!(params.angle > 0)) {
       throw new Error(`opStepCpp: hankin param "angle" must be positive, got ${params.angle}`);
@@ -215,9 +215,8 @@ function recipeStepCpp(step) {
     if (!(step.param > 0)) {
       throw new Error(`generateRegistryCpp: base chain hankin angle must be positive, got ${step.param}`);
     }
-    // `deg * D2R` only where it reproduces the engine's float exactly.
-    const deg = Math.round(step.param * (180 / Math.PI));
-    const angle = Math.fround(deg * D2R_F32) === Math.fround(step.param)
+    const deg = exactHankinDegrees(step.param);
+    const angle = deg !== null
       ? `${formatFloat(deg)} * IslamicStarPatterns::D2R`
       : exactFloatLiteral('base chain hankin angle', step.param);
     return `{Op::HANKIN, ${angle}}`;
