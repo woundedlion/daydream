@@ -129,9 +129,9 @@ test('update mirrors every arena row into the mobile cells', () => {
   const { doc, byId } = makeDoc();
   new GlobalStatsView(doc).update(1, metrics());
 
-  assert.ok(Object.values(STATS_CELL_IDS)
-    .some(([desktop]) => byId[desktop].textContent !== ''),
-  'the mirrored rows must contain at least one rendered value');
+  for (const row of ['scratchA', 'scratchB', 'persist', 'stack']) {
+    assert.notEqual(byId[STATS_CELL_IDS[row][0]].textContent, '', row);
+  }
 
   for (const [desktop, mobile] of Object.values(STATS_CELL_IDS)) {
     assert.equal(byId[mobile].textContent, byId[desktop].textContent);
