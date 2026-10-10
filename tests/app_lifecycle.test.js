@@ -186,6 +186,13 @@ function makeTeardown({
   for (const [type, handler, target = pageTarget] of listeners) {
     target.addEventListener(type, handler);
   }
+  for (const target of [pageTarget, noticeTarget]) {
+    const remove = target.removeEventListener.bind(target);
+    target.removeEventListener = (type, handler) => {
+      log.push(`remove ${type}`);
+      remove(type, handler);
+    };
+  }
   const host = new EngineHost();
   host.adapter = { drawFrame() {} };
   host.engine = engine
@@ -238,6 +245,10 @@ test('dispose releases in an order nothing can re-enter', () => {
   t.teardown.dispose();
 
   assert.deepEqual(t.log, [
+    'remove keydown',
+    'remove unhandledrejection',
+    'remove click',
+    'remove pagehide',
     'switches.dispose',
     'stopTimers',
     'effectGui.destroy',
@@ -309,6 +320,10 @@ test('a step that throws does not strand the releases behind it', () => {
   t.teardown.dispose();
 
   assert.deepEqual(t.log, [
+    'remove keydown',
+    'remove unhandledrejection',
+    'remove click',
+    'remove pagehide',
     'switches.dispose',
     'stopTimers',
     'effectGui.destroy',
