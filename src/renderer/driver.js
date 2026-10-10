@@ -1002,8 +1002,7 @@ export class Daydream {
       this.canvas.removeEventListener("keydown", this.onCanvasKeyDown);
       this.canvas.removeEventListener("focus", this.onCanvasFocus);
       this.canvas.removeEventListener("blur", this.onCanvasBlur);
-      // The canvas outlives the driver; a stale latch would orbit a fresh
-      // instance on arrow keys the page had not routed to it.
+      // The canvas outlives the driver.
       this.canvas.classList.remove("keyboard-focus");
     }
 
