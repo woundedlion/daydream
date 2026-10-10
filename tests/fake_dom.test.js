@@ -324,7 +324,7 @@ test('textContent and setAttribute hand back the strings a browser stores', () =
   assert.equal(el.getAttribute('tabindex'), '-1');
 });
 
-test('tabIndex reflects the attribute and browser focus defaults', () => {
+test('tabIndex reflects the attribute and the HTML defaults', () => {
   const box = fakeElement('div');
   assert.equal(box.tabIndex, -1);
   box.setAttribute('tabindex', '0');
@@ -333,10 +333,18 @@ test('tabIndex reflects the attribute and browser focus defaults', () => {
   assert.equal(box.getAttribute('tabindex'), '-1');
 
   assert.equal(fakeElement('button').tabIndex, 0);
-  assert.equal(fakeElement('a').tabIndex, -1);
-  const link = fakeElement('a');
+  assert.equal(fakeElement('a').tabIndex, 0);
+});
+
+test('an anchor is focusable only with an href', () => {
+  const body = fakeElement('body', { connected: true });
+  const doc = installDocument({ activeElement: body, body });
+  const link = fakeElement('a', { connected: true });
+  link.focus();
+  assert.equal(doc.activeElement, body);
   link.setAttribute('href', '/');
-  assert.equal(link.tabIndex, 0);
+  link.focus();
+  assert.equal(doc.activeElement, link);
 });
 
 test('id and class reflect between attributes and properties', () => {
