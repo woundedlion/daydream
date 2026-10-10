@@ -216,6 +216,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
           center.add(v);
         });
         center.divideScalar(f.length);
+        if (view.showGeodesics) center.normalize();
         faceCenters.push(center);
 
         faceNormals.push(new THREE.Vector3().copy(faceNormal(meshData.vertices, f)).normalize());

@@ -163,6 +163,15 @@ test('the vertex and normal toggles add their own objects with their own materia
   assert.equal(normals[1].geometry.attributes.color.array.length, 4 * 6);
 });
 
+test('geodesic mode starts each normal on the unit sphere the faces are drawn on', () => {
+  const { renderer, scene } = setup();
+  renderer.render(tetrahedron(), view({ showGeodesics: true, showNormals: true }), null);
+  const normals = scene.children.filter((o) => o.constructor.name === 'LineSegments')[1];
+  for (let i = 0; i < normals.geometry.points.length; i += 2) {
+    assert.ok(Math.abs(normals.geometry.points[i].length() - 1) < 1e-12);
+  }
+});
+
 test('geodesic mode tessellates the faces and supplies its own smooth normals', () => {
   const flat = setup();
   flat.renderer.render(tetrahedron(), view(), null);
