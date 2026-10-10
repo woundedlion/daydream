@@ -126,16 +126,13 @@ function axisControlElements(axisName) {
   };
 }
 
-// The model reading each axis' curve select carries.
-const AXIS_CURVE_READINGS = { lightness: 'lightnessCurve', chroma: 'chromaCurve' };
-
 function renderAxisControls(axisName) {
   const {
     label, shortLabel, curve, minimum, maximum, minimumLabel, maximumLabel,
     minimumValue, maximumValue,
   } = axisControlElements(axisName);
   const endpoints = recipeModel.axisEndpoints(axisName);
-  const curveName = recipeModel.reading(AXIS_CURVE_READINGS[axisName]);
+  const curveName = recipeModel.reading(PALETTE_AXIS_CONTROLS[axisName].reading);
   curve.value = curveName;
   minimum.min = maximum.min = '0';
   minimum.max = maximum.max = '1';
