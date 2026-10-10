@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
 import {
+  chainSnapshot,
   makeHarness,
   SPEED,
   GLOW,
+  TELEMETRY,
   pointerDown,
   pointerUp,
 } from './helpers/effect_gui_harness.js';
@@ -736,6 +738,20 @@ test('segmented mode rebuilds from main-engine definitions before reading worker
   assert.equal(h.gui().ctrl('Depth').getValue(), 0.6);
 });
 
+test('segmented enums follow the lagging pool values', () => {
+  const h = makeHarness({
+    params: [{ name: 'Mode', value: 0, requestedValue: 2,
+      options: ['A', 'B', 'C'], animated: true }],
+    engineValues: [2], segmentValues: [0], ownsDisplay: true,
+  });
+  h.panel.build();
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Mode').getValue(), 0);
+  h.state.segmentValues = [1.6];
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Mode').getValue(), 2);
+});
+
 test('a refused preset sync still rebuilds a stale schema', () => {
   const h = makeHarness({
     params: [SPEED],
@@ -988,6 +1004,26 @@ test('a preset rebuild adopts the post-sync preset range and index', () => {
   assert.deepEqual({ ...preset.args[0] }, { 1: 0 });
   assert.equal(preset.getValue(), 0);
   assert.deepEqual(h.writes, ['syncPreset:2']);
+});
+
+test('preset advancement refreshes nonanimated requested selectors', () => {
+  const mode = { name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'], animated: false };
+  const h = makeHarness({ params: [mode], engineValues: [0], presetCount: 3, presetIndex: 0 });
+  h.panel.build();
+  h.state.params = [{ ...mode, requestedValue: 1 }];
+  h.state.presetIndex = 1;
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Mode').getValue(), 1);
+});
+
+for (const chainSnapshotEnabled of [false, true]) test(`preset selection ${chainSnapshotEnabled ? 'keeps' : 'clears'} stored writable values (chainSnapshotEnabled=${chainSnapshotEnabled})`, () => {
+  const h = makeHarness({ params: [SPEED, TELEMETRY], presetCount: 3, chainSnapshotEnabled,
+    chainSnapshot: chainSnapshot() });
+  h.panel.build();
+  h.gui().storedWrites.length = 0;
+  assert.equal(h.panel.movePreset(1), true);
+  const cleared = h.gui().storedWrites.filter(([, value]) => value === null).map(([name]) => name);
+  assert.deepEqual(cleared, chainSnapshotEnabled ? [] : ['Speed']);
 });
 
 test('a rejected preset selection does not change the pause state', () => {

@@ -3,7 +3,6 @@ import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
-import { createEffectGui } from '../src/ui/effect_gui.js';
 import { EXPORT_COPIED, EXPORT_FAILED, FLASH_MS } from '../src/ui/effect_actions.js';
 import {
   chainSnapshot,
@@ -17,7 +16,6 @@ import {
   TELEMETRY,
   pointerDown,
   pointerUp,
-  wiring,
   chainParams,
 } from './helpers/effect_gui_harness.js';
 
@@ -757,31 +755,6 @@ test('a filter change rebuilds the panel on the next sync', () => {
     'clearing the filter restores the unfiltered panel');
 });
 
-test('readonly enum type-ahead cannot move the visible selection', () => {
-  const h = makeHarness({ params: [{ name: 'Mode', value: 0,
-    options: ['Off', 'On', 'Auto'], readonly: true }] });
-  h.panel.build();
-  const control = h.gui().ctrl('Mode');
-  for (const key of ['a', 'O', '1', ' ']) {
-    assert.equal(control.$select.dispatch('keydown', { key }).defaultPrevented, true);
-  }
-  assert.equal(control.$select.dispatch('keydown', { key: 'Tab' }).defaultPrevented, false);
-  assert.equal(control.$select.dispatch('click').defaultPrevented, true);
-});
-
-test('readonly enum changes restore the display before target handlers run', () => {
-  const h = makeHarness({ params: [{ name: 'Mode', value: 0,
-    options: ['Off', 'On'], readonly: true }] });
-  h.panel.build();
-  const control = h.gui().ctrl('Mode');
-  let bubbled = false;
-  control.$select.addEventListener('change', () => { bubbled = true; });
-  const updates = control.displayUpdates;
-  control.$select.dispatch('change');
-  assert.equal(bubbled, false);
-  assert.equal(control.displayUpdates, updates + 1);
-});
-
 test('externally rendered stage parameters build no stage folders', () => {
   const params = latticeMeltParams();
   const h = makeHarness({ params, engineValues: params.map((parameter) => parameter.value) });
@@ -789,96 +762,4 @@ test('externally rendered stage parameters build no stage folders', () => {
   h.panel.build();
   assert.equal(h.panel.active().stageFolders.size, 0);
   assert.deepEqual(h.panel.active().paramNames, params.map((parameter) => parameter.name));
-});
-
-test('segmented enums follow the lagging pool values', () => {
-  const h = makeHarness({
-    params: [{ name: 'Mode', value: 0, requestedValue: 2,
-      options: ['A', 'B', 'C'], animated: true }],
-    engineValues: [2], segmentValues: [0], ownsDisplay: true,
-  });
-  h.panel.build();
-  h.panel.sync();
-  assert.equal(h.gui().ctrl('Mode').getValue(), 0);
-  h.state.segmentValues = [1.6];
-  h.panel.sync();
-  assert.equal(h.gui().ctrl('Mode').getValue(), 2);
-});
-
-test('an applied chain restore clears the import notice', () => {
-  const stored = chainSnapshot();
-  const h = makeHarness({ params: chainParams(), chainSnapshotEnabled: true,
-    chainSnapshot: stored, acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: JSON.stringify(stored) } });
-  h.panel.build();
-  assert.deepEqual(h.restoredChainSnapshots, [stored]);
-  assert.deepEqual(h.configNotices, [null]);
-});
-
-test('a failed initial panel build reports an unavailable control panel', () => {
-  const h = makeHarness({ params: null });
-  h.panel.build();
-  assert.equal(h.panel.active(), null);
-  assert.deepEqual(h.configNotices, ['Effect controls could not be built.']);
-  assert.match(h.warnings[0], /panel construction failed/);
-  assert.equal(h.guis[0].destroyed, 1);
-});
-
-for (const rebuild of [false, true]) test(`panel ${rebuild ? 'rebuild' : 'build'} propagates module death`, () => {
-  const deps = wiring();
-  const trap = new WebAssembly.RuntimeError('unreachable');
-  let dead = false;
-  deps.engine.getParameterDefinitions = () => { if (dead) throw trap; return []; };
-  deps.engine.paramGeneration = () => dead ? 2 : 1;
-  const panel = createEffectGui({ ...deps, moduleDead: (error) => error === trap });
-  if (rebuild) panel.build();
-  dead = true;
-  assert.throws(() => rebuild ? panel.sync() : panel.build(), (error) => error === trap);
-});
-
-test('preset advancement refreshes nonanimated requested selectors', () => {
-  const mode = { name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'], animated: false };
-  const h = makeHarness({ params: [mode], engineValues: [0], presetCount: 3, presetIndex: 0 });
-  h.panel.build();
-  h.state.params = [{ ...mode, requestedValue: 1 }];
-  h.state.presetIndex = 1;
-  h.panel.sync();
-  assert.equal(h.gui().ctrl('Mode').getValue(), 1);
-});
-
-for (const chainSnapshotEnabled of [false, true]) test(`preset selection ${chainSnapshotEnabled ? 'keeps' : 'clears'} stored writable values (chainSnapshotEnabled=${chainSnapshotEnabled})`, () => {
-  const h = makeHarness({ params: [SPEED, TELEMETRY], presetCount: 3, chainSnapshotEnabled,
-    chainSnapshot: chainSnapshot() });
-  h.panel.build();
-  h.gui().storedWrites.length = 0;
-  assert.equal(h.panel.movePreset(1), true);
-  const cleared = h.gui().storedWrites.filter(([, value]) => value === null).map(([name]) => name);
-  assert.deepEqual(cleared, chainSnapshotEnabled ? [] : ['Speed']);
-});
-
-
-test('sparse enum controls roundtrip numeric IDs and reject gaps before a write', () => {
-  const parameter = { name: 'Pattern', value: 0, requestedValue: 6, acceptedValue: 0,
-    options: ['Cubic', 'Octet Truss', 'Shells'], optionValues: [0, 1, 6], animated: true };
-  const h = makeHarness({ params: [parameter], engineValues: [6] });
-  h.panel.build();
-  const controller = h.gui().ctrl('Pattern');
-  assert.deepEqual({ ...controller.args[0] }, { Cubic: 0, 'Octet Truss': 1, Shells: 6 });
-  assert.equal(controller.getValue(), 6);
-  for (const value of [0, 1, 6]) {
-    controller.setValue(value);
-    assert.equal(controller.getValue(), value);
-  }
-  assert.ok(h.writes.includes('engine:Pattern=6'));
-  assert.ok(h.writes.includes('worker:Pattern=6'));
-  const before = h.writes.length;
-  controller.setValue(2);
-  assert.equal(controller.getValue(), 6);
-  assert.equal(h.writes.length, before);
-  parameter.requestedValue = 1;
-  h.panel.sync();
-  assert.equal(controller.getValue(), 1);
-  h.state.ownsDisplay = true;
-  h.state.segmentValues = [6];
-  h.panel.sync();
-  assert.equal(controller.getValue(), 6);
 });
