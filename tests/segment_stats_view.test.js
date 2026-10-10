@@ -367,6 +367,28 @@ test('a replaced overlay element is re-resolved instead of written detached', ()
   assert.equal(replacement.style.display, '', 'the live bar is the one handed back');
 });
 
+test('a replaced stats container receives a rebuilt table with current values', () => {
+  const createElement = (tag) => fakeElement(tag);
+  const byId = {
+    'segment-stats': pageElement('div'),
+    'global-stats-desktop': pageElement('div'),
+    'stats-bar': pageElement('div'),
+  };
+  const doc = { getElementById: (id) => byId[id] ?? null, createElement };
+  const view = new SegmentStatsView(doc);
+
+  view.update(readyState(2));
+  const retired = byId['segment-stats'];
+  const first = retired.firstElementChild;
+  retired.remove();
+  const replacement = pageElement('div');
+  byId['segment-stats'] = replacement;
+
+  view.update(readyState(2, { timings: [7, 8] }));
+  assert.notEqual(replacement.firstElementChild, first);
+  assert.equal(grid(replacement).cell(1, 'Compute').textContent, '7.0 ms');
+});
+
 // The page swaps its overlay by rebuilding the container the bar sits in, which
 // never names the cached node itself.
 test('an overlay element retired with its container is re-resolved', () => {
