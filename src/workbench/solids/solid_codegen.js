@@ -174,7 +174,7 @@ export const PARAMETERIZED_OPS = new Set(
  * @returns {void}
  * @throws {Error} When a parameterized op arrives without a params object.
  */
-function requireParams(where, opName, o) {
+export function requireParams(where, opName, o) {
   if (PARAMETERIZED_OPS.has(opName) && (typeof o === 'string' || !o.params)) {
     throw new Error(`${where}: op "${opName}" requires a params object`);
   }
@@ -185,7 +185,7 @@ function requireParams(where, opName, o) {
  * @param {ChainOp} o - The op as supplied.
  * @returns {Object<string, number>} Its params; empty for a parameterless op.
  */
-function opParams(o) {
+export function opParams(o) {
   return (typeof o === 'string' ? undefined : o.params) ?? {};
 }
 
@@ -814,6 +814,17 @@ function float32Decimal(value) {
 }
 
 /**
+ * The whole-degree hankin angle whose `deg * D2R` float32 equals an engine angle.
+ * @param {number} radians - The hankin angle in the engine's float32 radians.
+ * @returns {?number} The whole degree count, or null when no whole degree
+ *   reproduces the float exactly.
+ */
+export function exactHankinDegrees(radians) {
+  const deg = Math.round(radians * (180 / Math.PI));
+  return Math.fround(deg * D2R_F32) === Math.fround(radians) ? deg : null;
+}
+
+/**
  * Editor ops for a registry solid's authored chain.
  * @param {Array<{op: string, param: number, twist: number}>} steps - The chain
  *   in the engine-native units MeshOps.getRecipe() reports.
@@ -829,9 +840,8 @@ export function opsFromRecipe(steps) {
     const opName = step.op;
     if (!KNOWN_OPS.has(opName)) throw new Error(`opsFromRecipe: unknown op "${opName}"`);
     if (opName === 'hankin') {
-      const deg = Math.round(step.param * (180 / Math.PI));
-      const exact = Math.fround(deg * D2R_F32) === Math.fround(step.param);
-      return { op: opName, params: { angle: exact ? deg : float32Decimal(step.param * (180 / Math.PI)) } };
+      const deg = exactHankinDegrees(step.param);
+      return { op: opName, params: { angle: deg ?? float32Decimal(step.param * (180 / Math.PI)) } };
     }
     if (opName === 'relax') {
       const iter = step.param > 0 ? step.param : OP_DEFS.relax.params.iter.max;
