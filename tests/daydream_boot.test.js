@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 import { URL_FLUSH_DEBOUNCE_MS } from '../src/app/state.js';
 import { pageWarmer } from '../src/segments/module_warmer.js';
+import { SegmentController } from '../src/segments/segment_controller.js';
 import {
   EffectSetResult, ParamSetResult, ResolutionSetResult, ChainSnapshotRestoreResult, unpinnedEngineMethods,
 } from './helpers/fake_engine.js';
@@ -83,19 +84,6 @@ test('catalog effects are offered at both simulator resolutions', async () => {
       `the sidebar must offer ${effect} at the low-res preset`);
   }
 });
-
-/**
- * Slices from `at` to the first `sentinel` after it, asserting the sentinel is
- * present so a drifted terminator fails instead of widening the window.
- * @param {number} at - Start index.
- * @param {string} sentinel - Terminator text, excluded from the slice.
- * @returns {string} The block text.
- */
-function sliceTo(at, sentinel) {
-  const end = SOURCE.indexOf(sentinel, at);
-  assert.ok(end > at, `daydream.js: no ${JSON.stringify(sentinel)} after index ${at}`);
-  return SOURCE.slice(at, end);
-}
 
 test('a booted render reconciles live panel values', async () => {
   const module = fakeWasmModule({ definitions: [
@@ -561,18 +549,39 @@ test('segmented controls reconcile a mobile spawn and resize without a second po
   assert.deepEqual(notices, []);
 });
 
-test('the segmented controls have their own notice owner', () => {
+test('the segmented controls have their own notice owner', async (t) => {
   const owners = [...SOURCE.matchAll(/const \w+_NOTICE = '([^']+)'/g)].map((match) => match[1]);
   assert.ok(owners.length > 1);
   assert.equal(new Set(owners).size, owners.length);
-  // The call site, not the definition: the owner tag is the root's.
-  const at = SOURCE.lastIndexOf('createSegmentedPovControls(');
-  assert.ok(at >= 0, 'the segmented controls must stay wired to their factory');
-  assert.match(sliceTo(at, '\n  });'),
-    /showNotice:\s*\(message\)\s*=>\s*applyNotice\.show\(message, SEGMENT_NOTICE\)/,
-    'the owner tag is what keeps a parameter write from clearing the fallback '
-    + 'notice, and only a real worker pool could raise one through a booted '
-    + 'app, so the fakes cannot reach this');
+
+  const module = fakeWasmModule({
+    definitions: [{ name: 'Speed', value: 1, min: 0, max: 2 }],
+  });
+  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
+  t.mock.method(pageWarmer, 'warm', async () => {});
+  t.mock.method(SegmentController.prototype, 'create', () => {
+    throw new Error('a worker would not start');
+  });
+  const enabled = app.guis[0].folders
+    .find((folder) => folder.namespace === 'Segmented POV').controllers
+    .find((controller) => controller.property === 'segmented');
+  enabled.object[enabled.property] = true;
+  const capture = installConsoleCapture('error', 'warn');
+  try {
+    await enabled.changed(true);
+  } finally {
+    capture.restore();
+  }
+  const fallback = noticeText(app);
+  assert.match(fallback, /Segmented POV enable failed:.*would not start/);
+
+  const speed = app.guis.at(-1).controllers.find((c) => c.property === 'Speed');
+  captureConsole(() => speed.setValue(1.5));
+  assert.deepEqual(module.params.at(-1), ['Speed', 1.5],
+    'the write must have reached the engine');
+  assert.equal(noticeText(app), fallback,
+    'sharing an owner tag with the param writer lets a slider nudge clear the '
+    + 'segmented fallback notice');
 });
 
 test('a recording report reaches the shared notice element', async () => {
