@@ -448,11 +448,7 @@ export function createChainStrip({
       closePalette();
     });
 
-    // Inserted after the anchor; childNodes is indexed through the array
-    // prototype because fake child lists lack indexOf.
-    const parent = anchor.parentNode;
-    const at = Array.prototype.indexOf.call(parent.childNodes, anchor);
-    parent.insertBefore(element, parent.childNodes[at + 1] ?? null);
+    anchor.parentNode.insertBefore(element, anchor.nextSibling);
     placePalette(element, anchor);
     palette = { element, anchor };
     if (anchor.getAttribute('aria-haspopup') !== null) anchor.setAttribute('aria-expanded', 'true');
