@@ -7,6 +7,7 @@ import createHolosphereModule from '../generated/holosphere_wasm.js';
 import {
   computeSegmentRange, extractSegment, compositeSegment,
 } from '../src/segments/segment_layout.js';
+import { SEGMENT_COUNT_MAX } from '../src/segments/segment_policy.js';
 
 // Small canvas: every instance is a whole WASM module with its own arena.
 const W = 96, H = 20;
@@ -179,7 +180,8 @@ test('production resolution stitches at every supported segment count', async ()
   const full = await renderWith(CLIPPED_EFFECT,
     { x0: 0, x1: width, y0: 0, y1: height }, FRAMES, width, height);
   assert.ok(new Set(full.pixels).size > 1);
-  for (const total of [2, 4, 6, 8]) {
+  const totals = Array.from({ length: SEGMENT_COUNT_MAX / 2 }, (_, i) => 2 * (i + 1));
+  for (const total of totals) {
     const { canvas, clips, rects, readbacks } = await compositeSegments(
       CLIPPED_EFFECT, total, FRAMES, width, height);
     assert.equal(clips.filter(clip => clip === 'APPLIED').length, total);
