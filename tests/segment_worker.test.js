@@ -14,6 +14,7 @@ import {
 } from './helpers/fake_engine.js';
 import { fakeWorkerScope } from './helpers/fake_worker.js';
 import { staticModuleGraph } from './helpers/module_graph.js';
+import { EMPTY_WASM } from './fixtures/module_warmer_fixture.js';
 
 // ---------------------------------------------------------------------------
 // Fakes — installed BEFORE importing the worker, which binds self.postMessage
@@ -335,9 +336,6 @@ test('state-changing messages before init explicitly reject instead of disappear
     assert.equal(posted[0].msg.reason, `${message.type} before a completed init`);
   }
 });
-
-/** Header-only module: valid, imports nothing, so it instantiates against `{}`. */
-const EMPTY_WASM = Uint8Array.of(0, 0x61, 0x73, 0x6d, 1, 0, 0, 0);
 
 test('init instantiates a controller-supplied module through the glue hook', async () => {
   const compiled = await WebAssembly.compile(EMPTY_WASM);
