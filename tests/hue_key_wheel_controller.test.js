@@ -189,6 +189,18 @@ test('the selection stays on a key the wheel still draws', () => {
   assert.equal(draws.at(-1).selectedKey, 1);
 });
 
+test('focus on a handle the wheel stops drawing moves to the last drawn handle', () => {
+  const { wheel, model, handles } = setup();
+  wheel.draw(model.recipe());
+  handles[2].focus();
+  handles[2].dispatch('focus');
+  assert.equal(globalThis.document.activeElement, handles[2]);
+  model.applyHueModeTransition('SWEEP');
+  wheel.draw(model.recipe());
+  assert.equal(handles[2].hidden, true);
+  assert.equal(globalThis.document.activeElement, handles[1]);
+});
+
 test('a keyboard resample follows the selected hue key through later nudges', () => {
   const recipe = defaultPaletteRecipe();
   recipe.hue.mode = PaletteV4.hueMode.SWEEP;
