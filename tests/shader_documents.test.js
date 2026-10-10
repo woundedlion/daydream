@@ -1042,14 +1042,16 @@ function compiledBuildEngine() {
  * FakeChainEngine, with the workbench mounts present and kaleidoscope_hex_bright loaded over
  * the scratch document the page opens on.
  * @param {{source?: string|null, patternCatalog?: string, hash?: string, search?: string, initialEffect?: string|null,
- *   paused?: boolean, selectEffect?: () => boolean, onOriginalLinkReleased?: () => void}} [seams] - source null
- *   leaves the scratch document loaded.
+ *   paused?: boolean, pausedFromEngine?: boolean, selectEffect?: () => boolean,
+ *   onOriginalLinkReleased?: () => void}} [seams] - source null leaves the scratch
+ *   document loaded; pausedFromEngine reads the pause seam off the chain engine.
  * @returns {Promise<Object>} The controller and everything it wrote to.
  */
 async function editorWorkbench({
   source = KALEIDOSCOPE_HEX_BRIGHT, patternCatalog = EMPTY_PATTERN_CATALOG, hash = '', search = '?effect=ShaderChain', initialEffect = null, paused = false,
   selectEffect = () => true,
   onOriginalLinkReleased = () => {},
+  pausedFromEngine = false,
 } = {}) {
   const engine = new FakeChainEngine();
   const compiledEngine = compiledBuildEngine();
@@ -1110,7 +1112,10 @@ async function editorWorkbench({
     },
     syncEffectGui: () => { ran.gui += 1; },
     invalidate: () => { ran.invalidated += 1; },
-    getAnimationsPaused: () => { pausedReads += 1; return animationsPaused; },
+    getAnimationsPaused: () => {
+      pausedReads += 1;
+      return pausedFromEngine ? engine.getAnimationsPaused() : animationsPaused;
+    },
     setAnimationsPaused: (paused) => {
       animationsPaused = paused;
       animationWrites.push(paused);
@@ -2130,8 +2135,10 @@ test('a chain snapshot restores its program and accepted parameters into the edi
   const bindings = engine.getShaderChainBindings();
   const snapshot = bindings.getSnapshot();
   bindings.delete();
-  const harness = await editorWorkbench({source: null,
+  const harness = await editorWorkbench({source: null, pausedFromEngine: true,
     search: `?effect=ShaderChain&fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(snapshot))}`});
+  assert.equal(harness.elements.get('shader-animation-toggle').getAttribute('aria-pressed'), 'true');
+  assert.equal(harness.animationWrites.at(-1), true);
   const restored = harness.engine.getShaderChainBindings();
   assert.deepEqual(restored.getProgram(), snapshot.chain);
   assert.equal(harness.engine.getParameterDefinitions().find((entry) => entry.name === 'sample.pattern-freq').acceptedValue, 2.25);

@@ -909,6 +909,9 @@ export function createShaderDocumentController({
           if (previous) callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'restoreSnapshot', [previous]);
           throw new Error('the imported chain snapshot was rejected');
         }
+        const paused = getAnimationsPaused();
+        if (paused !== null) setAnimationsPaused(paused);
+        showAnimationState();
         selectLoadedSource(null, 'imported.shader.json', 'Imported');
         syncEffectGui();
         invalidate();
