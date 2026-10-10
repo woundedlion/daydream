@@ -1320,22 +1320,6 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     [{ id: 'sample.edge-width', storage: 'binary32' }],
     { 'sample.edge-width': 0.1 }, chain, CATALOG)],
   [], 'no gate, no deactivation');
-
-  const renamed = structuredClone(CATALOG);
-  renamed.operators.find((operator) => operator.id === 'sample.grid.v3')
-    .params.find((field) => field.id === 'coverage-mode').id = 'coverage-style';
-  const renamedParameters = parameters.map((parameter) => ({
-    ...parameter,
-    id: parameter.id === 'sample.coverage-mode' ? 'sample.coverage-style' : parameter.id,
-  }));
-  assert.deepEqual([...deactivatedParameterIds(
-    renamedParameters,
-    { ...values, 'sample.coverage-style': values['sample.coverage-mode'] },
-    chain, renamed,
-  )], ['colorize.hue-noise-scale', 'colorize.hue-noise-speed',
-    'colorize.brightness-bottom', 'colorize.brightness-top'],
-  'a renamed gate field silently stops gating: the rule keys are field ids, so '
-    + 'the case below pins them against the shipped catalog');
 });
 
 test('parameter gate predicates match every catalog live value', () => {
