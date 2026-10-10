@@ -228,7 +228,7 @@ test('waveGraphBand puts the value range on the 10%-90% band, value up', () => {
   assert.ok(toY(1) < toY(0));
 });
 
-/** Verifies the plotted range brackets the [0, 1] output range, so clamped excursions stay on-canvas. */
+/** Verifies the plotted range brackets the [0, 1] output range, so unclamped excursions outside [0, 1] stay on-canvas. */
 test('waveGraphBand plots the clamped [0, 1] output range strictly inside the band', () => {
   const { yTop, yBottom, toY } = waveGraphBand(300);
   assert.ok(WAVE_GRAPH_VALUE_RANGE.min < 0 && WAVE_GRAPH_VALUE_RANGE.max > 1);
