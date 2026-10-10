@@ -981,6 +981,34 @@ test('the preset selector preserves state on refusal and pauses an accepted pres
 });
 
 
+test('a pooled effect switch sizes the preset row from the incoming effect', async (t) => {
+  const presetCounts = { IslamicStars: 24, Fishbowl: 1, Comets: 12 };
+  const module = fakeWasmModule();
+  module.HolosphereEngine.prototype.setEffect = function (name) {
+    this.effect = name;
+    return EffectSetResult.INSTALLED;
+  };
+  module.HolosphereEngine.prototype.getPresetCount = function () {
+    return presetCounts[this.effect] ?? 0;
+  };
+  t.mock.getter(SegmentController.prototype, 'ownsDisplay', () => true);
+  t.mock.getter(SegmentController.prototype, 'active', () => true);
+  t.mock.method(SegmentController.prototype, 'setEffect', function () {
+    this.refreshPresetState();
+  });
+  const app = await bootedApp({ loadModule: async () => module });
+  const presetChoices = () => {
+    const control = app.guis.at(-1).ctrl('presetIndex');
+    return control ? Object.keys(control.args[0]).length : 0;
+  };
+  for (const name of ['IslamicStars', 'Fishbowl', 'Comets', 'IslamicStars']) {
+    app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
+      .find((entry) => entry.dataset.effect === name).onclick();
+    assert.equal(presetChoices(), presetCounts[name], name);
+  }
+});
+
+
 test('segmented slider and pool follow viewport layout changes and release the listener', async (t) => {
   const gui = fakeGui('view');
   let changed;

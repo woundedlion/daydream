@@ -426,9 +426,7 @@ export function start({
       setParam: setEngineParam,
       setAnimationsPaused,
       animationsPaused: () => host.engine.getAnimationsPaused?.(),
-      getPresetCount: () => segments.ownsDisplay
-        ? (segments.getPresetCount() ?? host.engine.getPresetCount())
-        : host.engine.getPresetCount(),
+      getPresetCount: () => host.engine.getPresetCount(),
       getPresetIndex: () => segments.ownsDisplay
         ? (segments.getPresetIndex() ?? host.engine.getPresetIndex())
         : host.engine.getPresetIndex(),
