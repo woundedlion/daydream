@@ -1806,14 +1806,16 @@ const savedValues = (harness) => {
 // side effect, so Save reads the document and nothing else.
 test('a chip control writes the active preset and survives Save without an engine read', async () => {
   const harness = await editorWorkbench();
+  const mark = harness.engine.writes.length;
 
   stageEditor(harness, 'sample')('sample.pattern-freq', 7);
-  stageEditor(harness, 'colorize')('colorize.palette-mapping', 'bell');
-  assert.ok(harness.engine.writes.some(
+  stageEditor(harness, 'colorize')('colorize.palette-mapping', 'reverse');
+  const writes = harness.engine.writes.slice(mark);
+  assert.ok(writes.some(
     ([name, value]) => name === 'sample.pattern-freq' && value === 7),
   'the engine takes the edit as it lands');
-  assert.ok(harness.engine.writes.some(
-    ([name, value]) => name === 'colorize.palette-mapping' && value === 1),
+  assert.ok(writes.some(
+    ([name, value]) => name === 'colorize.palette-mapping' && value === 3),
   'an enum reaches the engine as its option index');
   harness.engine.getParameterDefinitions = () => {
     throw new Error('Save must not read the engine');
@@ -1821,7 +1823,7 @@ test('a chip control writes the active preset and survives Save without an engin
 
   const values = savedValues(harness);
   assert.equal(values['sample.pattern-freq'], 7);
-  assert.equal(values['colorize.palette-mapping'], 'bell',
+  assert.equal(values['colorize.palette-mapping'], 'reverse',
     'the document stores the option id');
 });
 
