@@ -6,8 +6,9 @@ import { readFileSync } from 'node:fs';
 import { parse } from 'espree';
 import * as THREE from 'three';
 import {
-  Daydream, dotDetailFor, fitDistance, initialAspect, MOBILE_BREAKPOINT_PX,
+  Daydream, dotDetailFor, fitDistance, initialAspect,
 } from '../src/renderer/driver.js';
+import { MOBILE_BREAKPOINT_PX } from '../src/shared/layout.js';
 import { repointDisplayAliases } from '../src/engine/display_aliases.js';
 import { captureConsole } from './helpers/fake_console.js';
 import { fakeElement } from './helpers/fake_dom.js';

@@ -8,7 +8,8 @@ import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
 import { GlobalStatsView } from "../ui/global_stats_view.js";
 import { MAX_DISPLAY_CAP_PERCENT, createDisplayCapsBinding } from "../renderer/display_caps.js";
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
-import { Daydream, MOBILE_BREAKPOINT_PX } from "../renderer/driver.js";
+import { Daydream } from "../renderer/driver.js";
+import { MOBILE_BREAKPOINT_PX } from "../shared/layout.js";
 import { GUI, resetGUI } from "../ui/gui.js";
 import { EffectSidebar } from "../ui/sidebar.js";
 import {
