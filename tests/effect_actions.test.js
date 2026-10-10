@@ -101,7 +101,7 @@ test('a failed or rejected copy flashes failure', async () => {
 });
 
 test('a copy that lands after the record was replaced flashes nothing', async () => {
-  for (const outcome of [true, new Error('late')]) {
+  for (const outcome of [true, false, new Error('late')]) {
     const a = actions({ copyText: fakeCopyText(outcome) });
     const pending = a.ctrl('export').object.export();
     a.state.active = false;
