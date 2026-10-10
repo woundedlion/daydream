@@ -1874,11 +1874,12 @@ test('a chip control edit joins the structural history and coalesces per control
   assert.equal(strip.querySelector('.chain-undo').disabled, false,
     'the write that opens the run enables the strip Undo');
 
+  const mark = harness.engine.writes.length;
   strip.querySelector('.chain-undo').dispatch('click');
 
   assert.equal(savedValues(harness)['sample.pattern-freq'], opening);
   assert.equal(strip.querySelector('.chain-undo').disabled, true);
-  assert.ok(harness.engine.writes.some(
+  assert.ok(harness.engine.writes.slice(mark).some(
     ([name, value]) => name === 'sample.pattern-freq' && value === opening),
   'undoing the edit re-applies the restored value to the engine');
 });
