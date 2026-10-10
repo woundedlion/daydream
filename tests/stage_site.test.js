@@ -2,8 +2,8 @@ import { after, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { installEngineBundle } from '../scripts/install-engine-bundle.mjs';
@@ -17,7 +17,7 @@ after(() => {
   else process.env.HOLOSPHERE_BUNDLE_PIN = AMBIENT_BUNDLE_PIN;
 });
 
-function fixture(t) {
+function fixture(t, readme = 'new README.md') {
   const scratch = mkdtempSync(join(tmpdir(), 'stage-site-'));
   t.after(() => rmSync(scratch, { recursive: true, force: true }));
   const root = join(scratch, 'repo');
@@ -43,6 +43,7 @@ function fixture(t) {
     'generated/shader/patterns/catalog.json',
     'generated/shader/patterns/new.shader.json', 'docs/screenshots/new.png'].map((path) => [path, 'new ' + path]));
   files['generated/holosphere_wasm.sha'] = pair.holosphere;
+  files['README.md'] = readme;
   const manifest = Object.entries(files).map(([path, content]) => {
     write(bundle, path, content);
     return `${createHash('sha256').update(content).digest('hex')}  ${path}`;
@@ -51,6 +52,15 @@ function fixture(t) {
   installEngineBundle(bundle, root);
   return { root, bundle, site, pair, write, git, scratch };
 }
+
+/** @param {string} base @returns {string[]} Every file under `base`, as sorted forward-slash paths. */
+function listing(base) {
+  return readdirSync(base, { recursive: true, withFileTypes: true }).filter((entry) => entry.isFile())
+    .map((entry) => relative(base, join(entry.parentPath, entry.name)).replaceAll('\\', '/')).sort();
+}
+
+const STAGED = ['deployment-pair.json', 'generated/shader/composed_effect_roster.mjs', 'generated/shader/patterns/catalog.json',
+  'generated/shader/patterns/new.shader.json', 'src/app/daydream.js'];
 
 test('site staging publishes verified additions, removes stale owned entries and records the actual pair', (t) => {
   const f = fixture(t);
@@ -63,9 +73,16 @@ test('site staging publishes verified additions, removes stale owned entries and
   assert.equal(readFileSync(join(f.site, 'generated/shader/composed_effect_roster.mjs'), 'utf8'),
     'new generated/shader/composed_effect_roster.mjs');
   assert.deepEqual(JSON.parse(readFileSync(join(f.site, 'deployment-pair.json'))), f.pair);
+  assert.deepEqual(listing(f.site), STAGED);
   assert.throws(() => stageSite(f.root, null, f.site, f.pair), /verified engine bundle/);
   for (const key of ['daydream', 'holosphere'])
     assert.throws(() => stageSite(f.root, f.bundle, f.site, { ...f.pair, [key]: 'c'.repeat(40) }), /selected sources/);
+});
+
+test('site staging publishes a bundled screenshot only when the README references it', (t) => {
+  const f = fixture(t, '![shot](docs/screenshots/new.png)\n');
+  stageSite(f.root, f.bundle, f.site, f.pair);
+  assert.deepEqual(listing(f.site), [...STAGED, 'docs/screenshots/new.png'].sort());
 });
 
 test('source-only site paths discover installed patterns without manifest entries', (t) => {
