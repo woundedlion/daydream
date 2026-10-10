@@ -68,7 +68,6 @@ test('refresh() reuses a live view without re-fetching or re-notifying', () => {
   assert.equal(notifyCalls, 0);
 });
 
-// A re-fetch replaces the buffer and the aliases move with it.
 test('refresh() reports whether it fetched a fresh view', () => {
   const fresh = new Uint16Array(4);
   const host = new EngineHost();
