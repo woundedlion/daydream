@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { after, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -9,6 +9,13 @@ import { fileURLToPath } from 'node:url';
 import { installEngineBundle } from '../scripts/install-engine-bundle.mjs';
 import { sitePaths, stageSite, verifiedEnginePaths } from '../scripts/stage-site.mjs';
 import { isolatedGitEnv } from './helpers/fixture_repo.js';
+
+const AMBIENT_BUNDLE_PIN = process.env.HOLOSPHERE_BUNDLE_PIN;
+beforeEach(() => { delete process.env.HOLOSPHERE_BUNDLE_PIN; });
+after(() => {
+  if (AMBIENT_BUNDLE_PIN === undefined) delete process.env.HOLOSPHERE_BUNDLE_PIN;
+  else process.env.HOLOSPHERE_BUNDLE_PIN = AMBIENT_BUNDLE_PIN;
+});
 
 function fixture(t) {
   const scratch = mkdtempSync(join(tmpdir(), 'stage-site-'));
