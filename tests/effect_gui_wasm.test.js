@@ -39,8 +39,8 @@ for (const scenario of ['raw', 'companions', 'singular']) {
     const { default: createModule } = await import('../generated/holosphere_wasm.js');
     const module = await createModule({ print: () => {} });
     const engine = new module.HolosphereEngine();
-    engine.setResolution(96, 20);
-    engine.setEffect('MobiusGrid');
+    assert.notEqual(engine.setResolution(96, 20), module.ResolutionSetResult.UNSUPPORTED, '96x20');
+    assert.equal(engine.setEffect('MobiusGrid'), module.EffectSetResult.INSTALLED, 'MobiusGrid');
     const target = {
       'Mobius A Re': 0, 'Mobius A Im': 0,
       'Mobius B Re': scenario === 'singular' ? 0 : 1, 'Mobius B Im': 0,
@@ -107,14 +107,14 @@ test('preset values survive URL reload after flushed or pending parameter edits'
     };
     const sync = new URLSync(new AppState({ effect: 'AlienBrain' }), ['effect'], {}, win);
     const engine = new module.HolosphereEngine();
-    engine.setResolution(96, 20);
-    engine.setEffect('AlienBrain');
+    assert.notEqual(engine.setResolution(96, 20), module.ResolutionSetResult.UNSUPPORTED, '96x20');
+    assert.equal(engine.setEffect('AlienBrain'), module.EffectSetResult.INSTALLED, 'AlienBrain');
     const panel = createEffectGui(realEngineDeps(module, engine, win, { warnings }));
     const speed = () => engine.getParameterDefinitions()
       .find((parameter) => parameter.name === 'Speed').acceptedValue;
     const reload = () => {
       panel.destroy();
-      engine.setEffect('AlienBrain');
+      assert.equal(engine.setEffect('AlienBrain'), module.EffectSetResult.INSTALLED, 'AlienBrain');
       panel.build();
       panel.applyAnimationPause();
     };
@@ -153,9 +153,9 @@ test('authored stage rosters recognize the engine parameter definitions', async 
   const engine = new module.HolosphereEngine();
   try {
     for (const resolution of [[96, 20], [288, 144]]) {
-      engine.setResolution(...resolution);
+      assert.notEqual(engine.setResolution(...resolution), module.ResolutionSetResult.UNSUPPORTED, resolution.join('x'));
       for (const [effect, recognize] of [['LatticeMelt', latticeMeltStageAssignments], ['KaleidoscopeSmooth', kaleidoscopeSmoothStageAssignments]]) {
-        engine.setEffect(effect);
+        assert.equal(engine.setEffect(effect), module.EffectSetResult.INSTALLED, effect);
         const parameters = engine.getParameterDefinitions();
         const assignments = recognize(parameters);
         assert.ok(assignments, effect);
@@ -173,7 +173,7 @@ test('URL numbers resolve every implicit slider step in live effect ranges', asy
   const engine = new module.HolosphereEngine();
   let checked = 0;
   try {
-    engine.setResolution(96, 20);
+    assert.notEqual(engine.setResolution(96, 20), module.ResolutionSetResult.UNSUPPORTED, '96x20');
     for (const effect of Object.keys(engine.getEffectSizes())) {
       assert.equal(engine.setEffect(effect), module.EffectSetResult.INSTALLED, effect);
       for (const param of engine.getParameterDefinitions()) {
