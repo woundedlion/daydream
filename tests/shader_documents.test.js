@@ -1401,10 +1401,11 @@ test('continuous shader edits debounce link writes and keep the latest state', a
       slider.value = String(value);
       slider.dispatch('input');
       harness.animationFrames.flush();
+      const edited = harness.pausedReads();
       mock.timers.tick(50);
+      assert.equal(harness.pausedReads(), edited, 'a write started before the debounce elapsed');
     }
 
-    assert.equal(harness.urls.length, 0);
     const reads = harness.pausedReads();
     mock.timers.tick(SHADER_LINK_DEBOUNCE_MS);
     assert.ok(harness.pausedReads() > reads, 'the debounce timer started the write');
