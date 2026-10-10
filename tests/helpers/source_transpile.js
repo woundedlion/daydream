@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 
 /**
- * Rewrite two-argument constructors as complex object literals.
+ * Rewrite two-argument constructors as complex object literals; a name that
+ * merely ends in ctorName is left alone.
  * @param {string} text - Source fragment.
  * @param {string} ctorName - Constructor name.
  * @returns {string} Rewritten fragment.
@@ -10,14 +11,15 @@ export function constructorToObject(text, ctorName) {
   let source = text;
   let at = 0;
   while ((at = source.indexOf(`${ctorName}(`, at)) !== -1) {
+    if (at > 0 && /[\w$]/.test(source[at - 1])) { at += 1; continue; }
     const open = at + ctorName.length;
-    let depth = 0, comma = -1, close = -1;
+    let depth = 0, comma = -1, commas = 0, close = -1;
     for (let i = open; i < source.length; i++) {
       if (source[i] === '(') depth += 1;
       else if (source[i] === ')' && (depth -= 1) === 0) { close = i; break; }
-      else if (source[i] === ',' && depth === 1) comma = i;
+      else if (source[i] === ',' && depth === 1) { comma = i; commas += 1; }
     }
-    assert.ok(comma > open && close > comma,
+    assert.ok(commas === 1 && close > comma,
       `unreadable ${ctorName}(...) at "${source.slice(at, at + 60)}"`);
     source = `${source.slice(0, at)}({ re: (${source.slice(open + 1, comma)}), `
       + `im: (${source.slice(comma + 1, close)}) })${source.slice(close + 1)}`;
