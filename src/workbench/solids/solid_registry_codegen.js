@@ -351,18 +351,20 @@ function seedAssertCpp(constName, seedName) {
 
 /**
  * The definition a paste carries for a seed solids.h declares no SEED_*
- * constant for: the constant plus its registry-order static_assert.
+ * constant for: the documented constant plus its registry-order static_assert.
  * @param {string} seedName - The simple_registry entry name.
  * @returns {string} The constant block, ending in a blank line.
  */
 function seedConstantCpp(seedName) {
   const constName = `SEED_${upperSnake(seedName)}`;
+  const words = upperSnake(seedName).toLowerCase().replaceAll('_', ' ');
   const declaration = `inline constexpr uint8_t ${constName} =`;
   const value = `static_cast<uint8_t>(BaseMesh::${upperSnake(seedName)});`;
   const definition = declaration.length + 1 + value.length <= COLUMN_LIMIT
     ? `${declaration} ${value}` : `${declaration}\n    ${value}`;
   return `// solids.h defines no ${constName}. Paste the constant and its\n`
     + '// static_assert beside the other SEED_* constants.\n'
+    + `/// simple_registry index of the ${words} seed.\n`
     + `${definition}\n`
     + `${seedAssertCpp(constName, seedName)}\n\n`;
 }

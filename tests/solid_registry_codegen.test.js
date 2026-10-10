@@ -169,9 +169,10 @@ test('generateRegistryCpp defines constants absent from the tool roster', () => 
     const block = code.slice(0, code.indexOf('/** Step table'));
     assert.ok(block.startsWith(`// solids.h defines no ${constName}.`),
       `the paste for "${seed}" must open by naming the missing constant`);
-    assert.match(block, new RegExp(
-      `inline constexpr uint8_t ${constName} =\\s+static_cast<uint8_t>\\(BaseMesh::${upperSnake(seed)}\\);`),
-    `${constName} must carry its simple_registry index`);
+    const words = upperSnake(seed).toLowerCase().replaceAll('_', ' ');
+    assert.match(block, new RegExp(`\\n/// simple_registry index of the ${words} seed\\.\\n`
+      + `inline constexpr uint8_t ${constName} =\\s+static_cast<uint8_t>\\(BaseMesh::${upperSnake(seed)}\\);`),
+    `${constName} must carry its documented simple_registry index`);
     // The house static_assert, which fails to compile if the index moves.
     assert.match(block, new RegExp('static_assert\\(\\s*std::string_view\\('
       + `simple_registry\\[${constName}\\]\\.name\\) ==\\s*"${seed}"\\);`));

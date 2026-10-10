@@ -1,5 +1,6 @@
 // solids.h defines no SEED_CUBE. Paste the constant and its
 // static_assert beside the other SEED_* constants.
+/// simple_registry index of the cube seed.
 inline constexpr uint8_t SEED_CUBE = static_cast<uint8_t>(BaseMesh::CUBE);
 static_assert(std::string_view(simple_registry[SEED_CUBE].name) == "cube");
 
