@@ -1043,8 +1043,9 @@ function compiledBuildEngine() {
  * the scratch document the page opens on.
  * @param {{source?: string|null, patternCatalog?: string, hash?: string, search?: string, initialEffect?: string|null,
  *   paused?: boolean, pausedFromEngine?: boolean, selectEffect?: () => boolean,
- *   onOriginalLinkReleased?: () => void}} [seams] - source null leaves the scratch
- *   document loaded; pausedFromEngine reads the pause seam off the chain engine.
+ *   onOriginalLinkReleased?: () => void, prepare?: (engine: FakeChainEngine) => void}} [seams] - source null
+ *   leaves the scratch document loaded; pausedFromEngine reads the pause seam off the chain engine; prepare
+ *   alters the engine before the controller starts.
  * @returns {Promise<Object>} The controller and everything it wrote to.
  */
 async function editorWorkbench({
@@ -1052,8 +1053,10 @@ async function editorWorkbench({
   selectEffect = () => true,
   onOriginalLinkReleased = () => {},
   pausedFromEngine = false,
+  prepare = () => {},
 } = {}) {
   const engine = new FakeChainEngine();
+  prepare(engine);
   const compiledEngine = compiledBuildEngine();
   let animationsPaused = paused;
   // writeDeepLink builds its link state synchronously, reading the pause seam
@@ -2151,6 +2154,50 @@ test('a chain snapshot restores its program and accepted parameters into the edi
   assert.deepEqual(JSON.parse(JSON.stringify(linked.chainSnapshot)), snapshot);
   assert.equal(linked.paused, snapshot.animationsPaused);
   assert.equal(harness.controller.preservesOriginalLink(), false);
+});
+
+test('a refused chain snapshot rolls the engine back and keeps the link', async () => {
+  const engine = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
+  const snapshot = { ...engine.getShaderChainBindings().getSnapshot(), runtime: [] };
+  const restores = [];
+  const harness = await editorWorkbench({ source: null,
+    search: `?effect=ShaderChain&fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(snapshot))}`,
+    prepare: (target) => {
+      target.setEffect('ShaderChain');
+      target.setParameter('sample.pattern-freq', 2.25);
+      const bindings = target.getShaderChainBindings.bind(target);
+      target.getShaderChainBindings = () => {
+        const live = bindings();
+        if (!live) return live;
+        const restore = live.restoreSnapshot;
+        live.restoreSnapshot = (value) => {
+          const outcome = restore(value);
+          restores.push({ value: structuredClone(value), outcome });
+          return outcome;
+        };
+        return live;
+      };
+    } });
+  assert.deepEqual(restores.map(({ outcome }) => outcome),
+    [ChainSnapshotRestoreResult.INVALID_VALUE, ChainSnapshotRestoreResult.APPLIED]);
+  assert.deepEqual(restores[0].value, snapshot);
+  assert.equal(restores[1].value.parameters.find(({ name }) => name === 'sample.pattern-freq').value, 2.25,
+    'the rollback restores the engine state from before the import');
+  assert.equal(harness.controller.preservesOriginalLink(), true);
+  assert.match(harness.elements.get('shader-document-status').textContent, /imported chain snapshot was rejected/);
+});
+
+test('a chain snapshot naming an unknown parameter is refused before adoption', async () => {
+  const engine = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
+  const snapshot = engine.getShaderChainBindings().getSnapshot();
+  snapshot.parameters = [...snapshot.parameters, { name: 'missing.parameter', value: 0 }];
+  const harness = await editorWorkbench({ source: null,
+    search: `?effect=ShaderChain&fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(snapshot))}` });
+  assert.equal(harness.controller.preservesOriginalLink(), true);
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /unknown chain snapshot parameter: missing\.parameter/);
 });
 
 test('a linked runtime snapshot that disagrees with its document retains the original link', async () => {
