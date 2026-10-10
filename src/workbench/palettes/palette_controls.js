@@ -439,19 +439,20 @@ export const PALETTE_CONTROL_IDS = Object.freeze({
 
 /**
  * The two OKLCH axes the generative tab edits by their endpoints: the ids
- * their sliders use, the curve select that governs them, and how each is
- * named in the labels and accessible names built from it.
- * @type {Object<string, {minimum: string, maximum: string, curve: string, label: string, shortLabel: string}>}
+ * their sliders use, the curve select that governs them, the control reading
+ * that select carries, and how each is named in the labels and accessible
+ * names built from it.
+ * @type {Object<string, {minimum: string, maximum: string, curve: string, reading: 'lightnessCurve'|'chromaCurve', label: string, shortLabel: string}>}
  */
 export const PALETTE_AXIS_CONTROLS = Object.freeze({
   lightness: Object.freeze({
     minimum: PALETTE_CONTROL_IDS.lightnessMinimum, maximum: PALETTE_CONTROL_IDS.lightnessMaximum,
-    curve: PALETTE_CONTROL_IDS.lightnessCurve,
+    curve: PALETTE_CONTROL_IDS.lightnessCurve, reading: 'lightnessCurve',
     label: 'Lightness', shortLabel: 'Lightness',
   }),
   chroma: Object.freeze({
     minimum: PALETTE_CONTROL_IDS.chromaMinimum, maximum: PALETTE_CONTROL_IDS.chromaMaximum,
-    curve: PALETTE_CONTROL_IDS.chromaCurve,
+    curve: PALETTE_CONTROL_IDS.chromaCurve, reading: 'chromaCurve',
     label: 'Relative Chroma', shortLabel: 'Chroma',
   }),
 });

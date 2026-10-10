@@ -12,7 +12,8 @@
 import {
   applyPaletteControls, clampRecipeWindow, customHueKeyState,
   customHueSweepRepresentable, defaultPaletteRecipe, loopSweepTurns,
-  movedHueKeyOffset, paletteControlsFromRecipe, paletteEnumOrdinal, wrapTurns,
+  movedHueKeyOffset, PALETTE_AXIS_CONTROLS, paletteControlsFromRecipe,
+  paletteEnumOrdinal, wrapTurns,
 } from './palette_controls.js';
 
 /** @typedef {import('./palette_controls.js').PaletteRecipe} PaletteRecipe */
@@ -45,11 +46,6 @@ const CHOICE_GROUPS = Object.freeze({
 
 const AMOUNT_READINGS = new Set(['spreadTurns', 'sweepTurns', 'headroom', 'hueTorsion', 'falloffStart']);
 
-/** @type {Readonly<Record<PaletteAxisName, 'lightnessCurve'|'chromaCurve'>>} */
-const AXIS_CURVE_READINGS = Object.freeze({
-  lightness: 'lightnessCurve', chroma: 'chromaCurve',
-});
-
 /**
  * Copies `source` into `target` field by field, recursing into nested
  * objects and arrays `target` already holds.
@@ -71,7 +67,7 @@ function copyInto(target, source) {
  * @throws {RangeError} When it names no recipe axis.
  */
 function checkedAxis(axis) {
-  if (!Object.hasOwn(AXIS_CURVE_READINGS, axis))
+  if (!Object.hasOwn(PALETTE_AXIS_CONTROLS, axis))
     throw new RangeError(`Unknown palette axis: ${axis}`);
   return axis;
 }
@@ -226,7 +222,7 @@ export class PaletteRecipeModel {
    */
   setAxisCurve(axis, curve) {
     paletteEnumOrdinal('curve', curve);
-    this.#readings[AXIS_CURVE_READINGS[checkedAxis(axis)]] = curve;
+    this.#readings[PALETTE_AXIS_CONTROLS[checkedAxis(axis)].reading] = curve;
     if (curve === 'CONSTANT') {
       const endpoints = this.#readings[axis];
       const center = (endpoints.minimum + endpoints.maximum) * 0.5;
@@ -247,7 +243,7 @@ export class PaletteRecipeModel {
   setAxisEndpoints(axis, minimum, maximum) {
     const endpoints = this.#readings[checkedAxis(axis)];
     endpoints.minimum = minimum;
-    endpoints.maximum = this.#readings[AXIS_CURVE_READINGS[axis]] === 'CONSTANT'
+    endpoints.maximum = this.#readings[PALETTE_AXIS_CONTROLS[axis].reading] === 'CONSTANT'
       ? minimum : maximum;
     this.#rebuild();
   }
