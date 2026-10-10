@@ -5,8 +5,10 @@ import { describe, test, before, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  closeSync,
   existsSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -64,12 +66,22 @@ describe(
      */
     const runHook = (lines, stage = 'prepared', cwd = repo) => {
       assert.ok(SH, MISSING);
-      const run = spawnSync(SH, [HOOK, stage], {
-        cwd,
-        env,
-        input: `${lines.join('\n')}\n`,
-        encoding: 'utf8',
-      });
+      // A file, not a pipe: the hook exits unread for non-prepared stages,
+      // and a piped write would race that exit to EPIPE.
+      const inputPath = join(root, 'hook-input');
+      writeFileSync(inputPath, `${lines.join('\n')}\n`);
+      const input = openSync(inputPath, 'r');
+      let run;
+      try {
+        run = spawnSync(SH, [HOOK, stage], {
+          cwd,
+          env,
+          stdio: [input, 'pipe', 'pipe'],
+          encoding: 'utf8',
+        });
+      } finally {
+        closeSync(input);
+      }
       if (run.error) throw run.error;
       return { status: run.status, stderr: run.stderr };
     };
