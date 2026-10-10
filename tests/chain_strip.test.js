@@ -1198,7 +1198,7 @@ test('a chosen option and an entered value each close the coalesced value run', 
     'one Undo reverts one entered value');
 });
 
-// Holosphere docs/specs/shader_workbench_chain_spec.md §3/§4.4: the union schema survives — a field the topology deactivates is
+// The union schema survives — a field the topology deactivates is
 // dimmed, but present and editable, because the document still carries it.
 test('a deactivated field renders dimmed but editable', async () => {
   const h = await makeStrip();
