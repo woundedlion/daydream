@@ -35,7 +35,7 @@ const base = { id: 's', label: 'L', min: 0, max: 10, step: 1, value: 5 };
 /** Verifies a missing container throws a named error before any validation. */
 test('throws when the container element is absent', () => {
   installDocument({ getElementById: () => null });
-  assert.throws(() => createSlider('missing', base, null),
+  assert.throws(() => createSlider('missing', { ...base, min: 10, max: 0 }, null),
                 /container #missing not found/);
 });
 
