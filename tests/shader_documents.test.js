@@ -396,10 +396,9 @@ test('the fixed path skips the ids the compiled build bakes in as constants', ()
   assert.deepEqual(engine.writes, [['Pattern Freq', 3]]);
 });
 
-// Ash Cloud is the document that carries a baked constant, against an engine
-// standing in for its compiled build: every other id resolves, and AshCloud
-// registers no Camera Spin Speed because CAMERA_SPIN_RATE is a constant.
-test('every ash-cloud preset value reaches its compiled build', () => {
+// Ash Cloud carries a baked constant: AshCloud registers no Camera Spin Speed
+// because CAMERA_SPIN_RATE is a constant.
+test('the fixed apply skips the Ash Cloud baked topology and constant ids and writes the rest in document order', () => {
   const ashCloud = promotedDocument(PROMOTED['ash-cloud']);
   const ids = Object.keys(ashCloud.preset_bank.presets[0].values);
   const definitions = ids
