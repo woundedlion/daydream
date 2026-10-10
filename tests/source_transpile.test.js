@@ -9,11 +9,22 @@ test('constructor rewriting accepts nested arguments and both constructor names'
   }
 });
 
-test('constructor rewriting rejects missing commas and closing parentheses', () => {
+test('constructor rewriting rejects anything but one comma and a closing parenthesis', () => {
   for (const name of ['Complex', 'CNum']) {
-    for (const args of ['(1)', '(1, 2']) {
+    for (const args of ['(1)', '(1, 2', '(1, 2, 3)']) {
       assert.throws(() => constructorToObject(name + args, name), /unreadable/);
     }
+  }
+});
+
+test('constructor rewriting leaves identifiers that end in the constructor name', () => {
+  for (const name of ['Complex', 'CNum']) {
+    for (const prefix of ['to', '_', '$']) {
+      const js = `${prefix}${name}(1, 2)`;
+      assert.equal(constructorToObject(js, name), js);
+    }
+    assert.equal(constructorToObject(`to${name}(${name}(1, 2))`, name),
+      `to${name}(({ re: (1), im: ( 2) }))`);
   }
 });
 
