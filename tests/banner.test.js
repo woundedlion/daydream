@@ -112,54 +112,34 @@ test('showFatalError does not throw when neither body nor documentElement exists
 // --- post-boot failure surface --------------------------------------------
 
 /**
- * A stand-in for `window`: records listeners so a test can fire the failure
- * events the browser would, and reports what was dispatched to whom.
- * @returns {{addEventListener: Function, removeEventListener: Function,
- *   dispatch: Function, types: () => string[]}}
+ * @param {Object} target - A fake element.
+ * @returns {string[]} The distinct event types it holds listeners for, sorted.
  */
-function fakeTarget() {
-  const listeners = new Map();
-  const target = {
-    addEventListener(type, fn) {
-      if (!listeners.has(type)) listeners.set(type, []);
-      listeners.get(type).push(fn);
-    },
-    removeEventListener(type, fn) {
-      const held = listeners.get(type);
-      if (!held) return;
-      const at = held.indexOf(fn);
-      if (at >= 0) held.splice(at, 1);
-      if (held.length === 0) listeners.delete(type);
-    },
-    dispatch(type, event = {}) {
-      for (const fn of listeners.get(type) ?? []) fn(event);
-    },
-    types: () => [...listeners.keys()],
-  };
-  return target;
+function listenedTypes(target) {
+  return [...new Set(target.listeners.map((l) => l.type))].sort();
 }
 
 test('reportPageFailures listens for both uncaught errors and unhandled rejections', () => {
-  const target = fakeTarget();
+  const target = fakeElement('window');
   reportPageFailures('solids tool', target);
-  assert.deepEqual(target.types().sort(), ['error', 'unhandledrejection']);
+  assert.deepEqual(listenedTypes(target), ['error', 'unhandledrejection']);
 });
 
 /** Verifies the registered listener pairs can be removed at page teardown. */
 test('reportPageFailures returns the pairs its caller needs to deregister', () => {
-  const target = fakeTarget();
+  const target = fakeElement('window');
 
   const installed = reportPageFailures('simulator', target);
 
   assert.deepEqual(installed.map(([type]) => type),
     ['error', 'unhandledrejection']);
   for (const [type, handler] of installed) target.removeEventListener(type, handler);
-  assert.deepEqual(target.types(), [], 'a returned handler was not the one installed');
+  assert.deepEqual(listenedTypes(target), [], 'a returned handler was not the one installed');
 });
 
 test('a post-boot uncaught error raises the banner, not just a console line', () => {
   const { bodyEl } = fakeDocument();
-  const target = fakeTarget();
+  const target = fakeElement('window');
   reportPageFailures('solids tool', target);
 
   const { calls: logged } = captureConsole(() => {
@@ -174,25 +154,22 @@ test('a post-boot uncaught error raises the banner, not just a console line', ()
 
 test('a post-boot unhandled rejection raises the banner and is not double-reported', () => {
   const { bodyEl } = fakeDocument();
-  const target = fakeTarget();
+  const target = fakeElement('window');
   reportPageFailures('palette tool', target);
 
-  let prevented = 0;
+  let dispatched;
   const { calls: logged } = captureConsole(() => {
-    target.dispatch('unhandledrejection', {
-      reason: new Error('bakeLut rejected'),
-      preventDefault: () => { prevented++; },
-    });
+    dispatched = target.dispatch('unhandledrejection', { reason: new Error('bakeLut rejected') });
   });
 
-  assert.equal(prevented, 1, 'the browser duplicate report was not suppressed');
+  assert.equal(dispatched.defaultPrevented, true, 'the browser duplicate report was not suppressed');
   assert.match(messageOf(bodyEl.children[0]), /bakeLut rejected/);
   assert.equal(logged.length, 1);
 });
 
 test('a failed subresource does not raise the page-failure banner', () => {
   const { bodyEl } = fakeDocument();
-  const target = fakeTarget();
+  const target = fakeElement('window');
   reportPageFailures('palette tool', target);
 
   captureConsole(() => {
@@ -203,9 +180,9 @@ test('a failed subresource does not raise the page-failure banner', () => {
 
 test('bootstrapTool installs the post-boot surface alongside the load handler', () => {
   const { bodyEl } = fakeDocument();
-  const target = fakeTarget();
+  const target = fakeElement('window');
   bootstrapTool(() => { }, 'Möbius tool', target);
-  assert.deepEqual(target.types().sort(), ['error', 'load', 'pagehide', 'unhandledrejection']);
+  assert.deepEqual(listenedTypes(target), ['error', 'load', 'pagehide', 'unhandledrejection']);
 
   // The boot path still reports through the same banner.
   captureConsole(() => {
@@ -217,14 +194,14 @@ test('bootstrapTool installs the post-boot surface alongside the load handler', 
 });
 
 test('bootstrapTool still banners a synchronous and an async init failure', async () => {
-  const target = fakeTarget();
+  const target = fakeElement('window');
   const { bodyEl } = fakeDocument();
   bootstrapTool(() => { throw new Error('sync boom'); }, 'solids tool', target);
   captureConsole(() => target.dispatch('load'));
   assert.match(messageOf(bodyEl.children[0]), /failed to initialize/);
 
   // An async initializer fails as a rejection after the load handler returned.
-  const asyncTarget = fakeTarget();
+  const asyncTarget = fakeElement('window');
   const asyncPage = fakeDocument();
   const captured = installConsoleCapture('error', 'warn');
   try {
@@ -255,14 +232,14 @@ test('clearing a recovered failure preserves a newer banner', () => {
 
 
 test('tool bootstrap retains handlers for bfcache and detaches on page discard', () => {
-  const target = fakeTarget();
+  const target = fakeElement('window');
   let starts = 0;
   bootstrapTool(() => { starts++; }, 'test tool', target);
   target.dispatch('pagehide', { persisted: true });
   target.dispatch('load');
   assert.equal(starts, 1);
   target.dispatch('pagehide', { persisted: false });
-  assert.deepEqual(target.types(), []);
+  assert.deepEqual(listenedTypes(target), []);
   target.dispatch('load');
   assert.equal(starts, 1);
 });
