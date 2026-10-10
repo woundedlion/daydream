@@ -17,7 +17,7 @@ import { generativePaletteCpp } from '../src/workbench/palettes/palette_math.js'
 import { defaultPaletteRecipe } from '../src/workbench/palettes/palette_controls.js';
 import { closingDomain, lissajousCodeString } from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
-import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../src/workbench/solids/solid_codegen.js';
+import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS, MORPH_SWEEP, OP_DEFS } from '../src/workbench/solids/solid_codegen.js';
 import { MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount, LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
 import { MAX_DISPLAY_CAP_PERCENT } from '../src/renderer/display_caps.js';
 import { FPS } from '../src/renderer/frame_constants.js';
@@ -513,6 +513,81 @@ test('gyro lowering uses the engine snub defaults', { skip: engineSkip }, () => 
   const [snub] = LOWERING.gyro('gyro');
   assert.equal(snub.params.t, engineConstant(cpp, 'SNUB_DEFAULT_T', path));
   assert.equal(snub.params.twist, engineConstant(cpp, 'SNUB_DEFAULT_TWIST', path));
+});
+
+test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip }, () => {
+  const graphPath = 'core/mesh/conway_graph.h';
+  const recipePath = 'core/mesh/recipe.h';
+  const graph = header(graphPath);
+  const recipe = header(recipePath);
+  const truncateMin = engineConstant(graph, 'T_TRUNCATE_ARRIVAL_MIN', graphPath);
+  const amboEpsilon = engineConstant(graph, 'T_EPS_AMBO', graphPath);
+  const chamferMin = engineConstant(graph, 'T_EPS', graphPath);
+  const chamferMax = engineConstant(recipe, 'CHAMFER_T_MAX', recipePath);
+
+  assert.match(
+    graph,
+    /inline\s+constexpr\s+float\s+T_TRUNCATE_FAR_MAX\s*=\s*1\.0f\s*-\s*T_EPS_AMBO\s*;/,
+    'the truncate far bound changed form; update the parity reader',
+  );
+  const truncate = recipe.match(
+    /case Op::TRUNCATE:\s*return step\.param >= ConwayGraph::T_TRUNCATE_ARRIVAL_MIN &&\s*step\.param <= ConwayGraph::T_TRUNCATE_FAR_MAX &&\s*step\.param != ([0-9.]+)f;/,
+  );
+  assert.ok(truncate,
+    'is_morphable_step no longer uses the parsed truncate bounds and exclusion');
+  assert.match(
+    recipe,
+    /case Op::CHAMFER:\s*return step\.param >= ConwayGraph::T_EPS && step\.param <= CHAMFER_T_MAX;/,
+    'is_morphable_step no longer uses the parsed chamfer bounds',
+  );
+
+  assert.deepEqual(
+    {
+      truncate: MORPH_SWEEP.truncate.t,
+      chamfer: MORPH_SWEEP.chamfer.t,
+    },
+    {
+      truncate: { min: truncateMin, max: 1 - amboEpsilon, excluded: [Number(truncate[1])] },
+      chamfer: { min: chamferMin, max: chamferMax },
+    },
+    'src/workbench/solids/solid_codegen.js MORPH_SWEEP drifted from the installed engine pin',
+  );
+});
+
+test('composite sweep exemptions stay inside the engine primitive bands', { skip: engineSkip }, () => {
+  const graphPath = 'core/mesh/conway_graph.h';
+  const conwayPath = 'core/mesh/conway.h';
+  const graph = header(graphPath);
+  assert.ok(OP_DEFS.bevel.params.t.min >= engineConstant(graph, 'T_TRUNCATE_ARRIVAL_MIN', graphPath));
+  assert.ok(OP_DEFS.bevel.params.t.max <= 1 - engineConstant(graph, 'T_EPS_AMBO', graphPath));
+  assert.ok(engineConstant(header(conwayPath), 'SNUB_DEFAULT_T', conwayPath) > 0);
+});
+
+test('registry composite lowering matches expand_to_primitives', { skip: engineSkip }, () => {
+  const recipe = header('core/mesh/recipe.h');
+  const body = recipe.slice(recipe.indexOf('inline size_t expand_to_primitives'));
+  for (const [name, lower] of Object.entries(LOWERING)) {
+    const block = body.split(`case Op::${name.toUpperCase()}:`)[1]?.split('break;')[0];
+    assert.ok(block, name);
+    for (const t of [0.25, 0.5]) {
+      let chosen = block;
+      if (name === 'bevel') {
+        assert.match(block, /if \(step\.param == 0\.5f\)/);
+        chosen = block.split('if (')[0] + (t === 0.5
+          ? block.split('if (step.param == 0.5f)')[1].split('else')[0]
+          : block.split('else')[1]);
+      }
+      const emitted = [...chosen.matchAll(/emit\(\{Op::([A-Z]+)([^}]*)\}\)/g)].map((match) => {
+        const op = match[1].toLowerCase();
+        if (op === 'truncate') { assert.match(match[2], /step\.param/); return { op, params: { t } }; }
+        if (op === 'snub') assert.match(match[2], /MeshOps::SNUB_DEFAULT_T, MeshOps::SNUB_DEFAULT_TWIST/);
+        return op;
+      });
+      const lowered = lower({ op: name, params: { t } })
+        .map((step) => (step.op === 'snub' ? step.op : step));
+      assert.deepEqual(lowered, emitted, `${name}(${t})`);
+    }
+  }
 });
 
 test('MAX_DISPLAY_CAP_PERCENT is the bound setDisplayCaps enforces', { skip: engineSkip }, () => {

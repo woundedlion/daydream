@@ -1,5 +1,4 @@
 import { engineRoot, engineMissing, engineSkip } from './helpers/engine_checkout.js';
-import { LOWERING, primitiveCount } from '../src/workbench/solids/solid_registry_codegen.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -7,7 +6,6 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { MORPH_SWEEP, OP_DEFS } from '../src/workbench/solids/solid_codegen.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const text = (path) => readFileSync(resolve(REPO, path), 'utf8').replaceAll('\r\n', '\n');
@@ -17,15 +15,6 @@ const sha256 = (path) => createHash('sha256').update(readFileSync(resolve(REPO, 
 const enginePin = text('generated/holosphere_wasm.sha').trim();
 const committed = (root, path, revision = enginePin) => execFileSync(
   'git', ['-C', root, 'show', `${revision}:${path}`], { encoding: 'buffer' });
-
-function cppFloatConstant(source, name) {
-  const match = new RegExp(
-    `\\binline\\s+constexpr\\s+float\\s+${name}\\s*=\\s*` +
-      '([0-9]+(?:\\.[0-9]*)?(?:[eE][+-]?[0-9]+)?f?)\\s*;',
-  ).exec(source);
-  assert.ok(match, `engine source does not declare literal float ${name}`);
-  return Number(match[1].replace(/f$/, ''));
-}
 
 test('the installed WASM artifacts match their recorded hashes', () => {
   const entries = text('generated/holosphere_wasm.wasm.sha256')
@@ -56,44 +45,6 @@ test('the installed operator catalog describes the installed WASM', async () => 
   const module = await createModule();
   assert.deepEqual(JSON.parse(text('generated/shader/engine_catalog.json')),
     JSON.parse(module.ShaderChainBindings.getShaderChainCatalog()));
-});
-
-test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip }, () => {
-  assert.ok(engineRoot, engineMissing);
-  const graph = committed(engineRoot, 'core/mesh/conway_graph.h').toString('utf8');
-  const recipe = committed(engineRoot, 'core/mesh/recipe.h').toString('utf8');
-  const truncateMin = cppFloatConstant(graph, 'T_TRUNCATE_ARRIVAL_MIN');
-  const amboEpsilon = cppFloatConstant(graph, 'T_EPS_AMBO');
-  const chamferMin = cppFloatConstant(graph, 'T_EPS');
-  const chamferMax = cppFloatConstant(recipe, 'CHAMFER_T_MAX');
-
-  assert.match(
-    graph,
-    /inline\s+constexpr\s+float\s+T_TRUNCATE_FAR_MAX\s*=\s*1\.0f\s*-\s*T_EPS_AMBO\s*;/,
-    'the truncate far bound changed form; update the parity reader',
-  );
-  const truncate = recipe.match(
-    /case Op::TRUNCATE:\s*return step\.param >= ConwayGraph::T_TRUNCATE_ARRIVAL_MIN &&\s*step\.param <= ConwayGraph::T_TRUNCATE_FAR_MAX &&\s*step\.param != ([0-9.]+)f;/,
-  );
-  assert.ok(truncate,
-    'is_morphable_step no longer uses the parsed truncate bounds and exclusion');
-  assert.match(
-    recipe,
-    /case Op::CHAMFER:\s*return step\.param >= ConwayGraph::T_EPS && step\.param <= CHAMFER_T_MAX;/,
-    'is_morphable_step no longer uses the parsed chamfer bounds',
-  );
-
-  assert.deepEqual(
-    {
-      truncate: MORPH_SWEEP.truncate.t,
-      chamfer: MORPH_SWEEP.chamfer.t,
-    },
-    {
-      truncate: { min: truncateMin, max: 1 - amboEpsilon, excluded: [Number(truncate[1])] },
-      chamfer: { min: chamferMin, max: chamferMax },
-    },
-    'src/workbench/solids/solid_codegen.js MORPH_SWEEP drifted from the installed engine pin',
-  );
 });
 
 test('deploy consumes one checksummed engine bundle at the module pin', () => {
@@ -181,59 +132,5 @@ test('pattern mirrors match the pinned engine in both content and membership', {
   for (const name of expected) {
     assert.equal(text(`generated/shader/patterns/${name}`),
       committed(engineRoot, `patterns/${name}`).toString('utf8').replaceAll('\r\n', '\n'), name);
-  }
-});
-
-test('composite sweep exemptions stay inside the engine primitive bands', { skip: engineSkip }, () => {
-  assert.ok(engineRoot, engineMissing);
-  const recipe = committed(engineRoot, 'core/mesh/recipe.h').toString('utf8');
-  const expansion = recipe.slice(recipe.indexOf('size_t expand_to_primitives'));
-  for (const [name, expected] of Object.entries({
-    GYRO: ['SNUB', 'DUAL'], META: ['AMBO', 'DUAL', 'KIS'],
-    NEEDLE: ['DUAL', 'KIS'], ZIP: ['KIS', 'DUAL'], BEVEL: ['AMBO', 'AMBO', 'TRUNCATE'],
-  })) {
-    const body = expansion.match(new RegExp(`case Op::${name}:([\\s\\S]*?)break;`))?.[1];
-    assert.ok(body, name);
-    assert.deepEqual([...body.matchAll(/emit\(\{Op::(\w+)/g)].map((match) => match[1]), expected);
-  }
-  const graph = committed(engineRoot, 'core/mesh/conway_graph.h').toString('utf8');
-  assert.ok(OP_DEFS.bevel.params.t.min >= cppFloatConstant(graph, 'T_TRUNCATE_ARRIVAL_MIN'));
-  assert.ok(OP_DEFS.bevel.params.t.max <= 1 - cppFloatConstant(graph, 'T_EPS_AMBO'));
-  assert.match(expansion, /if \(step\.param == 0\.5f\)\s*emit\(\{Op::AMBO\}\);/);
-  const conway = committed(engineRoot, 'core/mesh/conway.h').toString('utf8');
-  assert.ok(cppFloatConstant(conway, 'SNUB_DEFAULT_T') > 0);
-});
-
-test('registry composite lowering matches expand_to_primitives', { skip: engineSkip }, () => {
-  assert.ok(engineRoot, engineMissing);
-  const conway = committed(engineRoot, 'core/mesh/conway.h').toString('utf8');
-  const recipe = committed(engineRoot, 'core/mesh/recipe.h').toString('utf8');
-  const body = recipe.slice(recipe.indexOf('inline size_t expand_to_primitives'));
-  for (const [name, lower] of Object.entries(LOWERING)) {
-    const block = body.split(`case Op::${name.toUpperCase()}:`)[1]?.split('break;')[0];
-    assert.ok(block, name);
-    for (const t of [0.25, 0.5]) {
-      let chosen = block;
-      if (name === 'bevel') {
-        assert.match(block, /if \(step\.param == 0\.5f\)/);
-        chosen = block.split('if (')[0] + (t === 0.5
-          ? block.split('if (step.param == 0.5f)')[1].split('else')[0]
-          : block.split('else')[1]);
-      }
-      const emitted = [...chosen.matchAll(/emit\(\{Op::([A-Z]+)([^}]*)\}\)/g)].map((match) => {
-        const op = match[1].toLowerCase();
-        if (op === 'truncate') { assert.match(match[2], /step\.param/); return { op, params: { t } }; }
-        if (op === 'snub') {
-          assert.match(match[2], /MeshOps::SNUB_DEFAULT_T, MeshOps::SNUB_DEFAULT_TWIST/);
-          return { op, params: {
-            t: cppFloatConstant(conway, 'SNUB_DEFAULT_T'),
-            twist: cppFloatConstant(conway, 'SNUB_DEFAULT_TWIST'),
-          } };
-        }
-        return op;
-      });
-      assert.deepEqual(lower({ op: name, params: { t } }), emitted, `${name}(${t})`);
-      assert.equal(primitiveCount(name), emitted.length);
-    }
   }
 });
