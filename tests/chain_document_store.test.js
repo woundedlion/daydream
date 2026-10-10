@@ -12,8 +12,10 @@ import {
   DEFAULT_SCRATCH_CHAIN,
   UNDO_DEPTH,
   createChainDocumentStore,
+  documentFromChainSnapshot,
   scratchChainDocument,
 } from '../src/workbench/shader/chain_document_store.js';
+import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../src/workbench/shader/shader_deeplink.js';
 
 const CATALOG = JSON.parse(readFileSync(
   new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
@@ -1178,4 +1180,29 @@ test('declaration queries avoid cloning and follow committed replacement and und
   assert.equal(store.declares('project.central-meridian'), true);
   store.undo();
   assert.equal(store.declares('project.singularity-fade'), true);
+});
+
+const SNAPSHOT_CHAIN = DEFAULT_SCRATCH_CHAIN.map(({ label, operator }) => ({ instance: label, operator }));
+
+test('a chain snapshot imports its chain and maps enum indices to option ids', () => {
+  const document = documentFromChainSnapshot({ schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION,
+    chain: SNAPSHOT_CHAIN, parameters: [
+      { name: 'sample.coverage-mode', value: 2 },
+      { name: 'rotate.wander', value: 0.25 },
+    ] }, CATALOG);
+  assert.deepEqual(document.descriptor.chain, [...DEFAULT_SCRATCH_CHAIN]);
+  assert.equal(document.document_id, 'imported-chain');
+  const values = document.preset_bank.presets[0].values;
+  assert.equal(values['sample.coverage-mode'], 'weight-squared');
+  assert.equal(values['rotate.wander'], 0.25);
+});
+
+test('a chain snapshot import refuses unknown parameters and unsupported shapes', () => {
+  assert.throws(() => documentFromChainSnapshot({ schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION,
+    chain: SNAPSHOT_CHAIN, parameters: [{ name: 'missing.parameter', value: 0 }] }, CATALOG),
+  /unknown chain snapshot parameter: missing\.parameter/);
+  for (const snapshot of [null, { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION + 1, chain: SNAPSHOT_CHAIN, parameters: [] },
+    { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: null, parameters: [] },
+    { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: SNAPSHOT_CHAIN, parameters: null }])
+    assert.throws(() => documentFromChainSnapshot(snapshot, CATALOG), /unsupported chain snapshot/);
 });
