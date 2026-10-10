@@ -16,8 +16,12 @@ export default [
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
-      globals: globals.browser,
     },
+  },
+  {
+    files: ['**/*.js', '**/*.mjs'],
+    ignores: ['src/segments/segment_worker.js'],
+    languageOptions: { globals: globals.browser },
   },
   {
     files: ['scripts/**/*.mjs', 'tests/**/*.js', 'tests/**/*.mjs'],
