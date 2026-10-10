@@ -95,12 +95,14 @@ test('findBestRationalRatio: negative target snaps to the sign-flipped fraction'
   assert.equal(neg.N, pos.N);
 });
 
-/** A negative active/passive ratio keeps its sign through the snap. */
+/** A negative non-closing ratio keeps its sign through the rational search. */
 test('snapToRationalRatio: negative ratio keeps its sign', () => {
-  const { snappedActiveC, m, n } = snapToRationalRatio(-3, 2);
-  assert.equal(m, -3);
-  assert.equal(n, 2);
+  const { snappedActiveC, m, n } = snapToRationalRatio(-13, 11);
+  assert.equal(m, -7);
+  assert.equal(n, 6);
   assert.ok(snappedActiveC < 0, `expected negative snapped freq, got ${snappedActiveC}`);
+  assert.notEqual(snappedActiveC, -13);
+  assert.ok(Math.abs(snappedActiveC - (11 * -7) / 6) < 1e-12);
 });
 
 /**
