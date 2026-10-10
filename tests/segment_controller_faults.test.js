@@ -378,8 +378,7 @@ function deliverFrameWithSegId(controller, worker, segId) {
 }
 
 test('a frame with a non-integer segId faults instead of stalling the barrier', async () => {
-  // Each of these fails both range comparisons, so a range-only guard would let
-  // it index by string key and decrement `pending` for an absent segment.
+  // Each value differs from the sending worker's index, so the identity check must fault.
   for (const segId of [undefined, NaN, null, '1', 1.5]) {
     const c = makeController();
     c.create(2);
