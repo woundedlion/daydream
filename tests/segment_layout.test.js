@@ -101,8 +101,8 @@ test('three bands per arm tile north then south from the pole inward', () => {
   }
 });
 
-// Four bands per arm is where the firmware's northern/southern split becomes
-// observable.
+// Four bands per arm splits two north / two south, so both halves have an
+// internal order to check.
 test('four bands per arm tile north top-down then south from the pole inward', () => {
   const slotRows = [[0, 36], [36, 72], [108, 144], [72, 108]];
   for (let arm = 0; arm < 2; arm++) {
