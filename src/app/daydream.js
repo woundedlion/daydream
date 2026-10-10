@@ -329,7 +329,7 @@ export function start({
       });
       host.adapter = renderAdapter;
 
-      host.recorder = new VideoRecorder(daydream.canvas);
+      host.recorder = new VideoRecorder(daydream.canvas, undefined, undefined, doc);
       recording.attach(host.recorder);
 
       const loadingOverlay = doc.getElementById('loading-overlay');
