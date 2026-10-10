@@ -589,9 +589,7 @@ export function fakeElement(tag = 'div', options = {}) {
         const parsed = Number.parseInt(attribute, 10);
         return Number.isNaN(parsed) ? -1 : parsed;
       }
-      if (FOCUSABLE_TAGS.has(element.tagName)) return 0;
-      if (element.tagName === 'A' && element.getAttribute('href') !== null) return 0;
-      return -1;
+      return FOCUSABLE_TAGS.has(element.tagName) || element.tagName === 'A' ? 0 : -1;
     },
     set(value) { element.attributes.tabindex = String(value); },
   });
