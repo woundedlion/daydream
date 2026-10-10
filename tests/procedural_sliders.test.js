@@ -113,17 +113,21 @@ test('an unseeded slider input moves the whole locked group', () => {
   assert.equal(values.C_G, 1.7);
 });
 
-test('a locked group stops at the first channel to reach its bound', () => {
+test('a locked group stops when a sibling reaches its bound', () => {
   const { sliders, input } = mount({ D: true });
-  input('D_B').dispatch('keydown');
-  move(input('D_B'), 2000);
+  input('D_G').dispatch('keydown');
+  move(input('D_G'), 2000);
   const values = sliders.values();
-  assert.ok(Math.abs(values.D_B - 2) < 1e-12);
+  assert.ok(Math.abs(values.D_B - 2) < 1e-12, 'blue caps the rise');
+  assert.ok(Math.abs(values.D_G - 1.66) < 1e-12);
   assert.ok(Math.abs(values.D_R - 1.33) < 1e-12);
-  input('D_B').dispatch('keyup');
-  move(input('D_R'), -1000);
-  assert.ok(Math.abs(values.D_R - (-1)) < 1e-12, 'the lowest channel caps the drop');
+  assert.equal(input('D_G').value, '1660', 'the dragged slider is pulled back');
+  input('D_G').dispatch('keyup');
+  move(input('D_B'), -1000);
+  assert.ok(Math.abs(values.D_R - (-1)) < 1e-12, 'red caps the drop');
+  assert.ok(Math.abs(values.D_G - (-0.67)) < 1e-12);
   assert.ok(Math.abs(values.D_B - (-0.33)) < 1e-12);
+  assert.equal(input('D_B').value, '-330', 'the dragged slider is pulled back');
 });
 
 test('a slider whose group lock is missing moves alone', () => {
