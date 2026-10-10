@@ -389,7 +389,7 @@ test('dispose tolerates a page torn down before the engine or recorder existed',
   assert.deepEqual(t.log.filter((l) => l.includes('engine.delete')), []);
 });
 
-// Module load: the pagehide teardown is armed during module evaluation, so a
+// Module load: start() arms the pagehide teardown before the load begins, so a
 // page discard can settle before the WASM module does.
 
 /**
@@ -464,7 +464,7 @@ test('a failed load on an already discarded page is ignored', () => {
   assert.deepEqual(h.log, []);
 });
 
-test('both handlers tolerate a module evaluation that never built the teardown', () => {
+test('both handlers tolerate a teardown reader that returns null', () => {
   const ready = makeLoadHandlers({ teardown: 'missing' });
   ready.handlers.onModuleReady({ name: 'wasm' });
   assert.deepEqual(ready.log, ['start wasm']);

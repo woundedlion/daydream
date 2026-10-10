@@ -53,7 +53,8 @@
  * @property {PaletteAxis} lightness - The OKLCH lightness axis.
  * @property {PaletteChromaAxis} chroma - The OKLCH chroma axis.
  * @property {number} hueTorsion - Hue torsion in radians per unit lightness.
- * @property {number} falloffStart - Where a FALLOFF domain begins to fade.
+ * @property {number} falloffStart - Where a FALLOFF domain's fade (begun at t = 2/3)
+ *   reaches zero visibility.
  */
 
 /**
@@ -796,7 +797,10 @@ export function moveCustomHueKey(baseTurns, offsets, keyIndex, wrappedTurn) {
   return nextOffsets;
 }
 
-/** Where a FALLOFF domain begins to fade, as core/color/palette_recipe.h defaults it. */
+/**
+ * Where a FALLOFF domain's fade (begun at t = 2/3) reaches zero visibility, as
+ * core/color/palette_recipe.h defaults it.
+ */
 const DEFAULT_FALLOFF_START = 0.9;
 
 /**
@@ -887,7 +891,8 @@ export function loopSweepTurns(turns) {
  * @property {number} sweepTurns - Total travel of a SWEEP, in turns.
  * @property {number} headroom - Fraction of the local gamut the chroma may reach.
  * @property {number} hueTorsion - Hue drift per unit lightness, in radians.
- * @property {number} falloffStart - Where a FALLOFF domain begins to fade.
+ * @property {number} falloffStart - Where a FALLOFF domain's fade (begun at t = 2/3)
+ *   reaches zero visibility.
  */
 
 /**

@@ -455,10 +455,11 @@ export class Daydream {
   }
 
   /**
-   * Fit renderer, label layer, and both cameras to the container size. Switches
-   * to mobile layout at MOBILE_BREAKPOINT_PX, sizes the square PiP viewport to 30% of
-   * the smaller dimension, and re-fits the camera distance while it still equals
-   * the previous fit, so the sphere fills ~85% of the view. User zoom is preserved.
+   * Fit renderer, label layer, and both cameras to the container size. Sizes the
+   * square PiP viewport to 30% of the smaller dimension, marks the viewport
+   * compact at or below MOBILE_BREAKPOINT_PX (which suppresses the PiP), and
+   * re-fits the camera distance while it still equals the previous fit, so the
+   * sphere fills ~85% of the view. User zoom is preserved.
    */
   setCanvasSize() {
     const container = this.canvasParent;
@@ -727,8 +728,8 @@ export class Daydream {
 
   /**
    * Render the picture-in-picture corner view: the sphere seen from the antipode
-   * of the main camera. Skipped while showPip is off, on mobile, under headless
-   * automation (navigator.webdriver), and while recording.
+   * of the main camera. Skipped while showPip is off, in a compact viewport,
+   * under headless automation (navigator.webdriver), and while recording.
    */
   renderPip() {
     if (!this.showPip || this.compactViewport || this.nav.webdriver ||

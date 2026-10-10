@@ -167,10 +167,10 @@ function installWindowAt(search) {
 const RES = ['Holosphere (96x20)', 'Phantasm (288x144)'];
 
 /**
- * Runs `body` with console.warn captured so a rejection path's diagnostic is
- * asserted instead of printed into the suite output.
+ * Runs `body` with console.error and console.warn captured so a rejection
+ * path's diagnostic is asserted instead of printed into the suite output.
  * @param {Function} body - Code to run under the capture.
- * @returns {Array<string>} One joined message per console.warn call.
+ * @returns {Array<string>} One joined message per captured call.
  */
 const captureWarnings = (body) => captureConsole(body).messages;
 
