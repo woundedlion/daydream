@@ -18,14 +18,12 @@ const SAVE_CLOCK = new Date(2026, 0, 2, 3, 4, 5);
  */
 const supports = (...allowed) => (mt) => allowed.includes(mt);
 
-/** Verifies the mp4 format selects the H.264 (avc1) candidate when it is supported. */
 test('mp4 format picks the H.264 candidate when supported', () => {
   assert.equal(
     selectMimeType('mp4', supports('video/mp4;codecs=avc1')),
     'video/mp4;codecs=avc1');
 });
 
-/** Verifies the webm format falls back through VP9, then VP8, then the generic codec. */
 test('webm format prefers VP9, then VP8, then generic', () => {
   assert.equal(
     selectMimeType('webm', supports('video/webm;codecs=vp9', 'video/webm;codecs=vp8')),
@@ -38,21 +36,18 @@ test('webm format prefers VP9, then VP8, then generic', () => {
     'video/webm');
 });
 
-/** Verifies auto selection prefers an mp4 candidate when both mp4 and webm are supported. */
 test('auto prefers mp4 over webm', () => {
   assert.equal(
     selectMimeType('auto', supports('video/mp4;codecs=avc1', 'video/webm;codecs=vp9')),
     'video/mp4;codecs=avc1');
 });
 
-/** Verifies auto selection falls back to webm when no mp4 candidate is supported. */
 test('auto falls back to webm when mp4 is unsupported', () => {
   assert.equal(
     selectMimeType('auto', supports('video/webm;codecs=vp9')),
     'video/webm;codecs=vp9');
 });
 
-/** Verifies an empty string is returned when no candidate in the list is supported. */
 test('returns empty string when nothing in the list is supported', () => {
   assert.equal(selectMimeType('mp4', () => false), '');
   assert.equal(selectMimeType('auto', () => false), '');
@@ -79,11 +74,7 @@ const installFakeDocument = () => {
   return () => { globalThis.document = savedDocument; };
 };
 
-/**
- * Verifies native-resolution capture pins the offscreen buffer to the source's
- * start-time size (rounded up to even) and never resizes it when the source
- * canvas changes mid-recording — so the captured track's frame size is fixed.
- */
+/** Native capture rounds the start-time source size up to even and keeps it. */
 test('native-resolution capture pins the offscreen to the source size at start', () => {
   const restore = installFakeDocument();
   try {
@@ -106,11 +97,7 @@ test('native-resolution capture pins the offscreen to the source size at start',
   }
 });
 
-/**
- * Verifies the targetHeight (downscale) path sizes the offscreen to the target
- * height and the source's start-time aspect, rounding both dimensions up to even
- * (codecs require it), and then pins that buffer against a mid-recording resize.
- */
+/** Both offscreen dimensions round up to even, at the start-time source aspect. */
 test('targetHeight capture scales the offscreen to the target height and pins it', () => {
   const restore = installFakeDocument();
   try {
@@ -119,7 +106,6 @@ test('targetHeight capture scales the offscreen to the target height and pins it
     rec.targetHeight = 121;                 // odd target → rounded up to even
 
     const off = rec.ensureOffscreen();
-    // height 121 → 122; width round(121 * 800/600) = round(161.33) = 161 → 162.
     assert.equal(off.height, 122);
     assert.equal(off.width, 162);
 
@@ -134,11 +120,7 @@ test('targetHeight capture scales the offscreen to the target height and pins it
   }
 });
 
-/**
- * Verifies the downscale path clamps a degenerate source aspect: a 0x0 source
- * makes width/height non-finite, which would propagate to NaN canvas dimensions;
- * the offscreen falls back to a square at the target height instead.
- */
+/** A 0x0 source has a non-finite aspect, which would make NaN canvas dimensions. */
 test('targetHeight capture falls back to a square when the source aspect is degenerate', () => {
   const restore = installFakeDocument();
   try {
@@ -416,7 +398,6 @@ test('isSupported answers true where captureStream and MediaRecorder both exist'
   }
 });
 
-/** Verifies toggle() reports the real recording state for start then stop. */
 test('toggle starts then stops, reporting the true state each time', () => {
   const restore = installRecorderEnv();
   try {
@@ -482,11 +463,7 @@ test('elapsed time follows the recording wall-clock lifecycle', () => {
   }
 });
 
-/**
- * Verifies abort() ends a live session the way an external fault (a lost canvas
- * context) needs: the stop path still finalizes the output and the host hook
- * fires, while an idle recorder reports nothing.
- */
+/** abort() still finalizes the output; an idle recorder reports nothing. */
 test('abort stops a live session and tells the host', () => {
   const restore = installRecorderEnv();
   const captured = installConsoleCapture('error');
@@ -513,7 +490,6 @@ test('abort stops a live session and tells the host', () => {
   }
 });
 
-/** Verifies start() refuses (no phantom session) when the browser is unsupported. */
 test('start refuses and stays idle when recording is unsupported', () => {
   const restore = installRecorderEnv();
   const captured = installConsoleCapture('error');
@@ -568,11 +544,7 @@ test('an unsupported explicit format reports the browser-selected container', as
   }
 });
 
-/**
- * Verifies a throwing MediaRecorder constructor stops the capture tracks it was
- * handed. The stream is not on the instance yet at that point, so cleanup()
- * cannot reach it and the capture stays live unless the catch releases it.
- */
+/** The stream is not on the instance yet, so cleanup() cannot reach those tracks. */
 test('a MediaRecorder construction failure stops the acquired capture tracks', () => {
   const restore = installRecorderEnv();
   const captured = installConsoleCapture('error');
@@ -656,7 +628,6 @@ test('a MediaRecorder start failure releases the entire capture session', () => 
   }
 });
 
-/** Verifies a normally-stopped session downloads its chunks and then cleans up. */
 test('a stopped session downloads its own chunks and clears instance state', () => {
   const restore = installRecorderEnv();
   try {
@@ -681,11 +652,7 @@ test('a stopped session downloads its own chunks and clears instance state', () 
   }
 });
 
-/**
- * Verifies the buffered path reports an empty session the way the streaming
- * path does, so a browser without showSaveFilePicker leaves the same trail as
- * one with it.
- */
+/** Reported the same way as an empty streaming session. */
 test('a buffered session that captured nothing is reported', () => {
   const restore = installRecorderEnv();
   const captured = installConsoleCapture('warn');
@@ -708,11 +675,7 @@ test('a buffered session that captured nothing is reported', () => {
   }
 });
 
-/**
- * Verifies the last chunk stop() flushes still reaches the output: the encoder
- * hands over whatever it holds between stop() and the stop event, so a data
- * handler cleared a step early loses the tail of the recording.
- */
+/** The encoder hands over a final chunk between stop() and the stop event. */
 test('the chunk flushed by stop is saved with the rest', () => {
   const restore = installRecorderEnv();
   try {
@@ -868,7 +831,6 @@ test('a stale session error does not clobber the session that replaced it', () =
   }
 });
 
-/** Verifies ondataavailable drops empty (size:0) flushes and keeps real chunks. */
 test('a session retains only non-empty chunks', () => {
   const restore = installRecorderEnv();
   try {
@@ -1494,11 +1456,7 @@ const captureLetterbox = ({ srcW, srcH, offW, offH }) => {
   }
 };
 
-/**
- * Wider-than-target source: fit to the offscreen width, letterbox top/bottom.
- * 64x32 (2:1) into a 100x100 (1:1) offscreen -> destW=100, destH=round(100/2)=50,
- * centered at y=round((100-50)/2)=25, x=0.
- */
+/** Wider-than-target source: fit to the offscreen width, letterbox top/bottom. */
 test('captureFrame letterboxes a wider-than-target source to fit width', () => {
   const { img, x, y, w, h } = captureLetterbox({ srcW: 64, srcH: 32, offW: 100, offH: 100 });
   assert.equal(img.width, 64, 'blits the source canvas');
@@ -1508,11 +1466,7 @@ test('captureFrame letterboxes a wider-than-target source to fit width', () => {
   assert.equal(y, 25, 'centered vertically: (offH - destH) / 2');
 });
 
-/**
- * Taller-than-target source: fit to the offscreen height, pillarbox left/right.
- * 30x60 (1:2) into a 100x100 (1:1) offscreen -> destH=100, destW=round(100*0.5)=50,
- * centered at x=round((100-50)/2)=25, y=0.
- */
+/** Taller-than-target source: fit to the offscreen height, pillarbox left/right. */
 test('captureFrame pillarboxes a taller-than-target source to fit height', () => {
   const { x, y, w, h } = captureLetterbox({ srcW: 30, srcH: 60, offW: 100, offH: 100 });
   assert.equal(h, 100, 'destH spans the full offscreen height');
@@ -1849,7 +1803,6 @@ test('the buffered save maps each container to its extension and blob type', () 
   }
 });
 
-/** Verifies download() saves the chunks it is handed under the given name. */
 test('download saves the supplied recorder, chunks, and effect name', () => {
   const save = installSavePath();
   mock.timers.enable({ apis: ['setTimeout', 'Date'], now: SAVE_CLOCK });
@@ -1925,7 +1878,6 @@ test('start aborts without capturing when the offscreen has no 2D context', () =
   assert.match(outcome.notified[0].message, /2D drawing context/);
 });
 
-/** Verifies a captureStream that throws outright leaves no session behind. */
 test('start aborts and stays idle when captureStream throws', () => {
   const failure = new Error('capture unavailable');
   const outcome = startAborted({
