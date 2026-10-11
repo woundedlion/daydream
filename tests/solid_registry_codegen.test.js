@@ -94,31 +94,27 @@ test('generateRegistryCpp packs a short Recipe body onto one continuation line',
   }
 });
 
+/** Saved items, each with its base recipe when it is a derived seed. */
+const REGISTRY_CHAINS = [
+  [{ base: 'cube', ops: ['ambo'] }],
+  [{ base: 'icosahedron', ops: [{ op: 'hankin', params: { angle: 62 } }] }],
+  [{ base: 'icosahedron_kis', ops: ['dual'] },
+    { seed: 'icosahedron', ops: [chainStep('kis')] }],
+];
+
 /**
  * Adding the entry grows islamic_registry, which fails its size static_assert
  * and the NUM_ENTRIES sum until ISLAMIC_COUNT is raised to match.
  */
 test('every paste names the static_asserts a new entry breaks', () => {
-  const chains = [
-    [{ base: 'cube', ops: ['ambo'] }],
-    [{ base: 'icosahedron', ops: [{ op: 'hankin', params: { angle: 62 } }] }],
-    [{ base: 'icosahedron_kis', ops: ['dual'] },
-      { seed: 'icosahedron', ops: [chainStep('kis')] }],
-  ];
-  for (const [item, baseRecipe] of chains) {
+  for (const [item, baseRecipe] of REGISTRY_CHAINS) {
     assert.match(generateRegistryCpp(item, baseRecipe), /raise ISLAMIC_COUNT by one/,
       `${item.base} pastes without the ISLAMIC_COUNT bump`);
   }
 });
 
 test('generateRegistryCpp never emits a Category::Simple entry', () => {
-  const chains = [
-    [{ base: 'cube', ops: ['ambo'] }],
-    [{ base: 'icosahedron', ops: [{ op: 'hankin', params: { angle: 62 } }] }],
-    [{ base: 'icosahedron_kis', ops: ['dual'] },
-      { seed: 'icosahedron', ops: [chainStep('kis')] }],
-  ];
-  for (const [item, baseRecipe] of chains) {
+  for (const [item, baseRecipe] of REGISTRY_CHAINS) {
     const code = generateRegistryCpp(item, baseRecipe);
     assert.match(code, /Category::Complex/, `${item.base} must be Complex`);
     assert.doesNotMatch(code, /Category::Simple/);
