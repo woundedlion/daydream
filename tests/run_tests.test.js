@@ -40,17 +40,9 @@ const fail = (...args) => {
   return expectFailure(process.execPath, [SCRIPT, ...args], { cwd: root, env });
 };
 
-// Test-run output (spec reporter) goes to stdout and gate failures to stderr; read both.
 const failOutput = (...args) => {
   trackFixture();
-  try {
-    execFileSync(process.execPath, [SCRIPT, ...args], {
-      cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'],
-    });
-  } catch (error) {
-    return `${error.stdout}${error.stderr}`;
-  }
-  return assert.fail('the command was expected to exit non-zero');
+  return expectFailure(process.execPath, [SCRIPT, ...args], { cwd: root, env, captureStdout: true });
 };
 
 test('a passing suite that loads every source module passes', () => {

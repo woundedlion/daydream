@@ -99,14 +99,14 @@ export const fixtureRepo = (prefix, build) => {
  * @param {boolean} [options.captureStdout=false] - Include stdout before stderr.
  * @returns {string} The command's stderr, preceded by stdout when requested.
  */
-export const expectFailure = (file, args, options = {}) => {
+export const expectFailure = (file, args, { captureStdout = false, ...options } = {}) => {
   try {
     execFileSync(file, args, {
       ...options,
-      stdio: ['ignore', 'ignore', 'pipe'],
+      stdio: ['ignore', captureStdout ? 'pipe' : 'ignore', 'pipe'],
     });
   } catch (e) {
-    return String(e.stderr);
+    return captureStdout ? `${e.stdout}${e.stderr}` : String(e.stderr);
   }
   assert.fail('the command was expected to exit non-zero');
 };
