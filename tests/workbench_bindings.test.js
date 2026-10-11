@@ -1,6 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { callWorkbenchBinding, shaderChainCatalog } from '../src/engine/workbench_bindings.js';
+import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot, shaderChainCatalog } from '../src/engine/workbench_bindings.js';
+
+test('snapshot helpers share typed restore refusal and release their handles', () => {
+  const snapshot = {schemaVersion: 2};
+  const unavailable = {};
+  const applied = {};
+  const module = {ChainSnapshotRestoreResult: {NOT_SHADER_CHAIN: unavailable}};
+  let releases = 0;
+  const engine = {getShaderChainBindings: () => ({
+    getSnapshot: () => snapshot,
+    restoreSnapshot: (value) => { assert.equal(value, snapshot); return applied; },
+    delete: () => { releases++; },
+  })};
+  assert.equal(getChainSnapshot(engine), snapshot);
+  assert.equal(restoreChainSnapshot(engine, module, snapshot), applied);
+  assert.equal(releases, 2);
+  assert.equal(getChainSnapshot(null), null);
+  assert.equal(restoreChainSnapshot(null, module, snapshot), unavailable);
+});
 
 test('typed capability takes precedence over a forwarding engine method and releases its handle', () => {
   const calls = [];
@@ -11,7 +29,7 @@ test('typed capability takes precedence over a forwarding engine method and rele
       delete: () => { calls.push('released'); },
     }),
   };
-  assert.equal(callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChain', [[]]), 'accepted');
+  assert.equal(callWorkbenchBinding(engine, 'setShaderChain', [[]]), 'accepted');
   assert.deepEqual(calls, [[], 'released']);
 });
 
@@ -20,13 +38,13 @@ test('unsupported capabilities never fall through to an engine forwarding method
     getShaderChainBindings: () => null,
     getSnapshot: () => { throw new Error('unsupported capability reached'); },
   };
-  assert.equal(callWorkbenchBinding(engine, 'getShaderChainBindings', 'getSnapshot', []), null);
-  assert.equal(callWorkbenchBinding(null, 'getShaderChainBindings', 'getSnapshot', []), null);
+  assert.equal(callWorkbenchBinding(engine, 'getSnapshot', []), null);
+  assert.equal(callWorkbenchBinding(null, 'getSnapshot', []), null);
 });
 
 test('missing capabilities return unavailable without calling facade methods', () => {
   assert.equal(callWorkbenchBinding({ getSnapshot: () => 'snapshot' },
-    'getShaderChainBindings', 'getSnapshot', []), null);
+    'getSnapshot', []), null);
 });
 
 test('ordinary errors release handles; module traps leave the halted module alone', () => {
@@ -38,7 +56,7 @@ test('ordinary errors release handles; module traps leave the halted module alon
         delete: () => { released = true; },
       }),
     };
-    assert.throws(() => callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChain', [[]]),
+    assert.throws(() => callWorkbenchBinding(engine, 'setShaderChain', [[]]),
       (caught) => caught === error);
     assert.equal(released, !(error instanceof WebAssembly.RuntimeError));
   }

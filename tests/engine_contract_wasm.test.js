@@ -31,7 +31,7 @@ const { w: W, h: H } = resolutionPresets['Holosphere (96x20)'];
 // One shared engine: the engine owns a single global arena, so a second
 // instantiation traps.
 assert.equal(M.HolosphereEngine.isLive(), false);
-const chainCall = (target, method, payload) => callWorkbenchBinding(target, 'getShaderChainBindings', method, [payload]);
+const chainCall = (target, method, payload) => callWorkbenchBinding(target, method, [payload]);
 const engine = new M.HolosphereEngine();
 assert.equal(M.HolosphereEngine.isLive(), true);
 const initialDisplayAngles = [engine.getDisplayNorthPhi(), engine.getDisplaySouthPhi()];
@@ -282,7 +282,7 @@ test('generated/holosphere_wasm.d.ts declares the object shapes the engine retur
     assertDeclaredShape('NumericParameterDefinition', definition);
   }
 
-  const snapshot = callWorkbenchBinding(engine, 'getShaderChainBindings', 'getSnapshot', []);
+  const snapshot = callWorkbenchBinding(engine, 'getSnapshot', []);
   assertDeclaredShape('ChainSnapshot', snapshot);
 });
 
@@ -364,7 +364,7 @@ test('applied chain definitions and parameter pause behavior match the fake engi
     engine.setAnimationsPaused(false);
     fake.setAnimationsPaused(false);
     const write = (target) => method === 'setParameter' ? target[method](...args)
-      : callWorkbenchBinding(target, 'getShaderChainBindings', method, args);
+      : callWorkbenchBinding(target, method, args);
     assert.equal(write(fake).value, write(engine).value);
     assert.equal(engine.getAnimationsPaused(), true);
     assert.equal(fake.getAnimationsPaused(), engine.getAnimationsPaused());

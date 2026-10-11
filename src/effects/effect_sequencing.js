@@ -6,7 +6,7 @@
 /** The effect and resolution apply path and its switch/rollback transaction, over injected collaborators. */
 
 import { resolveActiveEffect } from "./effect_roster.js";
-import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
+import { getChainSnapshot, restoreChainSnapshot } from '../engine/workbench_bindings.js';
 
 /** @typedef {import('../../generated/holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
 /** @typedef {import('../../generated/holosphere_wasm.js').HolosphereModule} HolosphereModule */
@@ -406,8 +406,7 @@ export function createApplyPipeline({
     // A rejected effect leaves the engine unchanged; return before the worker
     // broadcast.
     if (getEngine() && !selectEngineEffect()) return ApplyResult.REJECTED;
-    if (chainSnapshot && callWorkbenchBinding(getEngine(), 'getShaderChainBindings',
-      'restoreSnapshot', [chainSnapshot]) !== getModule().ChainSnapshotRestoreResult.APPLIED)
+    if (chainSnapshot && restoreChainSnapshot(getEngine(), getModule(), chainSnapshot) !== getModule().ChainSnapshotRestoreResult.APPLIED)
       return ApplyResult.REJECTED;
 
     effectGui.destroy();
@@ -451,7 +450,7 @@ export function createApplyPipeline({
     }
 
     const engine = getEngine();
-    const chainSnapshot = callWorkbenchBinding(engine, 'getShaderChainBindings', 'getSnapshot', []);
+    const chainSnapshot = getChainSnapshot(engine);
     if (engine) {
       // Only UNSUPPORTED rejects; RESIZED and ALREADY_ACTIVE both leave the
       // requested size active.
