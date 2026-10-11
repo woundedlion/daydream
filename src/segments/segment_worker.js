@@ -77,7 +77,7 @@ export function installSegmentWorker() {
              reason: 'Shader chain snapshot restore API is unavailable' });
       return false;
     }
-    const result = callWorkbenchBinding(engine, 'getShaderChainBindings', 'restoreSnapshot', [snapshot], wasmModule.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN);
+    const result = callWorkbenchBinding(engine, 'restoreSnapshot', [snapshot], wasmModule.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN);
     const restoreResults = wasmModule.ChainSnapshotRestoreResult;
     if (result === restoreResults.APPLIED) return true;
     const name = enumConstantName(restoreResults, result);

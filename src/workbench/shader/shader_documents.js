@@ -574,7 +574,7 @@ export function createShaderDocumentController({
       return false;
     }
     // Every load previews through the interpreter; a digest match arms the parity toggle.
-    const previousSnapshot = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'getSnapshot', []);
+    const previousSnapshot = callWorkbenchBinding(getEngine(), 'getSnapshot', []);
     const official = [...sourceCatalog.values()].find((candidate) =>
       candidate.descriptorDigest === compiled.descriptor_digest) ?? null;
     // Ahead of the teardown, so a refusal leaves the current editor standing.
@@ -622,7 +622,7 @@ export function createShaderDocumentController({
       if (previous && (written || previous.compiledSide)) {
         const refusal = status.textContent;
         applyPreset(previous.presetId ?? presetSelect.value);
-        if (previousSnapshot) callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'restoreSnapshot', [previousSnapshot]);
+        if (previousSnapshot) callWorkbenchBinding(getEngine(), 'restoreSnapshot', [previousSnapshot]);
         show(refusal ?? '', true);
       }
       return false;
@@ -655,7 +655,7 @@ export function createShaderDocumentController({
     syncParity();
     if (!applyPreset(presetId)) return abandon(true);
     if (session?.chainSnapshot) {
-      const expected = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'getSnapshot', []);
+      const expected = callWorkbenchBinding(getEngine(), 'getSnapshot', []);
       const snapshot = session.chainSnapshot;
       const values = new Map(snapshot.parameters.map((/** @type {*} */ entry) => [entry.name, entry.value]));
       if (!expected || JSON.stringify(expected.chain) !== JSON.stringify(snapshot.chain)
@@ -664,7 +664,7 @@ export function createShaderDocumentController({
         show('The shader link snapshot does not match its document and preset.', true);
         return abandon(true);
       }
-      if (callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'restoreSnapshot', [snapshot])
+      if (callWorkbenchBinding(getEngine(), 'restoreSnapshot', [snapshot])
           !== getModule().ChainSnapshotRestoreResult.APPLIED) {
         show('The shader link runtime snapshot was rejected.', true);
         return abandon(true);
@@ -713,7 +713,7 @@ export function createShaderDocumentController({
     if (!linkPending || !active || active.presetId === null) return linkWrite;
     linkPending = false;
     const generation = linkGeneration;
-    const chainSnapshot = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'getSnapshot', []);
+    const chainSnapshot = callWorkbenchBinding(getEngine(), 'getSnapshot', []);
     const state = {
       document: currentDocument(),
       preset: active.presetId,
@@ -881,12 +881,12 @@ export function createShaderDocumentController({
       try {
         const snapshot = JSON.parse(chainText);
         const imported = documentFromChainSnapshot(snapshot, operatorCatalog);
-        const previous = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'getSnapshot', []);
+        const previous = callWorkbenchBinding(getEngine(), 'getSnapshot', []);
         if (!await loadSource(imported, 'imported.shader.json'))
           throw new Error(status.textContent || 'the imported chain could not be adopted');
-        const outcome = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'restoreSnapshot', [snapshot]);
+        const outcome = callWorkbenchBinding(getEngine(), 'restoreSnapshot', [snapshot]);
         if (outcome !== getModule().ChainSnapshotRestoreResult.APPLIED) {
-          if (previous) callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'restoreSnapshot', [previous]);
+          if (previous) callWorkbenchBinding(getEngine(), 'restoreSnapshot', [previous]);
           throw new Error('the imported chain snapshot was rejected');
         }
         const paused = getAnimationsPaused();

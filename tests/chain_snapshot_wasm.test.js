@@ -5,15 +5,15 @@ import {callWorkbenchBinding} from '../src/engine/workbench_bindings.js';
 
 const module = await createModule({print: () => {}});
 const engine = new module.HolosphereEngine();
-const capture = () => callWorkbenchBinding(engine, 'getShaderChainBindings', 'getSnapshot', []);
-const restore = (snapshot) => callWorkbenchBinding(engine, 'getShaderChainBindings', 'restoreSnapshot', [snapshot]);
+const capture = () => callWorkbenchBinding(engine, 'getSnapshot', []);
+const restore = (snapshot) => callWorkbenchBinding(engine, 'restoreSnapshot', [snapshot]);
 after(() => engine.delete());
 
 test('typed snapshots preserve evolving walk, noise, source and palette state across effect replacement', () => {
   engine.setResolution(96, 20);
   const install = () => {
     engine.setEffect('ShaderChain');
-    assert.equal(callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChainParameters', [[
+    assert.equal(callWorkbenchBinding(engine, 'setShaderChainParameters', [[
       {name: 'camera.wander', value: 0.1}, {name: 'project.projection-wander', value: 0.2},
       {name: 'sample.speed', value: 0.004}, {name: 'colorize.hue-noise-speed', value: 0.003},
     ]]), module.ParamSetResult.APPLIED);
@@ -38,7 +38,7 @@ test('typed snapshots preserve evolving walk, noise, source and palette state ac
 
 test('snapshot validation refuses malformed state transactionally', () => {
   engine.setEffect('ShaderChain');
-  assert.equal(callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChainParameters', [[
+  assert.equal(callWorkbenchBinding(engine, 'setShaderChainParameters', [[
     {name: 'camera.wander', value: 0.1}, {name: 'sample.speed', value: 0.004},
   ]]), module.ParamSetResult.APPLIED);
   engine.setAnimationsPaused(false);

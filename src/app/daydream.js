@@ -4,7 +4,7 @@
  */
 
 
-import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
+import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot } from '../engine/workbench_bindings.js';
 import { GlobalStatsView } from "../ui/global_stats_view.js";
 import { MAX_DISPLAY_CAP_PERCENT, createDisplayCapsBinding } from "../renderer/display_caps.js";
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
@@ -427,7 +427,7 @@ export function start({
   /** @returns {boolean} */
   function usesChainSnapshot() {
     if (host.moduleDead() || !host.module?.ChainSnapshotRestoreResult) return false;
-    return callWorkbenchBinding(host.engine, 'getShaderChainBindings', 'isValid', [], false);
+    return callWorkbenchBinding(host.engine, 'isValid', [], false);
   }
 
   // The shader-document controller publishes the chain editor's selected-instance
@@ -462,8 +462,8 @@ export function start({
     },
     config: {
       inUse: usesChainSnapshot,
-      snapshot: () => callWorkbenchBinding(host.engine, 'getShaderChainBindings', 'getSnapshot', []),
-      restore: (snapshot) => callWorkbenchBinding(host.engine, 'getShaderChainBindings', 'restoreSnapshot', [snapshot], host.module.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN),
+      snapshot: () => getChainSnapshot(host.engine),
+      restore: (snapshot) => restoreChainSnapshot(host.engine, host.module, snapshot),
       restoreResults: () => host.module.ChainSnapshotRestoreResult,
       showImportNotice: (message) => applyNotice.show(message, CONFIG_NOTICE),
     },
@@ -519,8 +519,8 @@ export function start({
     showFatal: showFatalError,
     moduleDead: (error) => host.moduleDead(error),
     usesChainSnapshot,
-    getChainSnapshot: () => callWorkbenchBinding(host.engine, 'getShaderChainBindings', 'getSnapshot', []),
-    restoreChainSnapshot: (snapshot) => callWorkbenchBinding(host.engine, 'getShaderChainBindings', 'restoreSnapshot', [snapshot])
+    getChainSnapshot: () => getChainSnapshot(host.engine),
+    restoreChainSnapshot: (snapshot) => restoreChainSnapshot(host.engine, host.module, snapshot)
       === host.module.ChainSnapshotRestoreResult.APPLIED,
   });
 

@@ -70,7 +70,7 @@ export function applyChainDocument({
   const live = new Set(chain.map((entry) => entry.instance));
   const bypassed = new Set(
     documentChain.map((entry) => entry.label).filter((label) => !live.has(label)));
-  const result = callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChain', [chain], { code: 'NOT_CHAIN_EFFECT', entryIndex: -1 });
+  const result = callWorkbenchBinding(engine, 'setShaderChain', [chain], { code: 'NOT_CHAIN_EFFECT', entryIndex: -1 });
   if (result?.code !== 'APPLIED') {
     const code = result?.code ?? 'no result';
     const at = typeof result?.entryIndex === 'number' && result.entryIndex >= 0
@@ -99,7 +99,7 @@ export function applyChainDocument({
     writes.push({name: write.name, value: write.stored});
   }
 
-  const written = callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChainParameters', [writes], module.ParamSetResult.NO_EFFECT);
+  const written = callWorkbenchBinding(engine, 'setShaderChainParameters', [writes], module.ParamSetResult.NO_EFFECT);
   if (written !== module.ParamSetResult.APPLIED)
     return refuse(`the engine refused the preset: ${enumConstantName(module.ParamSetResult, written)}`);
 

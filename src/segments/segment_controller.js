@@ -845,7 +845,7 @@ export class SegmentController {
    */
   snapshotEffectState() {
     const engine = this.getWasmEngine();
-    const snapshot = callWorkbenchBinding(engine, 'getShaderChainBindings', 'getSnapshot', []);
+    const snapshot = callWorkbenchBinding(engine, 'getSnapshot', []);
     if (snapshot) return { chainSnapshot: snapshot };
     return { params: this.snapshotParams() };
   }
