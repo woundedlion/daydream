@@ -710,6 +710,7 @@ function controlsFor(recipe) {
 }
 
 test('every preset survives the trip out to the controls and back', () => {
+  assert.ok(Object.keys(PALETTE_RECIPE_PRESETS).length >= 3);
   for (const [name, preset] of Object.entries(PALETTE_RECIPE_PRESETS)) {
     const recipe = preset();
     assertRecipeClose(paletteRecipeFromControls(defaultPaletteRecipe(),

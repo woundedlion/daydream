@@ -18,6 +18,7 @@ test('a new model holds the default recipe', () => {
 });
 
 test('a loaded preset exports as itself', () => {
+  assert.ok(Object.keys(PALETTE_RECIPE_PRESETS).length >= 3);
   for (const [name, preset] of Object.entries(PALETTE_RECIPE_PRESETS)) {
     const model = new PaletteRecipeModel(preset());
     assert.equal(exported(model), generativePaletteCpp(preset()), name);

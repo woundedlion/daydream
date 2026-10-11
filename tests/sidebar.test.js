@@ -419,6 +419,7 @@ test('setEffects leaves focus alone when it was outside the list', () => {
   sidebar.setEffects(['A', 'B'], {});
 
   assert.equal(elsewhere.focusCalls, 0);
+  assert.equal(sidebar.buttons.size, 2);
   for (const btn of sidebar.buttons.values()) {
     assert.equal(btn.focusCalls, 0, 'a rebuild must not pull focus into the list');
   }
