@@ -22,14 +22,15 @@ export function createEffectPersistence({
   /**
    * Persist the active effect through its snapshot or accepted-value surface.
    * @param {*} gui - The effect GUI holding the stored values.
-   * @param {{name: string, accepted: *}} [edited] - The one parameter an edit
-   *   moved, carrying the value the write settled on.
-   * @param {boolean} [existingOnly=false] - Rewrite only restored companion keys.
+   * @param {Object} [options]
+   * @param {{name: string, accepted: *}} [options.edited] - The one parameter an
+   *   edit moved, carrying the value the write settled on.
+   * @param {boolean} [options.existingOnly=false] - Rewrite only restored companion keys.
    * @returns {void}
    */
-  function persistEffectState(gui, edited = undefined, existingOnly = false) {
+  function persistEffectState(gui, { edited = undefined, existingOnly = false } = {}) {
     if (!usesChainSnapshot()) {
-      if (edited === undefined) persistAcceptedParams(gui, existingOnly);
+      if (edited === undefined) persistAcceptedParams(gui, { existingOnly });
       else persistAcceptedParam(gui, edited.name, edited.accepted);
       return;
     }
@@ -78,8 +79,12 @@ export function createEffectPersistence({
     gui.writeStoredValue(acceptedStorageKey(name), engineParamValue(accepted));
   }
 
-  /** Store writable accepted parameters. @param {*} gui @param {boolean} existingOnly */
-  function persistAcceptedParams(gui, existingOnly) {
+  /**
+   * Store writable accepted parameters.
+   * @param {*} gui
+   * @param {{existingOnly: boolean}} options - Rewrite only restored companion keys.
+   */
+  function persistAcceptedParams(gui, { existingOnly }) {
     for (const parameter of getParameterDefinitions()) {
       if (parameter.readonly) continue;
       if (existingOnly && !restoredKeys.has(parameter.name)) continue;

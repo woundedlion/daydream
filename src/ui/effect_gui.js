@@ -598,7 +598,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       warningsDirty: false,
     }));
 
-    fx.edits = new EffectPanelEdits(dragTarget, (edited) => persistence.persist(fx.gui, edited));
+    fx.edits = new EffectPanelEdits(dragTarget, (edited) => persistence.persist(fx.gui, { edited }));
 
     try {
       if (restoreAccepted) persistence.restore(fx.gui);
@@ -739,7 +739,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
         showConfigImportNotice('Effect controls could not be built.');
         return;
       }
-      persistence.persist(activeEffect.gui, undefined, true);
+      persistence.persist(activeEffect.gui, { existingOnly: true });
       rebuildFailureGeneration = undefined;
       valueSync.resetSkew();
     },
