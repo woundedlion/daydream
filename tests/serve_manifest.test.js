@@ -2,10 +2,11 @@
 // .wasm as application/wasm.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { serveManifest } from '../scripts/serve-manifest.mjs';
+import { writeFileAt } from './helpers/fixture_repo.js';
 import { request } from './helpers/http_request.js';
 
 const ENTRIES = ['index.html', 'engine.wasm', 'styles/index.css', 'styles/fonts/pin.woff2', 'gone.js', '../outside.txt', 'styles/fonts',
@@ -24,10 +25,7 @@ const FILES = {
 // file, which is what a served traversal would hand out.
 const TEMP = mkdtempSync(join(tmpdir(), 'daydream-serve-manifest-'));
 const ROOT = join(TEMP, 'site');
-for (const [path, body] of Object.entries(FILES)) {
-  mkdirSync(dirname(join(ROOT, path)), { recursive: true });
-  writeFileSync(join(ROOT, path), body);
-}
+for (const [path, body] of Object.entries(FILES)) writeFileAt(ROOT, path, body);
 writeFileSync(join(TEMP, 'outside.txt'), 'above the site root\n');
 after(() => rmSync(TEMP, { recursive: true, force: true }));
 
