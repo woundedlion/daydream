@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const LOCAL_GIT_ENV = [
   'GIT_ALTERNATE_OBJECT_DIRECTORIES',
@@ -50,6 +51,28 @@ const findShell = (name) => {
 export const findSh = () => findShell('sh');
 /** @returns {string|null} Bash interpreter. */
 export const findBash = () => findShell('bash');
+
+const HOOKS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../.githooks');
+const MISSING_SH = 'no POSIX shell available';
+
+/**
+ * Locates a repository git hook and the POSIX shell that runs it. Without a
+ * shell its cases skip, unless DAYDREAM_HOOK_SH_REQUIRED is set.
+ * @param {string} name - Hook basename under .githooks.
+ * @returns {{hook: string, sh: string|null, skip: string|false,
+ *   missing: string}} The hook path with forward slashes (MSYS sh does not
+ *   read a backslash path), the shell, the test skip option, and the
+ *   missing-shell message.
+ */
+export const hookUnderTest = (name) => {
+  const sh = findSh();
+  return {
+    hook: resolve(HOOKS_DIR, name).replace(/\\/g, '/'),
+    sh,
+    skip: sh || process.env.DAYDREAM_HOOK_SH_REQUIRED ? false : MISSING_SH,
+    missing: MISSING_SH,
+  };
+};
 
 // A config path that never exists, so no operator setting reaches a fixture: a
 // global core.excludesFile or core.autocrlf would steer ls-files and add, and a

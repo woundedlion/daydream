@@ -7,15 +7,10 @@ import {
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findSh, isolatedGitEnv, scratchDir } from './helpers/fixture_repo.js';
+import { hookUnderTest, isolatedGitEnv, scratchDir } from './helpers/fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const HOOK = resolve(HERE, '../.githooks/pre-push').replace(/\\/g, '/');
-const SH = findSh();
-const MISSING_SH = 'no POSIX shell available';
-const SKIP = SH || process.env.DAYDREAM_HOOK_SH_REQUIRED
-  ? false
-  : MISSING_SH;
+const { hook: HOOK, sh: SH, skip: SKIP, missing: MISSING_SH } = hookUnderTest('pre-push');
 
 test('pre-push refuses a push from a tree that cannot run the suites',
   { skip: SKIP }, (t) => {

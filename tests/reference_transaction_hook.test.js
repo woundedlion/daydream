@@ -14,24 +14,13 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { findSh, isolatedGitEnv } from './helpers/fixture_repo.js';
+import { join } from 'node:path';
+import { hookUnderTest, isolatedGitEnv } from './helpers/fixture_repo.js';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-// MSYS sh reads a drive-letter path but not a backslash one.
-const HOOK = resolve(HERE, '../.githooks/reference-transaction').replace(
-  /\\/g,
-  '/',
-);
+const {
+  hook: HOOK, sh: SH, skip: SKIP, missing: MISSING,
+} = hookUnderTest('reference-transaction');
 const ZERO = '0'.repeat(40);
-
-const SH = findSh();
-const REQUIRED_ENV = 'DAYDREAM_HOOK_SH_REQUIRED';
-const MISSING = 'no POSIX sh available';
-// Cases skip without a shell unless REQUIRED_ENV is set, under which a missing
-// shell fails.
-const SKIP = SH || process.env[REQUIRED_ENV] ? false : MISSING;
 
 describe(
   'reference-transaction hook',
