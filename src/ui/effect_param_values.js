@@ -61,7 +61,7 @@ export function createParamValueSync({
       const isEditing = focused !== null
         && controller.domElement?.contains(focused) === true;
       const { update, value } = resolveParamSync(
-        controller.getValue(), selectorControlValue(parameter), false, isEditing);
+        controller.getValue(), selectorControlValue(parameter), { isEditing });
       if (!update) continue;
       controller.object[controller.property] = value;
       controller.updateDisplay();
@@ -116,7 +116,7 @@ export function createParamValueSync({
         || (focused !== null && c.domElement?.contains(focused) === true));
 
       const { update, value } = resolveParamSync(
-        c.getValue(), liveValue, c.isBoolean, isEditing);
+        c.getValue(), liveValue, { isBoolean: c.isBoolean, isEditing });
       if (!update) continue;
       c.object[c.property] = value;
       c.updateDisplay();

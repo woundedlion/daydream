@@ -14,15 +14,16 @@
  * @param {*} incoming - The engine's latest value for this parameter: a raw
  *   float from the value stream, or an enum selector's requested value.
  *   Compared and returned unchanged unless isBoolean thresholds it.
- * @param {boolean} isBoolean - Whether the controller is a boolean toggle (the
+ * @param {Object} [options]
+ * @param {boolean} [options.isBoolean=false] - Whether the controller is a boolean toggle (the
  *   engine streams bools as 0/1 floats, thresholded at 0.5).
- * @param {boolean} isEditing - Whether the user is actively editing this
+ * @param {boolean} [options.isEditing=false] - Whether the user is actively editing this
  *   controller (focused or dragging) — such a controller must not be overwritten.
  * @returns {{update: boolean, value: number|boolean}} Whether to write, and the
  *   coerced value to write (a boolean when isBoolean). `value` is the coerced
  *   incoming value even when `update` is false.
  */
-export function resolveParamSync(current, incoming, isBoolean, isEditing) {
+export function resolveParamSync(current, incoming, { isBoolean = false, isEditing = false } = {}) {
   const value = isBoolean ? incoming > 0.5 : incoming;
   if (isEditing) return { update: false, value };
   // A NaN engine value would churn every frame (NaN !== current) and a boolean
