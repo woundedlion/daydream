@@ -34,12 +34,9 @@ const STAT_BAR_IDS = ['global-stats-desktop', 'stats-bar'];
  *   faulted: boolean,
  *   faultInfo: { segId: number, message: string } | null,
  *   count: number,
- *   results: Array<{x0: number, x1: number, y0: number, y1: number} | null>,
  *   timings: number[],
  *   arenas: Array<import('../segments/worker_protocol.js').SegArenaMetrics | null>,
- *   fullFrames: boolean[],
  *   warnings?: Array<string[] | null>,
- *   frameSeen: boolean[],
  *   wallTime: number,
  * }} SegmentStatsState
  */
@@ -50,7 +47,6 @@ const STAT_BAR_IDS = ['global-stats-desktop', 'stats-bar'];
  * @typedef {{
  *   label: HTMLTableCellElement,
  *   notice: HTMLElement,
- *   range: HTMLTableCellElement,
  *   compute: HTMLTableCellElement,
  *   scrA: HTMLTableCellElement,
  *   scrB: HTMLTableCellElement,
@@ -199,7 +195,6 @@ export class SegmentStatsView {
 
     let maxTime = 0;
     for (let s = 0; s < numSegs; s++) {
-      const r = state.results[s];
       const timing = state.timings[s] || 0;
       if (timing > maxTime) maxTime = timing;
       const c = cells.rows[s];
@@ -211,9 +206,6 @@ export class SegmentStatsView {
       if (c.label.className !== labelClass) c.label.className = labelClass;
       setText(c.notice, diverged ? warnings.join('; ') : '');
 
-      setText(c.range, !(state.frameSeen[s] && r) ? '?'
-        : state.fullFrames[s] ? 'full frame'
-        : `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]`);
       setText(c.compute, `${timing.toFixed(1)} ms`);
       const computeClass = timing > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
       if (c.compute.className !== computeClass) c.compute.className = computeClass;
@@ -241,7 +233,7 @@ export class SegmentStatsView {
     const table = this.doc.createElement('table');
     const caption = this.doc.createElement('caption');
     caption.className = 'visually-hidden';
-    caption.textContent = 'Per-segment range, compute time, scratch high-water marks and persistent usage';
+    caption.textContent = 'Per-segment compute time, scratch high-water marks and persistent usage';
     table.appendChild(caption);
     /** @param {string} text - Column header label. */
     const colHeader = (text) => {
@@ -279,12 +271,11 @@ export class SegmentStatsView {
     const notices = this.doc.createElement('div');
     notices.className = 'visually-hidden';
 
-    mkRow([colHeader('Segment'), colHeader('Range'), colHeader('Compute'),
+    mkRow([colHeader('Segment'), colHeader('Compute'),
            colHeader('Scr A KiB'), colHeader('Scr B KiB'), colHeader('Persist KiB')]);
 
     const rows = [];
     for (let s = 0; s < numSegs; s++) {
-      const range = td('', 'seg-range');
       const compute = td('', 'seg-time');
       const scrA = td('-');
       const scrB = td('-');
@@ -294,16 +285,16 @@ export class SegmentStatsView {
       notice.id = `seg-notice-${s}`;
       notices.appendChild(notice);
       label.setAttribute('aria-describedby', notice.id);
-      mkRow([label, range, compute, scrA, scrB, persist]);
-      rows.push({ label, notice, range, compute, scrA, scrB, persist });
+      mkRow([label, compute, scrA, scrB, persist]);
+      rows.push({ label, notice, compute, scrA, scrB, persist });
     }
 
     const maxTime = td('', 'seg-time');
-    const maxRow = mkRow([rowHeader('max'), td(''), maxTime, spanCell()]);
+    const maxRow = mkRow([rowHeader('max'), maxTime, spanCell()]);
     maxRow.className = 'seg-total';
 
     const wallTime = td('', 'seg-time');
-    mkRow([rowHeader('round-trip'), td(''), wallTime, spanCell()]);
+    mkRow([rowHeader('round-trip'), wallTime, spanCell()]);
 
     el.replaceChildren(table, notices);
     this.statsTable = table;

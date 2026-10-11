@@ -287,7 +287,7 @@ async function smokeSegmentedMode(browser, origin) {
       const probe = window.daydreamSegmentProbe;
       return getComputedStyle(overlay).display !== 'none'
         && rows.length === 2
-        && rows.every((row) => row.querySelector('.seg-range')?.textContent !== '?')
+        && rows.every((row) => row.lastElementChild?.textContent !== '-')
         && probe.modulePosts === 2
         && probe.transferPosts > 0;
     }, { timeout: READY_TIMEOUT_MS });

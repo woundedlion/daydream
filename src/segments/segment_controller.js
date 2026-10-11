@@ -94,14 +94,6 @@ export class SegmentController {
   #arenas = [];
 
   /**
-   * Per-segment clip disposition of the last reported frame: true when that
-   * worker's effect reports needs_full_frame() || persists_pixels() and it
-   * shaded the whole canvas instead of its band.
-   * @type {boolean[]}
-   */
-  #fullFrames = [];
-
-  /**
    * Per-segment divergence notices from the last reported frame (a parameter
    * or preset the worker's engine refused); null where the segment reported none.
    * @type {Array<string[] | null>}
@@ -253,7 +245,7 @@ export class SegmentController {
    *   frameComposited: boolean, frameSettled: boolean, wallTime: number,
    *   results: Array<FrameResult | null>, scratch: Array<FrameResult | null>,
    *   timings: number[], arenas: Array<SegArenaMetrics | null>,
-   *   fullFrames: boolean[], warnings: Array<string[] | null>,
+   *   warnings: Array<string[] | null>,
    *   frameSeen: boolean[]}}
    */
   get frameState() {
@@ -271,7 +263,6 @@ export class SegmentController {
       scratch: this.#scratch,
       timings: this.#timings,
       arenas: this.#arenas,
-      fullFrames: this.#fullFrames,
       warnings: this.#warnings,
       frameSeen: this.#frameSeen,
     };
@@ -445,7 +436,6 @@ export class SegmentController {
     this.#scratch = new Array(numSegments).fill(null);
     this.#timings = new Array(numSegments).fill(0);
     this.#arenas = new Array(numSegments).fill(null);
-    this.#fullFrames = new Array(numSegments).fill(false);
     this.#warnings = new Array(numSegments).fill(null);
     this.#frameSeen = new Array(numSegments).fill(false);
     this.paramValues = null;
@@ -655,7 +645,6 @@ export class SegmentController {
       };
       this.#timings[msg.segId] = msg.elapsed;
       this.#arenas[msg.segId] = msg.arenaMetrics;
-      this.#fullFrames[msg.segId] = msg.fullFrame === true;
       this.#warnings[msg.segId] = msg.warnings ?? null;
     }
     this.#frameSeen[msg.segId] = true;
@@ -739,7 +728,6 @@ export class SegmentController {
     this.#scratch = [];
     this.#timings = [];
     this.#arenas = [];
-    this.#fullFrames = [];
     this.#warnings = [];
     this.#frameSeen = [];
     this.#ready = false;
@@ -1001,7 +989,6 @@ export class SegmentController {
       // reports fresh 0/'-' rather than a prior generation's values.
       this.#timings.fill(0);
       this.#arenas.fill(null);
-      this.#fullFrames.fill(false);
       this.#warnings.fill(null);
       this.#frameStart = performance.now();
       this.#frameResolve = () => {
@@ -1061,12 +1048,9 @@ export class SegmentController {
       faulted: this.faulted,
       faultInfo: this.faultInfo,
       count: this.count,
-      results: this.#results,
       timings: this.#timings,
       arenas: this.#arenas,
-      fullFrames: this.#fullFrames,
       warnings: this.#warnings,
-      frameSeen: this.#frameSeen,
       wallTime: this.#wallTime,
     });
   }

@@ -985,11 +985,6 @@ div.label {
   color: var(--muted-text);
 }
 
-.segment-stats .seg-range {
-  color: var(--muted-text);
-  font-size: 0.8em;
-}
-
 .segment-stats .seg-total {
   border-top: 1px solid var(--panel-border);
 }

@@ -59,21 +59,15 @@ function makeDoc() {
  * @returns {Object} Snapshot for update().
  */
 function readyState(n, over = {}) {
-  const results = [];
   const timings = [];
   const arenas = [];
-  const fullFrames = [];
-  const frameSeen = [];
   for (let s = 0; s < n; s++) {
-    results.push({ x0: s * 10, x1: s * 10 + 9, y0: 100 + s, y1: 200 + s });
     timings.push(s + 1);
     arenas.push({
       scratch_arena_a: { high_water_mark: 1024 * (s + 1) },
       scratch_arena_b: { high_water_mark: 2048 * (s + 1) },
       persistent_arena: { usage: 4096 * (s + 1) },
     });
-    fullFrames.push(false);
-    frameSeen.push(true);
   }
   return {
     active: true,
@@ -81,11 +75,8 @@ function readyState(n, over = {}) {
     faulted: false,
     faultInfo: null,
     count: n,
-    results,
     timings,
     arenas,
-    fullFrames,
-    frameSeen,
     wallTime: 12.5,
     ...over,
   };
@@ -115,13 +106,11 @@ test('every per-segment metric renders under its own column header', () => {
   new SegmentStatsView(doc).update(readyState(3));
 
   const { head, cell } = grid(stats);
-  assert.deepEqual(head, ['Segment', 'Range', 'Compute', 'Scr A KiB', 'Scr B KiB', 'Persist KiB']);
+  assert.deepEqual(head, ['Segment', 'Compute', 'Scr A KiB', 'Scr B KiB', 'Persist KiB']);
 
   for (let s = 0; s < 3; s++) {
     const row = s + 1; // row 0 is the header
     assert.equal(cell(row, 'Segment').textContent, `Seg ${s}`);
-    assert.equal(cell(row, 'Range').textContent,
-      `x[${s * 10}–${s * 10 + 9}] y[${100 + s}–${200 + s}]`);
     assert.equal(cell(row, 'Compute').textContent, `${(s + 1).toFixed(1)} ms`);
     assert.equal(cell(row, 'Scr A KiB').textContent, `${(s + 1).toFixed(1)}`);
     assert.equal(cell(row, 'Scr B KiB').textContent, `${(2 * (s + 1)).toFixed(1)}`);
@@ -134,29 +123,16 @@ test('every per-segment metric renders under its own column header', () => {
   assert.equal(cell(5, 'Compute').textContent, '12.5 ms');
 });
 
-test('a segment with no frame yet shows ? for its range and - for its arenas', () => {
+test('a segment with no arena metrics shows - for its arenas', () => {
   const { doc, stats } = makeDoc();
   const state = readyState(2);
-  state.frameSeen[1] = false;
   state.arenas[1] = null;
   new SegmentStatsView(doc).update(state);
 
   const { cell } = grid(stats);
-  assert.equal(cell(2, 'Range').textContent, '?');
   assert.equal(cell(2, 'Scr A KiB').textContent, '-');
   assert.equal(cell(2, 'Scr B KiB').textContent, '-');
   assert.equal(cell(2, 'Persist KiB').textContent, '-');
-});
-
-test('a worker that shaded the whole canvas is not reported as a band render', () => {
-  const { doc, stats } = makeDoc();
-  const state = readyState(2);
-  state.fullFrames = [true, false];
-  new SegmentStatsView(doc).update(state);
-
-  const { cell } = grid(stats);
-  assert.equal(cell(1, 'Range').textContent, 'full frame');
-  assert.equal(cell(2, 'Range').textContent, 'x[10–19] y[101–201]');
 });
 
 test('a segment whose engine refused a write is marked with its notices', () => {
@@ -250,10 +226,10 @@ test('the generated table names itself and scopes its headers', () => {
   assert.equal(caption.tagName, 'CAPTION');
   assert.equal(caption.className, 'visually-hidden');
   assert.equal(caption.textContent,
-    'Per-segment range, compute time, scratch high-water marks and persistent usage');
+    'Per-segment compute time, scratch high-water marks and persistent usage');
   const { rows } = grid(stats);
   const headers = rows[0].children;
-  assert.equal(headers.length, 6);
+  assert.equal(headers.length, 5);
   assert.equal(headers[0].textContent, 'Segment');
   for (const header of headers) {
     assert.equal(header.getAttribute('scope'), 'col');
@@ -603,6 +579,6 @@ test('a steady frame rewrites no cell of the table', () => {
   view.update(state);
 
   assert.deepEqual(writes, [],
-    'the ranges and arena marks hold still across frames; writing them anyway '
+    'the arena marks hold still across frames; writing them anyway '
     + 'costs a layout invalidation per cell per composited frame');
 });

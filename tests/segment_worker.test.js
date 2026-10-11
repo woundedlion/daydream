@@ -811,59 +811,6 @@ test('a full-frame-kept clip does not fault the pool', async () => {
 });
 
 /**
- * An installed effect resets the engine to the full-canvas clip, so a clip
- * rejected after it must report a whole-canvas render, not the previous band.
- */
-test('a clip rejected after setEffect reports the full-canvas reset clip', async () => {
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  posted.length = 0;
-  await dispatch({ type: 'render' });
-  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.fullFrame, false,
-    'the band clip is in force');
-
-  engineInstance.clipOk = false;
-  await dispatch({ type: 'setEffect', name: 'Waves' });
-  assert.equal(engineInstance.clip, null, 'the engine is back on the full canvas');
-  posted.length = 0;
-  await dispatch({ type: 'render' });
-  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.fullFrame, true,
-    'the report follows the reset clip, not the rejected band');
-});
-
-/** A clip rejected without an effect rebuild leaves the engine on its previous clip. */
-test('a clip rejected by setDisplayCaps leaves the reported clip disposition alone', async () => {
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  const clipBefore = { ...engineInstance.clip };
-
-  engineInstance.clipOk = false;
-  await dispatch({ type: 'setDisplayCaps', topCap: 1, bottomCap: 1 });
-  assert.deepEqual(engineInstance.clip, clipBefore, 'the engine kept its band clip');
-  posted.length = 0;
-  await dispatch({ type: 'render' });
-  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.fullFrame, false,
-    'the report stays on the band clip');
-});
-
-/**
- * The two clip successes describe different work: APPLIED shades the band,
- * FULL_FRAME_KEPT shades the whole canvas in every worker.
- */
-test('a frame reports whether the whole canvas was shaded', async () => {
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  posted.length = 0;
-  await dispatch({ type: 'render' });
-  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.fullFrame, false,
-    'an installed band is a clipped render');
-
-  engineInstance.fullFrame = true;
-  await dispatch({ type: 'setEffect', name: 'MeshFeedback' });
-  posted.length = 0;
-  await dispatch({ type: 'render' });
-  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.fullFrame, true,
-    'a kept full-canvas clip is reported as one');
-});
-
-/**
  * The serialized queue must isolate a failure (later messages still run) and
  * rethrow it on a fresh task so it reaches the worker's global error handler
  * rather than vanishing as an unhandled rejection.
@@ -1382,8 +1329,8 @@ function typedefShapes(source) {
 // The typedefs are erased at runtime; this pin ties their shapes to
 // PROTOCOL_VERSION, which makes a reshaped message fault.
 const PROTOCOL_SHAPE_PIN = {
-  version: 12,
-  sha256: '44b46801a887f746a431444fed75b9ccfa1f048a53c038c7f773c42ac624833b',
+  version: 13,
+  sha256: '16bba16acbe62dda1dbb1fd0ccfac1b6f5acf9fed8afadabbaea001fc0fcf31f',
 };
 
 test('protocol typedef scanning includes single-line aliases', () => {
