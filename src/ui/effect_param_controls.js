@@ -42,11 +42,12 @@ export function paramWarningTexts(params) {
  * owns no deep-link key, and an unhydrated one owns its key without URL seeding.
  * @param {Gui} gui - The effect GUI to add to.
  * @param {ParameterDefinition} p - The parameter definition.
- * @param {boolean} hydrate - Whether a matching deep link may seed it.
- * @param {boolean} persist - Whether the control owns a deep-link key.
+ * @param {Object} options
+ * @param {boolean} options.hydrate - Whether a matching deep link may seed it.
+ * @param {boolean} options.persist - Whether the control owns a deep-link key.
  * @returns {(object: Record<string, any>, property: string, ...rest: Array<*>) => GuiController}
  */
-function paramAddMethod(gui, p, hydrate, persist) {
+function paramAddMethod(gui, p, { hydrate, persist }) {
   if (p.readonly || !persist) return (...args) => gui.addSession(...args);
   if (!hydrate) return (...args) => gui.addUnhydrated(...args);
   return (...args) => gui.add(...args);
@@ -71,14 +72,15 @@ export function sliderDecimals(min, max) {
  * @param {Gui} gui - The effect GUI to add to.
  * @param {Record<string, any>} state - The GUI-bound value object.
  * @param {ParameterDefinition} p - The parameter definition.
- * @param {boolean} [hydrate=true] - Whether a matching deep link may seed it.
- * @param {boolean} [persist=true] - Whether the control owns a deep-link key.
+ * @param {Object} [options]
+ * @param {boolean} [options.hydrate=true] - Whether a matching deep link may seed it.
+ * @param {boolean} [options.persist=true] - Whether the control owns a deep-link key.
  * @returns {GuiController} The created controller.
  */
 export function addParamControl(
-  gui, state, p, hydrate = true, persist = true) {
+  gui, state, p, { hydrate = true, persist = true } = {}) {
   const kind = paramControlKind(p);
-  const add = paramAddMethod(gui, p, hydrate, persist);
+  const add = paramAddMethod(gui, p, { hydrate, persist });
   let controller;
   if (kind === 'boolean') {
     controller = add(state, p.name);
