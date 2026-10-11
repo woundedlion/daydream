@@ -96,7 +96,8 @@ export const fixtureRepo = (prefix, build) => {
  * @param {string[]} args - Arguments to pass it.
  * @param {Object} [options] - execFileSync options; stdio is pinned so the
  *   command's stderr is captured rather than inherited.
- * @returns {string} The command's stderr.
+ * @param {boolean} [options.captureStdout=false] - Include stdout before stderr.
+ * @returns {string} The command's stderr, preceded by stdout when requested.
  */
 export const expectFailure = (file, args, options = {}) => {
   try {
