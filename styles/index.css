@@ -597,11 +597,10 @@
   .layout-container {
     flex-direction: column;
     position: absolute;
-    /* Allow page to grow */
+    bottom: auto;
     height: auto;
     min-height: 100dvh;
     overflow: visible;
-    /* Let page scroll */
   }
 
   /* GUI Container becomes a flex item at the bottom */
@@ -624,6 +623,7 @@
 
   /* Mobile Main Area Layout */
   .main-area {
+    flex: 1 0 auto;
     flex-direction: column;
     height: auto;
     min-height: 0;
@@ -725,8 +725,8 @@
   }
 
   .canvas-container {
-    flex: 1 1 0;
-    min-height: 0;
+    flex: 1 0 auto;
+    min-height: min(100vw, 50dvh);
   }
 
 }
