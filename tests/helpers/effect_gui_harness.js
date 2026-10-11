@@ -24,7 +24,7 @@ export function chainSnapshotParams() {
   ];
 }
 
-export function latticeMeltParams() {
+export function kaleidoscopeMeltParams() {
   return [
     'Lattice Cell Scale',
     'Lattice Shape',
@@ -53,11 +53,11 @@ export function latticeMeltParams() {
   ].map((name, i) => {
     const groups = [
       {name: 'Function', title: 'Primitive Lattice', order: 7},
-      {name: 'Projection', title: 'Folded Sinusoidal', order: 4},
+      {name: 'Projection', title: 'Equirectangular', order: 4},
       {name: 'Projection Frame', title: 'Spin + Wander', order: 3},
       {name: 'Camera', title: 'Camera', order: 0},
       {name: 'Surface Noise', title: 'Curl', order: 2},
-      {name: 'Colorize', title: 'Generated Triadic', order: 10},
+      {name: 'Colorize', title: 'Generated Analogous', order: 10},
     ];
     const index = i < 4 ? 0 : i === 4 ? 1 : i < 7 ? 2 : i === 7 ? 3 : i < 11 ? 4 : 5;
     return { name, group: groups[index], value: 0.5, min: 0, max: 1, animated: true };

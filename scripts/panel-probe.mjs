@@ -39,7 +39,7 @@ const RING_CLEARANCE = 4;
 
 // The roster's stage-folder schema: its folders truncate control labels to the
 // role each one plays inside its stage.
-const STAGE_EFFECT = 'LatticeMelt';
+const STAGE_EFFECT = 'KaleidoscopeMelt';
 const STAGE_WIDGET = '.effect-gui .lil-gui .lil-controller :is(input, select)';
 // The roster's engine-written telemetry: a value the effect clobbers every
 // frame, which the panel shows but the engine refuses to be written.

@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { stageGrouping } from '../src/effects/shader_stages.js';
-import { kaleidoscopeSmoothParams, latticeMeltParams } from './helpers/effect_gui_harness.js';
+import { kaleidoscopeSmoothParams, kaleidoscopeMeltParams } from './helpers/effect_gui_harness.js';
 
 test('stageGrouping uses registered titles and pipeline order', () => {
-  const params = latticeMeltParams();
+  const params = kaleidoscopeMeltParams();
   const grouping = stageGrouping(params);
   assert.deepEqual(grouping.order, ['Camera', 'Surface Noise', 'Projection Frame', 'Projection', 'Function', 'Colorize']);
   assert.equal(grouping.titles.get('Surface Noise'), 'Curl');

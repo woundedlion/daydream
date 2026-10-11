@@ -5,12 +5,12 @@ import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
 import { createEffectGui } from '../src/ui/effect_gui.js';
 import { stageGrouping } from '../src/effects/shader_stages.js';
-const LATTICE_MELT_STAGE_ORDER = ['Camera', 'Surface Noise', 'Projection Frame', 'Projection', 'Function', 'Colorize'];
+const KALEIDOSCOPE_MELT_STAGE_ORDER = ['Camera', 'Surface Noise', 'Projection Frame', 'Projection', 'Function', 'Colorize'];
 const KALEIDOSCOPE_SMOOTH_STAGE_ORDER = ['Camera', 'Projection Frame', 'Projection', 'Planar Warp 2', 'Function', 'Colorize'];
 import {
   chainSnapshot,
   chainSnapshotParams,
-  latticeMeltParams,
+  kaleidoscopeMeltParams,
   kaleidoscopeSmoothParams,
   makeHarness,
   SPEED,
@@ -112,7 +112,7 @@ test('sparse enum controls roundtrip numeric IDs and reject gaps before a write'
 });
 
 test('stage controls sharing a visible label keep distinct accessible names', () => {
-  const params = latticeMeltParams();
+  const params = kaleidoscopeMeltParams();
   const h = makeHarness({
     params,
     engineValues: params.map((parameter) => parameter.value),
@@ -138,7 +138,7 @@ test('stage controls sharing a visible label keep distinct accessible names', ()
 });
 
 test('a schema rebuild keeps the stage folders the user collapsed', () => {
-  const params = latticeMeltParams();
+  const params = kaleidoscopeMeltParams();
   const h = makeHarness({
     params,
     engineValues: params.map((parameter) => parameter.value),
@@ -148,20 +148,20 @@ test('a schema rebuild keeps the stage folders the user collapsed', () => {
   h.panel.mount();
   const folder = (name) => h.gui().folders.find((f) => f.name === name);
   folder('Curl').close();
-  folder('Generated Triadic').close();
+  folder('Generated Analogous').close();
 
   h.state.generation = 8;
   h.panel.sync();
 
   assert.equal(h.guis.length, 2, 'the panel was rebuilt');
-  assert.deepEqual(h.gui().folders.map((f) => f.name), ['Camera', 'Curl', 'Spin + Wander', 'Folded Sinusoidal', 'Primitive Lattice', 'Generated Triadic']);
+  assert.deepEqual(h.gui().folders.map((f) => f.name), ['Camera', 'Curl', 'Spin + Wander', 'Equirectangular', 'Primitive Lattice', 'Generated Analogous']);
   assert.equal(folder('Curl').closed, true);
-  assert.equal(folder('Generated Triadic').closed, true);
+  assert.equal(folder('Generated Analogous').closed, true);
   assert.equal(folder('Primitive Lattice').closed, false, 'the rest stay open');
 });
 
-test('LatticeMelt controls use the fixed pipeline modes as folders', () => {
-  const params = latticeMeltParams();
+test('KaleidoscopeMelt controls use the fixed pipeline modes as folders', () => {
+  const params = kaleidoscopeMeltParams();
   const assignments = stageGrouping(params).assignments;
   const h = makeHarness({
     params,
@@ -171,25 +171,25 @@ test('LatticeMelt controls use the fixed pipeline modes as folders', () => {
   h.panel.build();
 
   assert.deepEqual([...new Set(assignments.values())].sort(),
-    [...LATTICE_MELT_STAGE_ORDER].sort());
+    [...KALEIDOSCOPE_MELT_STAGE_ORDER].sort());
   assert.deepEqual(h.gui().folders.map((folder) => folder.name),
-    ['Camera', 'Curl', 'Spin + Wander', 'Folded Sinusoidal',
-      'Primitive Lattice', 'Generated Triadic']);
+    ['Camera', 'Curl', 'Spin + Wander', 'Equirectangular',
+      'Primitive Lattice', 'Generated Analogous']);
   assert.equal(h.gui().ctrl('Camera Wander').folder, 'Camera');
   assert.equal(h.gui().ctrl('Camera Wander').label, 'Wander');
   assert.equal(h.gui().ctrl('Surface Noise Strength').folder, 'Curl');
   assert.equal(h.gui().ctrl('Surface Noise Strength').label, 'Strength');
   assert.equal(h.gui().ctrl('Projection Spin Speed').folder, 'Spin + Wander');
   assert.equal(h.gui().ctrl('Projection Spin Speed').label, 'Spin Speed');
-  assert.equal(h.gui().ctrl('Central Meridian').folder, 'Folded Sinusoidal');
+  assert.equal(h.gui().ctrl('Central Meridian').folder, 'Equirectangular');
   assert.equal(h.gui().ctrl('Lattice Cell Scale').folder, 'Primitive Lattice');
   assert.equal(h.gui().ctrl('Lattice Cell Scale').label, 'Cell Scale');
-  assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Generated Triadic');
+  assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Generated Analogous');
   assert.deepEqual(h.warnings, [], 'every parameter reached a stage');
 });
 
 test('a staged schema builds an unclaimed parameter at the top level', () => {
-  const params = [...latticeMeltParams(),
+  const params = [...kaleidoscopeMeltParams(),
     { name: 'Palette Surprise', value: 0.5, min: 0, max: 1, animated: true }];
   const h = makeHarness({
     params,

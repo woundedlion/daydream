@@ -7,7 +7,7 @@ import { EXPORT_COPIED, EXPORT_FAILED, FLASH_MS } from '../src/ui/effect_actions
 import {
   chainSnapshot,
   chainSnapshotParams,
-  latticeMeltParams,
+  kaleidoscopeMeltParams,
   fakeCopyText,
   exportStatus,
   makeHarness,
@@ -765,7 +765,7 @@ test('a filter change rebuilds the panel on the next sync', () => {
 });
 
 test('externally rendered stage parameters build no stage folders', () => {
-  const params = latticeMeltParams();
+  const params = kaleidoscopeMeltParams();
   const h = makeHarness({ params, engineValues: params.map((parameter) => parameter.value) });
   h.state.paramFilter = { external: true };
   h.panel.build();
