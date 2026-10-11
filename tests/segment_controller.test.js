@@ -24,6 +24,8 @@ import {
   readyController,
   flush,
   deliverFrame,
+  deliverGeneration,
+  gridHalves,
   fakeEngine,
 } from './helpers/segment_controller_harness.js';
 
@@ -274,9 +276,7 @@ test('a generation overtaken by a resolution change is never published', async (
   const scratch = c.frameState.scratch;
 
   c.setResolution(8, 8);
-  deliverFrame(c, 0);
-  deliverFrame(c, 1);
-  await flush();
+  await deliverGeneration(c);
 
   assert.equal(c.frameState.renderInFlight, false, 'the overtaken render still settled');
   assert.equal(c.frameState.pendingFrame, false, 'nothing is queued for the compositor');
@@ -286,9 +286,7 @@ test('a generation overtaken by a resolution change is never published', async (
   c.tick();
   assert.equal(c.frameState.frameComposited, false, 'the next tick composites nothing');
   assert.equal(c.frameState.pendingFrame, false);
-  deliverFrame(c, 0);
-  deliverFrame(c, 1);
-  await flush();
+  await deliverGeneration(c);
 });
 
 test('a generation cut short by a worker fault is never published', async () => {
@@ -824,15 +822,11 @@ test('paused cap edits fence old frames and dispatch a replacement after they se
   try {
     c.setDisplayCaps(2, 3);
     assert.notEqual(c.frameState.inflightGen, c.frameState.renderGen);
-    deliverFrame(c, 0);
-    deliverFrame(c, 1);
-    await flush();
+    await deliverGeneration(c);
     assert.equal(c.frameState.renderInFlight, true);
     assert.equal(c.frameState.inflightGen, c.frameState.renderGen);
     assert.ok(c.frameState.results.every((frame) => frame === null));
-    deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
-    deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
-    await flush();
+    await deliverGeneration(c, gridHalves());
     assert.equal(c.frameState.renderInFlight, false);
     assert.ok(driver.invalidations > 0);
   } finally {
