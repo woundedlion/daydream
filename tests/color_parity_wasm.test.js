@@ -38,6 +38,16 @@ test('WASM parity module is present with the exports this suite pins', () => {
 const FLOAT_EPS = 5e-6;
 const near = (a, b, eps = FLOAT_EPS) => Math.abs(a - b) <= eps;
 
+/**
+ * Asserts each named component of two vectors agrees within FLOAT_EPS.
+ * @param {Record<string, number>} actual - Measured components.
+ * @param {Record<string, number>} expected - Reference components.
+ * @param {string[]} keys - Component names to compare.
+ * @param {string} message - Failure message.
+ */
+const assertNear = (actual, expected, keys, message) =>
+  assert.ok(keys.every((key) => near(actual[key], expected[key])), message);
+
 /** Verifies the sRGB transfer function and its inverse match color.js. */
 test('sRGB transfer parity (srgb_to_linear / linear_to_srgb)', () => {
   for (const s of [0, 0.01, 0.04045, 0.05, 0.2, 0.5, 0.8, 1]) {
@@ -57,13 +67,13 @@ test('sRGB transfer parity (srgb_to_linear / linear_to_srgb)', () => {
  */
 test('OKLab golden values (absolute pin)', () => {
   const fwd1 = M.linear_rgb_to_oklab(0.1, 0.5, 0.9);
-  assert.ok(near(fwd1.L, 0.757296) && near(fwd1.a, -0.067583) && near(fwd1.b, -0.101862),
+  assertNear(fwd1, { L: 0.757296, a: -0.067583, b: -0.101862 }, ['L', 'a', 'b'],
     `oklab(0.1,0.5,0.9): (${fwd1.L},${fwd1.a},${fwd1.b})`);
   const fwdRed = M.linear_rgb_to_oklab(1, 0, 0);
-  assert.ok(near(fwdRed.L, 0.627955) && near(fwdRed.a, 0.224863) && near(fwdRed.b, 0.125846),
+  assertNear(fwdRed, { L: 0.627955, a: 0.224863, b: 0.125846 }, ['L', 'a', 'b'],
     `oklab(1,0,0) vs Ottosson red: (${fwdRed.L},${fwdRed.a},${fwdRed.b})`);
   const inv = M.oklab_to_linear_rgb(0.7, 0.1, -0.05);
-  assert.ok(near(inv.r, 0.57893) && near(inv.g, 0.228833) && near(inv.b, 0.50137),
+  assertNear(inv, { r: 0.57893, g: 0.228833, b: 0.50137 }, ['r', 'g', 'b'],
     `oklab_to_linear_rgb(0.7,0.1,-0.05): (${inv.r},${inv.g},${inv.b})`);
 });
 
@@ -83,7 +93,7 @@ test('OKLCh transform parity (oklab_to_linear_rgb)', () => {
         const w = M.oklab_to_linear_rgb(
           lightness, chroma * Math.cos(angle), chroma * Math.sin(angle));
         const [r, g, b] = oklchLinearRgb(lightness, chroma, turns);
-        assert.ok(near(w.r, r) && near(w.g, g) && near(w.b, b),
+        assertNear(w, { r, g, b }, ['r', 'g', 'b'],
           `oklch(${lightness},${chroma},${turns}): `
           + `wasm(${w.r},${w.g},${w.b}) js(${r},${g},${b})`);
       }
@@ -586,7 +596,7 @@ test('lissajous parity (lissajous)', () => {
   for (const [m1, m2, a, t] of [[3, 2, 0, 0.7], [5, 4, 0.5, 1.2], [1, 1, 0, 0], [2, 3, 1.1, 2.5]]) {
     const w = M.lissajous(m1, m2, a, t);
     const j = L.lissajous(m1, m2, a, t);
-    assert.ok(near(w.x, j.x) && near(w.y, j.y) && near(w.z, j.z),
+    assertNear(w, j, ['x', 'y', 'z'],
       `lissajous(${m1},${m2},${a},${t}): wasm(${w.x},${w.y},${w.z}) js(${j.x},${j.y},${j.z})`);
   }
 });
@@ -596,10 +606,10 @@ test('lissajous parity (lissajous)', () => {
  */
 test('lissajous golden points (absolute pin)', () => {
   const p1 = M.lissajous(3, 2, 0, 0.7);
-  assert.ok(near(p1.x, -0.4975) && near(p1.y, 0.169967) && near(p1.z, 0.850649),
+  assertNear(p1, { x: -0.4975, y: 0.169967, z: 0.850649 }, ['x', 'y', 'z'],
     `lissajous(3,2,0,0.7): (${p1.x},${p1.y},${p1.z})`);
   const p2 = M.lissajous(5, 4, 0.5, 1.2);
-  assert.ok(near(p2.x, -0.705952) && near(p2.y, 0.087499) && near(p2.z, 0.702834),
+  assertNear(p2, { x: -0.705952, y: 0.087499, z: 0.702834 }, ['x', 'y', 'z'],
     `lissajous(5,4,0.5,1.2): (${p2.x},${p2.y},${p2.z})`);
   for (const p of [p1, p2]) {
     assert.ok(near(Math.hypot(p.x, p.y, p.z), 1),
@@ -673,7 +683,7 @@ test('mobius preset parity (mobius_transform)', () => {
     for (const p of MOBIUS_POINTS) {
       const w = M.mobius_transform(p[0], p[1], p[2], ...args);
       const j = mobiusSphereJs(p, coeffs);
-      assert.ok(near(w.x, j.x) && near(w.y, j.y) && near(w.z, j.z),
+      assertNear(w, j, ['x', 'y', 'z'],
         `${name}(t=${t}) at (${p}): wasm(${w.x},${w.y},${w.z}) js(${j.x},${j.y},${j.z})`);
       assert.ok(near(Math.hypot(w.x, w.y, w.z), 1),
         `${name}(t=${t}) at (${p}) left the unit sphere`);
@@ -689,10 +699,10 @@ test('mobius preset parity (mobius_transform)', () => {
 test('mobius golden images (absolute pin)', () => {
   for (const [x, y, z] of MOBIUS_POINTS) {
     const id = M.mobius_transform(x, y, z, 1, 0, 0, 0, 0, 0, 1, 0);
-    assert.ok(near(id.x, x) && near(id.y, y) && near(id.z, z),
+    assertNear(id, { x, y, z }, ['x', 'y', 'z'],
       `identity moved (${x},${y},${z}) to (${id.x},${id.y},${id.z})`);
     const inv = M.mobius_transform(x, y, z, 0, 0, 1, 0, 1, 0, 0, 0);
-    assert.ok(near(inv.x, x) && near(inv.y, -y) && near(inv.z, -z),
+    assertNear(inv, { x, y: -y, z: -z }, ['x', 'y', 'z'],
       `1/z mapped (${x},${y},${z}) to (${inv.x},${inv.y},${inv.z}), want (${x},${-y},${-z})`);
   }
 });
