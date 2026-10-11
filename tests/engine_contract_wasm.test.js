@@ -16,7 +16,7 @@ import {
   DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure,
 } from '../src/workbench/solids/solid_codegen.js';
 import {
-  FakeChainEngine, ChainSnapshotRestoreResult,
+  FakeChainEngine, ChainSnapshotRestoreResult, ChainStatus,
 } from './helpers/fake_engine.js';
 import { isViewLive, refreshPixelView } from '../src/renderer/pixel_view.js';
 import { DEFAULT_EFFECT, resolutionPresets } from '../src/effects/effect_roster.js';
@@ -387,8 +387,13 @@ test('chain refusal statuses match the fake engine payload contracts', () => {
   const payloads = [null, [null], [duplicate, null], [],
     Array.from({ length: max + 1 }, () => ({})), [duplicate, duplicate]];
   const plain = ({ status, code, entryIndex }) => ({ status: status.value, code, entryIndex });
-  for (const payload of payloads)
-    assert.deepEqual(plain(chainCall(engine, 'setShaderChain', payload)), plain(chainCall(fake, 'setShaderChain', payload)));
+  for (const payload of payloads) {
+    const refused = plain(chainCall(engine, 'setShaderChain', payload));
+    assert.equal(typeof refused.status, 'number');
+    assert.notEqual(refused.status, ChainStatus.OK.value);
+    assert.equal(refused.code, Object.keys(ChainStatus).find((name) => ChainStatus[name].value === refused.status));
+    assert.deepEqual(refused, plain(chainCall(fake, 'setShaderChain', payload)));
+  }
   assert.equal(engine.setEffect('Comets'), M.EffectSetResult.INSTALLED);
   fake.setEffect('Comets');
   assert.equal(engine.getShaderChainBindings(), null);
@@ -413,9 +418,12 @@ test('chain snapshots match fake key sets, decode refusals and runtime round tri
     { ...saved, paletteBank: { ...saved.paletteBank, hues: null } },
     { ...saved, paletteBank: { ...saved.paletteBank, cycles: null } },
     { ...saved, paletteBank: { ...saved.paletteBank, hues: [] } },
-    { ...saved, paletteBank: { ...saved.paletteBank, cycles: [] } }])
-    assert.equal(chainCall(fake, 'restoreSnapshot', snapshot).value,
-      chainCall(engine, 'restoreSnapshot', snapshot).value);
+    { ...saved, paletteBank: { ...saved.paletteBank, cycles: [] } }]) {
+    const refused = chainCall(engine, 'restoreSnapshot', snapshot).value;
+    assert.equal(typeof refused, 'number');
+    assert.notEqual(refused, ChainSnapshotRestoreResult.APPLIED.value);
+    assert.equal(chainCall(fake, 'restoreSnapshot', snapshot).value, refused);
+  }
   const [write] = saved.parameters;
   const enumName = fake.definitions.find((definition) => definition.options)?.name;
   assert.ok(enumName, 'the default chain exposes an enum parameter');
