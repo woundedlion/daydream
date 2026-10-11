@@ -446,7 +446,7 @@ export function installSegmentWorker() {
         let arenaMetrics;
         try {
           arenaMetrics = engine.getArenaMetrics();
-          // Convert to a plain SegArenaMetrics (embind vals can't be transferred).
+          // Project the engine metrics onto the SegArenaMetrics wire fields.
           arenaMetrics = {
             scratch_arena_a: {
               usage: arenaMetrics.scratch_arena_a.usage,

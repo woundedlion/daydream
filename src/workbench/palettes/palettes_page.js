@@ -345,8 +345,9 @@ function getNormalizedX(event) {
 
 /**
  * Handles the start of a drag or click on the color strip.
+ * @param {PointerEvent} event
+ * @returns {boolean|void}
  */
-/** @param {PointerEvent} event @returns {boolean|void} */
 function handleDragStart(event) {
   if (!colorStripCanvas) return false;
 
@@ -361,8 +362,8 @@ function handleDragStart(event) {
 /**
  * Handles pointer movement during a drag.
  * Cancels selection if the pointer moves above or below the canvas.
+ * @param {PointerEvent} event
  */
-/** @param {PointerEvent} event */
 function handleDragMove(event) {
   dragEndPosition = getNormalizedX(event);
 
@@ -379,8 +380,8 @@ function handleDragMove(event) {
 
 /**
  * Handles the end of a drag (zoom) or a simple click (copy color).
+ * @param {PointerEvent} event
  */
-/** @param {PointerEvent} event */
 function handleDragEnd(event) {
   if (!colorStripCanvas) return;
 
