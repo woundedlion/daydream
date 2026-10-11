@@ -5,7 +5,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
+import { applyChainDocument, resolveParameterWrite } from '../src/workbench/shader/chain_apply.js';
+
+test('parameter writes reject nonnumeric values and resolve sparse option labels', () => {
+  const definitions = [{name: 'speed'}, {name: 'mode', options: ['One', 'Six'], optionValues: [1, 6]}];
+  for (const value of [null, undefined, true, {}, NaN, Infinity, -Infinity])
+    assert.match(resolveParameterWrite(definitions, 'speed', value), /no numeric value/);
+  assert.match(resolveParameterWrite(definitions, 'speed', '1'), /no option/);
+  assert.deepEqual(resolveParameterWrite(definitions, 'speed', 1), {name: 'speed', stored: 1});
+  assert.deepEqual(resolveParameterWrite(definitions, 'mode', 'Six'), {name: 'mode', stored: 6});
+  assert.match(resolveParameterWrite(definitions, 'mode', 2), /no option value/);
+});
 import {
   FakeChainEngine, ParamSetResult,
 } from './helpers/fake_engine.js';

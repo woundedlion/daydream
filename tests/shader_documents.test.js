@@ -404,7 +404,11 @@ test('the fixed apply skips the Ash Cloud baked topology and constant ids and wr
   const ids = Object.keys(ashCloud.preset_bank.presets[0].values);
   const definitions = ids
     .filter((id) => !BAKED.has(id.slice(id.indexOf('.') + 1)))
-    .map((id) => ({ name: engineParameterName(id) }))
+    .map((id) => {
+      const value = ashCloud.preset_bank.presets[0].values[id];
+      return {name: engineParameterName(id), ...(typeof value === 'string'
+        ? {options: [value], optionValues: [0]} : {})};
+    })
     .filter((definition) => definition.name !== 'Camera Spin Speed');
   const engine = fixedEngine(() => true);
   engine.getParameterDefinitions = () => definitions;
@@ -414,7 +418,7 @@ test('the fixed apply skips the Ash Cloud baked topology and constant ids and wr
     engine, MODULE, { document: ashCloud }, 'ash-cloud', ['ash-cloud'], BAKED, fixedDerivedBinding), null);
   assert.equal(engine.writes.some(([name]) => name === 'Camera Spin Speed'), false);
   const expectedWrites = Object.entries(ashCloud.preset_bank.presets[0].values)
-    .map(([id, value]) => [engineParameterName(id), value])
+    .map(([id, value]) => [engineParameterName(id), typeof value === 'string' ? 0 : value])
     .filter(([name]) => definitions.some((definition) => definition.name === name));
   assert.deepEqual(engine.writes, expectedWrites);
 });
