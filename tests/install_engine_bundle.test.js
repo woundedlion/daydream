@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { installEngineBundle, runtimePath } from '../scripts/install-engine-bundle.mjs';
+import { installEngineBundle, runtimePath, RUNTIME_PATHS } from '../scripts/install-engine-bundle.mjs';
 
 const AMBIENT_BUNDLE_PIN = process.env.HOLOSPHERE_BUNDLE_PIN;
 beforeEach(() => { delete process.env.HOLOSPHERE_BUNDLE_PIN; });
@@ -33,13 +33,7 @@ function fixture(t, shape = () => {}) {
   write(destination, 'docs/screenshots/nested/obsolete.png', 'obsolete');
   write(destination, 'docs/screenshots/notes.txt', 'notes');
   const files = Object.fromEntries([
-    'generated/holosphere_wasm.d.ts', 'generated/holosphere_bindings.d.ts', 'generated/engine_types.d.ts',
-    'generated/engine_contract.mjs', 'generated/segment_geometry.js', 'generated/segment_geometry.d.ts',
-    'README.md', 'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm', 'generated/holosphere_wasm.wasm.sha256',
-    'generated/holosphere_wasm.toolchain', 'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs',
-    'generated/shader/sha256.mjs', 'generated/shader/engine_catalog.json',
-    'generated/shader/composed_effect_roster.mjs',
-    'generated/shader/patterns/catalog.json', 'generated/shader/patterns/new.shader.json',
+    ...RUNTIME_PATHS, 'generated/shader/patterns/new.shader.json',
   ].map((path) => [path, `fresh ${path}`]));
   files['generated/holosphere_wasm.sha'] = 'b'.repeat(40);
   shape(files);
@@ -56,7 +50,7 @@ test('install replaces stale assets and preserves consumer-owned files', (t) => 
   const { bundle, destination } = fixture(t);
   installEngineBundle(bundle, destination);
   assert.deepEqual(log.mock.calls.map(({ arguments: args }) => args),
-    [[`Installed 19 engine assets (${'a'.repeat(40)} -> ${'b'.repeat(40)})`]]);
+    [[`Installed ${RUNTIME_PATHS.size + 1} engine assets (${'a'.repeat(40)} -> ${'b'.repeat(40)})`]]);
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.js'), 'utf8'),
     'fresh generated/holosphere_wasm.js');
   assert.equal(readFileSync(join(destination, 'generated/shader/composed_effect_roster.mjs'), 'utf8'),
@@ -102,7 +96,7 @@ test('a bundle from another engine commit than the declared pin is refused', (t)
   process.env.HOLOSPHERE_BUNDLE_PIN = 'b'.repeat(40);
   installEngineBundle(bundle, destination);
   assert.deepEqual(log.mock.calls.map(({ arguments: args }) => args),
-    [[`Installed 19 engine assets (${'a'.repeat(40)} -> ${'b'.repeat(40)})`]]);
+    [[`Installed ${RUNTIME_PATHS.size + 1} engine assets (${'a'.repeat(40)} -> ${'b'.repeat(40)})`]]);
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'b'.repeat(40));
 });
 
@@ -116,15 +110,7 @@ test('a bundle whose source pin is not one full commit is refused', (t) => {
   assert.equal(existsSync(join(destination, 'generated/holosphere_wasm.js')), false);
 });
 
-test('a bundle missing a required asset is refused before any destination changes', (t) => {
-  const { bundle, destination } = fixture(t, (files) => {
-    delete files['generated/holosphere_wasm.toolchain'];
-  });
-  assert.throws(() => installEngineBundle(bundle, destination),
-    /Engine bundle is missing generated\/holosphere_wasm\.toolchain/);
-  assert.equal(existsSync(join(destination, 'generated/holosphere_wasm.js')), false);
-  assert.equal(existsSync(join(destination, 'generated/shader/patterns/obsolete.shader.json')), true);
-});
+
 
 test('a destination without daydream.js is not a checkout', (t) => {
   const { bundle, destination } = fixture(t);
@@ -151,7 +137,7 @@ test('install initializes a checkout with no previous engine pin', (t) => {
   rmSync(join(destination, 'generated/holosphere_wasm.sha'));
   installEngineBundle(bundle, destination);
   assert.deepEqual(log.mock.calls.map(({ arguments: args }) => args),
-    [[`Installed 19 engine assets (none -> ${'b'.repeat(40)})`]]);
+    [[`Installed ${RUNTIME_PATHS.size + 1} engine assets (none -> ${'b'.repeat(40)})`]]);
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'b'.repeat(40));
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.js'), 'utf8'),
     'fresh generated/holosphere_wasm.js');
@@ -167,20 +153,15 @@ test('runtime mirrors include engine documents but exclude Daydream sources', ()
     'src/workbench/shader/shader_documents.js']) assert.equal(runtimePath(path), false, path);
 });
 
-test('a bundle missing shader catalog data is refused before installation', (t) => {
-  const { bundle, destination } = fixture(t, (files) => {
-    delete files['generated/shader/patterns/catalog.json'];
-  });
-  assert.throws(() => installEngineBundle(bundle, destination), /missing generated\/shader\/patterns\/catalog\.json/);
-  assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
-});
 
-test('a bundle missing the composed-effect roster is refused before installation', (t) => {
-  const { bundle, destination } = fixture(t, (files) => {
-    delete files['generated/shader/composed_effect_roster.mjs'];
-  });
+
+
+
+for (const missing of RUNTIME_PATHS) test(`a bundle missing ${missing} preserves its destination`, (t) => {
+  const {bundle, destination} = fixture(t, (files) => { delete files[missing]; });
   assert.throws(() => installEngineBundle(bundle, destination),
-    /missing generated\/shader\/composed_effect_roster\.mjs/);
+    {message: `Engine bundle is missing ${missing}`});
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
   assert.equal(existsSync(join(destination, 'generated/holosphere_wasm.js')), false);
+  assert.equal(existsSync(join(destination, 'generated/shader/patterns/obsolete.shader.json')), true);
 });
