@@ -692,7 +692,7 @@ test('a correction the engine refuses does not re-enter the subscription', () =>
 test('a correction drops the outgoing effect param URL entries', () => {
   const app = makeApp({ resolution: 'Lo', effect: 'Gamma' });
 
-  app.pipeline.applyResolution(true);
+  app.pipeline.applyResolution({ preserveParams: true });
 
   assert.equal(app.state.effect, 'Alpha');
   assert.equal(app.log.includes('clearEffectParamUrl'), true);
@@ -701,7 +701,7 @@ test('a correction drops the outgoing effect param URL entries', () => {
 test('a preserving apply that keeps the effect keeps its param URL entries', () => {
   const app = makeApp({ resolution: 'Lo', effect: 'Alpha' });
 
-  app.pipeline.applyResolution(true);
+  app.pipeline.applyResolution({ preserveParams: true });
 
   assert.equal(app.log.includes('clearEffectParamUrl'), false);
 });
@@ -749,7 +749,7 @@ test('a refused chain restore rejects a resolution transaction before rebuilding
 
 test('resolution correction discards the outgoing chain snapshot and parameter URL', () => {
   const app = makeApp({resolution: 'Lo', effect: 'Gamma', chainSnapshot: {schemaVersion: 2}});
-  assert.equal(app.pipeline.applyResolution(true), ApplyResult.APPLIED);
+  assert.equal(app.pipeline.applyResolution({ preserveParams: true }), ApplyResult.APPLIED);
   assert.equal(app.log.includes('chain.capture'), true);
   assert.equal(app.log.includes('chain.restore'), false);
   assert.equal(app.log.includes('clearEffectParamUrl'), true);
