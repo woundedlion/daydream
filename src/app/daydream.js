@@ -375,7 +375,7 @@ export function start({
   // GUI + Sidebar Setup
   ///////////////////////////////////////////////////////////////////////////////
 
-  const guiInstance = createGui({ autoPlace: false }, 'view');
+  const guiInstance = createGui({ autoPlace: false, title: 'View' }, 'view');
   guiInstance.domElement.classList.add('global-gui');
   if (win.matchMedia?.(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`).matches ?? false) {
     guiInstance.close();
@@ -451,7 +451,7 @@ export function start({
       showImportNotice: (message) => applyNotice.show(message, CONFIG_NOTICE),
     },
     host: {
-      createGui: () => createGui({ autoPlace: false }, 'fx'),
+      createGui: () => createGui({ autoPlace: false, title: 'Effect' }, 'fx'),
       container: () => shaderWorkbench ? null : doc.getElementById('gui-container'),
       isMobile: () => win.matchMedia?.(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`).matches ?? false,
       copyText: copyToClipboard,
