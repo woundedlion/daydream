@@ -774,6 +774,32 @@ export function documentEvents() {
 }
 
 /**
+ * Snapshots the named globalThis slots.
+ * @param {...string} names - Global names to save.
+ * @returns {() => void} Restores each saved value, deleting a slot that was
+ *   undefined.
+ */
+export function stashGlobals(...names) {
+  const saved = names.map((name) => [name, globalThis[name]]);
+  return () => {
+    for (const [name, value] of saved) {
+      if (value === undefined) delete globalThis[name];
+      else globalThis[name] = value;
+    }
+  };
+}
+
+/**
+ * Registers an afterEach that restores the named globalThis slots to their
+ * pre-suite values.
+ * @param {...string} names - Global names to restore.
+ * @returns {void}
+ */
+export function restoreGlobalsAfterEach(...names) {
+  afterEach(stashGlobals(...names));
+}
+
+/**
  * Installs a fake globalThis.document.
  * @param {Object} [surface] - Document members the module under test reads.
  * @returns {Object} The installed document.
@@ -789,11 +815,7 @@ export function installDocument(surface = {}) {
  * @returns {void}
  */
 export function restoreDocumentAfterEach() {
-  const saved = globalThis.document;
-  afterEach(() => {
-    if (saved === undefined) delete globalThis.document;
-    else globalThis.document = saved;
-  });
+  restoreGlobalsAfterEach('document');
 }
 
 /**
@@ -823,11 +845,7 @@ export function installWindow(surface = {}) {
  * @returns {void}
  */
 export function restoreWindowAfterEach() {
-  const saved = globalThis.window;
-  afterEach(() => {
-    if (saved === undefined) delete globalThis.window;
-    else globalThis.window = saved;
-  });
+  restoreGlobalsAfterEach('window');
 }
 
 /**

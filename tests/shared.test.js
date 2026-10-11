@@ -6,7 +6,7 @@ import { register } from 'node:module';
 import {
   log, Mesh, PerspectiveCamera, Scene, WebGLRenderer, OrbitControls,
 } from './helpers/fake_three.js';
-import { fakeElement, installDocument } from './helpers/fake_dom.js';
+import { fakeElement, installDocument, restoreGlobalsAfterEach } from './helpers/fake_dom.js';
 
 /**
  * A container element reporting the box the scene is sized against.
@@ -29,19 +29,9 @@ const { capPixelRatio, getCssColor, initScene } = shared;
 
 const RAF_ID = 7;
 
-const saved = {
-  document: globalThis.document,
-  window: globalThis.window,
-  getComputedStyle: globalThis.getComputedStyle,
-  requestAnimationFrame: globalThis.requestAnimationFrame,
-  cancelAnimationFrame: globalThis.cancelAnimationFrame,
-  ResizeObserver: globalThis.ResizeObserver,
-};
+restoreGlobalsAfterEach('document', 'window', 'getComputedStyle',
+  'requestAnimationFrame', 'cancelAnimationFrame', 'ResizeObserver');
 afterEach(() => {
-  for (const [key, value] of Object.entries(saved)) {
-    if (value === undefined) delete globalThis[key];
-    else globalThis[key] = value;
-  }
   log.length = 0;
 });
 

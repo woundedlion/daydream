@@ -1,7 +1,9 @@
-import { test, afterEach } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EffectSidebar } from '../src/ui/sidebar.js';
-import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
+import {
+  fakeElement, installDocument, restoreDocumentAfterEach, restoreGlobalsAfterEach,
+} from './helpers/fake_dom.js';
 
 // EffectSidebar over the shared fake nodes: dispose detaches every
 // listener/observer and clears every ref the constructor created.
@@ -16,12 +18,6 @@ class FakeResizeObserver {
 const rafCallbacks = new Map();
 let rafId = 0;
 const cancelledRaf = [];
-
-const saved = {
-  ResizeObserver: globalThis.ResizeObserver,
-  requestAnimationFrame: globalThis.requestAnimationFrame,
-  cancelAnimationFrame: globalThis.cancelAnimationFrame,
-};
 
 // The observer and frame timers the sidebar is expected to take from the
 // container's own window, not from globalThis.
@@ -48,13 +44,7 @@ function installDom() {
 }
 
 restoreDocumentAfterEach();
-
-afterEach(() => {
-  for (const [k, v] of Object.entries(saved)) {
-    if (v === undefined) delete globalThis[k];
-    else globalThis[k] = v;
-  }
-});
+restoreGlobalsAfterEach('ResizeObserver', 'requestAnimationFrame', 'cancelAnimationFrame');
 
 function makeSidebar() {
   installDom();

@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fakeElement, installDocument } from './helpers/fake_dom.js';
+import { fakeElement, installDocument, stashGlobals } from './helpers/fake_dom.js';
 import { captureConsole } from './helpers/fake_console.js';
 
 import { SLOW_FRAME_MS } from '../src/renderer/frame_constants.js';
@@ -210,12 +210,12 @@ test('a cell that mounts later is picked up and latched', () => {
 
 test('the view reads only the injected document', () => {
   const { doc, byId } = makeDoc();
-  const saved = globalThis.document;
+  const restore = stashGlobals('document');
   installDocument({ getElementById: () => { throw new Error('global document read'); } });
   try {
     new GlobalStatsView(doc).update(1, null);
   } finally {
-    if (saved === undefined) delete globalThis.document; else globalThis.document = saved;
+    restore();
   }
 
   assert.equal(byId['perf-stats'].textContent, '1.000 ms');
