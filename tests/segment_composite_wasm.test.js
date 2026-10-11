@@ -108,6 +108,30 @@ function firstDifference(a, b) {
 }
 
 /**
+ * Asserts two frames match component for component, naming the first mismatch.
+ * @param {Uint16Array} actual - The composited or re-rendered frame.
+ * @param {Uint16Array} expected - The full-frame reference.
+ * @param {string} [label] - Prefix naming the case.
+ */
+function assertSameFrame(actual, expected, label = '') {
+  const at = firstDifference(actual, expected);
+  assert.equal(at, -1, at < 0 ? '' : `${label}component ${at}: `
+    + `composited ${actual[at]} vs full-frame ${expected[at]}`);
+}
+
+/**
+ * Asserts a readback is a whole canvas carrying more than one value.
+ * @param {Uint16Array} pixels - The readback.
+ * @param {number} width - Canvas width in pixels.
+ * @param {number} height - Canvas height in pixels.
+ * @param {string} message - Failure message for a uniform canvas.
+ */
+function assertImage(pixels, width, height, message) {
+  assert.equal(pixels.length, width * height * 3);
+  assert.ok(new Set(pixels).size > 1, message);
+}
+
+/**
  * Asserts each worker's readback outside its band differs from the unclipped
  * frame, so a clip reported as narrowed did not draw the whole canvas.
  * @param {Uint16Array[]} readbacks - Each worker's full-canvas readback.
@@ -136,9 +160,7 @@ const reference = await renderWith(CLIPPED_EFFECT, FULL, FRAMES);
 test('the reference frame is a real image, not a constant the stitch cannot fail', () => {
   assert.equal(reference.clip, 'APPLIED',
     `${CLIPPED_EFFECT} must accept a narrowing clip for this suite to mean anything`);
-  assert.equal(reference.pixels.length, W * H * 3);
-  assert.ok(new Set(reference.pixels).size > 1,
-    'a uniform canvas would match any stitch of any rectangles');
+  assertImage(reference.pixels, W, H, 'a uniform canvas would match any stitch of any rectangles');
 });
 
 test('four clipped segment renders stitch into the unclipped frame', async () => {
@@ -148,9 +170,7 @@ test('four clipped segment renders stitch into the unclipped frame', async () =>
   assert.deepEqual(clips, ['APPLIED', 'APPLIED', 'APPLIED', 'APPLIED'],
     'every band must narrow, or the workers are each drawing the whole canvas');
   assertBandsNarrowed(readbacks, rects, reference.pixels, W);
-  const at = firstDifference(canvas, reference.pixels);
-  assert.equal(at, -1, at < 0 ? '' : `component ${at}: `
-    + `composited ${canvas[at]} vs full-frame ${reference.pixels[at]}`);
+  assertSameFrame(canvas, reference.pixels);
 
   // Teeth: the same pieces laid into the wrong rectangles must not match, or
   // the comparison is satisfied by any permutation of the segments.
@@ -169,9 +189,7 @@ test('the stitch holds at device-backed and simulator-only segment counts', asyn
     assert.equal(clips.filter((c) => c === 'APPLIED').length, total,
       `every one of the ${total} bands must narrow`);
     assertBandsNarrowed(readbacks, rects, reference.pixels, W);
-    const at = firstDifference(canvas, reference.pixels);
-    assert.equal(at, -1, at < 0 ? '' : `${total} segments differ at component ${at}: `
-      + `composited ${canvas[at]} vs full-frame ${reference.pixels[at]}`);
+    assertSameFrame(canvas, reference.pixels, `${total} segments differ at `);
   }
 });
 
@@ -179,14 +197,14 @@ test('production resolution stitches at every supported segment count', async ()
   const width = 288, height = 144;
   const full = await renderWith(CLIPPED_EFFECT,
     { x0: 0, x1: width, y0: 0, y1: height }, FRAMES, width, height);
-  assert.ok(new Set(full.pixels).size > 1);
+  assertImage(full.pixels, width, height, 'the production reference frame must carry an image');
   const totals = Array.from({ length: SEGMENT_COUNT_MAX / 2 }, (_, i) => 2 * (i + 1));
   for (const total of totals) {
     const { canvas, clips, rects, readbacks } = await compositeSegments(
       CLIPPED_EFFECT, total, FRAMES, width, height);
     assert.equal(clips.filter(clip => clip === 'APPLIED').length, total);
     assertBandsNarrowed(readbacks, rects, full.pixels, width);
-    assert.equal(firstDifference(canvas, full.pixels), -1, `${total} segments at ${width}x${height}`);
+    assertSameFrame(canvas, full.pixels, `${total} segments at ${width}x${height}: `);
   }
 });
 
@@ -194,20 +212,17 @@ test('a cross-segment stateful effect keeps its full-frame clip and still stitch
   const full = await renderWith(FULL_FRAME_EFFECT, FULL, FRAMES);
   assert.equal(full.clip, 'FULL_FRAME_KEPT',
     `${FULL_FRAME_EFFECT} must report its clip as kept at the full canvas`);
-  assert.ok(new Set(full.pixels).size > 1, 'the reference frame must carry an image');
+  assertImage(full.pixels, W, H, 'the reference frame must carry an image');
 
   const { canvas, clips } = await compositeSegments(FULL_FRAME_EFFECT, 4, FRAMES);
   assert.deepEqual(clips,
     ['FULL_FRAME_KEPT', 'FULL_FRAME_KEPT', 'FULL_FRAME_KEPT', 'FULL_FRAME_KEPT'],
     'a band-clipped worker would read stale history outside its band');
-  const at = firstDifference(canvas, full.pixels);
-  assert.equal(at, -1, at < 0 ? '' : `component ${at}: `
-    + `composited ${canvas[at]} vs full-frame ${full.pixels[at]}`);
+  assertSameFrame(canvas, full.pixels);
 });
 
 test('two engines on the same message sequence reach the same frame', async () => {
   // Every instance seeds from the effect's stable id.
   const twin = await renderWith(CLIPPED_EFFECT, FULL, FRAMES);
-  assert.equal(firstDifference(twin.pixels, reference.pixels), -1,
-    'a second WASM instance drew a different frame from the same sequence');
+  assertSameFrame(twin.pixels, reference.pixels, 'a second WASM instance drew a different frame at ');
 });
