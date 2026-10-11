@@ -1198,8 +1198,10 @@ function opBoundCases(def) {
 test('every OP_DEFS bound sits inside the engine domain the WASM bridge enforces', () => {
   const seed = 'cube';
   const clamped = [];
+  let cases = 0;
   for (const [op, def] of Object.entries(OP_DEFS)) {
     for (const { label, params } of opBoundCases(def)) {
+      cases++;
       moduleLogs.length = 0;
       const mesh = M.MeshOps.fromSolidName(seed);
       let out = null;
@@ -1214,6 +1216,7 @@ test('every OP_DEFS bound sits inside the engine domain the WASM bridge enforces
       if (moduleLogs.length > 0) clamped.push(`${op} ${label}: ${moduleLogs.join(' ')}`);
     }
   }
+  assert.ok(cases > 0, 'OP_DEFS yielded no bound cases');
   assert.deepEqual(clamped.slice(0, 5), [],
     `${clamped.length} OP_DEFS endpoints made the WASM bridge log on a ${seed}; ` +
     'the range reaches outside the engine domain for that operator, so the ' +
@@ -1222,6 +1225,7 @@ test('every OP_DEFS bound sits inside the engine domain the WASM bridge enforces
 });
 
 test('the Platonic and Catalan seed lists name registered Simple solids', () => {
+  assert.ok(PLATONIC_SOLIDS.length > 0 && CATALAN_BASES.size > 0, 'both seed lists are populated');
   const registry = M.MeshOps.getRegistry();
   const simple = new Set();
   for (let i = 0; i < registry.length; i++) {
