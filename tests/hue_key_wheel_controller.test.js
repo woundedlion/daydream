@@ -166,11 +166,13 @@ test('a drag that cannot keep a loop sweep stops and says why', () => {
 });
 
 test('a key handle nudges its key and focus selects it', () => {
-  const { wheel, model, handles, counts } = setup();
+  const { wheel, model, handles, counts, draws } = setup();
   model.applyHueModeTransition('CUSTOM');
   wheel.draw(model.recipe());
   handles[1].dispatch('focus');
   assert.equal(counts.updates, 1);
+  wheel.draw(model.recipe());
+  assert.equal(draws.at(-1).selectedKey, 1);
   const before = model.customHueOffsets()[1];
   const turn = model.baseHueTurns + before;
   assert.equal(press(handles[1], 'ArrowRight', true).prevented, true);
