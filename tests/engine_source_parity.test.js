@@ -106,18 +106,31 @@ test('engine constant expressions reject unknown identifiers', () => {
 });
 
 /**
+ * Reads the stereographic-projection constants from core/math/stereographic.h,
+ * evaluating STEREO_POLE_EPS against the engine STEREO_INF.
+ * @returns {{STEREO_INF: number, STEREO_POLE_EPS: number, STEREO_AZIMUTH_EPS: number}} The engine values.
+ */
+const stereoConstants = () => {
+  const src = header(STEREO_H);
+  const inf = engineConstant(src, 'STEREO_INF', STEREO_H);
+  return {
+    STEREO_INF: inf,
+    STEREO_POLE_EPS: engineConstant(src, 'STEREO_POLE_EPS', STEREO_H, { STEREO_INF: inf }),
+    STEREO_AZIMUTH_EPS: engineConstant(src, 'STEREO_AZIMUTH_EPS', STEREO_H),
+  };
+};
+
+/**
  * Pins the stereographic-projection constants mobius_transforms.js mirrors to
  * their definitions in core/math/stereographic.h. STEREO_POLE_EPS is derived from
  * STEREO_INF on both sides, so the engine's expression is evaluated.
  */
 test('projection constants match core/math/stereographic.h', { skip: engineSkip }, () => {
-  const src = header(STEREO_H);
-  const inf = engineConstant(src, 'STEREO_INF', STEREO_H);
-  assert.equal(MB.STEREO_INF, inf, 'STEREO_INF drifted from the engine sentinel');
-  assert.equal(MB.STEREO_POLE_EPS,
-    engineConstant(src, 'STEREO_POLE_EPS', STEREO_H, { STEREO_INF: inf }),
+  const engine = stereoConstants();
+  assert.equal(MB.STEREO_INF, engine.STEREO_INF, 'STEREO_INF drifted from the engine sentinel');
+  assert.equal(MB.STEREO_POLE_EPS, engine.STEREO_POLE_EPS,
     'STEREO_POLE_EPS drifted from the engine pole cap');
-  assert.equal(MB.STEREO_AZIMUTH_EPS, engineConstant(src, 'STEREO_AZIMUTH_EPS', STEREO_H),
+  assert.equal(MB.STEREO_AZIMUTH_EPS, engine.STEREO_AZIMUTH_EPS,
     'STEREO_AZIMUTH_EPS drifted from the engine azimuth floor');
 });
 
@@ -126,15 +139,9 @@ test('projection constants match core/math/stereographic.h', { skip: engineSkip 
  * definitions.
  */
 test('glslProjectionFunctions constants match core/math/stereographic.h', { skip: engineSkip }, () => {
-  const src = header(STEREO_H);
-  const inf = engineConstant(src, 'STEREO_INF', STEREO_H);
   const glsl = MB.glslProjectionFunctions;
   const { values } = glslConstants(glsl);
-  for (const [name, value] of [
-    ['STEREO_INF', inf],
-    ['STEREO_POLE_EPS', engineConstant(src, 'STEREO_POLE_EPS', STEREO_H, { STEREO_INF: inf })],
-    ['STEREO_AZIMUTH_EPS', engineConstant(src, 'STEREO_AZIMUTH_EPS', STEREO_H)],
-  ]) {
+  for (const [name, value] of Object.entries(stereoConstants())) {
     const m = glsl.match(new RegExp(`const float ${name}\\s*=\\s*([^;]+);`));
     assert.ok(m, `glslProjectionFunctions does not declare ${name}`);
     assert.equal(values[name], value,
@@ -229,12 +236,7 @@ const PROJECT_DIV_PAIRS = [
  */
 test('stereo and projectDiv match their engine projection and Mobius headers', { skip: engineSkip }, () => {
   const src = header(STEREO_H);
-  const inf = engineConstant(src, 'STEREO_INF', STEREO_H);
-  const constants = {
-    STEREO_INF: inf,
-    STEREO_POLE_EPS: engineConstant(src, 'STEREO_POLE_EPS', STEREO_H, { STEREO_INF: inf }),
-    STEREO_AZIMUTH_EPS: engineConstant(src, 'STEREO_AZIMUTH_EPS', STEREO_H),
-  };
+  const constants = stereoConstants();
   const radial_scale = transpileEngineComplex(
     src, 'radial_scale', ['direction', 'length', 'radius'], {});
   const lift = engineConstant(header(MATH_H), 'COMPLEX_UNDERFLOW_LIFT', MATH_H);
