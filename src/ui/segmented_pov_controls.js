@@ -8,7 +8,7 @@
  * and the device-bounded spawn callback they drive.
  */
 
-import { MOBILE_BREAKPOINT_PX } from "../shared/layout.js";
+import { MOBILE_MEDIA_QUERY } from "../shared/layout.js";
 import { pageWarmer } from "../segments/module_warmer.js";
 import {
   createSegmentSpawnGuard,
@@ -56,7 +56,7 @@ export function createSegmentedPovControls({
   // (view.Segmented POV.<prop>); boundaries is session-only.
   const segFolder = gui.addFolder('Segmented POV');
   segFolder.close();
-  const layout = win.matchMedia?.(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`);
+  const layout = win.matchMedia?.(MOBILE_MEDIA_QUERY);
   const isMobile = () => layout?.matches ?? false;
   const segmentMax = () => maxSegmentCount(nav, isMobile());
   /** @param {number} max */
