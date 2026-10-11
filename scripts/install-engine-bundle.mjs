@@ -4,6 +4,7 @@ import { dirname, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const RUNTIME_PATHS = new Set([
+  'generated/holosphere_wasm.d.ts', 'generated/holosphere_bindings.d.ts', 'generated/engine_types.d.ts', 'generated/engine_contract.mjs', 'generated/segment_geometry.js', 'generated/segment_geometry.d.ts',
   'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm', 'generated/holosphere_wasm.sha',
   'generated/holosphere_wasm.wasm.sha256', 'generated/holosphere_wasm.toolchain', 'generated/shader/engine_catalog.json',
   'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs', 'generated/shader/sha256.mjs',

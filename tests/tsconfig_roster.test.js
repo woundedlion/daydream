@@ -8,9 +8,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = new URL('../', import.meta.url);
 
 // Engine-installed Emscripten glue and shader compiler are checked upstream.
-// The glue import resolves through its hand-written .d.ts sibling.
+// Compiled glue imports resolve through their emitted .d.ts siblings.
 const NOT_CHECKED = new Set([
-  'generated/holosphere_wasm.js', 'generated/shader/shader_workbench.mjs',
+  'generated/holosphere_wasm.js', 'generated/segment_geometry.js', 'generated/shader/shader_workbench.mjs',
   'generated/shader/composed_effect_roster.mjs',
 ]);
 
@@ -57,7 +57,10 @@ function importsOf(file) {
   const source = readFileSync(importer, 'utf8');
   const found = [];
   for (const [, spec] of source.matchAll(SPECIFIER)) {
-    found.push(new URL(spec, importer).href.slice(ROOT.href.length));
+    const relative = new URL(spec, importer).href.slice(ROOT.href.length);
+    const declaration = relative.replace(/\.js$/, '.d.ts');
+    found.push(!existsSync(new URL(relative, ROOT)) && existsSync(new URL(declaration, ROOT))
+      ? declaration : relative);
   }
   return found;
 }

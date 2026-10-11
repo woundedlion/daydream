@@ -11,6 +11,9 @@
  * @typedef {{ x0: number, x1: number, y0: number, y1: number, w: number, h: number }} SegRange
  */
 
+import createSegmentGeometry from '../../generated/segment_geometry.js';
+
+const geometry = await createSegmentGeometry();
 const NUM_ARMS = 2;
 
 /**
@@ -33,9 +36,8 @@ export function isValidSegmentCount(total) {
  * northern bands top-down and the remainder tile the southern bands from the
  * S pole inward, so four bands per arm run 0, 1, 3, 2.
  *
- * The arm partition and row bands mirror the firmware's
- * hardware/pov_segment_map.h::segment_map (cross-checked by
- * tests/segment_crosscheck.test.js). The column split is a worker partition
+ * The arm partition and row bands are compiled from the firmware's
+ * hardware/pov_segment_map.h. The column split is a worker partition
  * only: the firmware's segment_clip() trades the column halves between the
  * arms every half-revolution.
  *
@@ -70,26 +72,10 @@ export function computeSegmentRange(id, total, w, h) {
       `segment_layout: canvas height must be >= ${ySegsPerArm} y-segments per arm (got ${h})`);
   }
 
-  const armId = Math.floor(id / ySegsPerArm);
-  const armSeg = id % ySegsPerArm;
-
-  // Symmetric w/2 split per arm, matching the firmware's w/2 arm-B column offset.
-  const armW = w / NUM_ARMS;
-  const x0 = armId * armW;
-  const x1 = x0 + armW;
-
-  // Northern half of an arm counts bands down from the N pole; the southern half
-  // counts back up from the S pole, matching segment_map()'s reversed strips.
-  const northBands = Math.floor(ySegsPerArm / 2);
-  const bandId = armSeg < northBands
-    ? armSeg
-    : ySegsPerArm - 1 - (armSeg - northBands);
-
-  // Remainder rows go one per band from the N pole down.
-  const segH = Math.floor(h / ySegsPerArm);
-  const tallBands = h % ySegsPerArm;
-  const y0 = bandId * segH + Math.min(bandId, tallBands);
-  const y1 = y0 + segH + (bandId < tallBands ? 1 : 0);
+  const x0 = geometry._segment_x0(id, total, w, h);
+  const x1 = geometry._segment_x1(id, total, w, h);
+  const y0 = geometry._segment_y0(id, total, w, h);
+  const y1 = geometry._segment_y1(id, total, w, h);
 
   return { x0, x1, y0, y1, w: x1 - x0, h: y1 - y0 };
 }

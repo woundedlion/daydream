@@ -11,14 +11,12 @@ import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import {
   createChainValidator, KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
-  DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure, MESH_OP_RESULT_NAMES,
+  DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure,
 } from '../src/workbench/solids/solid_codegen.js';
 import {
-  FakeChainEngine, ENGINE_METHODS, ENGINE_OPTIONAL_METHODS, SHADER_CHAIN_BINDING_METHODS, ParamSetResult, ClipSetResult,
-  ResolutionSetResult, EffectSetResult, ChainSnapshotRestoreResult, ChainStatus,
+  FakeChainEngine, ChainSnapshotRestoreResult,
 } from './helpers/fake_engine.js';
 import { isViewLive, refreshPixelView } from '../src/renderer/pixel_view.js';
-import { PaletteCompileCode, PaletteRecipeField } from './helpers/fake_palette.js';
 import { DEFAULT_EFFECT, resolutionPresets } from '../src/effects/effect_roster.js';
 import { stageGrouping } from '../src/effects/shader_stages.js';
 
@@ -176,17 +174,6 @@ test('adapter decode rejects nested authoring and deletion from getters', async 
   }
 });
 
-test('authoring adapter declarations match their exported methods', () => {
-  engine.setEffect('ShaderChain');
-  const chain = engine.getShaderChainBindings();
-  const declared = [...interfaceBody('ShaderChainBindings').matchAll(/^\s*([A-Za-z_]\w*)\s*\(/gm)]
-    .map((match) => match[1]);
-  assert.deepEqual(SHADER_CHAIN_BINDING_METHODS.toSorted(), declared.toSorted());
-  for (const method of declared) assert.equal(typeof chain[method], 'function');
-  assert.deepEqual(Object.keys(Object.getPrototypeOf(chain)).toSorted(),
-    declared.filter((method) => method !== 'delete').toSorted());
-  chain.delete();
-});
 
 // Both non-rejections leave the requested size active; only RESIZED tears the
 // effect down.
@@ -200,8 +187,8 @@ const heapBytes = () => engine.getPixels().buffer.byteLength;
 // A resolution's first factory lookup can also grow the heap.
 const INITIAL_HEAP_BYTES = heapBytes();
 
-// generated/holosphere_wasm.d.ts is hand-written and stands in for the glue.
-const DTS = readFileSync(new URL('../generated/holosphere_wasm.d.ts', import.meta.url), 'utf8');
+// Structured payload shapes are authored separately from emitted bindings.
+const DTS = readFileSync(new URL('../generated/engine_types.d.ts', import.meta.url), 'utf8');
 
 /**
  * Reads a file the engine's LF export is pinned against. A CRLF working-tree
@@ -227,60 +214,7 @@ function interfaceBody(name) {
   return DTS.slice(at, end).replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
-test('generated/holosphere_wasm.d.ts declares the pinned engine method roster', () => {
-  const body = interfaceBody('HolosphereEngine');
-  // `\??` also admits an optionally-declared member, which would otherwise
-  // parse as nothing and be pinned by neither loop below.
-  const declared = new Set(
-    [...body.matchAll(/^\s*([A-Za-z_]\w*)\??\s*\(/gm)].map((m) => m[1]));
-  for (const name of [...ENGINE_METHODS, ...ENGINE_OPTIONAL_METHODS]) {
-    assert.ok(declared.has(name),
-      `generated/holosphere_wasm.d.ts is missing ${name}, which the app calls`);
-  }
-  for (const name of declared) {
-    assert.equal(typeof engine[name], 'function',
-      `generated/holosphere_wasm.d.ts declares ${name}, which the module does not export`);
-  }
-  // embind puts exactly the bound methods on the instance prototype, so this
-  // pins the other direction: a binding the declarations never grew.
-  for (const name of Object.keys(Object.getPrototypeOf(engine))) {
-    assert.ok(declared.has(name),
-      `the module exports ${name}, which generated/holosphere_wasm.d.ts does not declare`);
-  }
-});
 
-test('generated/holosphere_wasm.d.ts declares the engine statics the app calls', () => {
-  const body = interfaceBody('HolosphereModule');
-  const at = body.indexOf('HolosphereEngine:');
-  assert.ok(at >= 0, 'HolosphereModule must carry the engine constructor');
-  const decl = body.slice(at, body.indexOf('\n  };', at));
-  assert.match(decl, /new\s*\(\s*\)\s*:\s*HolosphereEngine/,
-    'the constructor signature must survive the statics being declared beside it');
-  const declared = new Set(
-    [...decl.matchAll(/^\s*([A-Za-z_]\w*)\??\s*\(/gm)].map((m) => m[1]));
-  declared.delete('new');
-  for (const name of declared) {
-    assert.equal(typeof M.HolosphereEngine[name], 'function',
-      `generated/holosphere_wasm.d.ts declares static ${name}, which the module does not `
-      + 'expose on the constructor');
-  }
-  // embind puts exactly the bound statics on the constructor as callables; its
-  // other own properties (length, name, prototype, argCount) are not functions.
-  for (const name of Object.getOwnPropertyNames(M.HolosphereEngine)) {
-    if (typeof M.HolosphereEngine[name] !== 'function') continue;
-    assert.ok(declared.has(name),
-      `the module exposes static ${name}, which generated/holosphere_wasm.d.ts does not `
-      + 'declare');
-  }
-  // Statics the app depends on, named outright: losing one from both sides
-  // passes the two-way loop.
-  assert.ok(declared.has('isLive'),
-    'daydream.js reads this static before constructing an '
-    + 'engine; a second instantiation traps and kills the module');
-  assert.ok(declared.has('getSupportedResolutions'),
-    'daydream.js narrows its resolution presets through this static; a bare '
-    + '`new () => HolosphereEngine` declares it out of existence');
-});
 
 /**
  * Members of a named `export interface` and of everything it extends. Only
@@ -298,43 +232,6 @@ function interfaceMembers(name) {
       .map((match) => [match[1], match[2] === '?']),
   ]);
 }
-
-/**
- * Method names a named `export interface` declares at its own indentation.
- * @param {string} name - Interface name.
- * @returns {Set<string>} The declared method names.
- */
-const interfaceMethods = (name) => new Set(
-  [...interfaceBody(name).matchAll(/^ {2}([A-Za-z_]\w*)\??\s*\(/gm)]
-    .map((match) => match[1]));
-
-test('generated/holosphere_wasm.d.ts declares every module function', () => {
-  const declared = interfaceMethods('HolosphereModule');
-  const members = interfaceMembers('HolosphereModule');
-  for (const name of declared) {
-    assert.equal(typeof M[name], 'function', `declared module function ${name} is absent`);
-  }
-  for (const name of Object.getOwnPropertyNames(M)) {
-    if (typeof M[name] !== 'function' || name === 'print' || name === 'printErr') continue;
-    assert.ok(declared.has(name) || members.has(name),
-      `module function ${name} is missing from generated/holosphere_wasm.d.ts`);
-  }
-});
-
-const RESULT_ENUMS = ['PaletteCompileCode', 'PaletteRecipeField', 'ChainStatus', 'ParamSetResult', 'ClipSetResult', 'ResolutionSetResult',
-  'EffectSetResult', 'ChainSnapshotRestoreResult'];
-
-test('generated/holosphere_wasm.d.ts declares every result enum roster the module exports', () => {
-  const moduleBody = interfaceBody('HolosphereModule');
-  for (const name of RESULT_ENUMS) {
-    const values = Object.keys(M[name]).filter((key) => M[name][key] instanceof M[name]);
-    assert.ok(values.length > 0, `the module must export enum ${name}`);
-    assert.match(moduleBody, new RegExp(`^ {2}${name}: ${name}Enum;$`, 'm'),
-      `HolosphereModule.${name} must be declared as ${name}Enum`);
-    assert.deepEqual([...interfaceMembers(`${name}Enum`).keys()].sort(), values.sort(),
-      `the declared ${name} roster must be the module enum roster`);
-  }
-});
 
 /**
  * Pins one declared object shape against a value the module produced: the
@@ -617,20 +514,6 @@ test('setShaderChain refuses transactionally and names the offending entry', () 
   assert.equal(chainCall(engine, 'setShaderChain', 'nonsense').code, 'MALFORMED_PAYLOAD',
     'a non-array payload is refused at the boundary, never a trap');
 });
-
-const RESULT_MIRRORS = { PaletteCompileCode, PaletteRecipeField, ChainStatus, ParamSetResult, ClipSetResult, ResolutionSetResult,
-  EffectSetResult, ChainSnapshotRestoreResult };
-for (const name of RESULT_ENUMS) {
-  test(`the module ${name} enum matches the test mirror`, () => {
-    const actual = M[name];
-    const mirror = RESULT_MIRRORS[name];
-    assert.ok(actual, `the module must export ${name}`);
-    const moduleNames = Object.keys(actual).filter((key) => actual[key] instanceof actual);
-    assert.deepEqual(moduleNames.sort(), Object.keys(mirror).sort());
-    for (const key of Object.keys(mirror))
-      assert.equal(actual[key].value, mirror[key].value, `${name}.${key}`);
-  });
-}
 
 test('getSupportedResolutions reports buildable [w, h] rows', () => {
   const rows = M.HolosphereEngine.getSupportedResolutions();
@@ -1266,11 +1149,6 @@ test('MeshOps exposes the method surface the solids tool drives', () => {
 // picks the remedy (shrink the chain versus flush the arenas).
 test('meshOpFailure routes a real bridge reject by the reason the module records', () => {
   assert.ok(M.MeshOpResult, 'the module must export MeshOpResult');
-  const moduleNames = Object.keys(M.MeshOpResult)
-    .filter((k) => M.MeshOpResult[k] instanceof M.MeshOpResult);
-  assert.deepEqual(moduleNames.sort(), [...MESH_OP_RESULT_NAMES].sort(),
-    'solid_codegen.js MESH_OP_RESULT_NAMES must mirror the module enum roster');
-
   assert.equal(M.MeshOps.fromSolidName('NoSuchSolid'), null,
     'fromSolidName must return null for an unknown name');
   const failure = meshOpFailure(M, 'Base solid "NoSuchSolid"');
@@ -1447,37 +1325,7 @@ test('PaletteOps compiles a palette recipe', () => {
 });
 
 // Pinned against embind's own prototypes.
-test('generated/holosphere_wasm.d.ts declares the MeshOps bridge the solids tool drives', () => {
-  const statics = interfaceMethods('MeshOpsStatics');
-  const optional = new Set([...interfaceBody('MeshOpsStatics')
-    .matchAll(/^ {2}([A-Za-z_]\w*)\?\s*\(/gm)].map((match) => match[1]));
-  assert.deepEqual([...optional], ['getMaxBounds']);
-  for (const name of statics) {
-    if (optional.has(name) && M.MeshOps[name] === undefined) continue;
-    assert.equal(typeof M.MeshOps[name], 'function',
-      `generated/holosphere_wasm.d.ts declares MeshOps.${name}, which the module does not export`);
-  }
-  for (const name of Object.getOwnPropertyNames(M.MeshOps)
-    .filter((key) => typeof M.MeshOps[key] === 'function')) {
-    assert.ok(statics.has(name),
-      `the module exports MeshOps.${name}, which generated/holosphere_wasm.d.ts does not declare`);
-  }
-
-  const handle = interfaceMethods('MeshHandle');
-  for (const name of handle) {
-    assert.equal(typeof M.MeshOps.prototype[name], 'function',
-      `generated/holosphere_wasm.d.ts declares MeshHandle.${name}, which the module does not bind`);
-  }
-  for (const name of Object.getOwnPropertyNames(M.MeshOps.prototype)
-    .filter((key) => key !== 'constructor')) {
-    assert.ok(handle.has(name), `the module binds MeshOps.prototype.${name}, `
-      + 'which generated/holosphere_wasm.d.ts does not declare');
-  }
-
-  assert.deepEqual([...interfaceMembers('MeshOpResultEnum').keys()].sort(),
-    [...MESH_OP_RESULT_NAMES].sort(),
-    'the declared MeshOpResult roster must be the module enum roster');
-
+test('MeshOps returns the authored structured payloads', () => {
   const registry = M.MeshOps.getRegistry();
   assertDeclaredShape('SolidRegistryEntry', registry[0]);
   const complex = registry.find((/** @type {*} */ e) => e.category === 'Complex');
@@ -1494,20 +1342,9 @@ test('generated/holosphere_wasm.d.ts declares the MeshOps bridge the solids tool
   M.MeshOps.clearToolingMemory();
 });
 
-test('generated/holosphere_wasm.d.ts declares the PaletteOps bridge the palette tool drives', () => {
-  const declared = interfaceMethods('PaletteOps');
+test('PaletteOps returns the authored structured payloads', () => {
   const ops = new M.PaletteOps();
   try {
-    for (const name of declared) {
-      assert.equal(typeof ops[name], 'function',
-        `generated/holosphere_wasm.d.ts declares PaletteOps.${name}, which the module does not bind`);
-    }
-    for (const name of Object.getOwnPropertyNames(Object.getPrototypeOf(ops))
-      .filter((key) => key !== 'constructor')) {
-      assert.ok(declared.has(name), `the module binds PaletteOps.${name}, `
-        + 'which generated/holosphere_wasm.d.ts does not declare');
-    }
-
     const preset = Array.from(ops.effectPresetsV4())[0];
     assertDeclaredShape('PaletteEffectPreset', preset);
     const inspected = ops.inspectV4(preset.recipe);

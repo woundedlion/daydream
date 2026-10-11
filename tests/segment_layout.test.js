@@ -2,6 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeSegmentRange, extractSegment, compositeSegment, stampBoundaries } from '../src/segments/segment_layout.js';
 
+test('layout coordinates retain integers beyond the 32-bit range', () => {
+  assert.deepEqual(computeSegmentRange(3, 4, 8589934592, 8589934593), {
+    x0: 4294967296, x1: 8589934592, y0: 4294967297, y1: 8589934593,
+    w: 4294967296, h: 4294967296,
+  });
+});
+
 // An odd width is rejected, so the exactly-once tiling invariant holds for every
 // width the layout accepts.
 test('a full segment set tiles the canvas exactly once', () => {

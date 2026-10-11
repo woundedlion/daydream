@@ -36,7 +36,8 @@ function fixture(t, readme = 'new README.md') {
   git('add', '--', 'src/app/daydream.js', 'site_manifest.txt', 'generated/shader/patterns/old.shader.json', 'generated/holosphere_wasm.sha');
   git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
   const pair = { daydream: git('rev-parse', 'HEAD'), holosphere: 'b'.repeat(40) };
-  const files = Object.fromEntries(['README.md', 'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm',
+  const files = Object.fromEntries(['generated/holosphere_wasm.d.ts', 'generated/holosphere_bindings.d.ts', 'generated/engine_types.d.ts',
+    'generated/engine_contract.mjs', 'generated/segment_geometry.js', 'generated/segment_geometry.d.ts', 'README.md', 'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm',
     'generated/holosphere_wasm.wasm.sha256', 'generated/holosphere_wasm.toolchain', 'generated/pov_segment_map.json',
     'generated/shader/shader_workbench.mjs', 'generated/shader/sha256.mjs', 'generated/shader/engine_catalog.json',
     'generated/shader/composed_effect_roster.mjs',

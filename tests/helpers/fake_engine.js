@@ -1,113 +1,24 @@
-// Single source of truth for the HolosphereEngine method surface the tests
-// stand in for, pinned against the real WASM module.
+// Engine fakes consume the installed, generated binding contract.
 import { readFileSync } from 'node:fs';
 
-/** Instance methods the tests' engine fakes stand in for. */
-export const ENGINE_METHODS = [
-  'setResolution', 'setEffect', 'setParameter', 'setAnimationsPaused',
-  'getPresetCount', 'getPresetIndex', 'selectPreset', 'selectPresetById',
-  'synchronizePreset', 'nextPreset', 'previousPreset',
-  'setPoleLod', 'setClip', 'drawFrame', 'getPixels', 'getArenaMetrics',
-  'setDisplayCaps', 'getDisplayNorthPhi', 'getDisplaySouthPhi',
-  'getParameterDefinitions', 'getParamValues', 'getBufferLength',
-  'getParamGeneration', 'getEffectSizes', 'getEffectPresetCounts',
-  'strobeColumns',
-];
+import { CLASS_METHODS, NUMERIC_ENUMS } from '../../generated/engine_contract.mjs';
 
-/**
- * The rest of the documented engine surface (README §7.2): read through
- * optional calls, or driven by no fake at all.
- */
+/** Calls which individual fakes may omit. */
 export const ENGINE_OPTIONAL_METHODS = [
-  'getShaderChainBindings',
-  'getAnimationsPaused', 'getPresetIds', 'getPoleLod',
-  // embind's own handle release.
-  'delete',
+  'getShaderChainBindings', 'getAnimationsPaused', 'getPresetIds', 'getPoleLod', 'delete',
 ];
+export const ENGINE_METHODS = CLASS_METHODS.HolosphereEngine
+  .filter((name) => !ENGINE_OPTIONAL_METHODS.includes(name));
+export const SHADER_CHAIN_BINDING_METHODS = CLASS_METHODS.ShaderChainBindings;
 
-/** Shader authoring handle methods pinned against the declaration and real WASM. */
-export const SHADER_CHAIN_BINDING_METHODS = [
-  'isValid', 'setShaderChain', 'setShaderChainParameters', 'getProgram',
-  'getSnapshot', 'restoreSnapshot', 'delete',
-];
-
-/**
- * Mirror of the module-level ParamSetResult embind enum (targets/wasm/engine_bindings.h)
- * that setParameter returns. Values are distinct frozen objects so identity
- * comparison behaves like embind's cached enum instances; consumers must
- * compare against these values, never by truthiness (every value is a truthy
- * object).
- */
-export const ParamSetResult = Object.freeze({
-  APPLIED: Object.freeze({ value: 0 }),
-  NO_EFFECT: Object.freeze({ value: 1 }),
-  UNKNOWN_PARAM: Object.freeze({ value: 2 }),
-  READONLY: Object.freeze({ value: 3 }),
-  NON_FINITE: Object.freeze({ value: 4 }),
-  INADMISSIBLE: Object.freeze({ value: 5 }),
-  MALFORMED_PAYLOAD: Object.freeze({ value: 6 }),
-  TOO_LONG: Object.freeze({ value: 7 }),
-});
-
-/**
- * Mirror of the module-level ClipSetResult embind enum (targets/wasm/engine_bindings.h)
- * that setClip returns, under the same identity-comparison contract as
- * ParamSetResult.
- */
-export const ClipSetResult = Object.freeze({
-  APPLIED: Object.freeze({ value: 0 }),
-  NO_EFFECT: Object.freeze({ value: 1 }),
-  INVALID_BOUNDS: Object.freeze({ value: 2 }),
-  FULL_FRAME_KEPT: Object.freeze({ value: 3 }),
-});
-
-/**
- * Mirror of the module-level ResolutionSetResult embind enum that setResolution
- * returns, under the same identity-comparison contract as ParamSetResult.
- * RESIZED and ALREADY_ACTIVE are both successes; only RESIZED tears the effect
- * down.
- */
-export const ResolutionSetResult = Object.freeze({
-  RESIZED: Object.freeze({ value: 0 }),
-  ALREADY_ACTIVE: Object.freeze({ value: 1 }),
-  UNSUPPORTED: Object.freeze({ value: 2 }),
-});
-
-/**
- * Mirror of the module-level EffectSetResult embind enum that setEffect
- * returns, under the same identity-comparison contract as ParamSetResult.
- */
-export const EffectSetResult = Object.freeze({
-  INSTALLED: Object.freeze({ value: 0 }),
-  UNKNOWN_EFFECT: Object.freeze({ value: 1 }),
-  UNSUPPORTED_RESOLUTION: Object.freeze({ value: 2 }),
-});
-
-export const ChainStatus = Object.freeze({
-  OK: Object.freeze({ value: 0 }),
-  NOT_CHAIN_EFFECT: Object.freeze({ value: 1 }),
-  MALFORMED_PAYLOAD: Object.freeze({ value: 2 }),
-  EMPTY: Object.freeze({ value: 3 }),
-  TOO_LONG: Object.freeze({ value: 4 }),
-  UNKNOWN_OPERATOR: Object.freeze({ value: 5 }),
-  DUPLICATE_INSTANCE: Object.freeze({ value: 6 }),
-  MALFORMED_INSTANCE: Object.freeze({ value: 7 }),
-  ENTRY_FAMILY: Object.freeze({ value: 8 }),
-  EXIT_FAMILY: Object.freeze({ value: 9 }),
-  CARRIER_MISMATCH: Object.freeze({ value: 10 }),
-  ARENA_OVERFLOW: Object.freeze({ value: 11 }),
-  PARAM_OVERFLOW: Object.freeze({ value: 12 }),
-  MIGRATE_FAILED: Object.freeze({ value: 13 }),
-});
-
-export const ChainSnapshotRestoreResult = Object.freeze({
-  APPLIED: Object.freeze({ value: 0 }),
-  NOT_SHADER_CHAIN: Object.freeze({ value: 1 }),
-  UNSUPPORTED_VERSION: Object.freeze({ value: 2 }),
-  INVALID_LENGTH: Object.freeze({ value: 3 }),
-  INVALID_VALUE: Object.freeze({ value: 4 }),
-  INVALID_CHAIN: Object.freeze({ value: 5 }),
-});
+const enumeration = (name) => Object.freeze(Object.fromEntries(
+  Object.entries(NUMERIC_ENUMS[name]).map(([key, value]) => [key, Object.freeze({ value })])));
+export const ParamSetResult = enumeration('ParamSetResult');
+export const ClipSetResult = enumeration('ClipSetResult');
+export const ResolutionSetResult = enumeration('ResolutionSetResult');
+export const EffectSetResult = enumeration('EffectSetResult');
+export const ChainStatus = enumeration('ChainStatus');
+export const ChainSnapshotRestoreResult = enumeration('ChainSnapshotRestoreResult');
 
 // The engine catalog exactly as the module's getShaderChainCatalog static
 // exports it: the installed file carries the export plus a POSIX trailing
