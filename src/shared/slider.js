@@ -164,14 +164,16 @@ export function createSlider(containerId, cfg, onInput) {
 }
 
 /**
- * @param {object} cfg
- * @param {string} cfg.label
- * @param {number} cfg.min
- * @param {number} cfg.max
- * @param {string} cfg.keys
- * @param {string} [cfg.id]
- * @param {'horizontal'|'vertical'} [cfg.orientation]
- * @param {Document} [doc]
+ * Creates a focusable ARIA slider for a painted control. The value starts at
+ * min; the caller updates aria-valuenow and aria-valuetext as the control moves.
+ * @param {object} cfg - Accessible slider metadata.
+ * @param {string} cfg.label - Accessible name.
+ * @param {number} cfg.min - Lower bound in the control's displayed units.
+ * @param {number} cfg.max - Upper bound in the same units.
+ * @param {string} cfg.keys - Space-separated keyboard shortcuts.
+ * @param {string} [cfg.id] - Optional element id.
+ * @param {'horizontal'|'vertical'} [cfg.orientation] - Slider orientation.
+ * @param {Document} [doc] - Document that creates the proxy.
  * @returns {HTMLSpanElement} Keyboard-focusable proxy for a painted slider.
  */
 export function createSliderProxy({ label, min, max, keys, id = '', orientation = 'horizontal' }, doc = document) {
