@@ -538,7 +538,7 @@ test('applying an effect points the engine at it and rebuilds the panel', () => 
 test('a preserved apply keeps the effect param deep links', () => {
   const app = makeApp();
 
-  app.pipeline.applyEffect(true);
+  app.pipeline.applyEffect({preserveParams: true});
 
   assert.equal(app.log.includes('clearEffectParamUrl'), false);
 });
@@ -563,7 +563,7 @@ test('a segmented switch rebuilds the worker effect after the panel', () => {
 test('a preserved pause is committed after the segmented effect rebuild', () => {
   const app = makeApp({ segmented: true });
 
-  app.pipeline.applyEffect(true);
+  app.pipeline.applyEffect({preserveParams: true});
 
   assertOrdered(app.log, 'effectGui.mount', 'segments.setEffect Alpha', 'effectGui.applyAnimationPause');
   assert.equal(app.log.includes('clearEffectParamUrl'), false);

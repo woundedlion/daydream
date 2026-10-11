@@ -182,7 +182,7 @@ export function switchFailureReport(label, result) {
  *   deps.appState - The state to subscribe to and roll back.
  * @param {() => EffectControlRecord|null} deps.getActiveEffect - Reads the live effect control record;
  *   called again after each rollback apply, which rebuilds it.
- * @param {(preserveParams?: boolean) => string} deps.applyEffect - Applies the
+ * @param {(options?: {preserveParams?: boolean}) => string} deps.applyEffect - Applies the
  *   state's effect, returning an ApplyResult.
  * @param {(preserveParams?: boolean) => string} deps.applyResolution - Applies
  *   the state's resolution, returning an ApplyResult.
@@ -244,7 +244,7 @@ export function createSwitchCoordinator({
   ) => runMuted(() => {
     appState.set('effect', effect);
     restoreUrl(url);
-    if (applyEffect(true) !== ApplyResult.APPLIED) {
+    if (applyEffect({preserveParams: true}) !== ApplyResult.APPLIED) {
       throw new Error(`Effect rollback to "${effect}" was rejected.`);
     }
     restoreEffectControlState(getActiveEffect(), effectState, restoreChainSnapshot);
@@ -351,7 +351,7 @@ export function createSwitchCoordinator({
  * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
  * @param {(error?: *) => boolean} [deps.moduleDead] - Reads whether the engine module
  *   trapped; a sidebar query that trapped is re-thrown.
- * @returns {{applyEffect: (preserveParams?: boolean) => string,
+ * @returns {{applyEffect: (options?: {preserveParams?: boolean, broadcast?: boolean, chainSnapshot?: *}) => string,
  *   applyResolution: (preserveParams?: boolean) => string}}
  */
 export function createApplyPipeline({
@@ -393,16 +393,17 @@ export function createApplyPipeline({
 
   /**
    * Tear down the current effect GUI and build a new one for the active effect.
-   * @param {boolean} [preserveParams=false] - When true, keep the existing
+   * @param {Object} [options]
+   * @param {boolean} [options.preserveParams=false] - When true, keep the existing
    *   per-effect param URL entries; when false, clear them.
-   * @param {boolean} [broadcast=true] - Publish the accepted effect to workers.
-   * @param {*} [chainSnapshot=null] - Snapshot restored after switching the effect.
+   * @param {boolean} [options.broadcast=true] - Publish the accepted effect to workers.
+   * @param {*} [options.chainSnapshot=null] - Snapshot restored after switching the effect.
    *   A refused restore returns REJECTED after the engine has switched.
    * @returns {string} ApplyResult.REJECTED when effect selection or snapshot
    *   restoration rejects; the caller must roll back the apply and appState.
    *   Otherwise ApplyResult.APPLIED.
    */
-  function applyEffect(preserveParams = false, broadcast = true, chainSnapshot = null) {
+  function applyEffect({preserveParams = false, broadcast = true, chainSnapshot = null} = {}) {
     // A rejected effect leaves the engine unchanged; return before the worker
     // broadcast.
     if (getEngine() && !selectEngineEffect()) return ApplyResult.REJECTED;
@@ -497,7 +498,8 @@ export function createApplyPipeline({
 
     // A correction's param URL entries belong to the effect it dropped.
     const keepParams = (preserveParams || !engine || chainSnapshot !== null) && !effectChanged;
-    if (applyEffect(keepParams, false, effectChanged ? null : chainSnapshot) !== ApplyResult.APPLIED) {
+    if (applyEffect({preserveParams: keepParams, broadcast: false,
+      chainSnapshot: effectChanged ? null : chainSnapshot}) !== ApplyResult.APPLIED) {
       return ApplyResult.REJECTED;
     }
 

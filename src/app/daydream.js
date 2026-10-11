@@ -504,7 +504,7 @@ export function start({
   const switches = createSwitchCoordinator({
     appState,
     getActiveEffect: () => effectGui.active(),
-    applyEffect: (preserveParams) => apply.applyEffect(preserveParams),
+    applyEffect: (options) => apply.applyEffect(options),
     applyResolution: (preserveParams) => apply.applyResolution(preserveParams),
     currentUrl: () =>
       win.location.pathname + win.location.search + win.location.hash,
