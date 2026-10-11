@@ -574,6 +574,8 @@ export interface HolosphereModule {
    * caller that sees this must discard the instance.
    */
   HS_MODULE_DEAD?: boolean;
+  /** Called when the Emscripten runtime aborts. */
+  onAbort?: (reason: unknown) => void;
 }
 
 /**
