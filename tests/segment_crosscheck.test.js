@@ -190,7 +190,10 @@ test('firmware columns wrap correctly at every half-turn boundary', () => {
 });
 
 test('firmware clip rectangles match web bands for both half-turn orientations', () => {
+  assert.ok(golden.configs.length > 0, 'golden lists at least one config');
   for (const config of golden.configs) {
+    assert.equal(config.segments.length, config.segment_count,
+      `S=${config.leds} N=${config.segment_count} lists every segment`);
     for (const [id, segment] of config.segments.entries()) {
       assert.deepEqual(segment.clips.map((clip) => [clip.width, clip.first_half]),
         [8, 96, 288].flatMap((width) => [[width, false], [width, true]]));

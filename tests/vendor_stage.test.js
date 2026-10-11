@@ -43,7 +43,9 @@ test('the vendored entry points are staged where the local map looks', () => {
 });
 
 test('the staged tree carries the manifest set', () => {
-  for (const entry of manifestEntries()) {
+  const entries = manifestEntries();
+  assert.ok(entries.length > 0, 'the manifest lists no entries');
+  for (const entry of entries) {
     assert.ok(existsSync(join(staged.root, entry)), `${entry} was not staged`);
   }
 });

@@ -16,6 +16,10 @@ const read = (...p) => readFileSync(join(REPO, ...p), 'utf8');
 const pageSrc = (name) => read('tools', `${name}.html`);
 const headOf = (src) => src.slice(src.indexOf('<head>'), src.indexOf('</head>'));
 
+test('the served site carries tool pages', () => {
+  assert.ok(PAGES.length > 0, 'no served page lives under tools/');
+});
+
 test('every tool page inherits the reduced-motion stylesheet fence', () => {
   const css = read('tools', 'tools.css');
   assert.match(css,
