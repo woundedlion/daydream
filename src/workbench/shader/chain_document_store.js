@@ -4,11 +4,9 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
-
 import { LABEL_PATTERN, declarationFromCatalogField as parameterFromField }
   from '../../../generated/shader/shader_workbench.mjs';
-import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from './shader_deeplink.js';
+import { CHAIN_SNAPSHOT_SCHEMA_VERSION, COMPILER_URL } from './shader_deeplink.js';
 
 /** @typedef {{id: string, name: string|null, min: number, max: number, default: *, curve?: string, topology?: false}} CatalogNumericField */
 /** @typedef {{id: string, topology: true, values: string[], default: *}} CatalogTopologyField */

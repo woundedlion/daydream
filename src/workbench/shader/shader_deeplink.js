@@ -7,7 +7,7 @@
 
 import { replaceUrl } from '../../shared/url.js';
 
-const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
+export const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
 const PREFIX = '#shader=v2.';
 const MAX_PAYLOAD_CHARS = 65536;
 const MAX_STATE_BYTES = 524288;
