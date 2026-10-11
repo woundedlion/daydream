@@ -185,8 +185,6 @@ export function drawWaveGraph({ canvas, ctx, palette }) {
   ctx.strokeStyle = '#475569';
   ctx.lineWidth = 1;
 
-  // Draw the range-boundary lines at the top/bottom of the value band (10%
-  // and 90% of the canvas height).
   ctx.beginPath();
   ctx.moveTo(0, yTop);
   ctx.lineTo(width, yTop);
@@ -207,7 +205,6 @@ export function drawWaveGraph({ canvas, ctx, palette }) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Sample all three channels per column up front.
   const samples = new Array(width);
   for (let x = 0; x < width; x++) {
     samples[x] = palette.getChannelValues(width === 1 ? 0 : x / (width - 1));
