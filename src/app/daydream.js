@@ -351,10 +351,10 @@ export function start({
 
       const loadingOverlay = doc.getElementById('loading-overlay');
       try {
-        // applyResolution(true) applies the hydrated resolution and validates the
-        // hydrated effect against its allow-list, before first paint.
+        // Apply the hydrated resolution with its params preserved and validate
+        // the hydrated effect against its allow-list, before first paint.
         applyInitialState(
-          () => apply.applyResolution(true),
+          () => apply.applyResolution({ preserveParams: true }),
           () => loadingOverlay?.remove(),
         );
         shaderDocuments?.init().then(() => {
@@ -505,7 +505,7 @@ export function start({
     appState,
     getActiveEffect: () => effectGui.active(),
     applyEffect: (options) => apply.applyEffect(options),
-    applyResolution: (preserveParams) => apply.applyResolution(preserveParams),
+    applyResolution: (options) => apply.applyResolution(options),
     currentUrl: () =>
       win.location.pathname + win.location.search + win.location.hash,
     restoreUrl: (url) => {

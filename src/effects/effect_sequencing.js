@@ -184,7 +184,7 @@ export function switchFailureReport(label, result) {
  *   called again after each rollback apply, which rebuilds it.
  * @param {(options?: {preserveParams?: boolean}) => string} deps.applyEffect - Applies the
  *   state's effect, returning an ApplyResult.
- * @param {(preserveParams?: boolean) => string} deps.applyResolution - Applies
+ * @param {(options?: {preserveParams?: boolean}) => string} deps.applyResolution - Applies
  *   the state's resolution, returning an ApplyResult.
  * @param {() => string} deps.currentUrl - Snapshots the URL to restore.
  * @param {(url: string) => void} deps.restoreUrl - Puts a snapshotted URL back.
@@ -259,7 +259,7 @@ export function createSwitchCoordinator({
     appState.update({ resolution, effect });
     showResolution(resolution);
     restoreUrl(url);
-    if (applyResolution(true) !== ApplyResult.APPLIED) {
+    if (applyResolution({preserveParams: true}) !== ApplyResult.APPLIED) {
       throw new Error(`Resolution rollback to "${resolution}" was rejected.`);
     }
     restoreEffectControlState(getActiveEffect(), effectState, restoreChainSnapshot);
@@ -352,7 +352,7 @@ export function createSwitchCoordinator({
  * @param {(error?: *) => boolean} [deps.moduleDead] - Reads whether the engine module
  *   trapped; a sidebar query that trapped is re-thrown.
  * @returns {{applyEffect: (options?: {preserveParams?: boolean, broadcast?: boolean, chainSnapshot?: *}) => string,
- *   applyResolution: (preserveParams?: boolean) => string}}
+ *   applyResolution: (options?: {preserveParams?: boolean}) => string}}
  */
 export function createApplyPipeline({
   appState,
@@ -431,7 +431,8 @@ export function createApplyPipeline({
   /**
    * Apply a resolution change: resize geometry, refresh sidebar list, then
    * re-apply effect.
-   * @param {boolean} [preserveParams=false] - When true, keep the active effect's
+   * @param {Object} [options]
+   * @param {boolean} [options.preserveParams=false] - When true, keep the active effect's
    *   param URL entries through the re-apply. Also kept while no engine exists
    *   or the outgoing effect restores through a chain snapshot; always dropped
    *   when an off-list effect is corrected.
@@ -440,7 +441,7 @@ export function createApplyPipeline({
    *   was; a rejected applyEffect returns after the engine, driver and sidebar
    *   have moved, so the caller must roll back.
    */
-  function applyResolution(preserveParams = false) {
+  function applyResolution({preserveParams = false} = {}) {
     const resolution = appState.get('resolution');
     // Own keys only: an inherited name ("constructor") would otherwise resolve to
     // a preset with no dimensions and resize the engine to undefined.

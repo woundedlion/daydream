@@ -77,7 +77,7 @@ function makeApp({
     return ApplyResult.APPLIED;
   };
 
-  const applyResolution = (preserveParams = false) => {
+  const applyResolution = ({ preserveParams = false } = {}) => {
     const resolution = appState.get('resolution');
     app.url = `/?resolution=${resolution}`;
     app.calls.push({
