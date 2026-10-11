@@ -7,25 +7,13 @@ const { createSlider, createSliderProxy } = await import('../src/shared/slider.j
 
 restoreDocumentAfterEach();
 
-/** A fake range input recording the attributes createSlider sets.
- * @returns {Object} Fake input element.
- */
-const fakeInput = () => {
-  const listeners = new Map();
-  return Object.assign(fakeElement('input'), {
-    type: '', min: '', max: '', step: '', value: '',
-    addEventListener: (type, listener) => listeners.set(type, listener),
-    dispatch: (type) => listeners.get(type)?.(),
-  });
-};
-
 let container;
 
 beforeEach(() => {
   container = fakeElement('div');
   installDocument({
     getElementById: (id) => id === 'c' ? container : null,
-    createElement: (tag) => (tag === 'input' ? fakeInput() : fakeElement(tag)),
+    createElement: (tag) => fakeElement(tag),
   });
 });
 
@@ -128,8 +116,8 @@ test('input updates the readout and aria-valuetext before onInput', () => {
 });
 
 /**
- * Verifies setValue writes all three parts of the control at once — thumb,
- * readout, and aria-valuetext — without firing onInput, since the caller
+ * Verifies setValue writes all three parts of the control at once â€” thumb,
+ * readout, and aria-valuetext â€” without firing onInput, since the caller
  * already holds the value it is pushing.
  */
 test('setValue drives thumb, readout and aria-valuetext without firing onInput', () => {
