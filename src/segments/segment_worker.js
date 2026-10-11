@@ -48,9 +48,6 @@ export function installSegmentWorker() {
   let paramRevision = 0;
   /** @type {SegRange | null} */
   let segRange = null;
-  // Disposition of the engine's clip: true while it covers the full canvas, as
-  // after an installed effect or a FULL_FRAME_KEPT applyClip.
-  let clipFullFrame = false;
   // Log-once latch for getArenaMetrics failures; reset per effect install and
   // geometry change.
   let arenaMetricsWarned = false;
@@ -116,7 +113,6 @@ export function installSegmentWorker() {
       awaitingEffect = true;
       return true;
     }
-    clipFullFrame = result === wasmModule.ClipSetResult.FULL_FRAME_KEPT;
     return true;
   }
 
@@ -286,7 +282,6 @@ export function installSegmentWorker() {
                  reason: `setEffect(${msg.effectName}) rejected` });
           break;
         }
-        clipFullFrame = true;
         // Mirrors the engine-driven index without engaging the pause.
         if (typeof msg.presetIndex === 'number') {
           applyPreset(msg.presetIndex, 'synchronizePreset');
@@ -315,7 +310,6 @@ export function installSegmentWorker() {
           divergenceWarnings = new Map();
           arenaMetricsWarned = false;
           awaitingEffect = false;
-          clipFullFrame = true;
           // Mirrors the engine-driven index without the pause, as in 'init'.
           if (typeof msg.presetIndex === 'number') {
             applyPreset(msg.presetIndex, 'synchronizePreset');
@@ -500,7 +494,6 @@ export function installSegmentWorker() {
           paramRevision,
           presetCount,
           presetIndex,
-          fullFrame: clipFullFrame,
           warnings: divergenceWarnings.size > 0 ? [...divergenceWarnings.values()] : undefined,
         }, [pixelsCopy.buffer]);
         break;

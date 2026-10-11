@@ -16,7 +16,7 @@
  * bumps PROTOCOL_VERSION.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 12;
+export const PROTOCOL_VERSION = 13;
 
 // Sentinel segIds for pool-wide faults with no single worker to blame:
 // FAULT_POOL for pool-creation faults, FAULT_RENDER for render-path faults.
@@ -138,9 +138,6 @@ export const FAULT_RENDER = -2;
  * `warnings` carries the standing parameter and preset refusals on this worker,
  * re-sent every frame and omitted while there are none.
  *
- * `fullFrame` is the disposition of the worker's last setClip: true when the
- * effect reports `needs_full_frame() || persists_pixels()` (`FULL_FRAME_KEPT`)
- * and the engine shaded the whole canvas rather than the rectangle.
  * @typedef {{
  *   type: 'frame', segId: number,
  *   x0: number, x1: number, y0: number, y1: number,
@@ -149,7 +146,6 @@ export const FAULT_RENDER = -2;
  *   paramValues: number[] | null,
  *   paramRevision: number, presetCount: number | null,
  *   presetIndex: number | null,
- *   fullFrame: boolean,
  *   warnings?: string[]|undefined,
  * }} FrameMsg
  */

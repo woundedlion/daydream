@@ -210,7 +210,6 @@ export async function publishGeneration(controller, bands) {
  * @param {number} [overrides.presetCount] - Preset count reported by the worker.
  * @param {number} [overrides.presetIndex] - Current preset index reported by the worker.
  * @param {string[]} [overrides.warnings] - Divergence warnings reported by the worker.
- * @param {boolean} [overrides.fullFrame] - Whether the worker shaded the whole canvas.
  * @returns {void}
  */
 export function deliverFrame(controller, segId, overrides = {}) {
@@ -231,7 +230,6 @@ export function deliverFrame(controller, segId, overrides = {}) {
       paramRevision: overrides.paramRevision ?? controller.paramRevision,
       presetCount: overrides.presetCount ?? null,
       presetIndex: overrides.presetIndex ?? null,
-      fullFrame: overrides.fullFrame ?? false,
       // Left undefined unless a case supplies one, as the worker posts
       // `warnings: undefined` when it saw no divergence.
       warnings: overrides.warnings,
