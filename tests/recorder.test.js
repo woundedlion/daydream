@@ -74,63 +74,51 @@ const installFakeDocument = () => {
 };
 
 /** Native capture rounds the start-time source size up to even and keeps it. */
-test('native-resolution capture pins the offscreen to the source size at start', () => {
-  const restore = installFakeDocument();
-  try {
-    const source = fakeCanvas(201, 101);   // odd dims → rounded up to even
-    const rec = new VideoRecorder(source);
-    assert.equal(rec.targetHeight, null);
+test('native-resolution capture pins the offscreen to the source size at start', (t) => {
+  t.after(installFakeDocument());
+  const source = fakeCanvas(201, 101);   // odd dims → rounded up to even
+  const rec = new VideoRecorder(source);
+  assert.equal(rec.targetHeight, null);
 
-    const off = rec.ensureOffscreen();
-    assert.equal(off.width, 202);
-    assert.equal(off.height, 102);
+  const off = rec.ensureOffscreen();
+  assert.equal(off.width, 202);
+  assert.equal(off.height, 102);
 
-    source.width = 640;
-    source.height = 480;
-    const off2 = rec.ensureOffscreen();
-    assert.equal(off2, off);
-    assert.equal(off2.width, 202);
-    assert.equal(off2.height, 102);
-  } finally {
-    restore();
-  }
+  source.width = 640;
+  source.height = 480;
+  const off2 = rec.ensureOffscreen();
+  assert.equal(off2, off);
+  assert.equal(off2.width, 202);
+  assert.equal(off2.height, 102);
 });
 
 /** Both offscreen dimensions round up to even, at the start-time source aspect. */
-test('targetHeight capture scales the offscreen to the target height and pins it', () => {
-  const restore = installFakeDocument();
-  try {
-    const source = fakeCanvas(800, 600);   // 4:3 source
-    const rec = new VideoRecorder(source);
-    rec.targetHeight = 121;                 // odd target → rounded up to even
+test('targetHeight capture scales the offscreen to the target height and pins it', (t) => {
+  t.after(installFakeDocument());
+  const source = fakeCanvas(800, 600);   // 4:3 source
+  const rec = new VideoRecorder(source);
+  rec.targetHeight = 121;                 // odd target → rounded up to even
 
-    const off = rec.ensureOffscreen();
-    assert.equal(off.height, 122);
-    assert.equal(off.width, 162);
+  const off = rec.ensureOffscreen();
+  assert.equal(off.height, 122);
+  assert.equal(off.width, 162);
 
-    source.width = 1920;
-    source.height = 1080;
-    const off2 = rec.ensureOffscreen();
-    assert.equal(off2, off);
-    assert.equal(off2.width, 162);
-    assert.equal(off2.height, 122);
-  } finally {
-    restore();
-  }
+  source.width = 1920;
+  source.height = 1080;
+  const off2 = rec.ensureOffscreen();
+  assert.equal(off2, off);
+  assert.equal(off2.width, 162);
+  assert.equal(off2.height, 122);
 });
 
 /** A 0x0 source has a non-finite aspect, which would make NaN canvas dimensions. */
-test('targetHeight capture falls back to a square when the source aspect is degenerate', () => {
-  const restore = installFakeDocument();
-  try {
-    const rec = new VideoRecorder(fakeCanvas(0, 0)); // 0/0 → NaN aspect
-    rec.targetHeight = 120;
-    const off = rec.ensureOffscreen();
-    assert.equal(off.height, 120);
-    assert.equal(off.width, 120, 'square fallback, not NaN');
-  } finally {
-    restore();
-  }
+test('targetHeight capture falls back to a square when the source aspect is degenerate', (t) => {
+  t.after(installFakeDocument());
+  const rec = new VideoRecorder(fakeCanvas(0, 0)); // 0/0 → NaN aspect
+  rec.targetHeight = 120;
+  const off = rec.ensureOffscreen();
+  assert.equal(off.height, 120);
+  assert.equal(off.width, 120, 'square fallback, not NaN');
 });
 
 test('elapsedFormatted zero-pads seconds and rolls over minutes', () => {
@@ -304,69 +292,69 @@ const visibilityDocument = (hidden) => Object.assign(new EventTarget(), {
   hidden, createElement: () => recordableCanvas(),
 });
 
-test('background visibility pauses recording time and remains stoppable', () => {
-  const restore = installRecorderEnv();
-  try {
-    const doc = visibilityDocument(false);
-    const removed = [];
-    const removeEventListener = doc.removeEventListener.bind(doc);
-    doc.removeEventListener = (type, listener, options) => {
-      removed.push([type, listener]);
-      removeEventListener(type, listener, options);
-    };
-    let now = 1000;
-    const rec = new VideoRecorder(recordableCanvas(), 1 / 16, () => now, doc);
-    rec.download = () => {};
-    rec.start('e');
-    const media = rec.mediaRecorder;
-    assert.equal(media.state, 'recording');
-    now = 2000;
-    doc.hidden = true;
-    doc.dispatchEvent(new Event('visibilitychange'));
-    assert.equal(media.state, 'paused');
-    assert.equal(rec.isRecording, true);
-    now = 62_000;
-    assert.equal(rec.elapsedSeconds, 1);
-    doc.hidden = false;
-    doc.dispatchEvent(new Event('visibilitychange'));
-    assert.equal(media.state, 'recording');
-    now = 63_000;
-    assert.equal(rec.elapsedSeconds, 2);
-    doc.hidden = true;
-    doc.dispatchEvent(new Event('visibilitychange'));
-    rec.stop();
-    assert.equal(media.state, 'inactive');
-    rec.dispose();
-    assert.deepEqual(removed, [['visibilitychange', rec.visibilityChanged]],
-      'dispose removes the document listener it installed');
-  } finally {
-    restore();
-  }
+/**
+ * Builds a recorder whose download is a no-op and starts it.
+ * @param {...any} args - VideoRecorder constructor arguments.
+ * @returns {VideoRecorder} The started recorder.
+ */
+const startRecorder = (...args) => {
+  const rec = new VideoRecorder(...args);
+  rec.download = () => {};
+  rec.start('e');
+  return rec;
+};
+
+test('background visibility pauses recording time and remains stoppable', (t) => {
+  t.after(installRecorderEnv());
+  const doc = visibilityDocument(false);
+  const removed = [];
+  const removeEventListener = doc.removeEventListener.bind(doc);
+  doc.removeEventListener = (type, listener, options) => {
+    removed.push([type, listener]);
+    removeEventListener(type, listener, options);
+  };
+  let now = 1000;
+  const rec = startRecorder(recordableCanvas(), 1 / 16, () => now, doc);
+  const media = rec.mediaRecorder;
+  assert.equal(media.state, 'recording');
+  now = 2000;
+  doc.hidden = true;
+  doc.dispatchEvent(new Event('visibilitychange'));
+  assert.equal(media.state, 'paused');
+  assert.equal(rec.isRecording, true);
+  now = 62_000;
+  assert.equal(rec.elapsedSeconds, 1);
+  doc.hidden = false;
+  doc.dispatchEvent(new Event('visibilitychange'));
+  assert.equal(media.state, 'recording');
+  now = 63_000;
+  assert.equal(rec.elapsedSeconds, 2);
+  doc.hidden = true;
+  doc.dispatchEvent(new Event('visibilitychange'));
+  rec.stop();
+  assert.equal(media.state, 'inactive');
+  rec.dispose();
+  assert.deepEqual(removed, [['visibilitychange', rec.visibilityChanged]],
+    'dispose removes the document listener it installed');
 });
 
-test('a recording started on a hidden page begins paused', () => {
-  const restore = installRecorderEnv();
-  try {
-    const doc = visibilityDocument(true);
-    let now = 1000;
-    const rec = new VideoRecorder(recordableCanvas(), 1 / 16, () => now, doc);
-    rec.download = () => {};
-    rec.start('e');
-    const media = rec.mediaRecorder;
-    assert.equal(media.state, 'paused');
-    assert.equal(rec.isRecording, true);
-    now = 5000;
-    assert.equal(rec.elapsedSeconds, 0);
-    doc.hidden = false;
-    doc.dispatchEvent(new Event('visibilitychange'));
-    assert.equal(media.state, 'recording');
-    now = 7000;
-    assert.equal(rec.elapsedSeconds, 2);
-    rec.dispose();
-    assert.equal(media.state, 'inactive');
-  } finally {
-    restore();
-  }
+test('a recording started on a hidden page begins paused', (t) => {
+  t.after(installRecorderEnv());
+  const doc = visibilityDocument(true);
+  let now = 1000;
+  const rec = startRecorder(recordableCanvas(), 1 / 16, () => now, doc);
+  const media = rec.mediaRecorder;
+  assert.equal(media.state, 'paused');
+  assert.equal(rec.isRecording, true);
+  now = 5000;
+  assert.equal(rec.elapsedSeconds, 0);
+  doc.hidden = false;
+  doc.dispatchEvent(new Event('visibilitychange'));
+  assert.equal(media.state, 'recording');
+  now = 7000;
+  assert.equal(rec.elapsedSeconds, 2);
+  rec.dispose();
+  assert.equal(media.state, 'inactive');
 });
 
 test('isSupported answers false where the DOM globals are absent', () => {
@@ -388,331 +376,281 @@ test('isSupported answers false where the DOM globals are absent', () => {
   }
 });
 
-test('isSupported answers true where captureStream and MediaRecorder both exist', () => {
-  const restore = installRecorderEnv();
-  try {
-    assert.equal(VideoRecorder.isSupported(), true);
-  } finally {
-    restore();
-  }
+test('isSupported answers true where captureStream and MediaRecorder both exist', (t) => {
+  t.after(installRecorderEnv());
+  assert.equal(VideoRecorder.isSupported(), true);
 });
 
-test('toggle starts then stops, reporting the true state each time', () => {
-  const restore = installRecorderEnv();
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    rec.download = () => {};
-    assert.equal(rec.toggle('e'), true);
-    assert.equal(rec.isRecording, true);
-    const stream = rec.stream;
-    const recorder = rec.mediaRecorder;
-    assert.equal(stream.captureRate, 0,
-      'the session must capture in manual-frame mode, not off the wall clock');
-    assert.equal(typeof rec.track.requestFrame, 'function');
-    assert.equal(recorder.timesliceMs, 1000,
-      'chunks must be delivered on a timeslice, not buffered until stop');
-    assert.equal(rec.toggle('e'), false);
-    assert.equal(rec.isRecording, false);
-    recorder.onstop();
-    assert.equal(rec.mediaRecorder, null, 'onstop clears the recorder');
-    assert.equal(stream.track.stopped, true, 'onstop stops the capture track');
-  } finally {
-    restore();
-  }
+test('toggle starts then stops, reporting the true state each time', (t) => {
+  t.after(installRecorderEnv());
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.download = () => {};
+  assert.equal(rec.toggle('e'), true);
+  assert.equal(rec.isRecording, true);
+  const stream = rec.stream;
+  const recorder = rec.mediaRecorder;
+  assert.equal(stream.captureRate, 0,
+    'the session must capture in manual-frame mode, not off the wall clock');
+  assert.equal(typeof rec.track.requestFrame, 'function');
+  assert.equal(recorder.timesliceMs, 1000,
+    'chunks must be delivered on a timeslice, not buffered until stop');
+  assert.equal(rec.toggle('e'), false);
+  assert.equal(rec.isRecording, false);
+  recorder.onstop();
+  assert.equal(rec.mediaRecorder, null, 'onstop clears the recorder');
+  assert.equal(stream.track.stopped, true, 'onstop stops the capture track');
 });
 
-test('elapsed time follows the recording wall-clock lifecycle', () => {
-  const restore = installRecorderEnv();
-  try {
-    let nowMs = 10_000;
-    let clockReads = 0;
-    const rec = new VideoRecorder(recordableCanvas(), 1 / 16, () => {
-      clockReads++;
-      return nowMs;
-    });
-    rec.download = () => {};
-    rec.start('e');
-    const recorder = rec.mediaRecorder;
-    const clockReadsAtStart = clockReads;
+test('elapsed time follows the recording wall-clock lifecycle', (t) => {
+  t.after(installRecorderEnv());
+  let nowMs = 10_000;
+  let clockReads = 0;
+  const rec = startRecorder(recordableCanvas(), 1 / 16, () => {
+    clockReads++;
+    return nowMs;
+  });
+  const recorder = rec.mediaRecorder;
+  const clockReadsAtStart = clockReads;
 
-    rec.captureFrame();
-    rec.captureFrame();
-    assert.equal(clockReads, clockReadsAtStart,
-      'captureFrame does not read the clock on the render path');
-    assert.equal(rec.elapsedSeconds, 0,
-      'captured frames do not manufacture elapsed time');
+  rec.captureFrame();
+  rec.captureFrame();
+  assert.equal(clockReads, clockReadsAtStart,
+    'captureFrame does not read the clock on the render path');
+  assert.equal(rec.elapsedSeconds, 0,
+    'captured frames do not manufacture elapsed time');
 
-    nowMs += 5_900;
-    assert.equal(rec.elapsedSeconds, 5.9,
-      'a simulation pause remains part of the recording duration');
-    assert.equal(rec.elapsedFormatted, '0:05');
+  nowMs += 5_900;
+  assert.equal(rec.elapsedSeconds, 5.9,
+    'a simulation pause remains part of the recording duration');
+  assert.equal(rec.elapsedFormatted, '0:05');
 
-    nowMs += 55_000;
-    assert.equal(rec.elapsedFormatted, '1:00',
-      'a render stall advances the readout without a captured frame');
+  nowMs += 55_000;
+  assert.equal(rec.elapsedFormatted, '1:00',
+    'a render stall advances the readout without a captured frame');
 
-    rec.stop();
-    const stoppedElapsed = rec.elapsedSeconds;
-    nowMs += 30_000;
-    assert.equal(rec.elapsedSeconds, stoppedElapsed,
-      'the duration freezes when MediaRecorder stops accepting data');
-    recorder.onstop();
-  } finally {
-    restore();
-  }
+  rec.stop();
+  const stoppedElapsed = rec.elapsedSeconds;
+  nowMs += 30_000;
+  assert.equal(rec.elapsedSeconds, stoppedElapsed,
+    'the duration freezes when MediaRecorder stops accepting data');
+  recorder.onstop();
 });
 
 /** abort() still finalizes the output; an idle recorder reports nothing. */
-test('abort stops a live session and tells the host', () => {
-  const restore = installRecorderEnv();
+test('abort stops a live session and tells the host', (t) => {
+  t.after(installRecorderEnv());
   const captured = installConsoleCapture('error');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    rec.download = () => {};
-    const notified = [];
-    rec.onError = (err) => notified.push(err);
-    rec.start('e');
-    const recorder = rec.mediaRecorder;
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.download = () => {};
+  const notified = [];
+  rec.onError = (err) => notified.push(err);
+  rec.start('e');
+  const recorder = rec.mediaRecorder;
 
-    rec.abort('context lost');
-    assert.equal(rec.isRecording, false);
-    assert.equal(notified.length, 1, 'the host is told the session ended');
-    assert.match(notified[0].message, /context lost/);
-    recorder.onstop();
-    assert.equal(rec.mediaRecorder, null, 'the stop path still finalizes the session');
+  rec.abort('context lost');
+  assert.equal(rec.isRecording, false);
+  assert.equal(notified.length, 1, 'the host is told the session ended');
+  assert.match(notified[0].message, /context lost/);
+  recorder.onstop();
+  assert.equal(rec.mediaRecorder, null, 'the stop path still finalizes the session');
 
-    rec.abort('context lost');
-    assert.equal(notified.length, 1, 'an idle recorder has nothing to abort');
-  } finally {
-    captured.restore();
-    restore();
-  }
+  rec.abort('context lost');
+  assert.equal(notified.length, 1, 'an idle recorder has nothing to abort');
 });
 
-test('start refuses and stays idle when recording is unsupported', () => {
-  const restore = installRecorderEnv();
+test('start refuses and stays idle when recording is unsupported', (t) => {
+  t.after(installRecorderEnv());
   const captured = installConsoleCapture('error');
-  try {
-    delete globalThis.MediaRecorder;
-    const rec = new VideoRecorder(recordableCanvas());
-    const notified = [];
-    rec.onError = (err) => notified.push(err);
-    rec.start('e');
-    assert.equal(rec.mediaRecorder, null);
-    assert.equal(rec.isRecording, false);
-    assert.equal(captured.messages.length, 1);
-    assert.equal(notified.length, 1, 'the host is told the session never started');
-    assert.match(notified[0].message, /not supported/);
-  } finally {
-    captured.restore();
-    restore();
-  }
+  t.after(captured.restore);
+  delete globalThis.MediaRecorder;
+  const rec = new VideoRecorder(recordableCanvas());
+  const notified = [];
+  rec.onError = (err) => notified.push(err);
+  rec.start('e');
+  assert.equal(rec.mediaRecorder, null);
+  assert.equal(rec.isRecording, false);
+  assert.equal(captured.messages.length, 1);
+  assert.equal(notified.length, 1, 'the host is told the session never started');
+  assert.match(notified[0].message, /not supported/);
 });
 
-test('an unsupported explicit format reports the browser-selected container', async () => {
-  const restore = installRecorderEnv();
+test('an unsupported explicit format reports the browser-selected container', async (t) => {
+  t.after(installRecorderEnv());
+  t.after(() => { FakeMediaRecorder.isTypeSupported = () => true; });
   const captured = installConsoleCapture('warn');
-  try {
-    FakeMediaRecorder.isTypeSupported = () => false;
-    const rec = new VideoRecorder(recordableCanvas());
-    const fallbacks = [];
-    let pickerOptions;
-    globalThis.showSaveFilePicker = (options) => {
-      pickerOptions = options;
-      return Promise.resolve({});
-    };
-    rec.format = 'webm';
-    FakeMediaRecorder.defaultMimeType = 'video/mp4';
-    rec.onFormatFallback = (extension) => fallbacks.push(extension);
-    rec.download = () => {};
+  t.after(captured.restore);
+  FakeMediaRecorder.isTypeSupported = () => false;
+  const rec = new VideoRecorder(recordableCanvas());
+  const fallbacks = [];
+  let pickerOptions;
+  globalThis.showSaveFilePicker = (options) => {
+    pickerOptions = options;
+    return Promise.resolve({});
+  };
+  rec.format = 'webm';
+  FakeMediaRecorder.defaultMimeType = 'video/mp4';
+  rec.onFormatFallback = (extension) => fallbacks.push(extension);
+  rec.download = () => {};
 
-    rec.start('e');
+  rec.start('e');
 
-    assert.match(pickerOptions.suggestedName, /\.video$/);
-    assert.equal(pickerOptions.types, undefined);
-    assert.equal(rec.mediaRecorder.mimeType, '');
-    assert.deepEqual(fallbacks, []);
-    await Promise.resolve();
-    assert.deepEqual(fallbacks, ['mp4']);
-    assert.equal(captured.messages.length, 1);
-    assert.match(captured.messages[0], /requested format "webm" is unsupported/);
-  } finally {
-    FakeMediaRecorder.isTypeSupported = () => true;
-    captured.restore();
-    restore();
-  }
+  assert.match(pickerOptions.suggestedName, /\.video$/);
+  assert.equal(pickerOptions.types, undefined);
+  assert.equal(rec.mediaRecorder.mimeType, '');
+  assert.deepEqual(fallbacks, []);
+  await Promise.resolve();
+  assert.deepEqual(fallbacks, ['mp4']);
+  assert.equal(captured.messages.length, 1);
+  assert.match(captured.messages[0], /requested format "webm" is unsupported/);
 });
 
 /** The stream is not on the instance yet, so cleanup() cannot reach those tracks. */
-test('a MediaRecorder construction failure stops the acquired capture tracks', () => {
-  const restore = installRecorderEnv();
+test('a MediaRecorder construction failure stops the acquired capture tracks', (t) => {
+  t.after(installRecorderEnv());
   const captured = installConsoleCapture('error');
-  try {
-    const failure = new Error('unsupported recorder options');
-    failure.name = 'NotSupportedError';
-    FakeMediaRecorder.constructError = failure;
+  t.after(captured.restore);
+  const failure = new Error('unsupported recorder options');
+  failure.name = 'NotSupportedError';
+  FakeMediaRecorder.constructError = failure;
 
-    const rec = new VideoRecorder(recordableCanvas());
-    let sinkOpened = false;
-    rec.openSink = () => { sinkOpened = true; };
-    const notified = [];
-    rec.onError = (err) => notified.push(err);
+  const rec = new VideoRecorder(recordableCanvas());
+  let sinkOpened = false;
+  rec.openSink = () => { sinkOpened = true; };
+  const notified = [];
+  rec.onError = (err) => notified.push(err);
 
-    assert.doesNotThrow(() => rec.start('e'));
+  assert.doesNotThrow(() => rec.start('e'));
 
-    assert.equal(FakeMediaRecorder.instances.length, 0);
-    assert.equal(FakeMediaRecorder.lastStream.track.stopped, true,
-      'the capture track is stopped, so the capture does not stay live');
-    assert.equal(rec.mediaRecorder, null);
-    assert.equal(rec.stream, null);
-    assert.equal(rec.track, null);
-    assert.equal(rec.offscreen, null);
-    assert.equal(rec.offCtx, null);
-    assert.equal(rec.isRecording, false);
-    assert.equal(sinkOpened, false);
-    assert.ok(captured.calls.some((args) => args.includes(failure)));
-    assert.deepEqual(notified, [failure], 'the host is told the session never started');
+  assert.equal(FakeMediaRecorder.instances.length, 0);
+  assert.equal(FakeMediaRecorder.lastStream.track.stopped, true,
+    'the capture track is stopped, so the capture does not stay live');
+  assert.equal(rec.mediaRecorder, null);
+  assert.equal(rec.stream, null);
+  assert.equal(rec.track, null);
+  assert.equal(rec.offscreen, null);
+  assert.equal(rec.offCtx, null);
+  assert.equal(rec.isRecording, false);
+  assert.equal(sinkOpened, false);
+  assert.ok(captured.calls.some((args) => args.includes(failure)));
+  assert.deepEqual(notified, [failure], 'the host is told the session never started');
 
-    FakeMediaRecorder.constructError = null;
-    rec.openSink = () => ({ write() {}, finish() {} });
-    rec.start('retry');
-    assert.equal(rec.isRecording, true);
-    rec.dispose();
-  } finally {
-    captured.restore();
-    restore();
-  }
+  FakeMediaRecorder.constructError = null;
+  rec.openSink = () => ({ write() {}, finish() {} });
+  rec.start('retry');
+  assert.equal(rec.isRecording, true);
+  rec.dispose();
 });
 
-test('a MediaRecorder start failure releases the entire capture session', () => {
-  const restore = installRecorderEnv();
+test('a MediaRecorder start failure releases the entire capture session', (t) => {
+  t.after(installRecorderEnv());
   const captured = installConsoleCapture('error');
-  try {
-    const failure = new Error('codec start rejected');
-    failure.name = 'NotSupportedError';
-    FakeMediaRecorder.startError = failure;
+  t.after(captured.restore);
+  const failure = new Error('codec start rejected');
+  failure.name = 'NotSupportedError';
+  FakeMediaRecorder.startError = failure;
 
-    const rec = new VideoRecorder(recordableCanvas());
-    let sinkOpened = false;
-    rec.openSink = () => { sinkOpened = true; };
-    const notified = [];
-    rec.onError = (err) => notified.push(err);
+  const rec = new VideoRecorder(recordableCanvas());
+  let sinkOpened = false;
+  rec.openSink = () => { sinkOpened = true; };
+  const notified = [];
+  rec.onError = (err) => notified.push(err);
 
-    assert.doesNotThrow(() => rec.start('e'));
+  assert.doesNotThrow(() => rec.start('e'));
 
-    const recorder = FakeMediaRecorder.instances[0];
-    assert.equal(recorder.stream.track.stopped, true);
-    assert.equal(recorder.ondataavailable, null);
-    assert.equal(recorder.onstop, null);
-    assert.equal(rec.mediaRecorder, null);
-    assert.equal(rec.stream, null);
-    assert.equal(rec.track, null);
-    assert.deepEqual(rec.chunks, []);
-    assert.equal(rec.offscreen, null);
-    assert.equal(rec.offCtx, null);
-    assert.equal(rec.isRecording, false);
-    assert.equal(sinkOpened, false);
-    assert.ok(captured.calls.some((args) => args.includes(failure)));
-    assert.deepEqual(notified, [failure], 'the host is told the session never started');
+  const recorder = FakeMediaRecorder.instances[0];
+  assert.equal(recorder.stream.track.stopped, true);
+  assert.equal(recorder.ondataavailable, null);
+  assert.equal(recorder.onstop, null);
+  assert.equal(rec.mediaRecorder, null);
+  assert.equal(rec.stream, null);
+  assert.equal(rec.track, null);
+  assert.deepEqual(rec.chunks, []);
+  assert.equal(rec.offscreen, null);
+  assert.equal(rec.offCtx, null);
+  assert.equal(rec.isRecording, false);
+  assert.equal(sinkOpened, false);
+  assert.ok(captured.calls.some((args) => args.includes(failure)));
+  assert.deepEqual(notified, [failure], 'the host is told the session never started');
 
-    FakeMediaRecorder.startError = null;
-    rec.openSink = () => ({ write() {}, finish() {} });
-    notified.length = 0;
-    rec.start('retry');
-    assert.equal(rec.isRecording, true);
-    rec.dispose();
-  } finally {
-    captured.restore();
-    restore();
-  }
+  FakeMediaRecorder.startError = null;
+  rec.openSink = () => ({ write() {}, finish() {} });
+  notified.length = 0;
+  rec.start('retry');
+  assert.equal(rec.isRecording, true);
+  rec.dispose();
 });
 
-test('a stopped session downloads its own chunks and clears instance state', () => {
-  const restore = installRecorderEnv();
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const downloads = [];
-    rec.download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
+test('a stopped session downloads its own chunks and clears instance state', (t) => {
+  t.after(installRecorderEnv());
+  const rec = new VideoRecorder(recordableCanvas());
+  const downloads = [];
+  rec.download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
 
-    rec.start('solo');
-    const recorder = rec.mediaRecorder;
-    const stream = rec.stream;
-    recorder.ondataavailable({ data: { size: 10 } });
-    rec.stop();
-    recorder.onstop();
+  rec.start('solo');
+  const recorder = rec.mediaRecorder;
+  const stream = rec.stream;
+  recorder.ondataavailable({ data: { size: 10 } });
+  rec.stop();
+  recorder.onstop();
 
-    assert.equal(downloads.length, 1);
-    assert.equal(downloads[0].name, 'solo');
-    assert.deepEqual(downloads[0].chunks, [{ size: 10 }]);
-    assert.equal(rec.mediaRecorder, null);
-    assert.equal(stream.track.stopped, true);
-  } finally {
-    restore();
-  }
+  assert.equal(downloads.length, 1);
+  assert.equal(downloads[0].name, 'solo');
+  assert.deepEqual(downloads[0].chunks, [{ size: 10 }]);
+  assert.equal(rec.mediaRecorder, null);
+  assert.equal(stream.track.stopped, true);
 });
 
 /** Reported the same way as an empty streaming session. */
-test('a buffered session that captured nothing is reported', () => {
-  const restore = installRecorderEnv();
+test('a buffered session that captured nothing is reported', (t) => {
+  t.after(installRecorderEnv());
   const captured = installConsoleCapture('warn');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const downloads = [];
-    rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  const downloads = [];
+  rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
 
-    rec.start('empty');
-    const recorder = rec.mediaRecorder;
-    rec.stop();
-    recorder.onstop();
+  rec.start('empty');
+  const recorder = rec.mediaRecorder;
+  rec.stop();
+  recorder.onstop();
 
-    assert.equal(downloads.length, 0, 'an empty buffer must not reach the anchor path');
-    assert.equal(captured.messages.length, 1);
-    assert.match(captured.messages[0], /session produced no data/);
-  } finally {
-    captured.restore();
-    restore();
-  }
+  assert.equal(downloads.length, 0, 'an empty buffer must not reach the anchor path');
+  assert.equal(captured.messages.length, 1);
+  assert.match(captured.messages[0], /session produced no data/);
 });
 
 /** The encoder hands over a final chunk between stop() and the stop event. */
-test('the chunk flushed by stop is saved with the rest', () => {
-  const restore = installRecorderEnv();
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const downloads = [];
-    rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
-    FakeMediaRecorder.stopData = { size: 7 };
+test('the chunk flushed by stop is saved with the rest', (t) => {
+  t.after(installRecorderEnv());
+  const rec = new VideoRecorder(recordableCanvas());
+  const downloads = [];
+  rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
+  FakeMediaRecorder.stopData = { size: 7 };
 
-    rec.start('tail');
-    const recorder = rec.mediaRecorder;
-    recorder.ondataavailable({ data: { size: 10 } });
-    rec.stop();
-    recorder.onstop();
+  rec.start('tail');
+  const recorder = rec.mediaRecorder;
+  recorder.ondataavailable({ data: { size: 10 } });
+  rec.stop();
+  recorder.onstop();
 
-    assert.equal(downloads.length, 1);
-    assert.deepEqual(downloads[0].chunks, [{ size: 10 }, { size: 7 }],
-      'the tail follows the chunks the timeslice already delivered');
-  } finally {
-    restore();
-  }
+  assert.equal(downloads.length, 1);
+  assert.deepEqual(downloads[0].chunks, [{ size: 10 }, { size: 7 }],
+    'the tail follows the chunks the timeslice already delivered');
 });
 
-test('a chunk emitted synchronously by start reaches the installed sink', () => {
-  const restore = installRecorderEnv();
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const writes = [];
-    rec.openSink = () => ({ write: (chunk) => writes.push(chunk), finish() {} });
-    FakeMediaRecorder.startData = { size: 10 };
+test('a chunk emitted synchronously by start reaches the installed sink', (t) => {
+  t.after(installRecorderEnv());
+  const rec = new VideoRecorder(recordableCanvas());
+  const writes = [];
+  rec.openSink = () => ({ write: (chunk) => writes.push(chunk), finish() {} });
+  FakeMediaRecorder.startData = { size: 10 };
 
-    rec.start('sync');
+  rec.start('sync');
 
-    assert.deepEqual(writes, [{ size: 10 }]);
-    assert.deepEqual(rec.chunks, []);
-    rec.dispose();
-  } finally {
-    restore();
-  }
+  assert.deepEqual(writes, [{ size: 10 }]);
+  assert.deepEqual(rec.chunks, []);
+  rec.dispose();
 });
 
 /**
@@ -721,74 +659,66 @@ test('a chunk emitted synchronously by start reaches the installed sink', () => 
  * recording state, and clear itself so the next click starts a fresh session
  * instead of a second one.
  */
-test('an encoder error finalizes the session, reports it, and clears the recorder', () => {
-  const restore = installRecorderEnv();
+test('an encoder error finalizes the session, reports it, and clears the recorder', (t) => {
+  t.after(installRecorderEnv());
   const captured = installConsoleCapture('error');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const downloads = [];
-    rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
-    const notified = [];
-    rec.onError = (err) => notified.push(err);
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  const downloads = [];
+  rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
+  const notified = [];
+  rec.onError = (err) => notified.push(err);
 
-    rec.start('faulted');
-    const recorder = rec.mediaRecorder;
-    const stream = rec.stream;
-    recorder.ondataavailable({ data: { size: 10 } });
+  rec.start('faulted');
+  const recorder = rec.mediaRecorder;
+  const stream = rec.stream;
+  recorder.ondataavailable({ data: { size: 10 } });
 
-    const failure = new Error('encoder died');
-    recorder.onerror({ error: failure });
-    assert.equal(downloads.length, 0, 'wait for the final data event');
-    recorder.ondataavailable({ data: { size: 7 } });
-    recorder.onstop();
+  const failure = new Error('encoder died');
+  recorder.onerror({ error: failure });
+  assert.equal(downloads.length, 0, 'wait for the final data event');
+  recorder.ondataavailable({ data: { size: 7 } });
+  recorder.onstop();
 
-    assert.equal(downloads.length, 1, 'the partial capture is still finalized');
-    assert.deepEqual(downloads[0].chunks, [{ size: 10 }, { size: 7 }]);
-    assert.equal(recorder.state, 'inactive', 'the faulted recorder is stopped');
-    assert.equal(stream.track.stopped, true, 'the capture track is released');
-    assert.equal(rec.mediaRecorder, null);
-    assert.equal(rec.stream, null);
-    assert.equal(rec.track, null);
-    assert.equal(rec.offscreen, null);
-    assert.equal(rec.isRecording, false);
-    assert.deepEqual(notified, [failure], 'the host is told the session ended');
-    assert.ok(captured.calls.some((args) => args.includes(failure)),
-      'the failure is reported');
+  assert.equal(downloads.length, 1, 'the partial capture is still finalized');
+  assert.deepEqual(downloads[0].chunks, [{ size: 10 }, { size: 7 }]);
+  assert.equal(recorder.state, 'inactive', 'the faulted recorder is stopped');
+  assert.equal(stream.track.stopped, true, 'the capture track is released');
+  assert.equal(rec.mediaRecorder, null);
+  assert.equal(rec.stream, null);
+  assert.equal(rec.track, null);
+  assert.equal(rec.offscreen, null);
+  assert.equal(rec.isRecording, false);
+  assert.deepEqual(notified, [failure], 'the host is told the session ended');
+  assert.ok(captured.calls.some((args) => args.includes(failure)),
+    'the failure is reported');
 
-    // The UA may still deliver a stop event after the error; it must not finalize twice.
-    recorder.onstop();
-    assert.equal(downloads.length, 1);
+  // The UA may still deliver a stop event after the error; it must not finalize twice.
+  recorder.onstop();
+  assert.equal(downloads.length, 1);
 
-    rec.start('retry');
-    assert.equal(rec.isRecording, true);
-    assert.notEqual(rec.mediaRecorder, recorder, 'the next start is a fresh session');
-    rec.dispose();
-  } finally {
-    captured.restore();
-    restore();
-  }
+  rec.start('retry');
+  assert.equal(rec.isRecording, true);
+  assert.notEqual(rec.mediaRecorder, recorder, 'the next start is a fresh session');
+  rec.dispose();
 });
 
-test('an encoder error event without an Error cause is normalized', () => {
-  const restore = installRecorderEnv();
+test('an encoder error event without an Error cause is normalized', (t) => {
+  t.after(installRecorderEnv());
   const captured = installConsoleCapture('error');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const notified = [];
-    rec.download = () => {};
-    rec.onError = (err) => notified.push(err);
-    rec.start('e');
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  const notified = [];
+  rec.download = () => {};
+  rec.onError = (err) => notified.push(err);
+  rec.start('e');
 
-    rec.mediaRecorder.onerror({ type: 'error' });
+  rec.mediaRecorder.onerror({ type: 'error' });
 
-    assert.equal(notified.length, 1);
-    assert.ok(notified[0] instanceof Error);
-    assert.match(notified[0].message, /recording failed/);
-    rec.dispose();
-  } finally {
-    captured.restore();
-    restore();
-  }
+  assert.equal(notified.length, 1);
+  assert.ok(notified[0] instanceof Error);
+  assert.match(notified[0].message, /recording failed/);
+  rec.dispose();
 });
 
 /**
@@ -796,62 +726,54 @@ test('an encoder error event without an Error cause is normalized', () => {
  * only its own output and must neither tear down nor report against the newer
  * session that replaced it.
  */
-test('a stale session error does not clobber the session that replaced it', () => {
-  const restore = installRecorderEnv();
+test('a stale session error does not clobber the session that replaced it', (t) => {
+  t.after(installRecorderEnv());
   const captured = installConsoleCapture('error');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const downloads = [];
-    rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
-    const notified = [];
-    rec.onError = (err) => notified.push(err);
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  const downloads = [];
+  rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
+  const notified = [];
+  rec.onError = (err) => notified.push(err);
 
-    rec.start('first');
-    const recorderA = rec.mediaRecorder;
-    recorderA.ondataavailable({ data: { size: 10 } });
-    rec.stop();
+  rec.start('first');
+  const recorderA = rec.mediaRecorder;
+  recorderA.ondataavailable({ data: { size: 10 } });
+  rec.stop();
 
-    rec.start('second');
-    const recorderB = rec.mediaRecorder;
-    recorderB.ondataavailable({ data: { size: 20 } });
+  rec.start('second');
+  const recorderB = rec.mediaRecorder;
+  recorderB.ondataavailable({ data: { size: 20 } });
 
-    recorderA.onerror({ error: new Error('late encoder fault') });
-    recorderA.onstop();
+  recorderA.onerror({ error: new Error('late encoder fault') });
+  recorderA.onstop();
 
-    assert.equal(downloads.length, 1);
-    assert.equal(downloads[0].name, 'first');
-    assert.equal(notified.length, 0, 'the live session is not reported as failed');
-    assert.equal(rec.mediaRecorder, recorderB);
-    assert.equal(rec.isRecording, true);
-    assert.equal(rec.stream.track.stopped, false);
-  } finally {
-    captured.restore();
-    restore();
-  }
+  assert.equal(downloads.length, 1);
+  assert.equal(downloads[0].name, 'first');
+  assert.equal(notified.length, 0, 'the live session is not reported as failed');
+  assert.equal(rec.mediaRecorder, recorderB);
+  assert.equal(rec.isRecording, true);
+  assert.equal(rec.stream.track.stopped, false);
 });
 
-test('a session retains only non-empty chunks', () => {
-  const restore = installRecorderEnv();
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const downloads = [];
-    rec.download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
+test('a session retains only non-empty chunks', (t) => {
+  t.after(installRecorderEnv());
+  const rec = new VideoRecorder(recordableCanvas());
+  const downloads = [];
+  rec.download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
 
-    rec.start('e');
-    const recorder = rec.mediaRecorder;
-    // MediaRecorder can emit zero-byte dataavailable events (a flush with nothing buffered).
-    recorder.ondataavailable({ data: { size: 0 } });
-    recorder.ondataavailable({ data: { size: 42 } });
-    recorder.ondataavailable({ data: { size: 0 } });
-    rec.stop();
-    recorder.onstop();
+  rec.start('e');
+  const recorder = rec.mediaRecorder;
+  // MediaRecorder can emit zero-byte dataavailable events (a flush with nothing buffered).
+  recorder.ondataavailable({ data: { size: 0 } });
+  recorder.ondataavailable({ data: { size: 42 } });
+  recorder.ondataavailable({ data: { size: 0 } });
+  rec.stop();
+  recorder.onstop();
 
-    assert.equal(downloads.length, 1);
-    assert.deepEqual(downloads[0].chunks, [{ size: 42 }],
-      'only the non-empty chunk is retained');
-  } finally {
-    restore();
-  }
+  assert.equal(downloads.length, 1);
+  assert.deepEqual(downloads[0].chunks, [{ size: 42 }],
+    'only the non-empty chunk is retained');
 });
 
 /**
@@ -859,38 +781,34 @@ test('a session retains only non-empty chunks', () => {
  * before the old recorder's async onstop fires. The stale handler must download
  * ITS OWN chunks and must NOT tear down the newer active session.
  */
-test('a stale onstop does not clobber the session that replaced it', () => {
-  const restore = installRecorderEnv();
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const downloads = [];
-    rec.download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
+test('a stale onstop does not clobber the session that replaced it', (t) => {
+  t.after(installRecorderEnv());
+  const rec = new VideoRecorder(recordableCanvas());
+  const downloads = [];
+  rec.download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
 
-    rec.start('first');
-    const recorderA = rec.mediaRecorder;
-    const streamA = rec.stream;
-    recorderA.ondataavailable({ data: { size: 10 } });
-    rec.stop();
+  rec.start('first');
+  const recorderA = rec.mediaRecorder;
+  const streamA = rec.stream;
+  recorderA.ondataavailable({ data: { size: 10 } });
+  rec.stop();
 
-    // Session B installed before A's deferred onstop runs.
-    rec.start('second');
-    const recorderB = rec.mediaRecorder;
-    assert.notEqual(recorderB, recorderA);
-    recorderB.ondataavailable({ data: { size: 20 } });
+  // Session B installed before A's deferred onstop runs.
+  rec.start('second');
+  const recorderB = rec.mediaRecorder;
+  assert.notEqual(recorderB, recorderA);
+  recorderB.ondataavailable({ data: { size: 20 } });
 
-    recorderA.onstop();
+  recorderA.onstop();
 
-    assert.equal(downloads.length, 1);
-    assert.equal(downloads[0].name, 'first');
-    assert.deepEqual(downloads[0].chunks, [{ size: 10 }]);
-    assert.equal(streamA.track.stopped, true);
+  assert.equal(downloads.length, 1);
+  assert.equal(downloads[0].name, 'first');
+  assert.deepEqual(downloads[0].chunks, [{ size: 10 }]);
+  assert.equal(streamA.track.stopped, true);
 
-    assert.equal(rec.mediaRecorder, recorderB);
-    assert.deepEqual(rec.chunks, [{ size: 20 }]);
-    assert.equal(rec.stream.track.stopped, false);
-  } finally {
-    restore();
-  }
+  assert.equal(rec.mediaRecorder, recorderB);
+  assert.deepEqual(rec.chunks, [{ size: 20 }]);
+  assert.equal(rec.stream.track.stopped, false);
 });
 
 /**
@@ -927,40 +845,37 @@ const trackSinkFinish = (rec) => {
  * and released after writing. Stopping closes the file after those writes;
  * no blob download is assembled on a successful streaming save.
  */
-test('streams chunks to disk when the File System Access API is present', async () => {
-  const restore = installRecorderEnv();
+test('streams chunks to disk when the File System Access API is present', async (t) => {
+  t.after(installRecorderEnv());
   const writes = [];
   let closed = false;
   const writable = { write: async (d) => { writes.push(d); }, close: async () => { closed = true; } };
   globalThis.showSaveFilePicker = async () => ({ createWritable: async () => writable });
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const sinkFinished = trackSinkFinish(rec);
-    let downloaded = false;
-    rec.download = () => { downloaded = true; };
+  const rec = new VideoRecorder(recordableCanvas());
+  const sinkFinished = trackSinkFinish(rec);
+  let downloaded = false;
+  rec.download = () => { downloaded = true; };
 
-    rec.start('stream');
-    const sessionChunks = rec.chunks;
-    const recorder = rec.mediaRecorder;
-    recorder.ondataavailable({ data: { size: 10 } });
-    recorder.ondataavailable({ data: { size: 20 } });
-    rec.stop();
-    recorder.onstop();
+  rec.start('stream');
+  const sessionChunks = rec.chunks;
+  const recorder = rec.mediaRecorder;
+  recorder.ondataavailable({ data: { size: 10 } });
+  recorder.ondataavailable({ data: { size: 20 } });
+  rec.stop();
+  recorder.onstop();
 
-    await sinkFinished();
+  await sinkFinished();
 
-    assert.deepEqual(writes, [{ size: 10 }, { size: 20 }], 'each chunk written to disk in order');
-    assert.equal(closed, true, 'writable closed at stop');
-    assert.equal(downloaded, false, 'no in-memory blob download while streaming');
-    assert.deepEqual(sessionChunks, [], 'streamed chunks are not retained in RAM');
-  } finally {
-    restore();
-  }
+  assert.deepEqual(writes, [{ size: 10 }, { size: 20 }], 'each chunk written to disk in order');
+  assert.equal(closed, true, 'writable closed at stop');
+  assert.equal(downloaded, false, 'no in-memory blob download while streaming');
+  assert.deepEqual(sessionChunks, [], 'streamed chunks are not retained in RAM');
 });
 
-test('a late file close failure reports its session without stopping a new recording', async () => {
-  const restore = installRecorderEnv();
+test('a late file close failure reports its session without stopping a new recording', async (t) => {
+  t.after(installRecorderEnv());
   const captured = installConsoleCapture('error');
+  t.after(captured.restore);
   let rejectClose;
   let filename;
   const failure = new Error('disk commit failed');
@@ -971,61 +886,53 @@ test('a late file close failure reports its session without stopping a new recor
       close: () => new Promise((_, reject) => { rejectClose = reject; }),
     }) };
   };
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const finished = trackSinkFinish(rec);
-    const failures = [];
-    const captureFailures = [];
-    rec.onSaveError = (error, name) => failures.push({ error, name });
-    rec.onError = (error) => captureFailures.push(error);
-    rec.start('previous');
-    const previous = rec.mediaRecorder;
-    previous.ondataavailable({ data: { size: 10 } });
-    rec.stop();
-    previous.onstop();
-    await drainSink();
-    rec.start('current');
-    const current = rec.mediaRecorder;
-    rejectClose(failure);
-    await finished();
-    assert.equal(failures.length, 1);
-    assert.equal(failures[0].name, filename);
-    assert.match(filename, /^previous_/);
-    assert.equal(failures[0].error.cause, failure);
-    assert.match(failures[0].error.message, /truncated or incomplete/);
-    assert.deepEqual(captureFailures, []);
-    assert.equal(rec.mediaRecorder, current);
-    assert.equal(rec.isRecording, true);
-  } finally {
-    captured.restore();
-    restore();
-  }
+  const rec = new VideoRecorder(recordableCanvas());
+  const finished = trackSinkFinish(rec);
+  const failures = [];
+  const captureFailures = [];
+  rec.onSaveError = (error, name) => failures.push({ error, name });
+  rec.onError = (error) => captureFailures.push(error);
+  rec.start('previous');
+  const previous = rec.mediaRecorder;
+  previous.ondataavailable({ data: { size: 10 } });
+  rec.stop();
+  previous.onstop();
+  await drainSink();
+  rec.start('current');
+  const current = rec.mediaRecorder;
+  rejectClose(failure);
+  await finished();
+  assert.equal(failures.length, 1);
+  assert.equal(failures[0].name, filename);
+  assert.match(filename, /^previous_/);
+  assert.equal(failures[0].error.cause, failure);
+  assert.match(failures[0].error.message, /truncated or incomplete/);
+  assert.deepEqual(captureFailures, []);
+  assert.equal(rec.mediaRecorder, current);
+  assert.equal(rec.isRecording, true);
 });
 
-test('the encoder is opened at the configured bitrate', () => {
-  const restore = installRecorderEnv();
-  try {
-    const auto = new VideoRecorder(recordableCanvas());
-    auto.download = () => {};
-    auto.start('e');
-    assert.equal(auto.mediaRecorder.options.videoBitsPerSecond, 16_000_000,
-      'the constructor default did not reach the encoder');
-    auto.stop();
-    auto.mediaRecorder.onstop();
+test('the encoder is opened at the configured bitrate', (t) => {
+  t.after(installRecorderEnv());
+  const auto = new VideoRecorder(recordableCanvas());
+  auto.download = () => {};
+  auto.start('e');
+  assert.equal(auto.mediaRecorder.options.videoBitsPerSecond, 16_000_000,
+    'the constructor default did not reach the encoder');
+  auto.stop();
+  auto.mediaRecorder.onstop();
 
-    const rec = new VideoRecorder(recordableCanvas());
-    rec.download = () => {};
-    rec.bitrateMbps = 24;
-    rec.start('e');
-    // Mbps, not bps: an unconverted 24 would encode at 24 bits per second.
-    assert.equal(rec.mediaRecorder.options.videoBitsPerSecond, 24_000_000);
-  } finally {
-    restore();
-  }
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.download = () => {};
+  rec.bitrateMbps = 24;
+  rec.start('e');
+  // Mbps, not bps: an unconverted 24 would encode at 24 bits per second.
+  assert.equal(rec.mediaRecorder.options.videoBitsPerSecond, 24_000_000);
 });
 
-test('the save picker is offered the timestamped name and the container filter', async () => {
-  const restore = installRecorderEnv();
+test('the save picker is offered the timestamped name and the container filter', async (t) => {
+  t.after(installRecorderEnv());
+  t.after(() => mock.timers.reset());
   const picked = [];
   const writable = { write: async () => {}, close: async () => {} };
   globalThis.showSaveFilePicker = async (options) => {
@@ -1033,38 +940,33 @@ test('the save picker is offered the timestamped name and the container filter',
     return { createWritable: async () => writable };
   };
   mock.timers.enable({ apis: ['setTimeout', 'Date'], now: SAVE_CLOCK });
-  try {
-    // Both the name and the filter follow the container the encoder settled on,
-    // so an advertised-format change has to move them together.
-    for (const [format, name, mime] of [
-      ['mp4', 'swirl_20260102_030405.mp4', 'video/mp4'],
-      ['webm', 'swirl_20260102_030405.webm', 'video/webm'],
-    ]) {
-      picked.length = 0;
-      const rec = new VideoRecorder(recordableCanvas());
-      const sinkFinished = trackSinkFinish(rec);
-      rec.download = () => {};
-      rec.format = format;
+  // Both the name and the filter follow the container the encoder settled on,
+  // so an advertised-format change has to move them together.
+  for (const [format, name, mime] of [
+    ['mp4', 'swirl_20260102_030405.mp4', 'video/mp4'],
+    ['webm', 'swirl_20260102_030405.webm', 'video/webm'],
+  ]) {
+    picked.length = 0;
+    const rec = new VideoRecorder(recordableCanvas());
+    const sinkFinished = trackSinkFinish(rec);
+    rec.download = () => {};
+    rec.format = format;
 
-      rec.start('swirl');
-      rec.stop();
-      rec.mediaRecorder.onstop();
-      await sinkFinished();
+    rec.start('swirl');
+    rec.stop();
+    rec.mediaRecorder.onstop();
+    await sinkFinished();
 
-      assert.equal(picked.length, 1);
-      assert.equal(picked[0].suggestedName, name,
-        'the dialog opened on something other than the timestamped file');
-      assert.deepEqual(picked[0].types,
-        [{ description: 'Video', accept: { [mime]: [`.${format}`] } }]);
-    }
-  } finally {
-    mock.timers.reset();
-    restore();
+    assert.equal(picked.length, 1);
+    assert.equal(picked[0].suggestedName, name,
+      'the dialog opened on something other than the timestamped file');
+    assert.deepEqual(picked[0].types,
+      [{ description: 'Video', accept: { [mime]: [`.${format}`] } }]);
   }
 });
 
-test('a mid-stream streaming write failure stops the session and reports truncation', async () => {
-  const restore = installRecorderEnv();
+test('a mid-stream streaming write failure stops the session and reports truncation', async (t) => {
+  t.after(installRecorderEnv());
   const writes = [];
   let closed = false;
   let writeCount = 0;
@@ -1078,45 +980,41 @@ test('a mid-stream streaming write failure stops the session and reports truncat
   };
   globalThis.showSaveFilePicker = async () => ({ createWritable: async () => writable });
   const captured = installConsoleCapture('error', 'warn');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const sinkFinished = trackSinkFinish(rec);
-    let downloaded = false;
-    const notified = [];
-    rec.download = () => { downloaded = true; };
-    rec.onError = (err) => notified.push(err);
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  const sinkFinished = trackSinkFinish(rec);
+  let downloaded = false;
+  const notified = [];
+  rec.download = () => { downloaded = true; };
+  rec.onError = (err) => notified.push(err);
 
-    rec.start('stream');
-    const recorder = rec.mediaRecorder;
-    recorder.ondataavailable({ data: { size: 10 } });
-    recorder.ondataavailable({ data: { size: 20 } }); // this write throws
-    recorder.ondataavailable({ data: { size: 30 } }); // dropped after the failure
-    await drainSink();
+  rec.start('stream');
+  const recorder = rec.mediaRecorder;
+  recorder.ondataavailable({ data: { size: 10 } });
+  recorder.ondataavailable({ data: { size: 20 } }); // this write throws
+  recorder.ondataavailable({ data: { size: 30 } }); // dropped after the failure
+  await drainSink();
 
-    assert.equal(rec.isRecording, false, 'the failed write stops the active recorder');
-    assert.equal(notified.length, 1, 'the host is notified once');
-    assert.match(notified[0].message, /disk full/);
-    recorder.onstop();
+  assert.equal(rec.isRecording, false, 'the failed write stops the active recorder');
+  assert.equal(notified.length, 1, 'the host is notified once');
+  assert.match(notified[0].message, /disk full/);
+  recorder.onstop();
 
-    await sinkFinished();
+  await sinkFinished();
 
-    assert.deepEqual(writes, [{ size: 10 }], 'only the pre-failure chunk reached disk');
-    assert.equal(closed, true, 'the writable is closed to flush the on-disk prefix');
-    assert.equal(downloaded, false, 'no blob download of the post-failure tail');
-    assert.ok(captured.messages.some((e) => /truncated/.test(e)),
-      'the truncation is reported to the user');
-  } finally {
-    captured.restore();
-    restore();
-  }
+  assert.deepEqual(writes, [{ size: 10 }], 'only the pre-failure chunk reached disk');
+  assert.equal(closed, true, 'the writable is closed to flush the on-disk prefix');
+  assert.equal(downloaded, false, 'no blob download of the post-failure tail');
+  assert.ok(captured.messages.some((e) => /truncated/.test(e)),
+    'the truncation is reported to the user');
 });
 
 /**
  * The write chain is serialized, so a link that rejects rejects every link
  * queued behind it and finish()'s close along with them.
  */
-test('a host hook that throws does not poison the streaming write chain', async () => {
-  const restore = installRecorderEnv();
+test('a host hook that throws does not poison the streaming write chain', async (t) => {
+  t.after(installRecorderEnv());
   const writes = [];
   let closed = false;
   let writeCount = 0;
@@ -1130,34 +1028,30 @@ test('a host hook that throws does not poison the streaming write chain', async 
   };
   globalThis.showSaveFilePicker = async () => ({ createWritable: async () => writable });
   const captured = installConsoleCapture('error', 'warn');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const sinkFinished = trackSinkFinish(rec);
-    let downloaded = false;
-    rec.download = () => { downloaded = true; };
-    rec.onError = () => { throw new Error('host hook exploded'); };
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  const sinkFinished = trackSinkFinish(rec);
+  let downloaded = false;
+  rec.download = () => { downloaded = true; };
+  rec.onError = () => { throw new Error('host hook exploded'); };
 
-    rec.start('stream');
-    const recorder = rec.mediaRecorder;
-    recorder.ondataavailable({ data: { size: 10 } });
-    recorder.ondataavailable({ data: { size: 20 } }); // this write throws
-    await drainSink();
-    recorder.onstop();
+  rec.start('stream');
+  const recorder = rec.mediaRecorder;
+  recorder.ondataavailable({ data: { size: 10 } });
+  recorder.ondataavailable({ data: { size: 20 } }); // this write throws
+  await drainSink();
+  recorder.onstop();
 
-    await sinkFinished();
+  await sinkFinished();
 
-    assert.deepEqual(writes, [{ size: 10 }], 'the pre-failure chunk reached disk');
-    assert.equal(closed, true,
-      'the on-disk prefix is still flushed, not stranded behind a rejected chain');
-    assert.equal(downloaded, false, 'no blob download of the post-failure tail');
-    assert.ok(captured.messages.some((e) => /host hook exploded/.test(e)),
-      'the swallowed host failure is reported');
-    assert.ok(captured.messages.some((e) => /truncated/.test(e)),
-      'the truncation is still reported to the user');
-  } finally {
-    captured.restore();
-    restore();
-  }
+  assert.deepEqual(writes, [{ size: 10 }], 'the pre-failure chunk reached disk');
+  assert.equal(closed, true,
+    'the on-disk prefix is still flushed, not stranded behind a rejected chain');
+  assert.equal(downloaded, false, 'no blob download of the post-failure tail');
+  assert.ok(captured.messages.some((e) => /host hook exploded/.test(e)),
+    'the swallowed host failure is reported');
+  assert.ok(captured.messages.some((e) => /truncated/.test(e)),
+    'the truncation is still reported to the user');
 });
 
 /**
@@ -1167,8 +1061,8 @@ test('a host hook that throws does not poison the streaming write chain', async 
  * as a contiguous prefix after the session ends at that limit.
  */
 for (const bitrate of [1, 0]) {
-  test(`an unanswered save dialog bounds backlog with configured bitrate ${bitrate}`, async () => {
-    const restore = installRecorderEnv();
+  test(`an unanswered save dialog bounds backlog with configured bitrate ${bitrate}`, async (t) => {
+    t.after(installRecorderEnv());
     const writes = [];
     let closed = false;
     const writable = { write: async (d) => { writes.push(d); }, close: async () => { closed = true; } };
@@ -1177,55 +1071,52 @@ for (const bitrate of [1, 0]) {
       answerPicker = () => resolve({ createWritable: async () => writable });
     });
     const captured = installConsoleCapture('error');
-    try {
-      const rec = new VideoRecorder(recordableCanvas());
-      const sinkFinished = trackSinkFinish(rec);
-      rec.bitrateMbps = bitrate;
-      let downloaded = false;
-      rec.download = () => { downloaded = true; };
-      const notified = [];
-      rec.onError = (err) => notified.push(err);
+    t.after(captured.restore);
+    const rec = new VideoRecorder(recordableCanvas());
+    const sinkFinished = trackSinkFinish(rec);
+    rec.bitrateMbps = bitrate;
+    let downloaded = false;
+    rec.download = () => { downloaded = true; };
+    const notified = [];
+    rec.onError = (err) => notified.push(err);
 
-      rec.start('unanswered');
-      const recorder = rec.mediaRecorder;
-      const expectedBitrate = (bitrate || 16) * 1_000_000;
-      assert.equal(recorder.options.videoBitsPerSecond, expectedBitrate);
-      const sessionChunks = rec.chunks;
-      const held = (expectedBitrate / 8) * PICKER_GRACE_SECONDS - 1_000_000;
-      recorder.ondataavailable({ data: { size: held } });
-      assert.equal(rec.isRecording, true, 'a backlog under the bound keeps recording');
+    rec.start('unanswered');
+    const recorder = rec.mediaRecorder;
+    const expectedBitrate = (bitrate || 16) * 1_000_000;
+    assert.equal(recorder.options.videoBitsPerSecond, expectedBitrate);
+    const sessionChunks = rec.chunks;
+    const held = (expectedBitrate / 8) * PICKER_GRACE_SECONDS - 1_000_000;
+    recorder.ondataavailable({ data: { size: held } });
+    assert.equal(rec.isRecording, true, 'a backlog under the bound keeps recording');
 
-      recorder.ondataavailable({ data: { size: 2_000_000 } });
-      assert.equal(rec.isRecording, false, 'the session stops when the backlog passes the bound');
-      assert.equal(notified.length, 1, 'the host is told the session ended');
-      assert.match(captured.messages.join(' '), /Save dialog/,
-        'the stop is reported, not silent');
-      assert.doesNotMatch(captured.messages.join(' '), /recording stopped/i,
-        'the notice prefix already says the session stopped');
+    recorder.ondataavailable({ data: { size: 2_000_000 } });
+    assert.equal(rec.isRecording, false, 'the session stops when the backlog passes the bound');
+    assert.equal(notified.length, 1, 'the host is told the session ended');
+    assert.match(captured.messages.join(' '), /Save dialog/,
+      'the stop is reported, not silent');
+    assert.doesNotMatch(captured.messages.join(' '), /recording stopped/i,
+      'the notice prefix already says the session stopped');
 
-      recorder.ondataavailable({ data: { size: 3_000_000 } });
-      recorder.onstop();
-      assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
+    recorder.ondataavailable({ data: { size: 3_000_000 } });
+    recorder.onstop();
+    assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
 
-      answerPicker();
-      await sinkFinished();
+    answerPicker();
+    await sinkFinished();
 
-      assert.deepEqual(writes, [{ size: held }],
-        'the chunks held under the bound still reach the chosen file, in order');
-      assert.equal(closed, true, 'the file is closed once the late pick lands');
-      assert.equal(downloaded, false, 'no in-memory blob download of the dropped tail');
-      assert.deepEqual(sessionChunks, [], 'the dropped chunks are not retained in RAM');
-    } finally {
-      captured.restore();
-      restore();
-    }
+    assert.deepEqual(writes, [{ size: held }],
+      'the chunks held under the bound still reach the chosen file, in order');
+    assert.equal(closed, true, 'the file is closed once the late pick lands');
+    assert.equal(downloaded, false, 'no in-memory blob download of the dropped tail');
+    assert.deepEqual(sessionChunks, [], 'the dropped chunks are not retained in RAM');
   });
 }
 
 for (const stalledAt of ['opening', 'writing']) {
-  test(`streaming backlog stays bounded during stalled ${stalledAt}`, async () => {
-    const restore = installRecorderEnv();
+  test(`streaming backlog stays bounded during stalled ${stalledAt}`, async (t) => {
+    t.after(installRecorderEnv());
     const captured = installConsoleCapture('error');
+    t.after(captured.restore);
     const writes = [];
     const releases = [];
     let open;
@@ -1243,83 +1134,74 @@ for (const stalledAt of ['opening', 'writing']) {
         ? new Promise((resolve) => { open = () => resolve(writable); })
         : Promise.resolve(writable),
     });
-    try {
-      const rec = new VideoRecorder(recordableCanvas());
-      rec.bitrateMbps = 1;
-      const notified = [];
-      rec.onError = (error) => notified.push(error);
-      const finished = trackSinkFinish(rec);
-      rec.start('slow-file');
-      const recorder = rec.mediaRecorder;
-      const size = rec.bitrateMbps * 1_000_000 / 8 * PICKER_GRACE_SECONDS / 2;
-      const chunks = Array.from({ length: 5 }, (_, id) => ({ size, id }));
+    const rec = new VideoRecorder(recordableCanvas());
+    rec.bitrateMbps = 1;
+    const notified = [];
+    rec.onError = (error) => notified.push(error);
+    const finished = trackSinkFinish(rec);
+    rec.start('slow-file');
+    const recorder = rec.mediaRecorder;
+    const size = rec.bitrateMbps * 1_000_000 / 8 * PICKER_GRACE_SECONDS / 2;
+    const chunks = Array.from({ length: 5 }, (_, id) => ({ size, id }));
+    await drainSink();
+    recorder.ondataavailable({ data: chunks[0] });
+    await drainSink();
+    recorder.ondataavailable({ data: chunks[1] });
+    let accepted = 2;
+    if (stalledAt === 'writing') {
+      releases.shift()();
       await drainSink();
-      recorder.ondataavailable({ data: chunks[0] });
-      await drainSink();
-      recorder.ondataavailable({ data: chunks[1] });
-      let accepted = 2;
-      if (stalledAt === 'writing') {
-        releases.shift()();
-        await drainSink();
-        recorder.ondataavailable({ data: chunks[2] });
-        accepted = 3;
-      }
-      assert.equal(rec.isRecording, true, 'settled writes release their backlog bytes');
-      recorder.ondataavailable({ data: chunks[accepted] });
-      assert.equal(rec.isRecording, false);
-      assert.equal(notified.length, 1);
-      assert.match(notified[0].message, /streaming save could not keep up/);
-      recorder.ondataavailable({ data: chunks[4] });
-      recorder.onstop();
-      if (open) open();
-      for (let i = 0; i < accepted; i++) {
-        await drainSink();
-        releases.shift()?.();
-      }
-      await finished();
-      assert.deepEqual(writes, chunks.slice(0, accepted));
-      assert.equal(closed, true);
-      assert.equal(notified.length, 1);
-    } finally {
-      captured.restore();
-      restore();
+      recorder.ondataavailable({ data: chunks[2] });
+      accepted = 3;
     }
+    assert.equal(rec.isRecording, true, 'settled writes release their backlog bytes');
+    recorder.ondataavailable({ data: chunks[accepted] });
+    assert.equal(rec.isRecording, false);
+    assert.equal(notified.length, 1);
+    assert.match(notified[0].message, /streaming save could not keep up/);
+    recorder.ondataavailable({ data: chunks[4] });
+    recorder.onstop();
+    if (open) open();
+    for (let i = 0; i < accepted; i++) {
+      await drainSink();
+      releases.shift()?.();
+    }
+    await finished();
+    assert.deepEqual(writes, chunks.slice(0, accepted));
+    assert.equal(closed, true);
+    assert.equal(notified.length, 1);
   });
 }
 
-test('the in-memory fallback sink stops the session at its byte bound', () => {
-  const restore = installRecorderEnv();
+test('the in-memory fallback sink stops the session at its byte bound', (t) => {
+  t.after(installRecorderEnv());
   const captured = installConsoleCapture('error');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    let downloaded = null;
-    rec.download = (recorder, chunks) => { downloaded = chunks.length; };
-    const notified = [];
-    rec.onError = (err) => notified.push(err);
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  let downloaded = null;
+  rec.download = (recorder, chunks) => { downloaded = chunks.length; };
+  const notified = [];
+  rec.onError = (err) => notified.push(err);
 
-    rec.start('unbounded');
-    const recorder = rec.mediaRecorder;
-    const CHUNK_BYTES = 1_000_000;
-    const underBound = MEMORY_BUFFER_LIMIT_BYTES / CHUNK_BYTES;
-    for (let i = 0; i < underBound; i++) recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
-    assert.equal(rec.isRecording, true, 'a buffer under the bound keeps recording');
+  rec.start('unbounded');
+  const recorder = rec.mediaRecorder;
+  const CHUNK_BYTES = 1_000_000;
+  const underBound = MEMORY_BUFFER_LIMIT_BYTES / CHUNK_BYTES;
+  for (let i = 0; i < underBound; i++) recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
+  assert.equal(rec.isRecording, true, 'a buffer under the bound keeps recording');
 
-    recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
-    assert.equal(rec.isRecording, false, 'the session runs to an OOM instead of stopping');
-    assert.equal(notified.length, 1, 'the host is told the session ended');
-    assert.match(captured.messages.join(' '), /held in memory/,
-      'the stop is reported, not silent');
-    assert.doesNotMatch(captured.messages.join(' '), /recording stopped/i,
-      'the notice prefix already says the session stopped');
+  recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
+  assert.equal(rec.isRecording, false, 'the session runs to an OOM instead of stopping');
+  assert.equal(notified.length, 1, 'the host is told the session ended');
+  assert.match(captured.messages.join(' '), /held in memory/,
+    'the stop is reported, not silent');
+  assert.doesNotMatch(captured.messages.join(' '), /recording stopped/i,
+    'the notice prefix already says the session stopped');
 
-    recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
-    recorder.onstop();
-    assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
-    assert.equal(downloaded, underBound, 'the prefix captured under the bound is still saved');
-  } finally {
-    captured.restore();
-    restore();
-  }
+  recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
+  recorder.onstop();
+  assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
+  assert.equal(downloaded, underBound, 'the prefix captured under the bound is still saved');
 });
 
 /**
@@ -1327,51 +1209,47 @@ test('the in-memory fallback sink stops the session at its byte bound', () => {
  * no file handle, so every chunk lands in the blob buffer for the download at
  * stop. With no queued writes remaining, the fallback uses its own byte bound.
  */
-test('a streaming session with no file handle bounds its in-memory fallback', async () => {
-  const restore = installRecorderEnv();
+test('a streaming session with no file handle bounds its in-memory fallback', async (t) => {
+  t.after(installRecorderEnv());
   globalThis.showSaveFilePicker = async () => { throw new Error('picker unavailable'); };
   const captured = installConsoleCapture('warn', 'error');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    let downloaded = null;
-    rec.download = (recorder, chunks) => { downloaded = chunks.length; };
-    const notified = [];
-    rec.onError = (err) => notified.push(err);
-    const sinkFinished = trackSinkFinish(rec);
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  let downloaded = null;
+  rec.download = (recorder, chunks) => { downloaded = chunks.length; };
+  const notified = [];
+  rec.onError = (err) => notified.push(err);
+  const sinkFinished = trackSinkFinish(rec);
 
-    rec.start('handleless');
-    const recorder = rec.mediaRecorder;
-    // Let the picker's rejection settle, so every chunk below is past the
-    // streaming backlog cap and reaches the in-memory fallback.
-    await drainSink();
-    const CHUNK_BYTES = 1_000_000;
-    const underBound = MEMORY_BUFFER_LIMIT_BYTES / CHUNK_BYTES;
-    for (let i = 0; i < underBound; i++) recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
-    await drainSink();
-    assert.equal(rec.isRecording, true, 'a buffer under the bound keeps recording');
+  rec.start('handleless');
+  const recorder = rec.mediaRecorder;
+  // Let the picker's rejection settle, so every chunk below is past the
+  // streaming backlog cap and reaches the in-memory fallback.
+  await drainSink();
+  const CHUNK_BYTES = 1_000_000;
+  const underBound = MEMORY_BUFFER_LIMIT_BYTES / CHUNK_BYTES;
+  for (let i = 0; i < underBound; i++) recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
+  await drainSink();
+  assert.equal(rec.isRecording, true, 'a buffer under the bound keeps recording');
 
-    recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
-    await drainSink();
-    assert.equal(rec.isRecording, false, 'the session runs to an OOM instead of stopping');
-    assert.equal(notified.length, 1, 'the host is told the session ended');
-    assert.match(captured.messages.join(' '), /held in memory/,
-      'the stop is reported, not silent');
-    assert.doesNotMatch(captured.messages.join(' '), /recording stopped/i,
-      'the notice prefix already says the session stopped');
+  recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
+  await drainSink();
+  assert.equal(rec.isRecording, false, 'the session runs to an OOM instead of stopping');
+  assert.equal(notified.length, 1, 'the host is told the session ended');
+  assert.match(captured.messages.join(' '), /held in memory/,
+    'the stop is reported, not silent');
+  assert.doesNotMatch(captured.messages.join(' '), /recording stopped/i,
+    'the notice prefix already says the session stopped');
 
-    recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
-    recorder.onstop();
-    await sinkFinished();
-    assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
-    assert.equal(downloaded, underBound, 'the prefix captured under the bound is still saved');
-  } finally {
-    captured.restore();
-    restore();
-  }
+  recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
+  recorder.onstop();
+  await sinkFinished();
+  assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
+  assert.equal(downloaded, underBound, 'the prefix captured under the bound is still saved');
 });
 
-test('a streaming session that produces no data never opens the chosen file', async () => {
-  const restore = installRecorderEnv();
+test('a streaming session that produces no data never opens the chosen file', async (t) => {
+  t.after(installRecorderEnv());
   let createWritableCalls = 0;
   let closed = false;
   const writable = { write: async () => {}, close: async () => { closed = true; } };
@@ -1379,29 +1257,25 @@ test('a streaming session that produces no data never opens the chosen file', as
     createWritable: async () => { createWritableCalls++; return writable; },
   });
   const captured = installConsoleCapture('warn');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const sinkFinished = trackSinkFinish(rec);
-    let downloaded = false;
-    rec.download = () => { downloaded = true; };
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  const sinkFinished = trackSinkFinish(rec);
+  let downloaded = false;
+  rec.download = () => { downloaded = true; };
 
-    rec.start('empty');
-    const recorder = rec.mediaRecorder;
-    // No ondataavailable: the session streams nothing.
-    rec.stop();
-    recorder.onstop();
+  rec.start('empty');
+  const recorder = rec.mediaRecorder;
+  // No ondataavailable: the session streams nothing.
+  rec.stop();
+  recorder.onstop();
 
-    await sinkFinished();
+  await sinkFinished();
 
-    assert.equal(createWritableCalls, 0, 'the file is never opened/truncated when no data streams');
-    assert.equal(closed, false, 'no empty writable is closed over the chosen file');
-    assert.equal(downloaded, false, 'nothing to download');
-    assert.ok(captured.messages.some((w) => /no data/.test(w)),
-      'the empty session is reported');
-  } finally {
-    captured.restore();
-    restore();
-  }
+  assert.equal(createWritableCalls, 0, 'the file is never opened/truncated when no data streams');
+  assert.equal(closed, false, 'no empty writable is closed over the chosen file');
+  assert.equal(downloaded, false, 'nothing to download');
+  assert.ok(captured.messages.some((w) => /no data/.test(w)),
+    'the empty session is reported');
 });
 
 /**
@@ -1416,9 +1290,7 @@ const captureLetterbox = ({ srcW, srcH, offW, offH }) => {
   const restore = installRecorderEnv();
   try {
     const source = recordableCanvas(srcW, srcH);
-    const rec = new VideoRecorder(source);
-    rec.download = () => {};
-    rec.start('e');
+    const rec = startRecorder(source);
 
     /** @type {any[]} */
     const draws = [];
@@ -1459,22 +1331,16 @@ test('captureFrame pillarboxes a taller-than-target source to fit height', () =>
  * self-samples at the frame rate), not an error: captureFrame skips the manual
  * requestFrame call and elapsed time remains clock-driven.
  */
-test('captureFrame leaves elapsed time clock-driven without requestFrame', () => {
-  const restore = installRecorderEnv();
-  try {
-    let nowMs = 0;
-    const rec = new VideoRecorder(recordableCanvas(), 1 / 16, () => nowMs);
-    rec.download = () => {};
-    rec.start('e');
-    delete rec.track.requestFrame;
-    rec.captureFrame();
-    rec.captureFrame();
-    assert.equal(rec.elapsedSeconds, 0);
-    nowMs = 2_000;
-    assert.equal(rec.elapsedSeconds, 2);
-  } finally {
-    restore();
-  }
+test('captureFrame leaves elapsed time clock-driven without requestFrame', (t) => {
+  t.after(installRecorderEnv());
+  let nowMs = 0;
+  const rec = startRecorder(recordableCanvas(), 1 / 16, () => nowMs);
+  delete rec.track.requestFrame;
+  rec.captureFrame();
+  rec.captureFrame();
+  assert.equal(rec.elapsedSeconds, 0);
+  nowMs = 2_000;
+  assert.equal(rec.elapsedSeconds, 2);
 });
 
 /**
@@ -1484,34 +1350,28 @@ test('captureFrame leaves elapsed time clock-driven without requestFrame', () =>
  * requested on the still-live track, and no elapsed-time advance past the point
  * the encoder stopped accepting frames.
  */
-test('captureFrame is inert between stop and the async onstop', () => {
-  const restore = installRecorderEnv();
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    rec.download = () => {};
-    rec.start('e');
+test('captureFrame is inert between stop and the async onstop', (t) => {
+  t.after(installRecorderEnv());
+  const rec = startRecorder(recordableCanvas());
 
-    const draws = [];
-    let requested = 0;
-    rec.offCtx = { clearRect() {}, drawImage(...a) { draws.push(a); } };
-    rec.track.requestFrame = () => { requested++; };
+  const draws = [];
+  let requested = 0;
+  rec.offCtx = { clearRect() {}, drawImage(...a) { draws.push(a); } };
+  rec.track.requestFrame = () => { requested++; };
 
-    rec.captureFrame();
-    assert.equal(draws.length, 1, 'a frame captured while recording blits');
-    assert.equal(requested, 1);
+  rec.captureFrame();
+  assert.equal(draws.length, 1, 'a frame captured while recording blits');
+  assert.equal(requested, 1);
 
-    rec.stop();
-    const elapsedAtStop = rec.elapsedSeconds;
-    assert.equal(rec.isRecording, false);
-    assert.ok(rec.track, 'onstop has not released the track yet');
+  rec.stop();
+  const elapsedAtStop = rec.elapsedSeconds;
+  assert.equal(rec.isRecording, false);
+  assert.ok(rec.track, 'onstop has not released the track yet');
 
-    rec.captureFrame();
-    assert.equal(draws.length, 1, 'no blit after stop');
-    assert.equal(requested, 1, 'no frame requested on the stopped session');
-    assert.equal(rec.elapsedSeconds, elapsedAtStop, 'elapsed does not advance');
-  } finally {
-    restore();
-  }
+  rec.captureFrame();
+  assert.equal(draws.length, 1, 'no blit after stop');
+  assert.equal(requested, 1, 'no frame requested on the stopped session');
+  assert.equal(rec.elapsedSeconds, elapsedAtStop, 'elapsed does not advance');
 });
 
 /**
@@ -1520,34 +1380,28 @@ test('captureFrame is inert between stop and the async onstop', () => {
  * transparent black. Only captureFrame(), called from the render task, fills the
  * offscreen — on the timed-fallback path too.
  */
-test('start does not blit; the timed fallback fills the offscreen on captureFrame', () => {
-  const restore = installRecorderEnv();
-  try {
-    const timedTrack = { stop() {} }; // no requestFrame -> forces the fps fallback
-    const draws = [];
-    // The offscreen (not the source) is the captured surface; make it report the
-    // timed-fallback track and spy on its blits.
-    const offscreen = {
-      width: 0, height: 0,
-      getContext: () => ({ clearRect() {}, drawImage(...a) { draws.push(a); } }),
-      captureStream: () => ({
-        getVideoTracks: () => [timedTrack],
-        getTracks: () => [timedTrack],
-      }),
-    };
-    installDocument({ createElement: () => offscreen });
+test('start does not blit; the timed fallback fills the offscreen on captureFrame', (t) => {
+  t.after(installRecorderEnv());
+  const timedTrack = { stop() {} }; // no requestFrame -> forces the fps fallback
+  const draws = [];
+  // The offscreen (not the source) is the captured surface; make it report the
+  // timed-fallback track and spy on its blits.
+  const offscreen = {
+    width: 0, height: 0,
+    getContext: () => ({ clearRect() {}, drawImage(...a) { draws.push(a); } }),
+    captureStream: () => ({
+      getVideoTracks: () => [timedTrack],
+      getTracks: () => [timedTrack],
+    }),
+  };
+  installDocument({ createElement: () => offscreen });
 
-    const rec = new VideoRecorder(recordableCanvas(64, 32));
-    rec.download = () => {};
-    rec.start('e');
+  const rec = startRecorder(recordableCanvas(64, 32));
 
-    assert.equal(draws.length, 0, 'no blit from the click-handler task');
+  assert.equal(draws.length, 0, 'no blit from the click-handler task');
 
-    rec.captureFrame();
-    assert.equal(draws.length, 1, 'the render-task capture fills the offscreen');
-  } finally {
-    restore();
-  }
+  rec.captureFrame();
+  assert.equal(draws.length, 1, 'the render-task capture fills the offscreen');
 });
 
 /**
@@ -1555,36 +1409,32 @@ test('start does not blit; the timed fallback fills the offscreen on captureFram
  * is a deliberate "don't save", so the buffered chunks are discarded and nothing
  * is written to the default Downloads folder — Cancel means cancel.
  */
-test('a cancelled save picker discards buffered chunks without downloading', async () => {
-  const restore = installRecorderEnv();
+test('a cancelled save picker discards buffered chunks without downloading', async (t) => {
+  t.after(installRecorderEnv());
   const abort = new Error('user cancelled');
   abort.name = 'AbortError';
   globalThis.showSaveFilePicker = async () => { throw abort; };
   const captured = installConsoleCapture('warn');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const sinkFinished = trackSinkFinish(rec);
-    const downloads = [];
-    rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  const sinkFinished = trackSinkFinish(rec);
+  const downloads = [];
+  rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
 
-    rec.start('cancelled');
-    const sessionChunks = rec.chunks;
-    const recorder = rec.mediaRecorder;
-    // Chunks arrive before the picker's rejection has settled the open promise.
-    recorder.ondataavailable({ data: { size: 10 } });
-    recorder.ondataavailable({ data: { size: 20 } });
-    recorder.ondataavailable({ data: { size: 30 } });
-    rec.stop();
-    recorder.onstop();
+  rec.start('cancelled');
+  const sessionChunks = rec.chunks;
+  const recorder = rec.mediaRecorder;
+  // Chunks arrive before the picker's rejection has settled the open promise.
+  recorder.ondataavailable({ data: { size: 10 } });
+  recorder.ondataavailable({ data: { size: 20 } });
+  recorder.ondataavailable({ data: { size: 30 } });
+  rec.stop();
+  recorder.onstop();
 
-    await sinkFinished();
+  await sinkFinished();
 
-    assert.equal(downloads.length, 0, 'no download after the picker was cancelled');
-    assert.deepEqual(sessionChunks, []);
-  } finally {
-    captured.restore();
-    restore();
-  }
+  assert.equal(downloads.length, 0, 'no download after the picker was cancelled');
+  assert.deepEqual(sessionChunks, []);
 });
 
 /**
@@ -1606,36 +1456,32 @@ const trackHostError = (rec) => {
  * the host hook must fire or the UI stays latched on a dead session and the next
  * click starts a second recording instead of stopping the first.
  */
-test('a cancelled save picker tells the host the session ended', async () => {
-  const restore = installRecorderEnv();
+test('a cancelled save picker tells the host the session ended', async (t) => {
+  t.after(installRecorderEnv());
   const abort = new Error('user cancelled');
   abort.name = 'AbortError';
   globalThis.showSaveFilePicker = async () => { throw abort; };
   const captured = installConsoleCapture('error');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    rec.download = () => {};
-    const notified = [];
-    rec.onError = (err) => notified.push(err);
-    const hostNotified = trackHostError(rec);
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.download = () => {};
+  const notified = [];
+  rec.onError = (err) => notified.push(err);
+  const hostNotified = trackHostError(rec);
 
-    rec.start('cancelled');
-    const recorder = rec.mediaRecorder;
-    // The picker's rejection reaches the hook while the session is still installed.
-    await hostNotified();
+  rec.start('cancelled');
+  const recorder = rec.mediaRecorder;
+  // The picker's rejection reaches the hook while the session is still installed.
+  await hostNotified();
 
-    assert.equal(notified.length, 1, 'the host is told the session ended');
-    assert.notEqual(notified[0], abort, 'the raw AbortError never reaches the host');
-    assert.match(notified[0].message, /Save dialog was cancelled/,
-      'the host is given the cancellation in the words the UI shows');
-    assert.equal(rec.isRecording, false, 'the cancelled session is stopped');
+  assert.equal(notified.length, 1, 'the host is told the session ended');
+  assert.notEqual(notified[0], abort, 'the raw AbortError never reaches the host');
+  assert.match(notified[0].message, /Save dialog was cancelled/,
+    'the host is given the cancellation in the words the UI shows');
+  assert.equal(rec.isRecording, false, 'the cancelled session is stopped');
 
-    recorder.onstop();
-    assert.equal(rec.mediaRecorder, null, 'the stop path still finalizes the session');
-  } finally {
-    captured.restore();
-    restore();
-  }
+  recorder.onstop();
+  assert.equal(rec.mediaRecorder, null, 'the stop path still finalizes the session');
 });
 
 // ---------------------------------------------------------------------------
@@ -1709,42 +1555,38 @@ const installSavePath = () => {
  * through a timestamped, attached-then-detached anchor whose object URL is
  * revoked once the click has consumed it.
  */
-test('the buffered save path downloads one blob through an anchor click', () => {
-  const restore = installRecorderEnv();
+test('the buffered save path downloads one blob through an anchor click', (t) => {
+  t.after(installRecorderEnv());
+  t.after(() => mock.timers.reset());
   const save = installSavePath();
+  t.after(save.restore);
   mock.timers.enable({ apis: ['setTimeout', 'Date'], now: SAVE_CLOCK });
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    rec.format = 'mp4';
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.format = 'mp4';
 
-    rec.start('swirl');
-    const recorder = rec.mediaRecorder;
-    recorder.ondataavailable({ data: { size: 10 } });
-    recorder.ondataavailable({ data: { size: 20 } });
-    rec.stop();
-    recorder.onstop();
+  rec.start('swirl');
+  const recorder = rec.mediaRecorder;
+  recorder.ondataavailable({ data: { size: 10 } });
+  recorder.ondataavailable({ data: { size: 20 } });
+  rec.stop();
+  recorder.onstop();
 
-    assert.equal(save.blobs.length, 1, 'the session assembles exactly one blob');
-    assert.deepEqual(save.blobs[0].parts, [{ size: 10 }, { size: 20 }],
-      'every captured chunk, in capture order');
-    assert.equal(save.blobs[0].type, 'video/mp4', 'the blob carries the container MIME type');
-    assert.deepEqual(save.created.map((c) => c.blob), [save.blobs[0]],
-      'one object URL, minted for that blob');
+  assert.equal(save.blobs.length, 1, 'the session assembles exactly one blob');
+  assert.deepEqual(save.blobs[0].parts, [{ size: 10 }, { size: 20 }],
+    'every captured chunk, in capture order');
+  assert.equal(save.blobs[0].type, 'video/mp4', 'the blob carries the container MIME type');
+  assert.deepEqual(save.created.map((c) => c.blob), [save.blobs[0]],
+    'one object URL, minted for that blob');
 
-    assert.equal(save.clicks.length, 1, 'the download is triggered by a single anchor click');
-    assert.equal(save.clicks[0].href, save.created[0].url);
-    assert.equal(save.clicks[0].download, 'swirl_20260102_030405.mp4');
-    assert.equal(save.clicks[0].parent, save.body, 'the anchor is in the document when clicked');
-    assert.deepEqual(save.body.children, [], 'and detached again afterwards');
+  assert.equal(save.clicks.length, 1, 'the download is triggered by a single anchor click');
+  assert.equal(save.clicks[0].href, save.created[0].url);
+  assert.equal(save.clicks[0].download, 'swirl_20260102_030405.mp4');
+  assert.equal(save.clicks[0].parent, save.body, 'the anchor is in the document when clicked');
+  assert.deepEqual(save.body.children, [], 'and detached again afterwards');
 
-    assert.deepEqual(save.revoked, [], 'the object URL outlives the click');
-    mock.timers.tick(1000);
-    assert.deepEqual(save.revoked, [save.created[0].url], 'then it is revoked');
-  } finally {
-    mock.timers.reset();
-    save.restore();
-    restore();
-  }
+  assert.deepEqual(save.revoked, [], 'the object URL outlives the click');
+  mock.timers.tick(1000);
+  assert.deepEqual(save.revoked, [save.created[0].url], 'then it is revoked');
 });
 
 /**
@@ -1753,53 +1595,47 @@ test('the buffered save path downloads one blob through an anchor click', () => 
  * falls back to WebM, including a subtype that names an Object.prototype
  * member.
  */
-test('the buffered save maps each container to its extension and blob type', () => {
+test('the buffered save maps each container to its extension and blob type', (t) => {
   const save = installSavePath();
+  t.after(save.restore);
+  t.after(() => mock.timers.reset());
   mock.timers.enable({ apis: ['setTimeout', 'Date'], now: SAVE_CLOCK });
-  try {
-    const cases = [
-      ['video/mp4;codecs=avc1', 'clip_20260102_030405.mp4', 'video/mp4'],
-      ['video/webm;codecs=vp9', 'clip_20260102_030405.webm', 'video/webm'],
-      ['video/x-matroska;codecs=avc1', 'clip_20260102_030405.mkv', 'video/x-matroska'],
-      ['video/ogg', 'clip_20260102_030405.ogv', 'video/ogg'],
-      ['', 'clip_20260102_030405.webm', 'video/webm'],
-      ['video/quicktime', 'clip_20260102_030405.webm', 'video/webm'],
-      ['video/constructor', 'clip_20260102_030405.webm', 'video/webm'],
-    ];
-    const rec = new VideoRecorder(recordableCanvas());
-    for (const [mimeType, filename, blobType] of cases) {
-      save.blobs.length = 0;
-      save.clicks.length = 0;
-      rec.download(/** @type {any} */ ({ mimeType }), [{ size: 1 }], 'clip');
-      assert.equal(save.blobs[0].type, blobType, `blob type for "${mimeType}"`);
-      assert.equal(save.clicks[0].download, filename, `file name for "${mimeType}"`);
-    }
-    mock.timers.tick(1000);
-    assert.equal(save.revoked.length, cases.length, 'every minted URL is revoked');
-  } finally {
-    mock.timers.reset();
-    save.restore();
+  const cases = [
+    ['video/mp4;codecs=avc1', 'clip_20260102_030405.mp4', 'video/mp4'],
+    ['video/webm;codecs=vp9', 'clip_20260102_030405.webm', 'video/webm'],
+    ['video/x-matroska;codecs=avc1', 'clip_20260102_030405.mkv', 'video/x-matroska'],
+    ['video/ogg', 'clip_20260102_030405.ogv', 'video/ogg'],
+    ['', 'clip_20260102_030405.webm', 'video/webm'],
+    ['video/quicktime', 'clip_20260102_030405.webm', 'video/webm'],
+    ['video/constructor', 'clip_20260102_030405.webm', 'video/webm'],
+  ];
+  const rec = new VideoRecorder(recordableCanvas());
+  for (const [mimeType, filename, blobType] of cases) {
+    save.blobs.length = 0;
+    save.clicks.length = 0;
+    rec.download(/** @type {any} */ ({ mimeType }), [{ size: 1 }], 'clip');
+    assert.equal(save.blobs[0].type, blobType, `blob type for "${mimeType}"`);
+    assert.equal(save.clicks[0].download, filename, `file name for "${mimeType}"`);
   }
+  mock.timers.tick(1000);
+  assert.equal(save.revoked.length, cases.length, 'every minted URL is revoked');
 });
 
-test('download saves the supplied recorder, chunks, and effect name', () => {
+test('download saves the supplied recorder, chunks, and effect name', (t) => {
   const save = installSavePath();
+  t.after(save.restore);
+  t.after(() => mock.timers.reset());
   mock.timers.enable({ apis: ['setTimeout', 'Date'], now: SAVE_CLOCK });
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
+  const rec = new VideoRecorder(recordableCanvas());
 
-    rec.download(
-      /** @type {any} */ ({ mimeType: 'video/webm;codecs=vp9' }),
-      /** @type {any} */ ([{ size: 7 }]),
-      'live');
+  rec.download(
+    /** @type {any} */ ({ mimeType: 'video/webm;codecs=vp9' }),
+    /** @type {any} */ ([{ size: 7 }]),
+    'live');
 
-    assert.deepEqual(save.blobs[0].parts, [{ size: 7 }]);
-    assert.equal(save.blobs[0].type, 'video/webm');
-    assert.equal(save.clicks[0].download, 'live_20260102_030405.webm');
-  } finally {
-    mock.timers.reset();
-    save.restore();
-  }
+  assert.deepEqual(save.blobs[0].parts, [{ size: 7 }]);
+  assert.equal(save.blobs[0].type, 'video/webm');
+  assert.equal(save.clicks[0].download, 'live_20260102_030405.webm');
 });
 
 // ---------------------------------------------------------------------------
@@ -1938,155 +1774,135 @@ test('start aborts and releases both streams when no video track is produced', (
   assert.match(outcome.notified[0].message, /no video track/);
 });
 
-test('output setup failure closes the picked sink and stops the encoder', () => {
-  const restore = installRecorderEnv();
+test('output setup failure closes the picked sink and stops the encoder', (t) => {
+  t.after(installRecorderEnv());
   const captured = installConsoleCapture('error');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    let finished = 0;
-    const errors = [];
-    rec.onError = (error) => errors.push(error);
-    rec.openSink = () => ({ write() { throw new Error('sink unavailable'); },
-      finish() { finished++; } });
-    FakeMediaRecorder.startData = { size: 10 };
-    rec.start('setup');
-    const encoder = FakeMediaRecorder.instances.at(-1);
-    assert.equal(finished, 1);
-    assert.equal(encoder.state, 'inactive');
-    assert.equal(encoder.ondataavailable, null);
-    assert.equal(encoder.onstop, null);
-    assert.equal(encoder.onerror, null);
-    assert.equal(rec.mediaRecorder, null);
-    assert.equal(errors.length, 1);
-    assert.match(errors[0].message, /sink unavailable/);
-    assert.match(captured.messages.join(), /output setup failed/);
-  } finally {
-    captured.restore();
-    restore();
-  }
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  let finished = 0;
+  const errors = [];
+  rec.onError = (error) => errors.push(error);
+  rec.openSink = () => ({ write() { throw new Error('sink unavailable'); },
+    finish() { finished++; } });
+  FakeMediaRecorder.startData = { size: 10 };
+  rec.start('setup');
+  const encoder = FakeMediaRecorder.instances.at(-1);
+  assert.equal(finished, 1);
+  assert.equal(encoder.state, 'inactive');
+  assert.equal(encoder.ondataavailable, null);
+  assert.equal(encoder.onstop, null);
+  assert.equal(encoder.onerror, null);
+  assert.equal(rec.mediaRecorder, null);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].message, /sink unavailable/);
+  assert.match(captured.messages.join(), /output setup failed/);
 });
 
-test('createWritable rejection preserves every chunk for Downloads', async () => {
-  const restore = installRecorderEnv();
+test('createWritable rejection preserves every chunk for Downloads', async (t) => {
+  t.after(installRecorderEnv());
   const captured = installConsoleCapture('warn');
+  t.after(captured.restore);
   globalThis.showSaveFilePicker = async () => ({
     createWritable: async () => { throw new Error('file locked'); },
   });
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const finished = trackSinkFinish(rec);
-    const downloads = [];
-    const notices = [];
-    const errors = [];
-    rec.onSaveFallback = (error) => notices.push(error);
-    rec.onSaveError = (error) => errors.push(error);
-    rec.download = (encoder, chunks) => downloads.push([...chunks]);
-    rec.start('fallback');
-    const encoder = rec.mediaRecorder;
-    const first = { size: 10 }, second = { size: 20 };
-    encoder.ondataavailable({ data: first });
-    await drainSink();
-    encoder.ondataavailable({ data: second });
-    rec.stop();
-    encoder.onstop();
-    await finished();
-    assert.deepEqual(downloads, [[first, second]]);
-    assert.equal(notices.length, 1);
-    assert.match(notices[0].message, /could not be opened; saving to Downloads instead/);
-    assert.deepEqual(errors, []);
-  } finally {
-    captured.restore();
-    restore();
-  }
+  const rec = new VideoRecorder(recordableCanvas());
+  const finished = trackSinkFinish(rec);
+  const downloads = [];
+  const notices = [];
+  const errors = [];
+  rec.onSaveFallback = (error) => notices.push(error);
+  rec.onSaveError = (error) => errors.push(error);
+  rec.download = (encoder, chunks) => downloads.push([...chunks]);
+  rec.start('fallback');
+  const encoder = rec.mediaRecorder;
+  const first = { size: 10 }, second = { size: 20 };
+  encoder.ondataavailable({ data: first });
+  await drainSink();
+  encoder.ondataavailable({ data: second });
+  rec.stop();
+  encoder.onstop();
+  await finished();
+  assert.deepEqual(downloads, [[first, second]]);
+  assert.equal(notices.length, 1);
+  assert.match(notices[0].message, /could not be opened; saving to Downloads instead/);
+  assert.deepEqual(errors, []);
 });
 
-test('a streaming write failure after Stop reaches the save-error UI', async () => {
-  const restore = installRecorderEnv();
+test('a streaming write failure after Stop reaches the save-error UI', async (t) => {
+  t.after(installRecorderEnv());
   const captured = installConsoleCapture('error', 'warn');
+  t.after(captured.restore);
   globalThis.showSaveFilePicker = async () => ({ createWritable: async () => ({
     write: async () => { throw new Error('disk full'); }, close: async () => {},
   }) });
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const finished = trackSinkFinish(rec);
-    const errors = [];
-    rec.onSaveError = (error) => errors.push(error);
-    rec.start('stream');
-    const recorder = rec.mediaRecorder;
-    recorder.ondataavailable({ data: { size: 10 } });
-    rec.stop();
-    recorder.onstop();
-    await finished();
-    assert.equal(errors.length, 1);
-    assert.match(errors[0].message, /truncated/);
-  } finally {
-    captured.restore();
-    restore();
-  }
+  const rec = new VideoRecorder(recordableCanvas());
+  const finished = trackSinkFinish(rec);
+  const errors = [];
+  rec.onSaveError = (error) => errors.push(error);
+  rec.start('stream');
+  const recorder = rec.mediaRecorder;
+  recorder.ondataavailable({ data: { size: 10 } });
+  rec.stop();
+  recorder.onstop();
+  await finished();
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].message, /truncated/);
 });
 
-test('superseded recorder guards ignore fallback and memory overflow', async () => {
-  const restore = installRecorderEnv();
+test('superseded recorder guards ignore fallback and memory overflow', async (t) => {
+  t.after(installRecorderEnv());
+  t.after(() => { FakeMediaRecorder.isTypeSupported = () => true; });
   const captured = installConsoleCapture('warn');
-  try {
-    FakeMediaRecorder.isTypeSupported = () => false;
-    FakeMediaRecorder.defaultMimeType = 'video/mp4';
-    const rec = new VideoRecorder(recordableCanvas());
-    rec.format = 'webm';
-    rec.download = () => {};
-    rec.start('first');
-    const first = rec.mediaRecorder;
-    rec.stop();
-    rec.start('second');
-    const second = rec.mediaRecorder;
-    const errors = [];
-    const fallbacks = [];
-    rec.onError = (error) => errors.push(error);
-    rec.onFormatFallback = (format) => fallbacks.push(format);
-    first.onstart();
-    first.ondataavailable({ data: { size: MEMORY_BUFFER_LIMIT_BYTES + 1 } });
-    assert.equal(rec.mediaRecorder, second);
-    assert.equal(rec.isRecording, true);
-    assert.deepEqual(errors, []);
-    assert.deepEqual(fallbacks, []);
-    rec.stop();
-    await Promise.resolve();
-  } finally {
-    FakeMediaRecorder.isTypeSupported = () => true;
-    captured.restore();
-    restore();
-  }
+  t.after(captured.restore);
+  FakeMediaRecorder.isTypeSupported = () => false;
+  FakeMediaRecorder.defaultMimeType = 'video/mp4';
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.format = 'webm';
+  rec.download = () => {};
+  rec.start('first');
+  const first = rec.mediaRecorder;
+  rec.stop();
+  rec.start('second');
+  const second = rec.mediaRecorder;
+  const errors = [];
+  const fallbacks = [];
+  rec.onError = (error) => errors.push(error);
+  rec.onFormatFallback = (format) => fallbacks.push(format);
+  first.onstart();
+  first.ondataavailable({ data: { size: MEMORY_BUFFER_LIMIT_BYTES + 1 } });
+  assert.equal(rec.mediaRecorder, second);
+  assert.equal(rec.isRecording, true);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(fallbacks, []);
+  rec.stop();
+  await Promise.resolve();
 });
 
-test('superseded streaming recorder ignores picker cancellation and backlog overflow', async () => {
-  const restore = installRecorderEnv();
-  try {
-    let rejectFirst;
-    let picks = 0;
-    globalThis.showSaveFilePicker = () => {
-      picks++;
-      if (picks === 1) return new Promise((resolve, reject) => { rejectFirst = reject; });
-      return new Promise(() => {});
-    };
-    const rec = new VideoRecorder(recordableCanvas());
-    rec.download = () => {};
-    rec.start('first');
-    const first = rec.mediaRecorder;
-    rec.stop();
-    rec.start('second');
-    const second = rec.mediaRecorder;
-    const errors = [];
-    rec.onError = (error) => errors.push(error);
-    first.ondataavailable({ data: { size: (16 * 1_000_000 / 8) * PICKER_GRACE_SECONDS + 1 } });
-    assert.equal(rec.mediaRecorder, second);
-    assert.equal(rec.isRecording, true);
-    rejectFirst(Object.assign(new Error('cancelled'), { name: 'AbortError' }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    assert.equal(rec.mediaRecorder, second);
-    assert.equal(rec.isRecording, true);
-    assert.deepEqual(errors, []);
-    rec.stop();
-  } finally {
-    restore();
-  }
+test('superseded streaming recorder ignores picker cancellation and backlog overflow', async (t) => {
+  t.after(installRecorderEnv());
+  let rejectFirst;
+  let picks = 0;
+  globalThis.showSaveFilePicker = () => {
+    picks++;
+    if (picks === 1) return new Promise((resolve, reject) => { rejectFirst = reject; });
+    return new Promise(() => {});
+  };
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.download = () => {};
+  rec.start('first');
+  const first = rec.mediaRecorder;
+  rec.stop();
+  rec.start('second');
+  const second = rec.mediaRecorder;
+  const errors = [];
+  rec.onError = (error) => errors.push(error);
+  first.ondataavailable({ data: { size: (16 * 1_000_000 / 8) * PICKER_GRACE_SECONDS + 1 } });
+  assert.equal(rec.mediaRecorder, second);
+  assert.equal(rec.isRecording, true);
+  rejectFirst(Object.assign(new Error('cancelled'), { name: 'AbortError' }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(rec.mediaRecorder, second);
+  assert.equal(rec.isRecording, true);
+  assert.deepEqual(errors, []);
+  rec.stop();
 });
