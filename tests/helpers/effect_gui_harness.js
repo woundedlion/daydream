@@ -50,7 +50,18 @@ export function latticeMeltParams() {
     'Hue Shift Amount',
     'Hue Noise Scale',
     'Hue Noise Speed',
-  ].map((name) => ({ name, value: 0.5, min: 0, max: 1, animated: true }));
+  ].map((name, i) => {
+    const groups = [
+      {name: 'Function', title: 'Primitive Lattice', order: 7},
+      {name: 'Projection', title: 'Folded Sinusoidal', order: 4},
+      {name: 'Projection Frame', title: 'Spin + Wander', order: 3},
+      {name: 'Camera', title: 'Camera', order: 0},
+      {name: 'Surface Noise', title: 'Curl', order: 2},
+      {name: 'Colorize', title: 'Generated Triadic', order: 10},
+    ];
+    const index = i < 4 ? 0 : i === 4 ? 1 : i < 7 ? 2 : i === 7 ? 3 : i < 11 ? 4 : 5;
+    return { name, group: groups[index], value: 0.5, min: 0, max: 1, animated: true };
+  });
 }
 
 export function kaleidoscopeSmoothParams() {
@@ -82,7 +93,18 @@ export function kaleidoscopeSmoothParams() {
     'Hue Shift Amount',
     'Hue Noise Scale',
     'Hue Noise Speed',
-  ].map((name) => ({ name, value: 0.5, min: 0, max: 1, animated: true }));
+  ].map((name, i) => {
+    const groups = [
+      {name: 'Function', title: 'Grid', order: 7},
+      {name: 'Projection', title: 'Stereographic', order: 4},
+      {name: 'Projection Frame', title: 'Spin + Wander', order: 3},
+      {name: 'Camera', title: 'Camera', order: 0},
+      {name: 'Planar Warp 2', title: 'Mirror Tile', order: 6},
+      {name: 'Colorize', title: 'Generated Analogous', order: 10},
+    ];
+    const index = i < 6 ? 0 : i === 6 ? 1 : i < 9 ? 2 : i === 9 ? 3 : i < 16 ? 4 : 5;
+    return { name, group: groups[index], value: 0.5, min: 0, max: 1, animated: true };
+  });
 }
 
 /**

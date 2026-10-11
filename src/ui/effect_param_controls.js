@@ -10,20 +10,11 @@
 
 import { enumChoices, paramControlKind } from "../effects/param_sync.js";
 import { focusWidget } from './effect_panel_view.js';
-import {
-  LATTICE_MELT_STAGE_ORDER,
-  LATTICE_MELT_STAGE_TITLES,
-  KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
-  KALEIDOSCOPE_SMOOTH_STAGE_TITLES,
-  STAGE_ORDER,
-  latticeMeltStageAssignments,
-  kaleidoscopeSmoothStageAssignments,
-  composedStageAssignments,
-  stageControlLabel,
-} from "../effects/shader_stages.js";
+import { stageControlLabel } from "../effects/shader_stages.js";
+export { stageGrouping } from "../effects/shader_stages.js";
 
 /** Engine toggles omit the range fields.
- * @typedef {{name: string, value: number|boolean, min?: number, max?: number, animated?: boolean, readonly?: boolean, warning?: string, options?: string[], optionValues?: number[], step?: number, acceptedValue?: number|boolean, requestedValue?: number|boolean}} ParameterDefinition */
+ * @typedef {{name: string, group?: {name: string, title: string, order: number}, value: number|boolean, min?: number, max?: number, animated?: boolean, readonly?: boolean, warning?: string, options?: string[], optionValues?: number[], step?: number, acceptedValue?: number|boolean, requestedValue?: number|boolean}} ParameterDefinition */
 /** @typedef {import("./effect_panel_view.js").PanelController & Record<string, any>} GuiController */
 /** @typedef {import("./effect_panel_view.js").PanelFolder & Record<string, any>} Gui */
 
@@ -116,42 +107,6 @@ export function addParamControl(
     widget.setAttribute('aria-describedby', note.id);
   }
   return controller;
-}
-
-/**
- * Pick the pipeline grouping for a parameter list; the first recognizer that
- * claims the list wins.
- * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
- * @returns {{assignments: Map<string, string>, titles: Map<string, string>|null,
- *   order: Array<string>}|null} The grouping, or null when none claims the list.
- */
-export function stageGrouping(params) {
-  const composed = composedStageAssignments(params);
-  const composedGrouping = () => {
-    const claimed = new Set(composed?.values());
-    return {
-      assignments: /** @type {Map<string, string>} */ (composed),
-      titles: null,
-      order: STAGE_ORDER.filter((stage) => claimed.has(stage)),
-    };
-  };
-  const latticeMelt = latticeMeltStageAssignments(params);
-  if (latticeMelt) {
-    return {
-      assignments: latticeMelt,
-      titles: LATTICE_MELT_STAGE_TITLES,
-      order: LATTICE_MELT_STAGE_ORDER,
-    };
-  }
-  const kaleidoscopeSmooth = kaleidoscopeSmoothStageAssignments(params);
-  if (kaleidoscopeSmooth) {
-    return {
-      assignments: kaleidoscopeSmooth,
-      titles: KALEIDOSCOPE_SMOOTH_STAGE_TITLES,
-      order: KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
-    };
-  }
-  return composed ? composedGrouping() : null;
 }
 
 /**

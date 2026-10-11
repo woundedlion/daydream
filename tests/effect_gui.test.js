@@ -6,13 +6,9 @@ import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
 import { createEffectGui } from '../src/ui/effect_gui.js';
 import { addParamControl, sliderDecimals } from '../src/ui/effect_param_controls.js';
-import {
-  LATTICE_MELT_STAGE_ORDER,
-  KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
-  latticeMeltStageAssignments,
-  kaleidoscopeSmoothStageAssignments,
-  composedStageAssignments,
-} from '../src/effects/shader_stages.js';
+import { stageGrouping } from '../src/effects/shader_stages.js';
+const LATTICE_MELT_STAGE_ORDER = ['Camera', 'Surface Noise', 'Projection Frame', 'Projection', 'Function', 'Colorize'];
+const KALEIDOSCOPE_SMOOTH_STAGE_ORDER = ['Camera', 'Projection Frame', 'Projection', 'Planar Warp 2', 'Function', 'Colorize'];
 import {
   chainSnapshot,
   chainSnapshotParams,
@@ -231,7 +227,7 @@ test('a schema rebuild keeps the stage folders the user collapsed', () => {
 
 test('LatticeMelt controls use the fixed pipeline modes as folders', () => {
   const params = latticeMeltParams();
-  const assignments = latticeMeltStageAssignments(params);
+  const assignments = stageGrouping(params).assignments;
   const h = makeHarness({
     params,
     engineValues: params.map((parameter) => parameter.value),
@@ -291,7 +287,7 @@ test('a staged schema builds an unclaimed parameter at the top level', () => {
 
 test('KaleidoscopeSmooth controls use the fixed pipeline modes as folders', () => {
   const params = kaleidoscopeSmoothParams();
-  const assignments = kaleidoscopeSmoothStageAssignments(params);
+  const assignments = stageGrouping(params).assignments;
   const h = makeHarness({
     params,
     engineValues: params.map((parameter) => parameter.value),
@@ -318,7 +314,10 @@ test('composed-effect controls file each slot parameter into its stage folder', 
     'Camera Wander', 'Singularity Fade', 'Planar Warp 1 Speed', 'Warp Strength',
     'Planar Warp 2 Speed', 'Mirror Rotation', 'Pattern Freq',
     'Edge Width', 'Palette Chroma', 'Mapping Frequency',
-  ].map((name) => ({ name, value: 0, min: 0, max: 1, animated: true }));
+  ].map((name, i) => {
+    const groups = ['Camera', 'Projection', 'Planar Warp 1', 'Planar Warp 1', 'Planar Warp 2', 'Planar Warp 2', 'Function', 'Coverage', 'Colorize', 'Colorize'];
+    return { name, group: {name: groups[i], title: groups[i], order: [0, 4, 5, 5, 6, 6, 7, 9, 10, 10][i]}, value: 0, min: 0, max: 1, animated: true };
+  });
   const h = makeHarness({
     params,
     engineValues: params.map(() => 0),
@@ -336,18 +335,12 @@ test('composed-effect controls file each slot parameter into its stage folder', 
     'the composed stage rules file every name they are given');
 });
 
-test('composed-effect warp ownership follows each explicit slot boundary', () => {
-  const names = [
-    'Camera Wander', 'Palette Chroma', 'Mapping Frequency',
-    'Planar Warp 1 Speed', 'Mirror Rotation',
-    'Planar Warp 2 Speed', 'Mirror Cell X',
-  ];
-  const assignments = composedStageAssignments(
-    names.map((name) => ({ name })));
-
-  assert.equal(assignments.get('Planar Warp 1 Speed'), 'Planar Warp 1');
+test('warp ownership follows registered groups independently of stream order', () => {
+  const assignments = stageGrouping([
+    {name: 'Mirror Rotation', group: {name: 'Planar Warp 1', title: 'Outer', order: 5}},
+    {name: 'Mirror Cell X', group: {name: 'Planar Warp 2', title: 'Inner', order: 6}},
+  ]).assignments;
   assert.equal(assignments.get('Mirror Rotation'), 'Planar Warp 1');
-  assert.equal(assignments.get('Planar Warp 2 Speed'), 'Planar Warp 2');
   assert.equal(assignments.get('Mirror Cell X'), 'Planar Warp 2');
 });
 
