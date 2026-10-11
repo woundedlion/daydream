@@ -1413,7 +1413,9 @@ test('createOpGate discards a pass the chain changed under', async () => {
   const first = gate.refresh('cube', [], CANDIDATES);
   const second = gate.refresh('octahedron', [], CANDIDATES);
   assert.equal(await first, null);
-  assert.notEqual(await second, null);
+  assert.deepEqual(await second, {
+    blocked: new Set(), complete: true, abandoned: false,
+  });
 });
 
 /**
