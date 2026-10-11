@@ -60,6 +60,7 @@ export class SegmentCompositor {
     this.onFault = onFault;
   }
 
+  /** Clears the alias-divergence diagnostic latch. */
   reset() {
     this.#aliasDivergenceLogged = false;
   }
@@ -71,11 +72,11 @@ export class SegmentCompositor {
    *   display buffer (no engine view): nothing was read or written and the caller
    *   must keep the generation pending. Composites over the buffer's previous
    *   contents except where a refreshed view is cleared.
-   * @param {number} count
-   * @param {boolean} showBoundaries
    * @param {Array<FrameResult | null>} results - One whole generation, indexed
    *   by segment. Only the published generation is coherent: a staging buffer
    *   mid-fill composites a half-updated mix.
+   * @param {number} count - Number of segment rectangles to composite.
+   * @param {boolean} showBoundaries - Whether to mark segment boundaries.
    */
   composite(results, count, showBoundaries) {
     const refreshed = this.refreshPixelView() === true;
