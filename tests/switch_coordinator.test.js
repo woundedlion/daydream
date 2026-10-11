@@ -63,7 +63,7 @@ function makeApp({
   };
   app.activeEffect = makeEffectRecord('Alpha', 0.5, false, app.paramWrites);
 
-  const applyEffect = (preserveParams = false) => {
+  const applyEffect = ({preserveParams = false} = {}) => {
     const effect = appState.get('effect');
     app.url = `/?effect=${effect}`;
     app.calls.push({
@@ -88,7 +88,7 @@ function makeApp({
       app.switches.mute(() => appState.set('effect', offListCorrection[resolution]));
     if (rejectResolutions.has(resolution)) return ApplyResult.REJECTED;
     app.applied.resolution = resolution;
-    return applyEffect(preserveParams);
+    return applyEffect({preserveParams});
   };
 
   app.switches = createSwitchCoordinator({
