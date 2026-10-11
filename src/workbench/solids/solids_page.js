@@ -1,3 +1,4 @@
+import { createCommitQueue, createChainValidator, createOpGate } from './solid_validation.js';
 /*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
@@ -25,9 +26,6 @@ import {
   reorderPreviewShift,
   movedOps,
   opTopologyKey,
-  createCommitQueue,
-  createChainValidator,
-  createOpGate,
 } from './solid_codegen.js';
 import { fanTriangulateFace, uniqueEdges } from './solid_geometry.js';
 import { buildBaseMesh, buildChainMesh } from './solid_build.js';
