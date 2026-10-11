@@ -310,26 +310,38 @@ test('a refused history write does not propagate out of the URL layer', () => {
 });
 
 /**
- * A tracked key is re-read from state on every flush, so a refused write costs
- * it nothing. An ad-hoc GUI param lives only in the buffer: dropping it there
- * would lose the value with nothing left to re-assert it.
+ * Installs a /sim window on a fake URL timer whose history.replaceState throws
+ * while `history.refuse` is set and otherwise records the URL.
+ * @param {string} message - Message of the refusal error.
+ * @returns {{history: {refuse: boolean}, timer: ReturnType<typeof fakeUrlTimer>,
+ *   written: string[]}} The refusal switch, the timer and the accepted URLs.
  */
-test('URLSync holds its ad-hoc buffer through a refused history write', () => {
+function installRefusingHistoryWindow(message) {
   const written = [];
-  let refuse = true;
+  const history = { refuse: true };
   const timer = fakeUrlTimer();
-  const captured = installConsoleCapture('warn');
   installWindow({
     location: { pathname: '/sim' },
     history: {
       replaceState: (state, title, url) => {
-        if (refuse) throw new Error('rate limit');
+        if (history.refuse) throw new Error(message);
         written.push(url);
       },
     },
     setTimeout: timer.setTimeout,
     clearTimeout: timer.clearTimeout,
   });
+  return { history, timer, written };
+}
+
+/**
+ * A tracked key is re-read from state on every flush, so a refused write costs
+ * it nothing. An ad-hoc GUI param lives only in the buffer: dropping it there
+ * would lose the value with nothing left to re-assert it.
+ */
+test('URLSync holds its ad-hoc buffer through a refused history write', () => {
+  const { history, timer, written } = installRefusingHistoryWindow('rate limit');
+  const captured = installConsoleCapture('warn');
   try {
     const sync = new URLSync(new AppState({ effect: 'Voronoi' }), ['effect']);
     sync.setParam('scale', 3);
@@ -338,7 +350,7 @@ test('URLSync holds its ad-hoc buffer through a refused history write', () => {
     assert.deepEqual(written, [], 'the refused write left the URL as it was');
     assert.equal(timer.delays.at(-1), URL_FLUSH_RETRY_MS, 'a retry is armed');
 
-    refuse = false;
+    history.refuse = false;
     timer.fire();
     assert.deepEqual(written, ['/sim?effect=Voronoi&scale=3'],
       'the retry re-asserts the buffered ad-hoc param');
@@ -356,21 +368,8 @@ test('URLSync holds its ad-hoc buffer through a refused history write', () => {
  * buffered URL changes.
  */
 test('URLSync bounds its retries of a refused history write', () => {
-  const written = [];
-  let refuse = true;
-  const timer = fakeUrlTimer();
+  const { history, timer, written } = installRefusingHistoryWindow('SecurityError');
   const captured = installConsoleCapture('warn');
-  installWindow({
-    location: { pathname: '/sim' },
-    history: {
-      replaceState: (state, title, url) => {
-        if (refuse) throw new Error('SecurityError');
-        written.push(url);
-      },
-    },
-    setTimeout: timer.setTimeout,
-    clearTimeout: timer.clearTimeout,
-  });
   try {
     const sync = new URLSync(new AppState({ effect: 'Voronoi' }), ['effect']);
     sync.setParam('scale', 3);
@@ -390,7 +389,7 @@ test('URLSync bounds its retries of a refused history write', () => {
     assert.deepEqual(timer.delays, Array(URL_FLUSH_MAX_RETRIES - 1).fill(URL_FLUSH_RETRY_MS),
       'a later refused edit starts a fresh retry budget');
     assert.ok(timer.armed());
-    refuse = false;
+    history.refuse = false;
     timer.fire();
     assert.deepEqual(written, ['/sim?effect=Voronoi&speed=7'],
       'a tracked key is re-read from state, but the abandoned ad-hoc param is gone');
@@ -400,22 +399,9 @@ test('URLSync bounds its retries of a refused history write', () => {
 });
 
 test('URLSync will not let a concurrent write shorten an armed retry', () => {
-  const written = [];
-  let refuse = true;
-  const timer = fakeUrlTimer();
+  const { history, timer, written } = installRefusingHistoryWindow('rate limit');
   const warn = console.warn;
   console.warn = () => {};
-  installWindow({
-    location: { pathname: '/sim' },
-    history: {
-      replaceState: (state, title, url) => {
-        if (refuse) throw new Error('rate limit');
-        written.push(url);
-      },
-    },
-    setTimeout: timer.setTimeout,
-    clearTimeout: timer.clearTimeout,
-  });
   try {
     const state = new AppState({ effect: 'Voronoi' });
     const sync = new URLSync(state, ['effect']);
@@ -431,7 +417,7 @@ test('URLSync will not let a concurrent write shorten an armed retry', () => {
     assert.deepEqual(timer.delays, [URL_FLUSH_RETRY_MS],
       'a tracked-key change did not re-arm at the debounce either');
 
-    refuse = false;
+    history.refuse = false;
     timer.fire();
     assert.deepEqual(written, ['/sim?effect=Hankin&scale=3'],
       'the armed retry flushes both concurrent writes');
