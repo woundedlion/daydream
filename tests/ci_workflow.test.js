@@ -378,7 +378,7 @@ test('expiring bundles warn and expired bundles explain the producing-run remedy
   assert.match(gate, /gh run rerun \$run_id --repo woundedlion\/pov/);
 });
 
-test('engine bundle callers grant Actions read only to the bundle gate', () => {
+test('engine bundle callers grant Actions read at the bundle gate, not workflow scope', () => {
   for (const path of [WORKFLOW_PATH, DEPLOY_PATH]) {
     const source = readFileSync(resolve(REPO, path), 'utf8');
     const gate = source.split(/^ {2}gate:\s*$/m)[1]?.split(/^ {2}\S/m)[0];
