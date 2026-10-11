@@ -6,7 +6,7 @@ test('URL timer rejects overlapping schedules and ignores stale cancellation han
   const timer = fakeUrlTimer();
   let fired = 0;
   const first = timer.setTimeout(() => { fired++; }, 1);
-  assert.throws(() => timer.setTimeout(() => {}, 2), /only one URL timer/);
+  assert.throws(() => timer.setTimeout(() => {}, 2), /only one timer/);
   timer.clearTimeout(first + 1);
   assert.equal(timer.armed(), true);
   timer.fire();

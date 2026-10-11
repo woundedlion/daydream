@@ -142,26 +142,17 @@ export function fakeTimers() {
  * @returns {Object} The stand-in and its scheduled delays.
  */
 export function fakeUrlTimer() {
+  const timer = fakeScheduler();
   const delays = [];
-  let pending = null;
-  let nextId = 0;
   return {
     delays,
     setTimeout(fn, ms) {
-      assert.equal(pending, null, 'only one URL timer may be pending');
-      pending = { fn, id: ++nextId };
+      const handle = timer.schedule(fn, ms);
       delays.push(ms);
-      return pending.id;
+      return handle;
     },
-    clearTimeout(id) { if (pending?.id === id) pending = null; },
-    /** @returns {boolean} Whether a timer is currently armed. */
-    armed() { return pending !== null; },
-    /** Runs the pending timer. @returns {void} */
-    fire() {
-      const fn = pending?.fn;
-      pending = null;
-      assert.ok(fn, 'a timer is pending');
-      fn();
-    },
+    clearTimeout: (id) => timer.cancel(id),
+    armed: () => timer.fn !== null,
+    fire: () => timer.fire(),
   };
 }
