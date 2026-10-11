@@ -5,6 +5,7 @@
  *
  *   node scripts/panel-probe.mjs
  */
+import { canonicalEffectId } from '../src/effects/effect_identity.js';
 import { checks, isMain, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'index.html';
@@ -70,7 +71,7 @@ const scrollerMetrics = (tab) => tab.$eval(SCROLLER, (node) => ({
 export async function probePanel(tab) {
   const { failures, check } = checks();
 
-  await (await tab.waitForSelector(`[data-effect="${EFFECT}"]`)).click();
+  await (await tab.waitForSelector(`[data-effect="${canonicalEffectId(EFFECT)}"]`)).click();
   await tab.waitForFunction(
     (selector) => (document.querySelector(selector)?.scrollHeight ?? 0) > 0,
     { timeout: TIMEOUT_MS }, SCROLLER);
@@ -314,7 +315,7 @@ export async function probePresetName(tab) {
 export async function probeStageNames(tab) {
   const { failures, check } = checks();
 
-  await (await tab.waitForSelector(`[data-effect="${STAGE_EFFECT}"]`)).click();
+  await (await tab.waitForSelector(`[data-effect="${canonicalEffectId(STAGE_EFFECT)}"]`)).click();
   await tab.waitForFunction(
     (selector) => document.querySelectorAll(selector).length > 1,
     { timeout: TIMEOUT_MS }, STAGE_WIDGET);
@@ -361,7 +362,7 @@ export async function probeStageNames(tab) {
 export async function probeTelemetry(tab) {
   const { failures, check } = checks();
 
-  await (await tab.waitForSelector(`[data-effect="${TELEMETRY_EFFECT}"]`)).click();
+  await (await tab.waitForSelector(`[data-effect="${canonicalEffectId(TELEMETRY_EFFECT)}"]`)).click();
   await tab.waitForSelector(TELEMETRY_WIDGET, { timeout: TIMEOUT_MS });
 
   const reached = await tab.$eval(TELEMETRY_WIDGET, (widget) => {
@@ -404,7 +405,7 @@ export async function probeTelemetry(tab) {
 export async function probeMobilePanel(tab) {
   const { failures, check } = checks();
 
-  await (await tab.waitForSelector(`[data-effect="${EFFECT}"]`)).click();
+  await (await tab.waitForSelector(`[data-effect="${canonicalEffectId(EFFECT)}"]`)).click();
   const initiallyClosed = await tab.$eval(
     '.effect-gui', (panel) => panel.classList.contains('lil-closed'));
   check(initiallyClosed, 'the first mobile panel mount is collapsed');
