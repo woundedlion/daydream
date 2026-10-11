@@ -34,7 +34,8 @@ restoreDocumentAfterEach();
 /**
  * A strip over a fresh store on a fresh fixture copy, plus its spies.
  * @param {{presetId?: string|null, bypassAvailable?: () => boolean,
- *   writeThrough?: boolean, parameterLive?: (parameterId: string) => boolean, source?: Object}} [seams] - The preset the inline controls read,
+ *   writeThrough?: boolean, parameterLive?: (parameterId: string) => boolean,
+ *   acceptParameter?: () => boolean, source?: Object}} [seams] - The preset the inline controls read,
  *   omitted the strip falls back to the document's first; whether a bypass
  *   reaches what is rendering; and whether inline edits reach the store as the
  *   page writes them; whether a parameter is live in the active build; and the
@@ -43,6 +44,7 @@ restoreDocumentAfterEach();
  */
 async function makeStrip({
   presetId = null, bypassAvailable = () => true, writeThrough = false, parameterLive = () => true,
+  acceptParameter = () => true,
   source = structuredClone(BASE.document),
 } = {}) {
   const store = await createChainDocumentStore({
@@ -69,6 +71,7 @@ async function makeStrip({
     onSelect: (label) => selections.push(label),
     presetId: () => presetId,
     onEditParameter: (parameterId, value) => {
+      if (!acceptParameter()) return false;
       edits.push([parameterId, value]);
       if (!writeThrough) return;
       const target = presetId ?? store.document().preset_bank.presets[0].preset_id;
@@ -1473,6 +1476,25 @@ test('separate slider drags form separate undo entries', async () => {
     slider.dispatch('change');
   }
   assert.deepEqual(h.commits, [1, 2]);
+  assert.equal(h.store.undo(), true);
+  assert.equal(h.store.document().preset_bank.presets[0].values['sample.pattern-freq'], 5.5);
+});
+
+test('a refused slider edit closes its undo gesture before replacing the control', async () => {
+  let accepted = true;
+  const h = await makeStrip({writeThrough: true, acceptParameter: () => accepted});
+  const drag = (value) => {
+    const slider = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
+    slider.value = String(value);
+    slider.dispatch('input');
+    runFrame();
+    return slider;
+  };
+  drag(5.5);
+  accepted = false;
+  drag(6);
+  accepted = true;
+  drag(7).dispatch('change');
   assert.equal(h.store.undo(), true);
   assert.equal(h.store.document().preset_bank.presets[0].values['sample.pattern-freq'], 5.5);
 });

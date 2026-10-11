@@ -580,6 +580,9 @@ export function createChainStrip({
   const editParameter = (parameterId, value) => {
     if (!parameterLive(parameterId)) return false;
     if (onEditParameter(parameterId, value) === false) {
+      scheduleSliderEdit.cancel();
+      pendingSliderEdit = null;
+      store.endValueRun();
       render();
       return false;
     }
