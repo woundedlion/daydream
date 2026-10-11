@@ -18,7 +18,7 @@ const NOT_CHECKED = new Set([
 // third-party drops, the engine checkout, and tests/, which tsconfig.json puts
 // out of scope.
 const SKIP_DIRS = new Set([
-  'node_modules', '.git', '.worktrees', 'vendor', 'three.js', 'tests', 'engine',
+  'node_modules', '.git', '.worktrees', 'vendor', 'three.js', 'tests', 'engine', 'engine-bundle',
 ]);
 
 /**
