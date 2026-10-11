@@ -15,6 +15,7 @@ import { ModuleWarmer, EMPTY_WASM } from './fixtures/module_warmer_fixture.js';
 import { PROTOCOL_VERSION, FAULT_POOL, FAULT_RENDER } from '../src/segments/worker_protocol.js';
 import {
   installSegmentControllerHarness,
+  capturedConsole,
   makeController,
   deliverReady,
   deliverBooted,
@@ -733,6 +734,7 @@ function faultSegZero(controller) {
 // A fault that reproduces on every rebuild must not respawn the pool on every
 // effect switch.
 test('repeated effect switches on a refaulting pool spawn a bounded worker count', () => {
+  const capturedFrom = capturedConsole.length;
   const c = makeController();
   c.active = true;
   c.create(2);
@@ -747,6 +749,11 @@ test('repeated effect switches on a refaulting pool spawn a bounded worker count
   assert.equal(FakeWorker.constructionCount - spawnedBefore, MAX_FAULTED_REBUILDS * 2,
     'rebuild spawns are bounded, not one pool per switch');
   assert.equal(c.faulted, true, 'the pool stays latched once the budget is spent');
+  assert.deepEqual(capturedConsole.slice(capturedFrom).filter(({method}) => method === 'warn')
+    .map(({args}) => args[0]), [
+    `[Segmented] pool faulted on ${MAX_FAULTED_REBUILDS} consecutive `
+      + 'effect-switch rebuilds; change resolution or toggle segmented mode to restart',
+  ]);
 });
 
 test('toggling mode restores the rebuild budget before a new pool reaches ready', () => {
