@@ -335,7 +335,7 @@ function unpinnedMethods(obj, methods) {
  * @returns {string[]} Unpinned methods, prefixed for handle methods, sorted.
  */
 export function unpinnedEngineMethods(obj) {
-  const methods = unpinnedMethods(obj, [...ENGINE_METHODS, ...ENGINE_OPTIONAL_METHODS]);
+  const methods = unpinnedMethods(obj, CLASS_METHODS.HolosphereEngine);
   const bindings = obj.getShaderChainBindings?.();
   if (bindings) {
     try {
