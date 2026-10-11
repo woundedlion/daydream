@@ -442,15 +442,17 @@ export async function createChainDocumentStore({
     for (const parameter of parameters) addParameter(candidate, parameter);
   };
 
-  // A removal can leave two presets value-identical, making a transition
-  // between them the identity; such edges are dropped with the instance.
   /** @param {*} candidate */
   const dropDegenerateEdges = (candidate) => {
+    const previous = new Map(doc.preset_bank.presets.map(
+      (/** @type {{preset_id: string, values: Object}} */ preset) =>
+        [preset.preset_id, compiler.stableStringify(preset.values)]));
     const signatures = new Map(candidate.preset_bank.presets.map(
       (/** @type {{preset_id: string, values: Object}} */ preset) =>
         [preset.preset_id, compiler.stableStringify(preset.values)]));
     candidate.preset_bank.edges = candidate.preset_bank.edges.filter(
       (/** @type {{from: string, to: string}} */ edge) =>
+        previous.get(edge.from) === previous.get(edge.to) ||
         signatures.get(edge.from) !== signatures.get(edge.to));
   };
 

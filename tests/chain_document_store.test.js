@@ -869,6 +869,14 @@ test('a removal drops transition edges it makes degenerate', async () => {
   assertGreen(store);
 });
 
+test('a removal preserves authored edges between identical presets', async () => {
+  const store = await makeStore({ mutate: (document) => presetsDifferBy(document, {}) });
+  const edges = store.document().preset_bank.edges;
+  assert.equal(store.replaceSpan(WARP, 1, []).ok, true);
+  assert.deepEqual(store.document().preset_bank.edges, edges);
+  assertGreen(store);
+});
+
 test('edges between presets that still differ survive a removal', async () => {
   const store = await makeStore({
     mutate: (document) => presetsDifferBy(document,
