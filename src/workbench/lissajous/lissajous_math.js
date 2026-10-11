@@ -208,8 +208,9 @@ export const lissajousCodeString = (c1, c2, a, domain) => {
   // Emit exact 2π multiples against PI_F to match the engine's source form.
   let domainStr;
   const multiple = domain / TWO_PI;
-  if (Math.abs(multiple - Math.round(multiple)) < 0.001 && Math.round(multiple) > 0) {
-    domainStr = `${2 * Math.round(multiple)} * math::PI_F`;
+  const factor = 2 * Math.round(multiple);
+  if (factor > 0 && Math.fround(domain) === Math.fround(factor * Math.fround(Math.PI))) {
+    domainStr = `${factor} * math::PI_F`;
   } else {
     domainStr = f(domain);
   }

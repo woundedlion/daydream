@@ -288,7 +288,15 @@ test('lissajousCodeString emits a C++ LissajousParams initializer', () => {
   // precision so the exported curve still closes.
   assert.equal(
     lissajousCodeString(5 * (8 / 7), 5, 0, 7 * TWO_PI),
-    'math::LissajousParams{5.714286f, 5.0f, 0.0f, 14 * math::PI_F}');
+    'math::LissajousParams{5.714286f, 5.0f, 0.0f, 43.982297f}');
+});
+
+test('lissajous export preserves a snapped domain near a two-pi multiple', () => {
+  const domain = closingDomain(12.012, TWO_PI);
+  const exported = lissajousCodeString(5.005, 12.012, 0, domain);
+  assert.doesNotMatch(exported, /math::PI_F/);
+  const literal = exported.match(/, ([\d.]+)f\}$/)[1];
+  assert.equal(Math.fround(Number(literal)), Math.fround(domain));
 });
 
 /**
