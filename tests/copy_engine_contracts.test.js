@@ -1,10 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { copyEngineContracts } from '../scripts/copy-engine-contracts.mjs';
 import { ENGINE_CONTRACT_PATHS } from '../scripts/install-engine-bundle.mjs';
+
+const SCRIPT = new URL('../scripts/copy-engine-contracts.mjs', import.meta.url);
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'engine-contract-copy-'));
@@ -33,4 +37,30 @@ test('missing installed contracts refuse snapshot checks before copying a partia
   writeFileSync(join(source, first), 'partial');
   assert.throws(() => copyEngineContracts(source, destination), /Install the engine bundle before pushing/);
   assert.equal(existsSync(join(destination, first)), false);
+});
+
+test('contract-copy CLI installs the complete contract set', (t) => {
+  const {source, destination} = fixture(t);
+  for (const path of ENGINE_CONTRACT_PATHS) writeFileSync(join(source, path), path);
+  const result = spawnSync(process.execPath, [fileURLToPath(SCRIPT),
+    source, destination], {encoding: 'utf8'});
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  for (const path of ENGINE_CONTRACT_PATHS)
+    assert.equal(readFileSync(join(destination, path), 'utf8'), path);
+});
+
+test('contract-copy CLI requires both source and destination', () => {
+  for (const args of [[], ['source-only']]) {
+    const result = spawnSync(process.execPath,
+      [fileURLToPath(SCRIPT), ...args], {encoding: 'utf8'});
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Usage: copy-engine-contracts/);
+  }
+});
+
+test('contract-copy library import has no CLI side effect without argv', () => {
+  const result = spawnSync(process.execPath,
+    ['--input-type=module', '-e', `await import(${JSON.stringify(SCRIPT.href)});`],
+    {encoding: 'utf8'});
+  assert.equal(result.status, 0, result.stdout + result.stderr);
 });
