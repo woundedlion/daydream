@@ -24,6 +24,9 @@ Holosphere installs engine assets into `generated/`. Handwritten module
 declarations beside those outputs are tracked; the runtime outputs are ignored.
 See [deployment](deployment.md) for installing and verifying an engine package.
 
+Composed parameter definitions carry `group: {name, title, order}` from C++.
+The panel groups unfamiliar display labels by that metadata.
+
 ## Shader state
 
 Shader authoring opens `ShaderChain`. The engine facade supplies effect lifecycle,

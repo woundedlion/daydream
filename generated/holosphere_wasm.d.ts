@@ -60,6 +60,8 @@ export interface ArenaMetrics {
 export interface ParameterDefinitionBase {
   /** Parameter name, as setParameter() takes it. */
   name: string;
+  /** Registered pipeline folder metadata. */
+  group?: {name: string; title: string; order: number};
   /**
    * True for a parameter registered as animated. An accepted setParameter() write
    * to an animated param engages the engine's animation pause.

@@ -20,10 +20,7 @@ import {
 import { isViewLive, refreshPixelView } from '../src/renderer/pixel_view.js';
 import { PaletteCompileCode, PaletteRecipeField } from './helpers/fake_palette.js';
 import { DEFAULT_EFFECT, resolutionPresets } from '../src/effects/effect_roster.js';
-import {
-  kaleidoscopeSmoothStageAssignments, latticeMeltStageAssignments,
-  composedStageAssignments,
-} from '../src/effects/shader_stages.js';
+import { stageGrouping } from '../src/effects/shader_stages.js';
 
 // Capture the bridge's diagnostics for clamped MeshOps arguments.
 const moduleLogs = [];
@@ -840,7 +837,7 @@ test('a rejected parameter write names its reason', () => {
     'setParameter must report NON_FINITE for a NaN value');
 });
 
-test('live shader rosters assign every parameter and both planar-warp slots', () => {
+test('live composed groups cover every parameter and both planar-warp slots', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(Object.hasOwn(engine.getEffectSizes(), 'Shader'), false,
     'the slot workbench is absent from the active effect roster');
@@ -854,17 +851,16 @@ test('live shader rosters assign every parameter and both planar-warp slots', ()
     for (let preset = 0; preset < presets; ++preset) {
       if (preset > 0) engine.selectPreset(preset);
       const definitions = Array.from(engine.getParameterDefinitions());
-      if (!definitions.some((entry) => entry.name === 'Singularity Fade')) continue;
+      if (!definitions.some((entry) => entry.group)) continue;
       ++checked;
-      const assignments = latticeMeltStageAssignments(definitions)
-        ?? kaleidoscopeSmoothStageAssignments(definitions)
-        ?? composedStageAssignments(definitions);
+      const assignments = stageGrouping(definitions)?.assignments;
       for (const definition of definitions) {
         if (!assignments?.has(definition.name)) {
           unassigned.push(`${effect} preset ${preset}: ${definition.name}`);
         }
       }
-      if (assignments?.get('Singularity Fade') !== 'Projection') {
+      if (definitions.some((entry) => entry.name === 'Singularity Fade')
+          && assignments?.get('Singularity Fade') !== 'Projection') {
         misplaced.push(`${effect} preset ${preset}: Singularity Fade`);
       }
       if (assignments?.get('Planar Warp 1 Speed') === 'Planar Warp 1'
@@ -873,7 +869,7 @@ test('live shader rosters assign every parameter and both planar-warp slots', ()
       }
     }
   }
-  assert.ok(checked > 0, 'the live engine exposes no Singularity Fade parameter');
+  assert.ok(checked > 0, 'the live engine exposes no registered pipeline groups');
   assert.deepEqual(unassigned, [], `unassigned parameters: ${unassigned.join(', ')}`);
   assert.deepEqual(misplaced, [], `misplaced parameters: ${misplaced.join(', ')}`);
   assert.ok(dualWarpRosters.length > 0,

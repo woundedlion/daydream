@@ -1,39 +1,31 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { stageGrouping } from '../src/ui/effect_param_controls.js';
-import {
-  KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
-  KALEIDOSCOPE_SMOOTH_STAGE_TITLES,
-  LATTICE_MELT_STAGE_ORDER,
-  LATTICE_MELT_STAGE_TITLES,
-} from '../src/effects/shader_stages.js';
 import { kaleidoscopeSmoothParams, latticeMeltParams } from './helpers/effect_gui_harness.js';
 
-const named = (...names) => names.map((name) => ({ name, value: 0, min: 0, max: 1 }));
-
-test('stageGrouping gives the LatticeMelt roster its fixed titles and order', () => {
+test('stageGrouping uses registered titles and pipeline order', () => {
   const params = latticeMeltParams();
   const grouping = stageGrouping(params);
-  assert.equal(grouping.titles, LATTICE_MELT_STAGE_TITLES);
-  assert.equal(grouping.order, LATTICE_MELT_STAGE_ORDER);
+  assert.deepEqual(grouping.order, ['Camera', 'Surface Noise', 'Projection Frame', 'Projection', 'Function', 'Colorize']);
+  assert.equal(grouping.titles.get('Surface Noise'), 'Curl');
+  assert.equal(grouping.titles.get('Function'), 'Primitive Lattice');
   assert.equal(grouping.assignments.size, params.length);
+  const other = stageGrouping(kaleidoscopeSmoothParams());
+  assert.equal(other.titles.get('Planar Warp 2'), 'Mirror Tile');
 });
 
-test('stageGrouping gives the KaleidoscopeSmooth roster its fixed titles and order', () => {
-  const grouping = stageGrouping(kaleidoscopeSmoothParams());
-  assert.equal(grouping.titles, KALEIDOSCOPE_SMOOTH_STAGE_TITLES);
-  assert.equal(grouping.order, KALEIDOSCOPE_SMOOTH_STAGE_ORDER);
+test('stageGrouping assigns unfamiliar labels from engine metadata', () => {
+  const grouping = stageGrouping([
+    {name: 'Vapor Ridges', group: {name: 'Function', title: 'Cloud Shape', order: 7}},
+    {name: 'View Jitter', group: {name: 'Camera', title: 'Camera', order: 0}},
+    {name: 'Unassigned'},
+  ]);
+  assert.deepEqual(grouping.order, ['Camera', 'Function']);
+  assert.deepEqual([...grouping.assignments], [['Vapor Ridges', 'Function'], ['View Jitter', 'Camera']]);
+  assert.deepEqual([...grouping.titles], [['Camera', 'Camera'], ['Function', 'Cloud Shape']]);
 });
 
-test('stageGrouping orders a composed list by the stages it claims, untitled', () => {
-  const grouping = stageGrouping(named('Palette Chroma', 'Camera Wander', 'Mapping Frequency'));
-  assert.equal(grouping.titles, null);
-  assert.deepEqual(grouping.order, ['Camera', 'Colorize']);
-  assert.deepEqual([...grouping.assignments],
-    [['Palette Chroma', 'Colorize'], ['Camera Wander', 'Camera'], ['Mapping Frequency', 'Colorize']]);
-});
-
-test('stageGrouping claims no list that no recognizer claims', () => {
-  assert.equal(stageGrouping(named('Speed', 'Camera Wander')), null);
+test('stageGrouping does not infer a group from a familiar label', () => {
+  assert.equal(stageGrouping([{name: 'Camera Wander'}, {name: 'Palette Chroma'}, {name: 'Mapping Frequency'}]), null);
   assert.equal(stageGrouping([]), null);
 });

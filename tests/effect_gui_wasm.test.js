@@ -146,18 +146,18 @@ test('preset values survive URL reload after flushed or pending parameter edits'
   }
 });
 
-test('authored stage rosters recognize the engine parameter definitions', async () => {
+test('composed engine definitions publish complete pipeline groups', async () => {
   const {default: createModule} = await import('../generated/holosphere_wasm.js');
-  const {latticeMeltStageAssignments, kaleidoscopeSmoothStageAssignments} = await import('../src/effects/shader_stages.js');
+  const {stageGrouping} = await import('../src/effects/shader_stages.js');
   const module = await createModule({print: () => {}});
   const engine = new module.HolosphereEngine();
   try {
     for (const resolution of [[96, 20], [288, 144]]) {
       assert.notEqual(engine.setResolution(...resolution), module.ResolutionSetResult.UNSUPPORTED, resolution.join('x'));
-      for (const [effect, recognize] of [['LatticeMelt', latticeMeltStageAssignments], ['KaleidoscopeSmooth', kaleidoscopeSmoothStageAssignments]]) {
+      for (const effect of ['LatticeMelt', 'KaleidoscopeSmooth', 'AshCloud', 'ChromaticLichen']) {
         assert.equal(engine.setEffect(effect), module.EffectSetResult.INSTALLED, effect);
         const parameters = engine.getParameterDefinitions();
-        const assignments = recognize(parameters);
+        const assignments = stageGrouping(parameters)?.assignments;
         assert.ok(assignments, effect);
         assert.equal(assignments.size, parameters.length);
         if (effect === 'KaleidoscopeSmooth')
