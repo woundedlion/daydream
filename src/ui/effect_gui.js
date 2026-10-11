@@ -508,9 +508,10 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
 
       const stage = stageAssignments?.get(p.name);
       const controlGui = stage ? stageFolders.get(stage) : fx.gui;
-      const controller = addParamControl(
-        controlGui, state, p, !previousParamNames?.has(p.name),
-        persistParamKeys);
+      const controller = addParamControl(controlGui, state, p, {
+        hydrate: !previousParamNames?.has(p.name),
+        persist: persistParamKeys,
+      });
       if (stage) nameStageControl(controller, stage, p.name);
       fx.paramNames.push(p.name);
       fx.controllerByName.set(p.name, controller);
