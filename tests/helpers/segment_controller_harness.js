@@ -49,6 +49,7 @@ const EXPECTED_CONSOLE_MESSAGES = {
 const PASSTHROUGH_CONSOLE_MESSAGES = {
   error: [/^\(node:\d+\) ExperimentalWarning: Module mocking is an experimental feature/],
 };
+export const capturedConsole = [];
 
 /**
  * Install the per-file console capture, per-test driver reset, global
@@ -60,7 +61,6 @@ export function installSegmentControllerHarness() {
     Object.keys(EXPECTED_CONSOLE_MESSAGES)
       .map((method) => [method, console[method].bind(console)]),
   );
-  const capturedConsole = [];
   const consoleMocks = Object.keys(EXPECTED_CONSOLE_MESSAGES)
     .map((method) => mock.method(console, method, (...args) => {
       capturedConsole.push({ method, args });

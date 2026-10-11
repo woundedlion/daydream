@@ -16,6 +16,7 @@ import { ModuleWarmer, warmModules, EMPTY_WASM } from './fixtures/module_warmer_
 import { FAULT_POOL } from '../src/segments/worker_protocol.js';
 import {
   installSegmentControllerHarness,
+  capturedConsole,
   driver,
   setDisplayGrid,
   makeController,
@@ -927,6 +928,7 @@ test('an in-flight frame cannot revert a selected preset', async () => {
 });
 
 test('a pool fault notifies the host once after workers stop', () => {
+  const capturedFrom = capturedConsole.length;
   const faults = [];
   const controller = makeController({ onFault: (message) => {
     assert.equal(controller.faulted, true);
@@ -937,6 +939,11 @@ test('a pool fault notifies the host once after workers stop', () => {
   controller.onWorkerFault(0, 'render failed');
   controller.onWorkerFault(1, 'another failure');
   assert.deepEqual(faults, ['render failed']);
+  assert.deepEqual(capturedConsole.slice(capturedFrom).filter(({method}) => method === 'warn')
+    .map(({args}) => args[0]), [
+    '[Segmented] additional worker fault (seg 1): another failure '
+      + '— first fault already latched, UI shows that one',
+  ]);
   controller.destroy();
 });
 
