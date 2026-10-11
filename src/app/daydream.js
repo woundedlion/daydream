@@ -38,7 +38,9 @@ import { createRecordingControls } from "../recording/recording_controls.js";
 import {
   createSegmentedPovControls,
 } from "../ui/segmented_pov_controls.js";
-import { AppState, URLSync, replaceUrl } from "./state.js";
+import { AppState, URLSync } from "./state.js";
+import { replaceUrl } from "../shared/url.js";
+import { SegmentStatsView } from "../ui/segment_stats_view.js";
 import { VideoRecorder } from "../recording/recorder.js";
 import {
   SEGMENT_CONTROLLER_API_VERSION,
@@ -160,7 +162,7 @@ export function start({
     getMemoryView: () => host.view(),
     repointDisplayAliases: (view) => repointDisplayAliases(daydream, view),
     displayAliasesDiverged: (view) => displayAliasesDiverged(daydream, view),
-    statsDoc: doc,
+    statsView: new SegmentStatsView(doc),
     onFault: () => host.recorder?.abort(
       "Recording stopped because the segmented rendering engine failed."),
   });

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
 import { fakeElement } from './helpers/fake_dom.js';
-import { replaceUrl } from '../src/app/state.js';
+import { replaceUrl } from '../src/shared/url.js';
 import { PaletteV4, defaultPaletteRecipe } from '../src/workbench/palettes/palette_controls.js';
 import { PaletteRecipeModel } from '../src/workbench/palettes/palette_recipe_model.js';
 import { captureConsole } from './helpers/fake_console.js';
