@@ -33,8 +33,7 @@ test('Export copies the live values as a C++ brace-init list', async () => {
   const h = makeHarness({ params: [SPEED, GLOW], engineValues: [0.25, 1] });
   h.panel.build();
 
-  h.gui().ctrl('export').object.export();
-  await Promise.resolve();
+  await h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, ['{ 0.25f, true }']);
   assert.equal(h.gui().ctrl('export').label, '\u2713');
@@ -71,8 +70,7 @@ test('ShaderChain Export copies the versioned chain snapshot', async () => {
   });
   h.panel.build();
 
-  h.gui().ctrl('export').object.export();
-  await Promise.resolve();
+  await h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, [JSON.stringify(snapshot, null, 2)]);
   assert.equal(h.gui().ctrl('export').label, '\u2713');
@@ -89,8 +87,7 @@ test('Export copies displayed values while a segmented snapshot is pending', asy
   h.gui().ctrl('Speed').setValue(0.75);
   h.gui().ctrl('Glow').setValue(true);
 
-  h.gui().ctrl('export').object.export();
-  await Promise.resolve();
+  await h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, ['{ 0.75f, true }']);
   assert.equal(h.gui().ctrl('export').label, '\u2713');
@@ -122,8 +119,7 @@ test('Export omits engine-written readonly params from the preset', async () => 
   });
   h.panel.build();
 
-  h.gui().ctrl('export').object.export();
-  await Promise.resolve();
+  await h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, ['{ 0.25f }']);
 });
@@ -209,8 +205,7 @@ test('a copy operation that exhausts its fallbacks reports the failure', async (
   });
   h.panel.build();
 
-  h.gui().ctrl('export').object.export();
-  await Promise.resolve();
+  await h.gui().ctrl('export').object.export();
 
   assert.equal(h.gui().ctrl('export').label, '\u2717');
   assert.match(h.warnings[0], /clipboard copy failed/);
@@ -221,10 +216,10 @@ test('an Export that lands after an effect switch does not flash the old panel',
   h.panel.build();
   const stale = h.gui();
 
-  stale.ctrl('export').object.export();
+  const completion = stale.ctrl('export').object.export();
   h.panel.destroy();
   h.panel.build();
-  await Promise.resolve();
+  await completion;
 
   assert.deepEqual(h.state.copyText.copied, ['{ 0.25f }']);
   assert.equal(stale.ctrl('export').label, '\u29c9',
