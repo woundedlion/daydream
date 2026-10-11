@@ -729,6 +729,11 @@
     min-height: min(100vw, 50dvh);
   }
 
+  #canvas {
+    position: absolute;
+    inset: 0;
+  }
+
 }
 
 .gui-container .effect-gui .effect-action-row {
