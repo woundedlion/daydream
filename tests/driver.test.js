@@ -631,6 +631,19 @@ test('render repaints a pending frame while paused', () => {
   assert.equal(ctx.needsRender, false);
 });
 
+test('render preserves the pending frame while the WebGL context is lost', () => {
+  const log = [];
+  const ctx = renderCtx(new Uint16Array(4), log);
+  ctx.contextLost = true;
+  ctx.paused = false;
+  ctx.clock.update = () => log.push('clock.update');
+  ctx.clock.getDelta = () => 1;
+  ctx.stepSimulation = () => log.push('stepSimulation');
+  Daydream.prototype.render.call(ctx, null);
+  assert.deepEqual(log, []);
+  assert.equal(ctx.needsRender, true);
+});
+
 test('render reconciles the effect panel while simulation is paused', () => {
   const log = [];
   const ctx = renderCtx(new Uint16Array(4), log);
