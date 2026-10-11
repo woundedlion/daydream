@@ -55,11 +55,11 @@ test('syncValues writes each live value into its controller by stream position',
   const speed = controller('Speed', 0);
   const glow = controller('Glow', false, { isBoolean: true });
   const h = harness({ values: [0.25, 1] });
-  h.sync.syncValues(display([speed, glow]), true, false);
+  h.sync.syncValues(display([speed, glow]), { advanced: true, presetAdvanced: false });
   assert.equal(speed.object.Speed, 0.25);
   assert.equal(glow.object.Glow, true);
   assert.equal(speed.displays, 1);
-  h.sync.syncValues(display([speed, glow]), true, false);
+  h.sync.syncValues(display([speed, glow]), { advanced: true, presetAdvanced: false });
   assert.equal(speed.displays, 1, 'an unchanged value is not redisplayed');
 });
 
@@ -71,18 +71,18 @@ test('syncValues leaves a dragged or focused control alone, but not focused tele
   const input = typed.owns({});
   telemetry.owns(input);
   h.state.focused = input;
-  h.sync.syncValues(display([dragged, typed, telemetry]), true, false);
+  h.sync.syncValues(display([dragged, typed, telemetry]), { advanced: true, presetAdvanced: false });
   assert.deepEqual([dragged.object.A, typed.object.B, telemetry.object.C], [0, 0, 3]);
 });
 
 test('syncValues skips a panel without parameters and an empty stream', () => {
   const speed = controller('Speed', 0);
   const h = harness({ values: [] });
-  h.sync.syncValues(display([speed]), true, false);
+  h.sync.syncValues(display([speed]), { advanced: true, presetAdvanced: false });
   h.state.values = null;
-  h.sync.syncValues(display([speed]), true, false);
+  h.sync.syncValues(display([speed]), { advanced: true, presetAdvanced: false });
   h.state.values = [5];
-  h.sync.syncValues(display([speed], { hasParams: false }), true, false);
+  h.sync.syncValues(display([speed], { hasParams: false }), { advanced: true, presetAdvanced: false });
   assert.equal(speed.object.Speed, 0);
 });
 
@@ -90,25 +90,25 @@ test('syncValues warns once per skew episode and re-arms after a paired frame', 
   const speed = controller('Speed', 0);
   const h = harness({ values: [1, 2] });
   const fx = display([speed]);
-  h.sync.syncValues(fx, true, false);
-  h.sync.syncValues(fx, true, false);
+  h.sync.syncValues(fx, { advanced: true, presetAdvanced: false });
+  h.sync.syncValues(fx, { advanced: true, presetAdvanced: false });
   assert.equal(h.warnings.length, 1);
   assert.match(h.warnings[0], /length skew \(1 vs 2\)/);
   assert.equal(speed.object.Speed, 0, 'a skewed stream is not paired');
   h.state.values = [3];
-  h.sync.syncValues(fx, true, false);
+  h.sync.syncValues(fx, { advanced: true, presetAdvanced: false });
   assert.equal(speed.object.Speed, 3);
   h.state.values = [1, 2];
-  h.sync.syncValues(fx, true, false);
+  h.sync.syncValues(fx, { advanced: true, presetAdvanced: false });
   assert.equal(h.warnings.length, 2);
 });
 
 test('resetSkew re-arms the skew warning inside an episode', () => {
   const h = harness({ values: [1, 2] });
   const fx = display([controller('Speed', 0)]);
-  h.sync.syncValues(fx, true, false);
+  h.sync.syncValues(fx, { advanced: true, presetAdvanced: false });
   h.sync.resetSkew();
-  h.sync.syncValues(fx, true, false);
+  h.sync.syncValues(fx, { advanced: true, presetAdvanced: false });
   assert.equal(h.warnings.length, 2);
 });
 
@@ -116,7 +116,7 @@ test('a writable selector follows its requested value, not the stream', () => {
   const mode = controller('Mode', 0, { isEnum: true, enumOptions: ['a', 'b', 'c'] });
   const h = harness({ values: [2], definitions: [
     { name: 'Mode', value: 2, requestedValue: 1, options: ['a', 'b', 'c'] }] });
-  h.sync.syncValues(display([mode], { hasAnimatedEnums: true }), true, false);
+  h.sync.syncValues(display([mode], { hasAnimatedEnums: true }), { advanced: true, presetAdvanced: false });
   assert.equal(mode.object.Mode, 1);
 });
 
@@ -125,7 +125,7 @@ test('enum definitions are read only when a selector can have moved', () => {
   const definitions = [{ name: 'Mode', value: 1, options: ['a', 'b'] }];
   const reads = (fx, advanced, presetAdvanced, ownsDisplay = false) => {
     const h = harness({ values: [1], definitions, ownsDisplay });
-    h.sync.syncValues(fx, advanced, presetAdvanced);
+    h.sync.syncValues(fx, { advanced, presetAdvanced });
     return h.state.definitionReads;
   };
   assert.equal(reads(display([mode()]), true, false), 0, 'static selectors, no preset move');
@@ -142,7 +142,7 @@ test('while the pool owns the display a selector follows the stream', () => {
   const mode = controller('Mode', 0, { isEnum: true, enumOptions: ['a', 'b'],
     enumOptionValues: [4, 9] });
   const h = harness({ values: [9], ownsDisplay: true });
-  h.sync.syncValues(display([mode]), true, true);
+  h.sync.syncValues(display([mode]), { advanced: true, presetAdvanced: true });
   assert.equal(mode.object.Mode, 9);
 });
 
@@ -151,7 +151,7 @@ test('syncValues skips a stream slot no controller claims', () => {
   const fx = display([speed]);
   fx.paramNames = ['External', 'Speed'];
   const h = harness({ values: [7, 8] });
-  h.sync.syncValues(fx, true, false);
+  h.sync.syncValues(fx, { advanced: true, presetAdvanced: false });
   assert.equal(speed.object.Speed, 8);
 });
 

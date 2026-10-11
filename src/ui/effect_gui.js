@@ -291,7 +291,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     if (activeEffect.actions.hasPresets()) {
       activeEffect.actions.showPreset(getPresetCount(), getPresetIndex());
     }
-    valueSync.syncValues(activeEffect, advanced, presetAdvanced);
+    valueSync.syncValues(activeEffect, { advanced, presetAdvanced });
   }
 
   /**
@@ -381,13 +381,14 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * any preset available for manual selection (selecting one pauses animation).
    * @param {EffectRecord} fx - The effect record being built.
    * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
-   * @param {boolean} [initialPause=false] - Initial pause state.
-   * @param {boolean} [hydrate=true] - Read the stored pause value while constructing the toggle.
+   * @param {Object} [options]
+   * @param {boolean} [options.initialPause=false] - Initial pause state.
+   * @param {boolean} [options.hydrate=true] - Read the stored pause value while constructing the toggle.
    * @returns {PauseToggle} The toggle's state, its controller (null when
    *   neither animation surface is available), its state transition, and its
    *   display-only update.
    */
-  function addPauseToggle(fx, params, initialPause = false, hydrate = true) {
+  function addPauseToggle(fx, params, { initialPause = false, hydrate = true } = {}) {
     const animationState = { pause: Boolean(initialPause) };
     /** @type {GuiController|null} */
     let controller = null;
@@ -611,7 +612,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       fx.paramGeneration = paramGeneration();
 
       fx.actions = addEffectActions(fx, params);
-      const pause = addPauseToggle(fx, params, initialPause, hydratePause);
+      const pause = addPauseToggle(fx, params, { initialPause, hydrate: hydratePause });
       addParamControllers(fx, params, pause, previousParamNames);
       fx.pause = pause;
       fx.hydrating = false;
