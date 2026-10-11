@@ -1,13 +1,12 @@
 import { after, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { existsSync, readdirSync, readFileSync, symlinkSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { installEngineBundle } from '../scripts/install-engine-bundle.mjs';
 import { sitePaths, stageSite, verifiedEnginePaths } from '../scripts/stage-site.mjs';
-import { isolatedGitEnv, scratchDir } from './helpers/fixture_repo.js';
+import { isolatedGitEnv, scratchDir, writeEngineBundle, writeFileAt } from './helpers/fixture_repo.js';
 
 const AMBIENT_BUNDLE_PIN = process.env.HOLOSPHERE_BUNDLE_PIN;
 beforeEach(() => { delete process.env.HOLOSPHERE_BUNDLE_PIN; });
@@ -21,7 +20,7 @@ function fixture(t, readme = 'new README.md') {
   const root = join(scratch, 'repo');
   const bundle = join(scratch, 'bundle');
   const site = join(scratch, 'site');
-  const write = (base, path, value) => { mkdirSync(dirname(join(base, path)), { recursive: true }); writeFileSync(join(base, path), value); };
+  const write = writeFileAt;
   write(root, 'src/app/daydream.js', 'export const app = true;\n');
   write(root, 'site_manifest.txt', '# source\n\nsrc/app/daydream.js\ngenerated/shader/composed_effect_roster.mjs\ngenerated/shader/patterns/old.shader.json\n');
   write(root, 'generated/shader/patterns/old.shader.json', '{}');
@@ -43,11 +42,7 @@ function fixture(t, readme = 'new README.md') {
     'generated/shader/patterns/new.shader.json', 'docs/screenshots/new.png'].map((path) => [path, 'new ' + path]));
   files['generated/holosphere_wasm.sha'] = pair.holosphere;
   files['README.md'] = readme;
-  const manifest = Object.entries(files).map(([path, content]) => {
-    write(bundle, path, content);
-    return `${createHash('sha256').update(content).digest('hex')}  ${path}`;
-  }).join('\n');
-  write(bundle, 'holosphere_engine.sha256', manifest);
+  writeEngineBundle(bundle, files);
   installEngineBundle(bundle, root);
   return { root, bundle, site, pair, write, git, scratch };
 }

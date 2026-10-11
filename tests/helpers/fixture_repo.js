@@ -4,9 +4,10 @@
 import { after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 const LOCAL_GIT_ENV = [
   'GIT_ALTERNATE_OBJECT_DIRECTORIES',
@@ -88,6 +89,33 @@ export const fixtureRepo = (prefix, build) => {
   beforeEach(build);
   after(() => rmSync(root, { recursive: true, force: true }));
   return root;
+};
+
+/**
+ * Writes a file under `base`, creating its parent directories.
+ * @param {string} base - Root directory.
+ * @param {string} path - Path relative to `base`.
+ * @param {string|Uint8Array} contents - File contents.
+ * @returns {void}
+ */
+export const writeFileAt = (base, path, contents) => {
+  mkdirSync(dirname(join(base, path)), { recursive: true });
+  writeFileSync(join(base, path), contents);
+};
+
+/**
+ * Writes an engine bundle: each file plus the holosphere_engine.sha256
+ * manifest listing its checksum.
+ * @param {string} bundle - Bundle directory.
+ * @param {Object<string, string>} files - Contents by bundle-relative path.
+ * @returns {void}
+ */
+export const writeEngineBundle = (bundle, files) => {
+  const manifest = Object.entries(files).map(([path, contents]) => {
+    writeFileAt(bundle, path, contents);
+    return `${createHash('sha256').update(contents).digest('hex')}  ./${path}`;
+  }).join('\n');
+  writeFileAt(bundle, 'holosphere_engine.sha256', manifest + '\n');
 };
 
 /**

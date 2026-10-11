@@ -1,10 +1,9 @@
 import { after, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { installEngineBundle, runtimePath, RUNTIME_PATHS } from '../scripts/install-engine-bundle.mjs';
-import { scratchDir } from './helpers/fixture_repo.js';
+import { scratchDir, writeEngineBundle, writeFileAt } from './helpers/fixture_repo.js';
 
 const AMBIENT_BUNDLE_PIN = process.env.HOLOSPHERE_BUNDLE_PIN;
 beforeEach(() => { delete process.env.HOLOSPHERE_BUNDLE_PIN; });
@@ -22,10 +21,7 @@ function fixture(t, shape = () => {}) {
   const root = scratchDir(t, 'daydream-bundle-');
   const bundle = join(root, 'bundle');
   const destination = join(root, 'daydream');
-  const write = (base, path, text) => {
-    mkdirSync(dirname(join(base, path)), { recursive: true });
-    writeFileSync(join(base, path), text);
-  };
+  const write = writeFileAt;
   write(destination, 'src/app/daydream.js', 'application');
   write(destination, 'generated/holosphere_wasm.sha', 'a'.repeat(40));
   write(destination, 'generated/shader/patterns/obsolete.shader.json', 'obsolete');
@@ -36,11 +32,7 @@ function fixture(t, shape = () => {}) {
   ].map((path) => [path, `fresh ${path}`]));
   files['generated/holosphere_wasm.sha'] = 'b'.repeat(40);
   shape(files);
-  const manifest = Object.entries(files).map(([path, text]) => {
-    write(bundle, path, text);
-    return `${createHash('sha256').update(text).digest('hex')}  ./${path}`;
-  }).join('\n');
-  write(bundle, 'holosphere_engine.sha256', manifest + '\n');
+  writeEngineBundle(bundle, files);
   return { bundle, destination, write };
 }
 
