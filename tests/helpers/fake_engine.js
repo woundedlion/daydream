@@ -1,8 +1,9 @@
+import { enumeration } from './fake_enums.js';
 // Engine fakes consume the installed, generated binding contract.
 import { canonicalEffectId } from "../../src/effects/effect_identity.js";
 import { readFileSync } from 'node:fs';
 
-import { CLASS_METHODS, NUMERIC_ENUMS } from '../../generated/engine_contract.mjs';
+import { CLASS_METHODS } from '../../generated/engine_contract.mjs';
 
 /** Calls which individual fakes may omit. */
 export const ENGINE_OPTIONAL_METHODS = [
@@ -12,8 +13,6 @@ export const ENGINE_METHODS = CLASS_METHODS.HolosphereEngine
   .filter((name) => !ENGINE_OPTIONAL_METHODS.includes(name));
 export const SHADER_CHAIN_BINDING_METHODS = CLASS_METHODS.ShaderChainBindings;
 
-const enumeration = (name) => Object.freeze(Object.fromEntries(
-  Object.entries(NUMERIC_ENUMS[name]).map(([key, value]) => [key, Object.freeze({ value })])));
 export const ParamSetResult = enumeration('ParamSetResult');
 export const ClipSetResult = enumeration('ClipSetResult');
 export const ResolutionSetResult = enumeration('ResolutionSetResult');

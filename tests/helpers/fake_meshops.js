@@ -1,4 +1,5 @@
-import { KNOWN_OPS, MESH_OP_RESULT_NAMES } from '../../src/workbench/solids/solid_codegen.js';
+import { enumeration } from './fake_enums.js';
+import { KNOWN_OPS } from '../../src/workbench/solids/solid_codegen.js';
 
 // One triangle: the smallest readback that exercises both arrays.
 const VERTICES = () => Float32Array.from([0, 0, 0, 1, 0, 0, 0, 1, 0]);
@@ -16,7 +17,7 @@ const FACES = () => ({ indices: Uint16Array.from([0, 1, 2]), counts: Uint8Array.
 export function fakeModule({ rejects = new Set(), reason = 'ARENA_EXHAUSTED',
   onOp = () => { }, vertices = VERTICES() } = {}) {
   const state = { live: 0, cleared: 0, calls: [] };
-  const MeshOpResult = Object.fromEntries(MESH_OP_RESULT_NAMES.map((n) => [n, Symbol(n)]));
+  const MeshOpResult = enumeration('MeshOpResult');
   let lastResult = MeshOpResult.OK;
   const call = (token) => {
     state.calls.push(token);
