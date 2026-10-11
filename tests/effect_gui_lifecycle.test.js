@@ -336,7 +336,7 @@ test('destroy drains the drag listeners of a panel torn down mid-drag', () => {
 });
 
 test('a slider drag defers persistence to the pointer release', () => {
-  const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+  const speed = { ...SPEED };
   const h = makeHarness({
     params: [speed],
     onEngineParam: (name, value) => { speed.value = value; },
@@ -383,7 +383,7 @@ test('a ShaderChain drag writes one chain snapshot, at the release', () => {
   ], 'the release deep-links the state the last move would have');
 });
 test('a schema rebuild mid-drag still lands the write the drag deferred', () => {
-  const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+  const speed = { ...SPEED };
   const h = makeHarness({
     params: [speed],
     engineValues: [0.1],
@@ -442,7 +442,7 @@ test('a schema rebuild mid-drag lands the whole workbench snapshot', () => {
 test('a teardown mid-drag persists the deferred write, and a release only once',
   () => {
     const harness = () => {
-      const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+      const speed = { ...SPEED };
       return makeHarness({
         params: [speed],
         onEngineParam: (name, value) => { speed.value = value; },
@@ -482,7 +482,7 @@ test('a release that changed no value persists nothing', () => {
 });
 
 test('a toggle persists without waiting for a pointer release', () => {
-  const glow = { name: 'Glow', value: false, animated: true };
+  const glow = { ...GLOW };
   const h = makeHarness({
     params: [glow],
     onEngineParam: (name, value) => { glow.value = value > 0.5; },
@@ -575,7 +575,7 @@ test('a definition with no accepted value falls back to its requested target', (
 
 test('a drag whose release never lands ends when the window loses focus', () => {
   const warning = 'Speed is faster than the segment stream can follow.';
-  const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+  const speed = { ...SPEED };
   const h = makeHarness({
     params: [speed],
     engineValues: [0.1],
@@ -611,7 +611,7 @@ test('a drag whose release never lands ends when the window loses focus', () => 
 // control nor release it: the release the panel acts on is the opening
 // pointer's alone.
 test('a second pointer neither re-latches a held control nor releases it', () => {
-  const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+  const speed = { ...SPEED };
   const h = makeHarness({
     params: [speed],
     onEngineParam: (name, value) => { speed.value = value; },

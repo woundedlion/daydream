@@ -498,7 +498,7 @@ test('an edit that changes no warning costs one definitions read and no rebuild'
 });
 
 test('a warning raised mid-drag lands on the pointer release', () => {
-  const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+  const speed = { ...SPEED };
   const warning = 'Speed is faster than the segment stream can follow.';
   const h = makeHarness({
     params: [speed],
@@ -528,7 +528,7 @@ test('a warning raised mid-drag lands on the pointer release', () => {
 });
 
 test('a warning raised mid-key-repeat lands on the key release', () => {
-  const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+  const speed = { ...SPEED };
   const warning = 'Speed is faster than the segment stream can follow.';
   const h = makeHarness({
     params: [speed],
