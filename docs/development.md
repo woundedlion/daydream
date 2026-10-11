@@ -36,7 +36,7 @@ accepted named parameters, typed per-instance runtime, palette state and animati
 pause. Workbench links use `#shader=v2` with their document and typed snapshot.
 URL persistence stores the snapshot in `fx.__chainSnapshot`;
 resolution rollback and segment-worker initialization use the same snapshot. Worker
-protocol version 12 carries `chainSnapshot`.
+protocol carries `chainSnapshot`.
 
 Snapshot schema version 2 uses `chain: [{instance, operator}]` and
 `parameters: [{name, value}]`. Runtime entries identify their instance and stable
