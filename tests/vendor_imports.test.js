@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { vendorAddonsFromSource } from '../scripts/vendor-imports.mjs';
+
+test('the shader compiler loaders pass the vendor integrity audit', () => {
+  for (const name of ['chain_document_store', 'shader_deeplink', 'shader_documents']) {
+    const file = `src/workbench/shader/${name}.js`;
+    const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
+    assert.deepEqual(vendorAddonsFromSource(source, file), []);
+  }
+});
 
 test('vendor scanner follows import and re-export literals, including escapes', () => {
   const source = `import 'three/addons/a.js';
@@ -27,6 +36,9 @@ test('vendor scanner rejects computed imports except fixed relative URL constant
   }
   assert.deepEqual(vendorAddonsFromSource(
     "const COMPILER_URL = new URL('../compiler.js', import.meta.url).href; await import(COMPILER_URL)",
+    'app.js'), []);
+  assert.deepEqual(vendorAddonsFromSource(
+    "export const U = new URL('./local.js', import.meta.url).href; await import(U)",
     'app.js'), []);
 });
 
