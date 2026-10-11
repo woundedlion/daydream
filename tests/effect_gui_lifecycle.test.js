@@ -730,6 +730,20 @@ test('the external filter builds no parameter controls', () => {
   assert.equal(fx.hasParams, false, 'nothing to sync per frame');
 });
 
+test('external parameter export refuses missing live values without controller fallback', () => {
+  mock.timers.enable({apis: ['setTimeout']});
+  const h = makeHarness({params: [SPEED], engineValues: []});
+  h.state.paramFilter = {external: true};
+  h.panel.build();
+  assert.equal(h.panel.active().paramsExternal, true);
+  assert.deepEqual([...h.panel.active().controllerByName.keys()], []);
+  h.gui().ctrl('export').object.export();
+  assert.deepEqual(h.state.copyText.copied, []);
+  assert.equal(exportStatus(h).textContent, EXPORT_FAILED);
+  assert.deepEqual(h.warnings,
+    ['Export: no parameter values matching the current effect; skipping copy']);
+});
+
 test('a filter change rebuilds the panel on the next sync', () => {
   const params = chainParams();
   const h = makeHarness({
