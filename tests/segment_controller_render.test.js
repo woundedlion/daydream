@@ -15,7 +15,9 @@ import {
   readyController,
   flush,
   publishGeneration,
+  deliverGeneration,
   deliverFrame,
+  gridHalves,
 } from './helpers/segment_controller_harness.js';
 
 installSegmentControllerHarness();
@@ -544,11 +546,7 @@ test('the first tick() once ready dispatches a parallel render', () => {
 
 test('a completed render arms pendingFrame and frees the in-flight slot', async () => {
   const c = readyController(2);
-  c.tick();
-
-  deliverFrame(c, 0);
-  deliverFrame(c, 1);
-  await flush();
+  await publishGeneration(c);
 
   assert.equal(c.frameState.pending, 0);
   assert.equal(c.frameState.pendingFrame, true, 'results are waiting to be composited');
@@ -560,12 +558,7 @@ test('the next tick() composites the armed frame and dispatches the following on
 
   const c = readyController(2);
   c.showBoundaries = false;
-  c.tick();
-
-  const band = () => new Uint16Array(2 * 2 * 3).fill(111);
-  deliverFrame(c, 0, { pixels: band(), x0: 0, x1: 2, y0: 0, y1: 2 });
-  deliverFrame(c, 1, { pixels: band(), x0: 2, x1: 4, y0: 0, y1: 2 });
-  await flush();
+  await publishGeneration(c, gridHalves(111));
   assert.equal(c.frameState.pendingFrame, true);
 
   c.tick();
@@ -588,26 +581,21 @@ test('each render dispatch hands the retired generation buffer back for reuse', 
   assert.ok(c.workers.every((w) => lastRender(w).recycle === undefined),
     'nothing is retired yet, so the first dispatch leaves the worker to allocate');
 
-  const genA = [new Uint16Array(2 * 2 * 3).fill(111), new Uint16Array(2 * 2 * 3).fill(111)];
-  deliverFrame(c, 0, { pixels: genA[0], x0: 0, x1: 2, y0: 0, y1: 2 });
-  deliverFrame(c, 1, { pixels: genA[1], x0: 2, x1: 4, y0: 0, y1: 2 });
-  await flush();
+  const genA = gridHalves(111);
+  await deliverGeneration(c, genA);
   c.tick(); // composite A, dispatch B: A is the live generation, not retired
   assert.ok(c.workers.every((w) => lastRender(w).recycle === undefined),
     'the generation the compositor is displaying is never handed back');
 
-  const genB = () => new Uint16Array(2 * 2 * 3).fill(222);
-  deliverFrame(c, 0, { pixels: genB(), x0: 0, x1: 2, y0: 0, y1: 2 });
-  deliverFrame(c, 1, { pixels: genB(), x0: 2, x1: 4, y0: 0, y1: 2 });
-  await flush();
+  await deliverGeneration(c, gridHalves(222));
   c.tick(); // composite B, dispatch C carrying generation A's retired buffers
 
   c.workers.forEach((w, s) => {
     assert.deepEqual(lastRender(w).recycle, new Uint16Array(12).fill(111),
       `seg ${s} receives the retired pixel values`);
-    assert.deepEqual(w.transfers.at(-1), [genA[s].buffer],
+    assert.deepEqual(w.transfers.at(-1), [genA[s].pixels.buffer],
       'the buffer is transferred, not structured-cloned');
-    assert.equal(genA[s].buffer.byteLength, 0,
+    assert.equal(genA[s].pixels.buffer.byteLength, 0,
       `seg ${s}'s retired buffer is detached on the controller side`);
   });
   assert.ok(c.frameState.results.every((r) => r.pixels.byteLength > 0 && r.pixels[0] === 222),
@@ -621,12 +609,7 @@ test('tick() re-blits the last composite when a render overruns the tick (previe
 
   const c = readyController(2);
   c.showBoundaries = false;
-  c.tick();
-
-  const band = () => new Uint16Array(2 * 2 * 3).fill(111);
-  deliverFrame(c, 0, { pixels: band(), x0: 0, x1: 2, y0: 0, y1: 2 });
-  deliverFrame(c, 1, { pixels: band(), x0: 2, x1: 4, y0: 0, y1: 2 });
-  await flush();
+  await publishGeneration(c, gridHalves(111));
   c.tick(); // composite the armed frame, dispatch the next (now in flight)
   assert.equal(c.frameState.pendingFrame, false);
   assert.equal(c.frameState.renderInFlight, true, 'the next render is in flight and will overrun');
@@ -652,17 +635,12 @@ test('an overrun re-blit shows one whole generation, never a half-updated mix', 
   try {
     const c = readyController(2);
     c.showBoundaries = false;
-    c.tick(); // dispatch generation A
-
-    const genA = () => new Uint16Array(2 * 2 * 3).fill(111);
-    deliverFrame(c, 0, { pixels: genA(), x0: 0, x1: 2, y0: 0, y1: 2 });
-    deliverFrame(c, 1, { pixels: genA(), x0: 2, x1: 4, y0: 0, y1: 2 });
-    await flush();
+    await publishGeneration(c, gridHalves(111)); // generation A
     c.tick(); // composite generation A, dispatch generation B (now in flight)
     assert.equal(c.frameState.renderInFlight, true, 'generation B is in flight and will overrun');
 
     // Generation B arrives only partially: seg 0 reports, seg 1 still rendering.
-    deliverFrame(c, 0, { pixels: new Uint16Array(2 * 2 * 3).fill(222), x0: 0, x1: 2, y0: 0, y1: 2 });
+    deliverFrame(c, 0, gridHalves(222)[0]);
     assert.equal(c.frameState.pending, 1, 'generation B still has one segment outstanding');
     assert.ok(c.frameState.scratch[0] && c.frameState.scratch[0].pixels[0] === 222,
       'the partial next generation is staged in scratch, not results');
@@ -686,12 +664,7 @@ test('a composite short one segment is not handed to the recorder as a frame', a
 
   const c = readyController(2);
   c.showBoundaries = false;
-  c.tick();
-
-  const band = () => new Uint16Array(2 * 2 * 3).fill(111);
-  deliverFrame(c, 0, { pixels: band(), x0: 0, x1: 2, y0: 0, y1: 2 });
-  deliverFrame(c, 1, { pixels: band(), x0: 2, x1: 4, y0: 0, y1: 2 });
-  await flush();
+  await publishGeneration(c, gridHalves(111));
 
   // The whole-array swap publishes only generations that filled every slot, so
   // an empty one stands in for that invariant breaking.
@@ -709,12 +682,7 @@ test('destroy() clears frameComposited so a respawning pool cannot capture black
 
   const c = readyController(2);
   c.showBoundaries = false;
-  c.tick();
-
-  const band = () => new Uint16Array(2 * 2 * 3).fill(111);
-  deliverFrame(c, 0, { pixels: band(), x0: 0, x1: 2, y0: 0, y1: 2 });
-  deliverFrame(c, 1, { pixels: band(), x0: 2, x1: 4, y0: 0, y1: 2 });
-  await flush();
+  await publishGeneration(c, gridHalves(111));
   c.tick();
   assert.equal(c.frameComposited, true, 'a real composite latched the flag');
 
@@ -773,13 +741,7 @@ test('tick() holds the assembled generation when the display buffer is missing',
 
   const c = readyController(2);
   c.showBoundaries = false;
-  c.tick();
-
-  deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2,
-                       pixels: new Uint16Array(2 * 2 * 3).fill(111) });
-  deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2,
-                       pixels: new Uint16Array(2 * 2 * 3).fill(222) });
-  await flush();
+  await publishGeneration(c, [gridHalves(111)[0], gridHalves(222)[1]]);
   assert.equal(c.frameState.pendingFrame, true);
 
   c.compositor.getMemoryView = () => null;
@@ -803,11 +765,7 @@ test('a fault latched by the overrun re-blit paints the overlay on the same tick
   try {
     const c = readyController(2);
     c.showBoundaries = false;
-    c.tick(); // dispatch generation A
-
-    deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
-    deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
-    await flush();
+    await publishGeneration(c, gridHalves()); // generation A
     c.tick(); // composite A, dispatch B (in flight, so the next tick overruns)
 
     // Corrupt the published generation so the overrun re-blit's pre-pass faults.

@@ -187,13 +187,39 @@ export const flush = () => new Promise((r) => setImmediate(r));
  * completed frame does: the controller's own results, which only its own
  * scratch swap ever writes.
  * @param {SegmentController} controller - A ready controller.
- * @param {Array<Object>} bands - Per-segment frame overrides, in segment order.
+ * @param {Array<Object>} [bands] - Per-segment frame overrides, in segment
+ *   order; defaults to one default frame per worker.
  * @returns {Promise<void>} Resolves once the generation is published.
  */
 export async function publishGeneration(controller, bands) {
   controller.tick();
+  await deliverGeneration(controller, bands);
+}
+
+/**
+ * Deliver one frame per segment, in segment order, and let the render promise
+ * settle.
+ * @param {SegmentController} controller - Controller owning the worker pool.
+ * @param {Array<Object>} [bands] - Per-segment frame overrides; defaults to one
+ *   default frame per worker.
+ * @returns {Promise<void>} Resolves on the macrotask after the last delivery.
+ */
+export async function deliverGeneration(controller, bands = controller.workers.map(() => ({}))) {
   bands.forEach((band, segId) => deliverFrame(controller, segId, band));
   await flush();
+}
+
+/**
+ * Per-segment frame overrides covering a 4x2 display grid as two 2x2 bands.
+ * @param {number} [fill] - Value filling each band's pixels; omitted, each band
+ *   leaves deliverFrame's zeroed default.
+ * @returns {Array<Object>} The two bands, left then right.
+ */
+export function gridHalves(fill) {
+  return [0, 2].map((x0) => ({
+    ...(fill === undefined ? {} : { pixels: new Uint16Array(2 * 2 * 3).fill(fill) }),
+    x0, x1: x0 + 2, y0: 0, y1: 2,
+  }));
 }
 
 /**
