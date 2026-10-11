@@ -750,13 +750,7 @@ export class SegmentController {
     this.#frameComposited = false;
     // Bump before settling: the in-flight render's `.then` runs on a later
     // microtask, possibly after a fresh pool exists.
-    this.#renderGen++;
-    // Settle any in-flight render promise so it never leaks unresolved.
-    if (this.#frameResolve) {
-      const resolve = this.#frameResolve;
-      this.#frameResolve = null;
-      resolve();
-    }
+    this.#settleInflight();
     this.#renderInFlight = false;
     this.#pendingFrame = false;
     this.faulted = false;
@@ -798,15 +792,25 @@ export class SegmentController {
     this.#renderInFlight = false;
     // Bump before settling so the in-flight `.then` cannot publish the
     // incomplete frame.
+    this.#settleInflight();
+    // A paused host need not tick, so paint the overlay here.
+    this.updateStats();
+    if (firstFault) this.onFault(message);
+  }
+
+  #fencePublished() {
+    this.#renderGen++;
+    this.#results.fill(null);
+    this.#pendingFrame = false;
+  }
+
+  #settleInflight() {
     this.#renderGen++;
     if (this.#frameResolve) {
       const resolve = this.#frameResolve;
       this.#frameResolve = null;
       resolve();
     }
-    // A paused host need not tick, so paint the overlay here.
-    this.updateStats();
-    if (firstFault) this.onFault(message);
   }
 
   /**
@@ -877,9 +881,7 @@ export class SegmentController {
       return;
     }
     // Fence in-flight old-effect frames and drop settled ones.
-    this.#renderGen++;
-    this.#results.fill(null);
-    this.#pendingFrame = false;
+    this.#fencePublished();
     this.broadcast({
       type: 'setEffect',
       name,
@@ -961,9 +963,7 @@ export class SegmentController {
     this.bottomCap = bottomCap;
     if (this.faulted) return;
     this.paramValues = null;
-    this.#renderGen++;
-    this.#results.fill(null);
-    this.#pendingFrame = false;
+    this.#fencePublished();
     this.broadcast({ type: 'setDisplayCaps', topCap, bottomCap });
     if (this.driver.paused) this.tick();
   }
@@ -982,9 +982,7 @@ export class SegmentController {
     // Fence old-resolution results into a prior generation.
     this.paramValues = null;
     this.paramRevision++;
-    this.#renderGen++;
-    this.#results.fill(null);
-    this.#pendingFrame = false;
+    this.#fencePublished();
     // The outstanding render retains the latch until frameResolve or its watchdog.
     this.broadcast({ type: 'setResolution', w, h });
   }
