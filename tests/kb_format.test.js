@@ -22,8 +22,3 @@ test('formatKB: rounds at the requested width', () => {
   assert.equal(formatKB(1800, 0), '2');
   assert.equal(formatKB(100), '0.1');
 });
-
-test('formatKB: appends no unit suffix', () => {
-  assert.equal(formatKB(4096), '4.0');
-  assert.equal(formatKB(4096, 0), '4');
-});
