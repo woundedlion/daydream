@@ -1,7 +1,7 @@
 import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { installConsoleCapture } from './helpers/fake_console.js';
-import { fakeElement, installDocument } from './helpers/fake_dom.js';
+import { fakeElement, installDocument, stashGlobals } from './helpers/fake_dom.js';
 import {
   MEMORY_BUFFER_LIMIT_BYTES, PICKER_GRACE_SECONDS, selectMimeType, VideoRecorder,
 } from '../src/recording/recorder.js';
@@ -68,9 +68,9 @@ const fakeCanvas = (width = 0, height = 0) =>
  * @returns {() => void} A function that restores the saved document.
  */
 const installFakeDocument = () => {
-  const savedDocument = globalThis.document;
+  const restore = stashGlobals('document');
   installDocument({ createElement: () => fakeCanvas() });
-  return () => { globalThis.document = savedDocument; };
+  return restore;
 };
 
 /** Native capture rounds the start-time source size up to even and keeps it. */
@@ -257,12 +257,8 @@ class FakeMediaRecorder {
  * @returns {() => void} A function that restores the saved globals.
  */
 const installRecorderEnv = () => {
-  const saved = {
-    MediaRecorder: globalThis.MediaRecorder,
-    HTMLCanvasElement: globalThis.HTMLCanvasElement,
-    document: globalThis.document,
-    showSaveFilePicker: globalThis.showSaveFilePicker,
-  };
+  const restore = stashGlobals('MediaRecorder', 'HTMLCanvasElement', 'document',
+    'showSaveFilePicker');
   FakeMediaRecorder.instances = [];
   FakeMediaRecorder.constructError = null;
   FakeMediaRecorder.lastStream = null;
@@ -275,12 +271,7 @@ const installRecorderEnv = () => {
   globalThis.HTMLCanvasElement = class { captureStream() {} };
   installDocument({ createElement: () => recordableCanvas() });
   delete globalThis.showSaveFilePicker;
-  return () => {
-    globalThis.MediaRecorder = saved.MediaRecorder;
-    globalThis.HTMLCanvasElement = saved.HTMLCanvasElement;
-    globalThis.document = saved.document;
-    globalThis.showSaveFilePicker = saved.showSaveFilePicker;
-  };
+  return restore;
 };
 
 /**
@@ -357,23 +348,15 @@ test('a recording started on a hidden page begins paused', (t) => {
   assert.equal(media.state, 'inactive');
 });
 
-test('isSupported answers false where the DOM globals are absent', () => {
-  const saved = {
-    HTMLCanvasElement: globalThis.HTMLCanvasElement,
-    MediaRecorder: globalThis.MediaRecorder,
-  };
+test('isSupported answers false where the DOM globals are absent', (t) => {
+  t.after(stashGlobals('HTMLCanvasElement', 'MediaRecorder'));
   delete globalThis.HTMLCanvasElement;
   delete globalThis.MediaRecorder;
-  try {
-    assert.equal(VideoRecorder.isSupported(), false,
-      'a host with no canvas global must be answered, not thrown at');
-    globalThis.HTMLCanvasElement = class { captureStream() {} };
-    assert.equal(VideoRecorder.isSupported(), false,
-      'a host with no MediaRecorder global must be answered, not thrown at');
-  } finally {
-    globalThis.HTMLCanvasElement = saved.HTMLCanvasElement;
-    globalThis.MediaRecorder = saved.MediaRecorder;
-  }
+  assert.equal(VideoRecorder.isSupported(), false,
+    'a host with no canvas global must be answered, not thrown at');
+  globalThis.HTMLCanvasElement = class { captureStream() {} };
+  assert.equal(VideoRecorder.isSupported(), false,
+    'a host with no MediaRecorder global must be answered, not thrown at');
 });
 
 test('isSupported answers true where captureStream and MediaRecorder both exist', (t) => {
@@ -1498,7 +1481,7 @@ test('a cancelled save picker tells the host the session ended', async (t) => {
  */
 const installSavePath = () => {
   const savedDocument = globalThis.document;
-  const savedBlob = globalThis.Blob;
+  const restoreGlobals = stashGlobals('document', 'Blob');
   const savedCreateObjectURL = URL.createObjectURL;
   const savedRevokeObjectURL = URL.revokeObjectURL;
   /** @type {any} */
@@ -1541,8 +1524,7 @@ const installSavePath = () => {
     },
   });
   spy.restore = () => {
-    globalThis.document = savedDocument;
-    globalThis.Blob = savedBlob;
+    restoreGlobals();
     URL.createObjectURL = savedCreateObjectURL;
     URL.revokeObjectURL = savedRevokeObjectURL;
   };

@@ -8,17 +8,14 @@ import { enumChoices } from '../src/effects/param_sync.js';
 import { GUI as DeepLinkGUI } from '../src/ui/gui.js';
 import { createEffectGui } from '../src/ui/effect_gui.js';
 import { fakePanelGui } from './helpers/fake_app.js';
-import { test, afterEach } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
+import {
+  fakeElement, installDocument, restoreDocumentAfterEach, restoreWindowAfterEach,
+} from './helpers/fake_dom.js';
 
 restoreDocumentAfterEach();
-
-const savedWindow = globalThis.window;
-afterEach(() => {
-  if (savedWindow === undefined) delete globalThis.window;
-  else globalThis.window = savedWindow;
-});
+restoreWindowAfterEach();
 
 /** Installs the document and window surface lil-gui's constructors read.
  * @returns {Object} A container element the panel mounts into.
