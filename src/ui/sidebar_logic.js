@@ -10,19 +10,19 @@
  * (the input is not mutated). Name sorts lexicographically via localeCompare;
  * size sorts numerically, with equal sizes broken by name (A->Z). Direction 'asc'
  * is ascending, anything else descending.
- * @param {Array<{name: string, size: number}>} items - Items to order.
+ * @param {Array<{name: string, size: number, label?: string}>} items - Items to order.
  * @param {'name'|'size'} key - Sort key.
  * @param {'asc'|'desc'} dir - Sort direction.
- * @returns {Array<{name: string, size: number}>} A new, sorted array.
+ * @returns {Array<{name: string, size: number, label?: string}>} A new, sorted array.
  */
 export function sortItems(items, key, dir) {
   const mul = dir === 'asc' ? 1 : -1;
   return [...items].sort((a, b) => {
     if (key === 'size') {
       const d = a.size - b.size;
-      return d ? d * mul : a.name.localeCompare(b.name, 'en');
+      return d ? d * mul : (a.label ?? a.name).localeCompare(b.label ?? b.name, 'en');
     }
-    return a.name.localeCompare(b.name, 'en') * mul;
+    return (a.label ?? a.name).localeCompare(b.label ?? b.name, 'en') * mul;
   });
 }
 

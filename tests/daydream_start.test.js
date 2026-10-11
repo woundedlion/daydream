@@ -2,6 +2,7 @@
 // daydream.js's composition root: start(deps) builds the whole app against
 // injected seams (document, page target, navigator, driver, GUI factory,
 // module loader).
+import { canonicalEffectId } from '../src/effects/effect_identity.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -72,7 +73,7 @@ test('the global GUI carries the controls a deep link names', () => {
 test('a workbench-only effect deep link is handed to the workbench page', () => {
   for (const effect of ['ShaderChain', 'alien-brain']) {
     const app = startApp({ search: `?effect=${effect}` });
-    assert.deepEqual(app.replaced, [`/tools/shader.html?effect=${effect}`]);
+    assert.deepEqual(app.replaced, [`/tools/shader.html?effect=${canonicalEffectId(effect)}`]);
     assert.equal(app.guis.length, 0);
     assert.deepEqual(app.listeners, []);
     assert.equal(app.teardown.disposed(), false);
@@ -151,5 +152,22 @@ test('retired shader identities are absent from simulator routing', () => {
     const app = startApp({search: `?effect=${effect}`});
     assert.deepEqual(app.replaced, []);
     assert.equal(app.guis.length, 1);
+  }
+});
+
+test('legacy simulator links and explicit canonical simulator links retain their route', () => {
+  for (const search of ['?effect=AlienBrain', '?effect=alien-brain&view=simulator',
+    '?effect=Comets', '?effect=comets']) {
+    const app = startApp({ search });
+    assert.deepEqual(app.replaced, []);
+    assert.ok(app.guis.length > 0);
+  }
+});
+
+test('authoring page accepts legacy and canonical document aliases', () => {
+  for (const effect of ['AlienBrain', 'alien-brain']) {
+    const app = startApp({daydreamMode: 'shader-workbench', search: `?effect=${effect}`});
+    assert.deepEqual(app.replaced, []);
+    assert.ok(app.guis.length > 0);
   }
 });

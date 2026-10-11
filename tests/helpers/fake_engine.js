@@ -1,11 +1,12 @@
 // Engine fakes consume the installed, generated binding contract.
+import { canonicalEffectId } from "../../src/effects/effect_identity.js";
 import { readFileSync } from 'node:fs';
 
 import { CLASS_METHODS, NUMERIC_ENUMS } from '../../generated/engine_contract.mjs';
 
 /** Calls which individual fakes may omit. */
 export const ENGINE_OPTIONAL_METHODS = [
-  'getShaderChainBindings', 'getAnimationsPaused', 'getPresetIds', 'getPoleLod', 'delete',
+  'getEffectIdentities', 'getShaderChainBindings', 'getAnimationsPaused', 'getPresetIds', 'getPoleLod', 'delete',
 ];
 export const ENGINE_METHODS = CLASS_METHODS.HolosphereEngine
   .filter((name) => !ENGINE_OPTIONAL_METHODS.includes(name));
@@ -63,7 +64,7 @@ export class FakeChainEngine {
     this.effect = name;
     this.definitions = [];
     this.generation += 1;
-    if (name === 'ShaderChain') {
+    if (canonicalEffectId(name) === canonicalEffectId('ShaderChain')) {
       const result = this.#setShaderChain([
         { instance: 'camera', operator: 'sphere.rotate.v2' },
         { instance: 'project', operator: 'project.stereographic.v2' },
@@ -79,7 +80,7 @@ export class FakeChainEngine {
   #setShaderChain(entries) {
     this.chainCalls.push(entries);
     const refusal = (code, entryIndex = -1) => ({ status: ChainStatus[code], code, entryIndex });
-    if (this.effect !== 'ShaderChain') return refusal('NOT_CHAIN_EFFECT');
+    if (canonicalEffectId(this.effect) !== canonicalEffectId('ShaderChain')) return refusal('NOT_CHAIN_EFFECT');
     const malformed = { status: ChainStatus.MALFORMED_PAYLOAD, code: 'MALFORMED_PAYLOAD', entryIndex: -1 };
     if (!Array.isArray(entries)) return malformed;
     if (entries.length > this.catalog.budgets.max_chain_ops) return refusal('TOO_LONG');
@@ -161,7 +162,7 @@ export class FakeChainEngine {
   }
 
   getShaderChainBindings() {
-    if (this.effect !== 'ShaderChain') return null;
+    if (canonicalEffectId(this.effect) !== canonicalEffectId('ShaderChain')) return null;
     const generation = this.effectGeneration;
     let released = false;
     const isValid = () => !released && this.effectGeneration === generation;

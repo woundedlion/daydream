@@ -31,6 +31,7 @@ src/ui/effect_actions.js
 src/effects/effect_persistence.js
 src/ui/effect_panel_view.js
 src/ui/effect_panel_edits.js
+src/effects/effect_identity.js
 src/effects/effect_roster.js
 src/effects/effect_sequencing.js
 src/engine/engine_host.js

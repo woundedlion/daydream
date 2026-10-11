@@ -102,6 +102,7 @@
     "src/ui/effect_actions.js",
     "src/recording/recording_controls.js",
     "src/ui/effect_panel_view.js",
+    "src/effects/effect_identity.js",
     "src/effects/effect_roster.js"
   ]
 }

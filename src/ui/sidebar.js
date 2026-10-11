@@ -3,6 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { effectDisplayName } from "../effects/effect_identity.js";
 import {
   balancedColumnRows,
   sortItems,
@@ -46,7 +47,7 @@ export class EffectSidebar {
     this.buttons = new Map();
     /** @type {HTMLElement[]} Buttons in the order they are laid out. */
     this.orderedButtons = [];
-    /** @type {Array<{name: string, size: number}>} */
+    /** @type {Array<{name: string, size: number, label?: string}>} */
     this.items = [];
     /** @type {number|null} Measured lazily; see onKeyDown. */
     this.gridStride = null;
@@ -162,9 +163,11 @@ export class EffectSidebar {
     this.gridStride = null;
 
     names.forEach(name => {
-      const size = effectSizes ? (effectSizes[name] || 0) : 0;
-      const presetCount = Math.max(1, presetCounts ? (presetCounts[name] || 0) : 0);
-      this.items.push({ name, size });
+      const label = effectDisplayName(name);
+      const size = effectSizes ? (effectSizes[label] || effectSizes[name] || 0) : 0;
+      const presetCount = Math.max(1, presetCounts
+        ? (presetCounts[label] || presetCounts[name] || 0) : 0);
+      this.items.push({ name, size, label });
 
       const btn = this.doc.createElement('button');
       btn.type = 'button';
@@ -173,12 +176,12 @@ export class EffectSidebar {
       btn.setAttribute('aria-selected', 'false');
       btn.tabIndex = -1; // roving tabindex
       btn.dataset.effect = name;
-      btn.setAttribute('aria-label', `${name}, ${presetCount} preset${presetCount === 1 ? '' : 's'}`
+      btn.setAttribute('aria-label', `${label}, ${presetCount} preset${presetCount === 1 ? '' : 's'}`
         + (size > 0 ? `, object size ${formatKB(size)} KiB` : ''));
 
       const nameSpan = this.doc.createElement('span');
       nameSpan.className = 'effect-name';
-      nameSpan.textContent = `${name} (${presetCount})`;
+      nameSpan.textContent = `${label} (${presetCount})`;
       btn.appendChild(nameSpan);
 
       if (size > 0) {

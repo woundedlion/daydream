@@ -38,6 +38,7 @@ import { createRecordingControls } from "../recording/recording_controls.js";
 import {
   createSegmentedPovControls,
 } from "../ui/segmented_pov_controls.js";
+import { canonicalEffectId } from "../effects/effect_identity.js";
 import { AppState, URLSync } from "./state.js";
 import { replaceUrl } from "../shared/url.js";
 import { SegmentStatsView } from "../ui/segment_stats_view.js";
@@ -84,7 +85,8 @@ export function shaderWorkbenchUrl(location, effect = 'ShaderChain') {
   const url = new URL('tools/shader.html', current);
   url.search = current.search;
   url.hash = current.hash;
-  url.searchParams.set('effect', effect);
+  url.searchParams.set('effect', canonicalEffectId(effect));
+  url.searchParams.delete('view');
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
@@ -109,9 +111,13 @@ export function start({
   loadModule = createHolosphereModule,
 } = {}) {
   const shaderWorkbench = doc.documentElement?.dataset.daydreamMode === 'shader-workbench';
-  const requestedEffect = new URLSearchParams(win.location?.search ?? '').get('effect');
-  const workbenchEffect = requestedEffect === 'ShaderChain' ? 'ShaderChain'
-    : SHADER_DOCUMENT_EFFECTS.includes(requestedEffect) ? requestedEffect : null;
+  const routeParams = new URLSearchParams(win.location?.search ?? '');
+  const requestedEffect = routeParams.get('effect');
+  const canonicalRequest = canonicalEffectId(requestedEffect ?? '');
+  const workbenchEffect = canonicalRequest === canonicalEffectId('ShaderChain')
+    ? canonicalRequest : requestedEffect === canonicalRequest
+      && routeParams.get('view') !== 'simulator'
+      && SHADER_DOCUMENT_EFFECTS.includes(canonicalRequest) ? canonicalRequest : null;
   if (!shaderWorkbench && workbenchEffect) {
     win.location.replace(shaderWorkbenchUrl(win.location, workbenchEffect));
     // Same shape as createAppTeardown's handle.
@@ -137,21 +143,30 @@ export function start({
 
   // Seed plain defaults; URLSync hydrates these from the query string through
   // its validators.
-  const knownEffects = new Set(shaderWorkbench
+  const knownEffects = new Set((shaderWorkbench
     ? WORKBENCH_EFFECTS
-    : Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
+    : Object.values(resolutionPresets).flatMap((preset) => preset.favorites)
+  ).map(canonicalEffectId));
   const appState = new AppState({
-    effect: shaderWorkbench ? 'ShaderChain' : DEFAULT_EFFECT,
+    effect: canonicalEffectId(shaderWorkbench ? 'ShaderChain' : DEFAULT_EFFECT),
+    view: null,
     resolution: "Phantasm (288x144)",
   });
-  const urlSync = new URLSync(appState, ['effect', 'resolution'], {
+  const syncRoute = () => appState.set('view', !shaderWorkbench
+    && SHADER_DOCUMENT_EFFECTS.includes(canonicalEffectId(appState.get('effect')))
+    ? 'simulator' : null);
+  const disposeEffectRoute = appState.subscribe((key) => { if (key === 'effect') syncRoute(); });
+  const urlSync = new URLSync(appState, ['effect', 'resolution', 'view'], {
     resolution: (v) => Object.hasOwn(resolutionPresets, v),
-    effect: (v) => knownEffects.has(v),
+    effect: (v) => knownEffects.has(canonicalEffectId(v)),
+    view: (v) => !shaderWorkbench && v === 'simulator',
   }, win);
+  appState.set('effect', canonicalEffectId(appState.get('effect')));
+  syncRoute();
   let workbenchUrlPending = shaderWorkbench;
   if (workbenchUrlPending) urlSync.suspend();
   const availableEffects = (resolution) => shaderWorkbench
-    ? [...WORKBENCH_EFFECTS] : favoritesFor(resolution);
+    ? WORKBENCH_EFFECTS.map(canonicalEffectId) : favoritesFor(resolution).map(canonicalEffectId);
 
   const segments = new SegmentController({
     resolutionPresets,
@@ -176,7 +191,7 @@ export function start({
    * @returns {void}
    */
   function clearEffectParamUrl() {
-    resetGUI(['resolution', 'effect', ...guiInstance.collectUrlKeys()], win);
+    resetGUI(['resolution', 'effect', 'view', ...guiInstance.collectUrlKeys()], win);
   }
 
   const applyNotice = createApplyNotice({ doc });
@@ -520,8 +535,9 @@ export function start({
     getEngine: () => host.engine,
     getModule: () => host.module,
     selectEffect: (effect) => {
-      appState.set('effect', effect);
-      return appState.get('effect') === effect;
+      const canonical = canonicalEffectId(effect);
+      appState.set('effect', canonical);
+      return appState.get('effect') === canonical;
     },
     syncEffectGui: () => effectGui.sync(),
     invalidate: () => daydream.invalidate(),
@@ -630,7 +646,7 @@ export function start({
       ["click", onApplyNoticeDismiss, doc],
     ],
     switches,
-    stopTimers: () => { testAllTicker.stop(); applyNotice.clear(); },
+    stopTimers: () => { disposeEffectRoute(); testAllTicker.stop(); applyNotice.clear(); },
     effectGui,
     shaderDocuments,
     globalGui: guiInstance,

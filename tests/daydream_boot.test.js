@@ -4,11 +4,12 @@
 //
 // Cases that read the source anchor on the call site and name the failure they
 // stand in for.
+import { canonicalEffectId, effectDisplayName } from '../src/effects/effect_identity.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
-import { URL_FLUSH_DEBOUNCE_MS } from '../src/app/state.js';
+import { getActiveURLSync, URL_FLUSH_DEBOUNCE_MS } from '../src/app/state.js';
 import { pageWarmer } from '../src/segments/module_warmer.js';
 import { SegmentController } from '../src/segments/segment_controller.js';
 import {
@@ -78,9 +79,9 @@ test('catalog effects are offered at both simulator resolutions', async () => {
   const loRes = offeredEffects(app);
 
   for (const effect of ['AshCloud', 'HyperLattice']) {
-    assert.ok(hiRes.includes(effect),
+    assert.ok(hiRes.includes(canonicalEffectId(effect)),
       `the sidebar must offer ${effect} at the high-res preset`);
-    assert.ok(loRes.includes(effect),
+    assert.ok(loRes.includes(canonicalEffectId(effect)),
       `the sidebar must offer ${effect} at the low-res preset`);
   }
 });
@@ -126,7 +127,7 @@ test('an effect switch preserves view deep-link parameters', async (t) => {
   });
   t.mock.timers.enable({apis: ['setTimeout']});
   const option = app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
-    .find((entry) => entry.dataset.effect === 'Raymarch');
+    .find((entry) => entry.dataset.effect === canonicalEffectId('Raymarch'));
   assert.ok(option);
   assert.ok(app.guis[0].collectUrlKeys().includes('view.poleLod'), app.guis[0].collectUrlKeys().join(', '));
   option.onclick();
@@ -1000,7 +1001,7 @@ test('a pooled effect switch sizes the preset row from the incoming effect', asy
     return EffectSetResult.INSTALLED;
   };
   module.HolosphereEngine.prototype.getPresetCount = function () {
-    return presetCounts[this.effect] ?? 0;
+    return presetCounts[effectDisplayName(this.effect)] ?? 0;
   };
   t.mock.getter(SegmentController.prototype, 'ownsDisplay', () => true);
   t.mock.getter(SegmentController.prototype, 'active', () => true);
@@ -1014,7 +1015,7 @@ test('a pooled effect switch sizes the preset row from the incoming effect', asy
   };
   for (const name of ['IslamicStars', 'Fishbowl', 'Comets', 'IslamicStars']) {
     app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
-      .find((entry) => entry.dataset.effect === name).onclick();
+      .find((entry) => entry.dataset.effect === canonicalEffectId(name)).onclick();
     assert.equal(presetChoices(), presetCounts[name], name);
   }
 });
@@ -1053,4 +1054,41 @@ test('segmented slider and pool follow viewport layout changes and release the l
   assert.equal(count.label, 'Segments (6 = sim only)');
   spawn.dispose();
   assert.equal(removed, changed);
+});
+
+test('simulator shares canonical identity, preserves display metadata and reloads its route', async (t) => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  const app = await bootedApp({search: '?effect=Comets&fx.Speed=0.7',
+    loadModule: async () => fakeWasmModule()});
+  const option = app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
+    .find((entry) => entry.dataset.effect === 'alien-brain');
+  assert.ok(option);
+  assert.match(option.getAttribute('aria-label'), /^AlienBrain, /);
+  option.onclick();
+  t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+  const shared = new URL(app.urlWrites.at(-1), 'https://example.test');
+  assert.equal(shared.searchParams.get('effect'), 'alien-brain');
+  assert.equal(shared.searchParams.get('view'), 'simulator');
+  const reload = startApp({search: shared.search});
+  assert.deepEqual(reload.replaced, []);
+  assert.ok(reload.guis.length > 0);
+});
+
+test('canonical and legacy URL normalization retains parameter keys', async (t) => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  for (const effect of ['Comets', 'comets']) {
+    const app = await bootedApp({search: `?effect=${effect}&fx.Speed=0.7`,
+      loadModule: async () => fakeWasmModule({ definitions: [
+        {name: 'Speed', value: 0.2, min: 0, max: 1, animated: false},
+      ]})});
+    getActiveURLSync().setParam('view.poleLod', 1.5);
+    t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+    const query = new URL(app.urlWrites.at(-1), 'https://example.test').searchParams;
+    assert.equal(query.get('effect'), 'comets');
+    assert.equal(query.get('fx.Speed'), '0.7');
+    assert.equal(app.guis.at(-1).namespace, 'fx');
+    const active = app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
+      .find((entry) => entry.getAttribute('aria-selected') === 'true');
+    assert.equal(active.dataset.effect, 'comets');
+  }
 });

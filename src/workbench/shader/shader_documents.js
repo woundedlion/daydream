@@ -3,6 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { canonicalEffectId, effectDisplayName } from "../../effects/effect_identity.js";
 import { engineHalted } from '../../shared/engine_halt.js';
 import { callWorkbenchBinding, shaderChainCatalog } from '../../engine/workbench_bindings.js';
 import { enumConstantName, optionValue } from '../../effects/param_sync.js';
@@ -25,7 +26,7 @@ const CATALOG_URL = '../../../generated/shader/engine_catalog.json';
 const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
 
 // The engine's chain interpreter, programmed through setShaderChain.
-const CHAIN_EFFECT = 'ShaderChain';
+const CHAIN_EFFECT = canonicalEffectId('ShaderChain');
 
 // Digest characters the toolbar shows; the button copies all of it.
 const DIGEST_ABBREVIATION = 12;
@@ -600,7 +601,7 @@ export function createShaderDocumentController({
     // Ahead of the teardown, so a refusal leaves the current editor standing.
     try {
       if (!selectEffect(CHAIN_EFFECT)) {
-        show(`The preview engine rejected effect "${CHAIN_EFFECT}".`, true);
+        show(`The preview engine rejected effect "${effectDisplayName(CHAIN_EFFECT)}".`, true);
         return false;
       }
     } catch (error) {
@@ -927,7 +928,8 @@ export function createShaderDocumentController({
         linkGeneration += 1;
       }
     }
-    const requested = sourceCatalog.get(initialEffect ?? '');
+    const requested = sourceCatalog.get(canonicalEffectId(initialEffect ?? ''))
+      ?? sourceCatalog.get(initialEffect ?? '');
     let loaded;
     if (requested === undefined) loaded = await loadScratch();
     else {
@@ -1026,7 +1028,7 @@ export function createShaderDocumentController({
     const compiledSide = !active.compiledSide;
     const effect = compiledSide ? active.official.effectId : CHAIN_EFFECT;
     if (!selectEffect(effect)) {
-      announce(`The preview engine rejected effect "${effect}".`);
+      announce(`The preview engine rejected effect "${effectDisplayName(effect)}".`);
       return;
     }
     active.compiledSide = compiledSide;
@@ -1037,7 +1039,7 @@ export function createShaderDocumentController({
       const refusal = status?.textContent ?? 'The preset could not be applied.';
       const previousEffect = compiledSide ? CHAIN_EFFECT : active.official.effectId;
       if (!selectEffect(previousEffect)) {
-        announce(`The preview engine rejected effect "${previousEffect}".`);
+        announce(`The preview engine rejected effect "${effectDisplayName(previousEffect)}".`);
         return;
       }
       active.compiledSide = !compiledSide;
