@@ -569,7 +569,7 @@ export interface HolosphereModule {
   MeshOpResult: MeshOpResultEnum;
   PaletteOps: { new (): PaletteOps };
   /**
-   * Set by HS_CHECK immediately before its trap, and absent until then. The
+   * Set before an engine trap or Emscripten runtime abort callback. The
    * trap is terminal for the whole module: no later call recovers, so a
    * caller that sees this must discard the instance.
    */
