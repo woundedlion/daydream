@@ -1237,9 +1237,25 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
   assert.deepEqual(keydown('-'), { prevented: true, stopped: true });
   assert.ok(spherical().radius > beforeOut.radius);
 
+  ctx.controls.minPolarAngle = 0.2;
+  ctx.controls.maxPolarAngle = 0.4;
+  ctx.controls.minDistance = 2;
+  ctx.controls.maxDistance = 3;
+  for (const [key, radius, phi, expectedRadius, expectedPhi] of [
+    ['ArrowUp', 2.5, 0.2, 2.5, 0.2],
+    ['ArrowDown', 2.5, 0.4, 2.5, 0.4],
+    ['+', 2, 0.3, 2, 0.3],
+    ['-', 3, 0.3, 3, 0.3],
+  ]) {
+    ctx.camera.position.setFromSpherical(new THREE.Spherical(radius, phi, 0));
+    assert.deepEqual(keydown(key), {prevented: true, stopped: true});
+    assert.ok(Math.abs(spherical().radius - expectedRadius) < 1e-12);
+    assert.ok(Math.abs(spherical().phi - expectedPhi) < 1e-12);
+  }
+
   const position = ctx.camera.position.clone();
   for (const event of [{ key: ' ' }, { key: 'ArrowLeft', ctrlKey: true },
-    { key: 'ArrowLeft', altKey: true }]) {
+    { key: 'ArrowLeft', altKey: true }, {key: 'ArrowLeft', metaKey: true}]) {
     ctx.handlers.keydown({ ...event,
       preventDefault: () => assert.fail('unowned key prevented'),
       stopPropagation: () => assert.fail('unowned key stopped'),
