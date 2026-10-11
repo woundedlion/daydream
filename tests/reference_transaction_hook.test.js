@@ -35,7 +35,6 @@ const SKIP = SH || process.env[REQUIRED_ENV] ? false : MISSING;
 
 describe(
   'reference-transaction hook',
-  { skip: SKIP },
   () => {
     let root;
     let repo;
@@ -123,33 +122,33 @@ describe(
       rmSync(root, { recursive: true, force: true });
     });
 
-    test('malformed records fail closed and append an audit entry', () => {
+    test('malformed records fail closed and append an audit entry', { skip: SKIP }, () => {
       const result = runHook([`${mid} refs/heads/master`]);
       assert.equal(result.status, 1);
       assert.match(result.stderr, /malformed reference transaction/);
       assert.match(readLog(), /REFUSED malformed reference transaction/);
     });
 
-    test('refuses deletion of master', () => {
+    test('refuses deletion of master', { skip: SKIP }, () => {
       const { status, stderr } = runHook([`${mid} ${ZERO} refs/heads/master`]);
       assert.equal(status, 1);
       assert.match(stderr, /REFUSED deletion of master/);
       assert.match(readLog(), new RegExp(`REFUSED deletion master ${mid}`));
     });
 
-    test('a refused deletion leaves the authorization token unconsumed', () => {
+    test('a refused deletion leaves the authorization token unconsumed', { skip: SKIP }, () => {
       writeToken('deadbeefdeadbeefdeadbeefdeadbeefdeadbeef');
       assert.equal(runHook([`${mid} ${ZERO} refs/heads/master`]).status, 1);
       assert.ok(existsSync(tokenPath()));
     });
 
-    test('the zero OID does not authorize a deletion', () => {
+    test('the zero OID does not authorize a deletion', { skip: SKIP }, () => {
       writeToken(ZERO);
       const { status } = runHook([`${mid} ${ZERO} refs/heads/master`]);
       assert.equal(status, 1);
     });
 
-    test('the doomed OID authorizes the deletion and is consumed', () => {
+    test('the doomed OID authorizes the deletion and is consumed', { skip: SKIP }, () => {
       writeToken(mid);
       assert.equal(runHook([`${mid} ${ZERO} refs/heads/master`]).status, 0);
       assert.match(readLog(), new RegExp(`OVERRIDE deletion master ${mid}`));
@@ -157,32 +156,32 @@ describe(
       assert.equal(runHook([`${mid} ${ZERO} refs/heads/master`]).status, 1);
     });
 
-    test('ANY authorizes a deletion', () => {
+    test('ANY authorizes a deletion', { skip: SKIP }, () => {
       writeToken('ANY');
       assert.equal(runHook([`${mid} ${ZERO} refs/heads/master`]).status, 0);
       assert.equal(existsSync(tokenPath()), false);
     });
 
-    test('a lowercase any does not authorize a deletion', () => {
+    test('a lowercase any does not authorize a deletion', { skip: SKIP }, () => {
       writeToken('any');
       assert.equal(runHook([`${mid} ${ZERO} refs/heads/master`]).status, 1);
     });
 
-    test('refuses a rewind of master', () => {
+    test('refuses a rewind of master', { skip: SKIP }, () => {
       const { status, stderr } = runHook([`${ZERO} ${old} refs/heads/master`]);
       assert.equal(status, 1);
       assert.match(stderr, /REFUSED non-fast-forward update of master/);
       assert.match(readLog(), new RegExp(`REFUSED rewind master ${mid} -> ${old}`));
     });
 
-    test('the target OID authorizes a rewind and is consumed', () => {
+    test('the target OID authorizes a rewind and is consumed', { skip: SKIP }, () => {
       writeToken(old);
       assert.equal(runHook([`${ZERO} ${old} refs/heads/master`]).status, 0);
       assert.match(readLog(), new RegExp(`OVERRIDE rewind master ${mid} -> ${old}`));
       assert.equal(existsSync(tokenPath()), false);
     });
 
-    test('a linked worktree consumes the common-directory override token', () => {
+    test('a linked worktree consumes the common-directory override token', { skip: SKIP }, () => {
       const linked = join(root, 'linked');
       git(repo, 'worktree', 'add', '--detach', linked, mid);
       writeToken(old);
@@ -191,35 +190,35 @@ describe(
       assert.match(readLog(), new RegExp(`OVERRIDE rewind master ${mid} -> ${old}`));
     });
 
-    test('a token prefix of the target authorizes', () => {
+    test('a token prefix of the target authorizes', { skip: SKIP }, () => {
       writeToken(old.slice(0, 10));
       assert.equal(runHook([`${ZERO} ${old} refs/heads/master`]).status, 0);
     });
 
-    test('a token shorter than seven characters never authorizes', () => {
+    test('a token shorter than seven characters never authorizes', { skip: SKIP }, () => {
       writeToken(old.slice(0, 6));
       assert.equal(runHook([`${ZERO} ${old} refs/heads/master`]).status, 1);
       writeToken(mid.slice(0, 6));
       assert.equal(runHook([`${mid} ${ZERO} refs/heads/master`]).status, 1);
     });
 
-    test('an empty token file never authorizes', () => {
+    test('an empty token file never authorizes', { skip: SKIP }, () => {
       writeFileSync(tokenPath(), '\n');
       assert.equal(runHook([`${mid} ${ZERO} refs/heads/master`]).status, 1);
     });
 
-    test('a token for another commit does not authorize', () => {
+    test('a token for another commit does not authorize', { skip: SKIP }, () => {
       writeToken(ahead);
       assert.equal(runHook([`${ZERO} ${old} refs/heads/master`]).status, 1);
       assert.equal(runHook([`${mid} ${ZERO} refs/heads/master`]).status, 1);
     });
 
-    test('allows a fast-forward and logs nothing', () => {
+    test('allows a fast-forward and logs nothing', { skip: SKIP }, () => {
       assert.equal(runHook([`${ZERO} ${ahead} refs/heads/master`]).status, 0);
       assert.equal(readLog(), '');
     });
 
-    test('allows creation of master', () => {
+    test('allows creation of master', { skip: SKIP }, () => {
       const { status } = runHook(
         [`${ZERO} ${orphan} refs/heads/master`],
         'prepared',
@@ -228,7 +227,7 @@ describe(
       assert.equal(status, 0);
     });
 
-    test('ignores every ref other than master', () => {
+    test('ignores every ref other than master', { skip: SKIP }, () => {
       const updates = [
         `${old} ${ZERO} refs/heads/fix/7`,
         `${mid} ${ZERO} refs/heads/master-backup`,
@@ -239,7 +238,7 @@ describe(
       assert.equal(readLog(), '');
     });
 
-    test('governs only the prepared stage', () => {
+    test('governs only the prepared stage', { skip: SKIP }, () => {
       for (const stage of ['committed', 'aborted', '']) {
         const { status } = runHook([`${mid} ${ZERO} refs/heads/master`], stage);
         assert.equal(status, 0);
@@ -247,7 +246,7 @@ describe(
       assert.equal(readLog(), '');
     });
 
-    test('refuses a batch that deletes master alongside other refs', () => {
+    test('refuses a batch that deletes master alongside other refs', { skip: SKIP }, () => {
       const { status } = runHook([
         `${old} ${ZERO} refs/heads/fix/7`,
         `${mid} ${ZERO} refs/heads/master`,
