@@ -711,6 +711,9 @@ test('a schema rebuild preserves the engine pause and hydrates only new controls
   assert.equal(h.gui().ctrl('pause').unhydrated, true);
   assert.deepEqual(h.writes, ['engine:Detail=0.7', 'worker:Detail=0.7'],
     'rebuilding does not write a guessed pause state');
+  h.writes.length = 0;
+  h.gui().ctrl('pause').setValue(false);
+  assert.deepEqual(h.writes, ['paused:false']);
 });
 
 test('segmented mode rebuilds from main-engine definitions before reading worker values', () => {
