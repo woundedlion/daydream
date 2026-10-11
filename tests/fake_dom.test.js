@@ -264,6 +264,17 @@ test('a disabled control prevents click propagation to ancestors', () => {
   assert.deepEqual(log, [], 'disabled activation never reaches an ancestor');
 });
 
+test('a disabled leaf permits non-activation events through live ancestors', () => {
+  const {root, mid, leaf, log} = chain();
+  root.addEventListener('chain-applied', () => log.push('root-capture'), true);
+  mid.addEventListener('chain-applied', () => log.push('mid'));
+  leaf.addEventListener('chain-applied', () => log.push('leaf'));
+  root.addEventListener('chain-applied', () => log.push('root-bubble'));
+  leaf.disabled = true;
+  leaf.dispatch('chain-applied');
+  assert.deepEqual(log, ['root-capture', 'leaf', 'mid', 'root-bubble']);
+});
+
 test('a disabled control still runs its listeners for events disabling never gates', () => {
   const leaf = fakeElement('button');
   const seen = [];
