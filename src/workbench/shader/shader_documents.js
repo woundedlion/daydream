@@ -276,17 +276,21 @@ export function createShaderDocumentController({
     onOriginalLinkReleased();
   };
 
-  /** @param {string} message @param {boolean} [error] */
-  const show = (message, error = false) => {
+  /** @param {string} message @param {boolean} error */
+  const writeStatus = (message, error) => {
     status.setAttribute('role', error ? 'alert' : 'status');
     status.setAttribute('aria-live', error ? 'assertive' : 'polite');
     status.dataset.status = error ? 'error' : 'ok';
     status.textContent = message;
   };
+  /** @param {string} message */
+  const showStatus = (message) => writeStatus(message, false);
+  /** @param {string} message */
+  const showError = (message) => writeStatus(message, true);
 
   // The shared live region; an empty message clears it.
   /** @param {string} message */
-  const announce = (message) => show(message, message !== '');
+  const announce = (message) => writeStatus(message, message !== '');
 
   /**
    * The descriptor digest of whichever document is authoritative: the store's
@@ -365,7 +369,7 @@ export function createShaderDocumentController({
       const engine = getEngine();
       const module = getModule();
       if (!engine || !module || !active) {
-        show('The preview engine is not ready.', true);
+        showError('The preview engine is not ready.');
         return false;
       }
       // With the editor live, the store's document is authoritative and its
@@ -392,7 +396,7 @@ export function createShaderDocumentController({
         invalidate();
       }
       if (refusal) {
-        show(`Preset "${presetId}" could not be applied: ${refusal}`, true);
+        showError(`Preset "${presetId}" could not be applied: ${refusal}`);
         return false;
       }
       active.presetId = presetId;
@@ -401,13 +405,13 @@ export function createShaderDocumentController({
       const preset = presetSelect.selectedOptions[0]?.textContent ?? presetId;
       const side = !parityArmed() ? ''
         : active.compiledSide ? ' · compiled build' : ' · interpreter';
-      show(`${title} · ${preset}${side}`);
+      showStatus(`${title} · ${preset}${side}`);
       showDigest();
       scheduleDeepLink();
       return true;
     } catch (error) {
       markHalted(error);
-      show(`The preview edit failed: ${errorDetail(error)}`, true);
+      showError(`The preview edit failed: ${errorDetail(error)}`);
       return false;
     }
   };
@@ -493,7 +497,7 @@ export function createShaderDocumentController({
       return true;
     } catch (error) {
       markHalted(error);
-      show(`The preview edit failed: ${errorDetail(error)}`, true);
+      showError(`The preview edit failed: ${errorDetail(error)}`);
       return false;
     }
   };
@@ -522,7 +526,7 @@ export function createShaderDocumentController({
         if (dropped) {
           // Re-enables the bypass toggles on the interpreter.
           chainUi?.strip.render();
-          show('The edit changed the descriptor: the preview is back on the '
+          showStatus('The edit changed the descriptor: the preview is back on the '
             + 'interpreter and the parity toggle is disarmed.');
         }
       },
@@ -555,24 +559,24 @@ export function createShaderDocumentController({
         compiled = compiler.compileShaderDocument(source, { catalog: operatorCatalog });
       } catch (error) {
         const detail = errorDetail(error);
-        show(`The document could not be compiled: ${detail}`, true);
+        showError(`The document could not be compiled: ${detail}`);
         return false;
       }
     }
     if (compiled.status !== 'VALID') {
-      show(diagnosticText(compiled), true);
+      showError(diagnosticText(compiled));
       return false;
     }
     // Resolved before anything is built: the strip renders the active preset's values.
     const presetId = session?.preset
       ?? compiled.document.preset_bank.presets[0]?.preset_id;
     if (!presetId) {
-      show('The document is valid, but it carries no preset to preview.', true);
+      showError('The document is valid, but it carries no preset to preview.');
       return false;
     }
     if (!compiled.document.preset_bank.presets.some(
       (/** @type {*} */ preset) => preset.preset_id === presetId)) {
-      show(`The shader link names no document preset "${presetId}".`, true);
+      showError(`The shader link names no document preset "${presetId}".`);
       return false;
     }
     // Every load previews through the interpreter; a digest match arms the parity toggle.
@@ -582,11 +586,11 @@ export function createShaderDocumentController({
     // Ahead of the teardown, so a refusal leaves the current editor standing.
     try {
       if (!selectEffect(CHAIN_EFFECT)) {
-        show(`The preview engine rejected effect "${effectDisplayName(CHAIN_EFFECT)}".`, true);
+        showError(`The preview engine rejected effect "${effectDisplayName(CHAIN_EFFECT)}".`);
         return false;
       }
     } catch (error) {
-      show(`The preview edit failed: ${errorDetail(error)}`, true);
+      showError(`The preview edit failed: ${errorDetail(error)}`);
       return false;
     }
     const previous = active;
@@ -605,10 +609,11 @@ export function createShaderDocumentController({
     /**
      * Puts the toolbar back on the document the engine is rendering, writing the
      * previous program back when the refused load had already written its own.
-     * @param {boolean} [written] - Whether the program write has run.
+     * @param {Object} [options]
+     * @param {boolean} [options.written=false] - Whether the program write has run.
      * @returns {boolean} The load's refusal.
      */
-    const abandon = (written = false) => {
+    const abandon = ({ written = false } = {}) => {
       teardownChainUi();
       active = previous;
       chainUi = previousUi;
@@ -625,7 +630,7 @@ export function createShaderDocumentController({
         const refusal = status.textContent;
         applyPreset(previous.presetId ?? presetSelect.value);
         if (previousSnapshot) callWorkbenchBinding(getEngine(), 'restoreSnapshot', [previousSnapshot]);
-        show(refusal ?? '', true);
+        showError(refusal ?? '');
       }
       return false;
     };
@@ -634,7 +639,7 @@ export function createShaderDocumentController({
         chainUi = await buildChainUi(compiled.document, candidateMount);
       } catch (error) {
         const detail = errorDetail(error);
-        show(`The chain editor could not adopt the document: ${detail}`, true);
+        showError(`The chain editor could not adopt the document: ${detail}`);
         return abandon();
       }
     }
@@ -642,8 +647,8 @@ export function createShaderDocumentController({
       for (const label of session.bypassed) {
         const result = chainUi.store.setBypassed(label, true);
         if (!result.ok) {
-          show(`The shader link could not bypass "${label}": `
-            + `${result.diagnostics[0].message}.`, true);
+          showError(`The shader link could not bypass "${label}": `
+            + `${result.diagnostics[0].message}.`);
           return abandon();
         }
       }
@@ -655,7 +660,7 @@ export function createShaderDocumentController({
     if (saveAsButton) saveAsButton.disabled = false;
     showDigest();
     syncParity();
-    if (!applyPreset(presetId)) return abandon(true);
+    if (!applyPreset(presetId)) return abandon({ written: true });
     if (session?.chainSnapshot) {
       const expected = callWorkbenchBinding(getEngine(), 'getSnapshot', []);
       const snapshot = session.chainSnapshot;
@@ -663,13 +668,13 @@ export function createShaderDocumentController({
       if (!expected || JSON.stringify(expected.chain) !== JSON.stringify(snapshot.chain)
           || expected.parameters.length !== values.size
           || expected.parameters.some((/** @type {*} */ entry) => entry.value !== Math.fround(values.get(entry.name)))) {
-        show('The shader link snapshot does not match its document and preset.', true);
-        return abandon(true);
+        showError('The shader link snapshot does not match its document and preset.');
+        return abandon({ written: true });
       }
       if (callWorkbenchBinding(getEngine(), 'restoreSnapshot', [snapshot])
           !== getModule().ChainSnapshotRestoreResult.APPLIED) {
-        show('The shader link runtime snapshot was rejected.', true);
-        return abandon(true);
+        showError('The shader link runtime snapshot was rejected.');
+        return abandon({ written: true });
       }
     }
     if (session) {
@@ -729,7 +734,7 @@ export function createShaderDocumentController({
       if (generation !== linkGeneration) return;
       replaceShaderStateHash('', win);
       const detail = errorDetail(error);
-      show(`The shader link could not be updated: ${detail}.`, true);
+      showError(`The shader link could not be updated: ${detail}.`);
     });
     return linkWrite;
   };
@@ -756,7 +761,7 @@ export function createShaderDocumentController({
   const exportDocument = (document, filename) => {
     download(filename, compiler.exportShaderDocumentJson(document));
     active.savedDocument = JSON.stringify(currentDocument());
-    show(`Saved ${filename}.`);
+    showStatus(`Saved ${filename}.`);
     return true;
   };
 
@@ -855,7 +860,7 @@ export function createShaderDocumentController({
       }
     } catch (error) {
       const detail = errorDetail(error);
-      show(`Source catalog failed to load: ${detail}`, true);
+      showError(`Source catalog failed to load: ${detail}`);
       return false;
     }
     let linked = null;
@@ -903,7 +908,7 @@ export function createShaderDocumentController({
         invalidate();
         scheduleDeepLink();
         await flushDeepLink();
-        show('Restored the chain snapshot.');
+        showStatus('Restored the chain snapshot.');
         return true;
       } catch (error) {
         linkError = errorDetail(error);
@@ -919,7 +924,7 @@ export function createShaderDocumentController({
       if (loaded) sourceSelect.value = requested.effectId;
     }
     selectedSource = sourceSelect.value;
-    if (linkError) show(`The shader link could not be restored: ${linkError}.`, true);
+    if (linkError) showError(`The shader link could not be restored: ${linkError}.`);
     return loaded;
   };
 
@@ -954,7 +959,7 @@ export function createShaderDocumentController({
       }
       const entry = sourceCatalog.get(option.value);
       if (!entry) {
-        show(`The source catalog carries no document for "${option.value}".`, true);
+        showError(`The source catalog carries no document for "${option.value}".`);
         return;
       }
       if (!await loadSource(entry.source, entry.filename, entry.compiled)) {
@@ -963,7 +968,7 @@ export function createShaderDocumentController({
       }
       await adoptLoadedSource(entry.effectId, entry.filename, '');
     } catch (error) {
-      show(`Could not load shader source: ${errorDetail(error)}`, true);
+      showError(`Could not load shader source: ${errorDetail(error)}`);
     }
   };
   const onPresetChange = () => {
@@ -983,14 +988,14 @@ export function createShaderDocumentController({
       if (!file) return;
       compiler ??= await importCompiler();
       if (file.size > compiler.DEFAULT_LIMITS.bytes) {
-        show('The document byte limit was exceeded.', true);
+        showError('The document byte limit was exceeded.');
         return;
       }
       if (!allowSourceChange()) return;
       if (!await loadSource(await file.text(), file.name)) return;
       await adoptLoadedSource(null, file.name, 'Imported');
     } catch (error) {
-      show(`Could not open shader document: ${errorDetail(error)}`, true);
+      showError(`Could not open shader document: ${errorDetail(error)}`);
     } finally {
       fileInput.value = '';
     }
@@ -1027,13 +1032,13 @@ export function createShaderDocumentController({
       syncParity();
       chainUi?.strip.render();
       applyPreset(presetId);
-      show(refusal, true);
+      showError(refusal);
     }
   };
   const onDigest = async () => {
     const digest = digestButton?.dataset.digest;
     if (!digest) return;
-    if (await copyToClipboard(digest)) show(`Copied the descriptor digest ${digest}.`);
+    if (await copyToClipboard(digest)) showStatus(`Copied the descriptor digest ${digest}.`);
     else announce('The descriptor digest could not be copied.');
   };
 
