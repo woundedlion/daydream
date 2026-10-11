@@ -6,10 +6,10 @@
 import { canonicalEffectId, effectDisplayName } from "../../effects/effect_identity.js";
 import { engineHalted } from '../../shared/engine_halt.js';
 import { callWorkbenchBinding, shaderChainCatalog } from '../../engine/workbench_bindings.js';
-import { enumConstantName, optionValue } from '../../effects/param_sync.js';
+import { enumConstantName } from '../../effects/param_sync.js';
 import { fieldOf as fieldSegment } from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
-import { applyChainDocument } from './chain_apply.js';
+import { applyChainDocument, resolveParameterWrite } from './chain_apply.js';
 import { createChainDocumentStore, documentFromChainSnapshot, scratchChainDocument } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
 import { BAKED_CONSTANT_IDS, bakedTopologyFields, engineControlNames } from '../../../generated/shader/shader_workbench.mjs';
@@ -47,27 +47,6 @@ export function engineParameterName(parameterId) {
 
 
 /**
- * Resolves one engine parameter write without performing it.
- * @param {ParameterDefinition[]} definitions
- * @param {string} name
- * @param {*} value
- * @returns {{name: string, stored: *}|string} The write, or the refusal reason.
- */
-function resolveEngineValue(definitions, name, value) {
-  const definition = definitions.find((candidate) => candidate.name === name);
-  if (!definition) return `the engine has no parameter "${name}"`;
-  if (definition.readonly) return `"${name}" is read-only`;
-  if (definition.options && typeof value !== 'number') {
-    const stored = optionValue(definition, value);
-    if (stored === null) return `"${name}" has no option "${value}"`;
-    return { name, stored };
-  }
-  if (definition.optionValues && !definition.optionValues.includes(value))
-    return `"${name}" has no option value ${value}`;
-  return { name, stored: value };
-}
-
-/**
  * Performs one resolved write.
  * @param {*} engine
  * @param {*} module - The loaded WASM module, for its ParamSetResult enum.
@@ -91,7 +70,7 @@ function performEngineWrite(engine, module, { name, stored }) {
  * @returns {string|null} Refusal reason, or null once written.
  */
 function writeEngineValue(engine, module, definitions, name, value) {
-  const write = resolveEngineValue(definitions, name, value);
+  const write = resolveParameterWrite(definitions, name, value);
   return typeof write === 'string' ? write : performEngineWrite(engine, module, write);
 }
 
@@ -131,7 +110,7 @@ function applyDocumentValues(engine, module, compiled, presetId, baked, derived)
     const { name, refusal } = compiledControlFor(parameterId, definitions, baked);
     if (refusal) return refusal;
     if (name === null) continue;
-    const write = resolveEngineValue(definitions, name, value);
+    const write = resolveParameterWrite(definitions, name, value);
     if (typeof write === 'string') return write;
     writes.push(write);
   }

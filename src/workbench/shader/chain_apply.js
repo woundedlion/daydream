@@ -11,6 +11,28 @@ import { enumConstantName, optionValue } from '../../effects/param_sync.js';
 /** @typedef {{document: *, descriptor_digest?: string}} CompiledDocument */
 
 /**
+ * @param {ParameterDefinition[]} definitions
+ * @param {string} name
+ * @param {*} value
+ * @returns {{name: string, stored: number}|string} Resolved write or refusal.
+ */
+export function resolveParameterWrite(definitions, name, value) {
+  const definition = definitions.find((candidate) => candidate.name === name);
+  if (!definition) return `the engine has no parameter "${name}"`;
+  if (definition.readonly) return `"${name}" is read-only`;
+  let stored = value;
+  if (typeof value === 'string') {
+    stored = optionValue(definition, value);
+    if (stored === null) return `"${name}" has no option "${value}"`;
+  }
+  if (typeof stored !== 'number' || !Number.isFinite(stored))
+    return `"${name}" has no numeric value`;
+  if (definition.optionValues && !definition.optionValues.includes(stored))
+    return `"${name}" has no option value ${stored}`;
+  return {name, stored};
+}
+
+/**
  * Applies a compiled chain document to the chain engine, in order:
  * setShaderChain with the document's chain, the named preset's values by
  * parameter id, then the GUI resync and a repaint. A setShaderChain refusal is
@@ -72,18 +94,9 @@ export function applyChainDocument({
     const definition = definitions.find(
       (candidate) => candidate.name === parameterId);
     if (!definition) return refuse(`the chain registered no parameter "${parameterId}"`);
-    if (definition.readonly) return refuse(`"${parameterId}" is read-only`);
-    let stored = value;
-    if (typeof value === 'string') {
-      const resolved = optionValue(definition, value);
-      if (resolved === null) return refuse(`"${parameterId}" has no option "${value}"`);
-      stored = resolved;
-    }
-    if (typeof stored !== 'number' || !Number.isFinite(stored))
-      return refuse(`"${parameterId}" has no numeric value`);
-    if (definition.optionValues && !definition.optionValues.includes(stored))
-      return refuse(`"${parameterId}" has no option value ${stored}`);
-    writes.push({ name: parameterId, value: stored });
+    const write = resolveParameterWrite(definitions, parameterId, value);
+    if (typeof write === 'string') return refuse(write);
+    writes.push({name: write.name, value: write.stored});
   }
 
   const written = callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChainParameters', [writes], module.ParamSetResult.NO_EFFECT);
