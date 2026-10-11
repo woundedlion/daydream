@@ -18,12 +18,11 @@ import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../../effects/effect_persistence.js'
 import { copyToClipboard } from '../../shared/copy_text.js';
 import { downloadBlob } from '../../shared/download_file.js';
 import {
-  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
+  COMPILER_URL, decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
 } from './shader_deeplink.js';
 
 const PATTERN_CATALOG_URL = '../../../generated/shader/patterns/catalog.json';
 const CATALOG_URL = '../../../generated/shader/engine_catalog.json';
-const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
 
 // The engine's chain interpreter, programmed through setShaderChain.
 const CHAIN_EFFECT = canonicalEffectId('ShaderChain');
