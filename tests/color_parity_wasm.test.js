@@ -16,6 +16,7 @@ import {
 } from '../src/workbench/palettes/palette_controls.js';
 import * as L from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
+import { LISSAJOUS_GOLDENS } from './helpers/lissajous_goldens.js';
 
 // Top-level await fails this file loudly if the module can't instantiate.
 const M = await createHolosphereModule({ print() {}, printErr() {} });
@@ -605,13 +606,9 @@ test('lissajous parity (lissajous)', () => {
  * Pins the lissajous curve to fixed golden points, each on the unit sphere.
  */
 test('lissajous golden points (absolute pin)', () => {
-  const p1 = M.lissajous(3, 2, 0, 0.7);
-  assertNear(p1, { x: -0.4975, y: 0.169967, z: 0.850649 }, ['x', 'y', 'z'],
-    `lissajous(3,2,0,0.7): (${p1.x},${p1.y},${p1.z})`);
-  const p2 = M.lissajous(5, 4, 0.5, 1.2);
-  assertNear(p2, { x: -0.705952, y: 0.087499, z: 0.702834 }, ['x', 'y', 'z'],
-    `lissajous(5,4,0.5,1.2): (${p2.x},${p2.y},${p2.z})`);
-  for (const p of [p1, p2]) {
+  for (const [args, expected] of LISSAJOUS_GOLDENS) {
+    const p = M.lissajous(...args);
+    assertNear(p, expected, ['x', 'y', 'z'], `lissajous(${args}): (${p.x},${p.y},${p.z})`);
     assert.ok(near(Math.hypot(p.x, p.y, p.z), 1),
       `lissajous point off the unit sphere: (${p.x},${p.y},${p.z})`);
   }

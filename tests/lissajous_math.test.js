@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { LISSAJOUS_GOLDENS } from './helpers/lissajous_goldens.js';
 
 const {
   MAX_RATIONAL_TERM,
@@ -243,11 +244,7 @@ test('lissajous: at t=0 returns the expected point (0, 1, 0)', () => {
 });
 
 test('lissajous: non-trivial samples match analytic coordinates', () => {
-  const goldens = [
-    [[3, 2, 0, 0.7], [-0.4975, 0.169967, 0.850649]],
-    [[5, 4, 0.5, 1.2], [-0.705952, 0.087499, 0.702834]],
-  ];
-  for (const [[m1, m2, a, t], [x, y, z]] of goldens) {
+  for (const [[m1, m2, a, t], { x, y, z }] of LISSAJOUS_GOLDENS) {
     const p = lissajous(m1, m2, a, t);
     assert.ok(Math.abs(p.x - x) < 1e-6, `x at (${m1},${m2},${a},${t})`);
     assert.ok(Math.abs(p.y - y) < 1e-6, `y at (${m1},${m2},${a},${t})`);
