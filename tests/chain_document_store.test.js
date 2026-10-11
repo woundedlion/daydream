@@ -51,6 +51,22 @@ const makeStore = ({ mutate, catalog = CATALOG } = {}) => {
 const assertGreen = (store) =>
   assert.deepEqual(compiler.validateShaderDocument(store.document(), { catalog: CATALOG }), []);
 
+/**
+ * Asserts no parameter, serialized field, staggered group or preset value
+ * keeps an id under a label prefix.
+ * @param {object} document - Shader document to inspect.
+ * @param {string} prefix - Id prefix that must be absent, e.g. `warp2.`.
+ */
+const assertNoIdsWithPrefix = (document, prefix) => {
+  const stray = (id) => id.startsWith(prefix);
+  assert.equal(document.descriptor.parameters.some((parameter) => stray(parameter.id)), false);
+  assert.equal(document.descriptor.serialization.fields.some(stray), false);
+  const staggered = document.descriptor.path_policies.find((policy) => policy.id === 'staggered');
+  assert.equal(staggered.groups.some(stray), false);
+  for (const preset of document.preset_bank.presets)
+    assert.equal(Object.keys(preset.values).some(stray), false);
+};
+
 /** Adds a STAGGERED_ORDERED policy scheduling every interpolation group. */
 const addStaggered = (document) => {
   document.descriptor.path_policies.push({
@@ -275,14 +291,7 @@ test('an unknown operator is refused', async () => {
 test('removing an endomorphism drops its instance everywhere', async () => {
   const store = await makeStore({ mutate: addStaggered });
   assert.equal(store.replaceSpan(WARP, 1, []).ok, true);
-  const document = store.document();
-  const stray = (id) => id.startsWith('warp2.');
-  assert.equal(document.descriptor.parameters.some((parameter) => stray(parameter.id)), false);
-  assert.equal(document.descriptor.serialization.fields.some(stray), false);
-  const staggered = document.descriptor.path_policies.find((policy) => policy.id === 'staggered');
-  assert.equal(staggered.groups.some(stray), false);
-  for (const preset of document.preset_bank.presets)
-    assert.equal(Object.keys(preset.values).some(stray), false);
+  assertNoIdsWithPrefix(store.document(), 'warp2.');
   assertGreen(store);
 });
 
@@ -439,18 +448,13 @@ test('relabel rewrites every derived id in place', async () => {
   const result = store.relabel('warp2', 'mirror');
   assert.equal(result.ok, true);
   const document = store.document();
-  const stray = (id) => id.startsWith('warp2.');
   assert.deepEqual(labels(store)[WARP], 'mirror');
-  assert.equal(document.descriptor.parameters.some((parameter) => stray(parameter.id)), false);
-  assert.equal(document.descriptor.serialization.fields.some(stray), false);
+  assertNoIdsWithPrefix(document, 'warp2.');
   assert.ok(document.descriptor.serialization.fields.includes('mirror.rotation'));
   const staggered = document.descriptor.path_policies.find((policy) => policy.id === 'staggered');
   assert.ok(staggered.groups.includes('mirror.rotation'));
-  assert.equal(staggered.groups.some(stray), false);
-  for (const preset of document.preset_bank.presets) {
-    assert.equal(Object.keys(preset.values).some(stray), false);
+  for (const preset of document.preset_bank.presets)
     assert.equal(preset.values['mirror.rotation'], rotationBefore.get(preset.preset_id));
-  }
   assert.equal(store.selectedLabel(), 'mirror');
   assertGreen(store);
 });
