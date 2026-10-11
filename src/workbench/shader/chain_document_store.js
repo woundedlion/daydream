@@ -481,6 +481,9 @@ export async function createChainDocumentStore({
       ...current.slice(0, start),
       ...current.slice(start + deleteCount),
     ].map((entry) => entry.label));
+    for (const item of sequence) {
+      if (item && typeof item === 'object' && item.label !== undefined) used.add(item.label);
+    }
     /** @type {ChainEntry[]} */
     const entries = [];
     for (const item of sequence) {

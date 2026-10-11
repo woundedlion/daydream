@@ -869,6 +869,17 @@ test('a removal drops transition edges it makes degenerate', async () => {
   assertGreen(store);
 });
 
+test('automatic labels reserve later explicit labels in the sequence', async () => {
+  const store = await makeStore();
+  assert.deepEqual(store.replaceSpan(WARP, 0, [
+    { operator: 'warp.wave-shear.v2' },
+    { label: 'warp', operator: 'warp.wave-shear.v2' },
+  ]), { ok: true });
+  assert.deepEqual(store.chain().slice(WARP, WARP + 2).map((entry) => entry.label),
+    ['warp1', 'warp']);
+  assertGreen(store);
+});
+
 test('a removal preserves authored edges between identical presets', async () => {
   const store = await makeStore({ mutate: (document) => presetsDifferBy(document, {}) });
   const edges = store.document().preset_bank.edges;
