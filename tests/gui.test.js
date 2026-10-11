@@ -903,6 +903,30 @@ test('DeepLinkGUI refuses unsupported properties before URL hydration', () => {
   assert.deepEqual(gui.collectUrlKeys(), []);
 });
 
+test('duplicate enum values warn while retaining the admitted URL value', () => {
+  installWindowAt('?fx.mode=1');
+  const gui = new DeepLinkGUI({autoPlace: false}, 'fx');
+  const state = {mode: 0};
+  const warnings = captureWarnings(() => gui.add(state, 'mode', {One: 1, AlsoOne: 1, Two: 2}));
+  assert.equal(state.mode, 1);
+  assert.deepEqual(warnings, [
+    'DeepLinkGUI: enum "fx.mode" has options sharing a value; the deep link may restore a different label.',
+  ]);
+});
+
+test('a hydrated display refresh failure warns and retains its controller', (t) => {
+  installWindowAt('?fx.speed=0.5');
+  const gui = new DeepLinkGUI({autoPlace: false}, 'fx');
+  const error = new Error('paint');
+  t.mock.method(StubController.prototype, 'updateDisplay', () => { throw error; });
+  const state = {speed: 0};
+  let controller;
+  const warnings = captureWarnings(() => { controller = gui.add(state, 'speed', 0, 1); });
+  assert.equal(controller.getValue(), 0.5);
+  assert.deepEqual(gui.collectUrlKeys(), ['fx.speed']);
+  assert.deepEqual(warnings, ['DeepLinkGUI: updateDisplay failed for "fx.speed": Error: paint']);
+});
+
 test('a fallback URL writer hands pending keys to a newly registered URLSync', () => {
   const timers = fakeTimers();
   const url = installRecordingWindow('');
