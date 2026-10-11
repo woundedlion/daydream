@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { githubApi, latestSuccessfulPair, pairWasAttempted, recordPair, run, samePair, snapshotPair, validatePair } from '../scripts/deployment-pair.mjs';
+import { scratchDir } from './helpers/fixture_repo.js';
 
 const pair = { daydream: 'a'.repeat(40), holosphere: 'b'.repeat(40) };
 const repo = 'example/daydream';
@@ -69,8 +69,7 @@ test('attempted pairs suppress scheduled retries independently of success', asyn
 
 for (const event of ['push', 'schedule']) {
   test(`resolve ${event} retries a failed pair only for pushes`, async (t) => {
-    const root = mkdtempSync(join(tmpdir(), 'deployment-retry-'));
-    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const root = scratchDir(t, 'deployment-retry-');
     const env = { GITHUB_REPOSITORY: repo, GITHUB_SHA: pair.daydream,
       GITHUB_EVENT_NAME: event, GITHUB_OUTPUT: join(root, 'outputs'),
       PAIR_FILE: join(root, 'pair.json') };
@@ -97,8 +96,7 @@ test('GitHub API supports public reads, authenticated writes and surfaces HTTP e
 });
 
 test('resolve skips an already deployed pair and final checks reject either advancing head', async (t) => {
-  const root = mkdtempSync(join(tmpdir(), 'deployment-pair-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = scratchDir(t, 'deployment-pair-');
   const env = { GITHUB_REPOSITORY: repo, GITHUB_SHA: pair.daydream, GITHUB_OUTPUT: join(root, 'outputs'), PAIR_FILE: join(root, 'pair.json') };
   const api = async (path) => {
     if (path.includes('statuses')) return [{ state: 'success' }];

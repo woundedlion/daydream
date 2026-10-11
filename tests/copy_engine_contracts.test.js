@@ -1,18 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { copyEngineContracts } from '../scripts/copy-engine-contracts.mjs';
 import { ENGINE_CONTRACT_PATHS } from '../scripts/install-engine-bundle.mjs';
+import { scratchDir } from './helpers/fixture_repo.js';
 
 const SCRIPT = new URL('../scripts/copy-engine-contracts.mjs', import.meta.url);
 
 function fixture(t) {
-  const root = mkdtempSync(join(tmpdir(), 'engine-contract-copy-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = scratchDir(t, 'engine-contract-copy-');
   const source = join(root, 'source');
   const destination = join(root, 'destination');
   mkdirSync(join(source, 'generated'), { recursive: true });

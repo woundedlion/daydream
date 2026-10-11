@@ -3,12 +3,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
-  chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
+  chmodSync, mkdirSync, readFileSync, writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findSh, isolatedGitEnv } from './helpers/fixture_repo.js';
+import { findSh, isolatedGitEnv, scratchDir } from './helpers/fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = resolve(HERE, '../.githooks/pre-push').replace(/\\/g, '/');
@@ -62,8 +61,7 @@ function runWithTools(root, tools, input = '') {
  * @returns {string} The root.
  */
 function fixtureRoot(t) {
-  const root = mkdtempSync(join(tmpdir(), 'pre-push-hook-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = scratchDir(t, 'pre-push-hook-');
   return root;
 }
 

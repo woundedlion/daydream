@@ -4,15 +4,13 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findSh, isolatedGitEnv } from './helpers/fixture_repo.js';
+import { findSh, isolatedGitEnv, scratchDir } from './helpers/fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = resolve(HERE, '../.githooks/pre-commit').replace(/\\/g, '/');
@@ -23,8 +21,7 @@ const SKIP = SH || process.env.DAYDREAM_HOOK_SH_REQUIRED
   : MISSING_SH;
 
 test('pre-commit checks the staged tree', { skip: SKIP }, async (t) => {
-  const root = mkdtempSync(join(tmpdir(), 'pre-commit-hook-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = scratchDir(t, 'pre-commit-hook-');
   const env = isolatedGitEnv();
   const git = (...args) => execFileSync('git', args, { cwd: root, env });
   const runHook = () => {
@@ -142,8 +139,7 @@ const LS_FILES_MANIFEST = [
 
 for (const layout of ['standard index', 'split index', 'linked worktree with split index']) {
   test(`pre-commit snapshot index is readable: ${layout}`, { skip: SKIP }, (t) => {
-    const root = mkdtempSync(join(tmpdir(), 'pre-commit-index-'));
-    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const root = scratchDir(t, 'pre-commit-index-');
     const env = isolatedGitEnv();
     delete env.NODE_TEST_CONTEXT;
     const source = join(root, 'source');

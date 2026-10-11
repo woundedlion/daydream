@@ -110,3 +110,15 @@ export const expectFailure = (file, args, { captureStdout = false, ...options } 
   }
   assert.fail('the command was expected to exit non-zero');
 };
+
+/**
+ * Makes a scratch directory under the OS temp dir, removed when the test ends.
+ * @param {import('node:test').TestContext} t - Test that owns the directory.
+ * @param {string} prefix - Name prefix for the temp directory.
+ * @returns {string} The scratch directory.
+ */
+export const scratchDir = (t, prefix) => {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  return dir;
+};
