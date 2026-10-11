@@ -46,8 +46,7 @@ const { formatFloatCpp } = await import('../src/shared/cpp_format.js');
  */
 function recordingOp(op) {
   const seen = new Set();
-  const values = {};
-  for (const [key, def] of Object.entries(OP_DEFS[op].params)) values[key] = def.val;
+  const values = seedOpParams(op, null);
   const params = new Proxy(values, {
     get(target, key) {
       if (typeof key === 'string') seen.add(key);
@@ -106,7 +105,7 @@ test('generateFuncAndRecipe emits the OP_DEFS params of every known op', () => {
   assert.ok(KNOWN_OPS.size > 0);
   for (const op of KNOWN_OPS) {
     const defs = Object.entries(OP_DEFS[op].params);
-    const defaults = Object.fromEntries(defs.map(([key, def]) => [key, def.val]));
+    const defaults = seedOpParams(op, null);
     const base = generateFuncAndRecipe({ base: 'cube', ops: [{ op, params: defaults }] });
     assert.equal(emittedArguments(base.recipe, op).length, defs.length,
       `generateFuncAndRecipe emits the wrong argument count for "${op}"`);
@@ -1128,11 +1127,7 @@ test('createChainValidator accepts everything when the module cannot spawn', asy
  * assembles them — one entry per op, params seeded from the OP_DEFS defaults.
  */
 test('savedChainShapeError accepts the chains the tool itself saves', () => {
-  const ops = [...KNOWN_OPS].map((op) => {
-    const params = {};
-    for (const [key, def] of Object.entries(OP_DEFS[op].params)) params[key] = def.val;
-    return { op, params };
-  });
+  const ops = [...KNOWN_OPS].map((op) => ({ op, params: seedOpParams(op, null) }));
   assert.equal(savedChainShapeError('cube', ops), null);
   for (const o of ops) {
     assert.equal(savedChainShapeError('truncatedIcosahedron', [o]), null,
