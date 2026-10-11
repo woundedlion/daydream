@@ -5,7 +5,7 @@
 
 // @ts-check
 
-import { replaceUrl } from '../../app/state.js';
+import { replaceUrl } from '../../shared/url.js';
 
 const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
 const PREFIX = '#shader=v2.';

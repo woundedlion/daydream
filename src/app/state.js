@@ -4,6 +4,8 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { replaceUrl } from '../shared/url.js';
+
 /** @typedef {(key: string, value: *, old: *) => void} StateListener */
 
 // Significant digits kept by roundUrlNumber.
@@ -92,25 +94,6 @@ export const URL_FLUSH_RETRY_MS = 2000;
 // Consecutive refused writes before the buffer is dropped. The retry window
 // outlasts WebKit's 30 s rate limit.
 export const URL_FLUSH_MAX_RETRIES = 20;
-
-/**
- * Replace the current history entry with a URL, reporting a refused write
- * instead of propagating it.
- * @details Browsers rate-limit replaceState (WebKit: ~100 per 30 s) and throw
- *   past the limit.
- * @param {string} url - The URL to write.
- * @param {Window} [win] - The window whose history is written.
- * @returns {boolean} Whether the URL was written; false when the browser refused it.
- */
-export function replaceUrl(url, win = window) {
-  try {
-    win.history.replaceState({}, '', url);
-    return true;
-  } catch (e) {
-    console.warn('URL update skipped:', e);
-    return false;
-  }
-}
 
 /**
  * replaceState with pathname + query + the existing location.hash.

@@ -30,6 +30,10 @@ See [deployment](deployment.md) for installing and verifying an engine package.
 Composed parameter definitions carry `group: {name, title, order}` from C++.
 The panel groups unfamiliar display labels by that metadata.
 
+`src/app/daydream.js` injects the statistics view into the segment controller.
+The controller publishes `SegmentStatsState` without constructing DOM views.
+Application and workbench URL writes use `src/shared/url.js`.
+
 ## Shader state
 
 Shader authoring opens `ShaderChain`. The engine facade supplies effect lifecycle,

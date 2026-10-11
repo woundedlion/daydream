@@ -25,21 +25,7 @@ function setText(cell, text) {
 
 const STAT_BAR_IDS = ['global-stats-desktop', 'stats-bar'];
 
-/**
- * The controller state one overlay repaint reads. Arrays are indexed by segment
- * and at least `count` long for a ready pool; teardown leaves them empty.
- * @typedef {{
- *   active: boolean,
- *   ready: boolean,
- *   faulted: boolean,
- *   faultInfo: { segId: number, message: string } | null,
- *   count: number,
- *   timings: number[],
- *   arenas: Array<import('../segments/worker_protocol.js').SegArenaMetrics | null>,
- *   warnings?: Array<string[] | null>,
- *   wallTime: number,
- * }} SegmentStatsState
- */
+/** @typedef {import('../segments/segment_controller.js').SegmentStatsState} SegmentStatsState */
 
 /**
  * The cells one segment's row repaint writes, plus the node describing its

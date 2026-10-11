@@ -15,7 +15,6 @@ import {
 import { SegmentCompositor } from "./segment_compositor.js";
 import { isViewLive } from "../renderer/pixel_view.js";
 import { pageWarmer } from "./module_warmer.js";
-import { SegmentStatsView } from "../ui/segment_stats_view.js";
 import { FAULT_POOL, FAULT_RENDER, PROTOCOL_VERSION } from "./worker_protocol.js";
 import { errorDetail } from "../shared/banner.js";
 import { SEGMENT_COUNT_MAX } from "./segment_policy.js";
@@ -69,6 +68,22 @@ const ALL_TIMERS = ['initWatchdog', 'bootWatchdog', 'renderWatchdog', 'retryTime
 /** @typedef {import('./worker_protocol.js').SegArenaMetrics} SegArenaMetrics */
 
 /** @typedef {import('./segment_compositor.js').FrameResult} FrameResult */
+
+/**
+ * The controller state one overlay repaint reads. Arrays are indexed by segment
+ * and at least `count` long for a ready pool; teardown leaves them empty.
+ * @typedef {{
+ *   active: boolean,
+ *   ready: boolean,
+ *   faulted: boolean,
+ *   faultInfo: { segId: number, message: string } | null,
+ *   count: number,
+ *   timings: number[],
+ *   arenas: Array<import('./worker_protocol.js').SegArenaMetrics | null>,
+ *   warnings?: Array<string[] | null>,
+ *   wallTime: number,
+ * }} SegmentStatsState
+ */
 
 export class SegmentController {
   /** Backing store for the `active` accessor pair. */
@@ -145,14 +160,14 @@ export class SegmentController {
    * @param {(view: Uint16Array) => void} deps.repointDisplayAliases - Re-points BOTH display aliases (Three.js instanceColor.array + driver.pixels) at the given view.
    * @param {(view: Uint16Array) => boolean} deps.displayAliasesDiverged - Reports whether either display alias has stopped referencing the given view.
    * @param {(message: string) => void} [deps.onFault] - Reports the first fault since the pool was (re)built.
-   * @param {Document} [deps.statsDoc] - DOM document the stats overlay renders into; defaults to the global `document`.
+   * @param {{update: (state: SegmentStatsState) => void}} [deps.statsView] - Synchronously renders published pool statistics.
    * @param {import('./module_warmer.js').ModuleWarmer} [deps.moduleWarmer] - Warmer whose held compilation spawned workers reuse; defaults to the page's.
    * @throws {TypeError} When repointDisplayAliases or displayAliasesDiverged is
    *   not a function.
    */
   constructor({ resolutionPresets, appState, driver, getWasmEngine, refreshPixelView,
                 getMemoryView, repointDisplayAliases, displayAliasesDiverged,
-                statsDoc, moduleWarmer = pageWarmer, onFault = () => {} }) {
+                statsView = { update() {} }, moduleWarmer = pageWarmer, onFault = () => {} }) {
     if (typeof repointDisplayAliases !== 'function') {
       throw new TypeError('SegmentController: repointDisplayAliases is required '
         + 'and must be a function that re-points both display aliases');
@@ -171,8 +186,7 @@ export class SegmentController {
     });
     this.moduleWarmer = moduleWarmer;
     this.onFault = onFault;
-    /** @type {SegmentStatsView} */
-    this.statsView = new SegmentStatsView(statsDoc);
+    this.statsView = statsView;
 
     // Last legal segment count create() accepted, reused by a rebuild. Matches the
     // per-segment array lengths only while a pool stands.

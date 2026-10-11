@@ -5,7 +5,7 @@
  * Page module for tools/palettes.html.
  */
 import { copyToClipboard, wireCopyBlock } from '../../shared/clipboard.js';
-import { replaceUrl } from '../../app/state.js';
+import { replaceUrl } from '../../shared/url.js';
 import { showFatalError, bootstrapTool } from '../../shared/banner.js';
 import { linearRgbToHex } from '../../shared/color.js';
 import {

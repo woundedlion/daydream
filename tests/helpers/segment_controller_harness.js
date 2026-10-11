@@ -6,6 +6,7 @@ import { installDocument } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 import { FakeWorker } from './fake_worker.js';
 import { displayAliasesDiverged, repointDisplayAliases } from '../../src/engine/display_aliases.js';
+import { SegmentStatsView } from '../../src/ui/segment_stats_view.js';
 import { SegmentController } from '../../src/segments/segment_controller.js';
 import { pageWarmer } from '../fixtures/module_warmer_fixture.js';
 import { PROTOCOL_VERSION } from '../../src/segments/worker_protocol.js';
@@ -117,6 +118,7 @@ export function installSegmentControllerHarness() {
  * @param {string} [config.resolution] - Initial app-state resolution key.
  * @param {string} [config.effect] - Initial app-state effect name.
  * @param {Object} [config.presets] - Resolution-preset map keyed by resolution name.
+ * @param {Object} [config.statsView] - Injected statistics renderer.
  * @param {Object} [config.moduleWarmer] - Warmer whose compilation the spawn hands to its workers; omitted leaves the page's.
  * @param {(message: string) => void} [config.onFault] - Host pool-fault callback.
  * @param {Object} [config.driver] - Alternate render driver.
@@ -124,11 +126,12 @@ export function installSegmentControllerHarness() {
  */
 export function makeController({ resolution = 'lo', effect = 'TestEffect',
                          presets = { lo: { w: 4, h: 4 } },
-                         moduleWarmer, onFault, driver: renderDriver = driver } = {}) {
+                         moduleWarmer, onFault, statsView = new SegmentStatsView(), driver: renderDriver = driver } = {}) {
   const state = { resolution, effect };
   return new SegmentController({
     moduleWarmer,
     onFault,
+    statsView,
     resolutionPresets: presets,
     appState: { get: (k) => state[k], set: (k, v) => { state[k] = v; } },
     driver: renderDriver,

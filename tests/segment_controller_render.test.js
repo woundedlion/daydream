@@ -467,6 +467,17 @@ test('composite() clears a buffer the refresh re-fetched', () => {
     'the columns no segment reported are cleared, not the engine\'s last frame');
 });
 
+test('the controller publishes statistics through its injected view', () => {
+  const seen = [];
+  const c = makeController({ statsView: { update: state => seen.push(structuredClone(state)) } });
+  c.count = 6;
+  c.updateStats();
+  assert.deepEqual(seen, [{
+    active: false, ready: false, faulted: false, faultInfo: null,
+    count: 6, timings: [], arenas: [], warnings: [], wallTime: 0,
+  }]);
+});
+
 test('a controller cannot be built without a two-alias display repointer', () => {
   assert.throws(
     () => new SegmentController({
