@@ -113,7 +113,7 @@ export function createRenderAdapter({
  *   deps.listeners - Listeners the app installed, removed from their optional
  *   owner target or pageTarget on dispose.
  * @param {{dispose: Function}} deps.switches - The switch coordinator.
- * @param {() => void} deps.stopTimers - Stops the app's interval timers.
+ * @param {() => void} deps.releaseAppServices - Releases subscriptions, interval timers, and notices.
  * @param {{destroy: Function}} deps.effectGui - The effect panel controller.
  * @param {{dispose: Function}|null} [deps.shaderDocuments] - The workbench
  *   document controller, when this is the authoring route.
@@ -137,7 +137,7 @@ export function createAppTeardown({
   pageTarget,
   listeners,
   switches,
-  stopTimers,
+  releaseAppServices,
   effectGui,
   shaderDocuments = null,
   globalGui,
@@ -180,7 +180,7 @@ export function createAppTeardown({
     release('removing the pagehide listener',
       () => pageTarget.removeEventListener("pagehide", onPageHide));
     release('the switch coordinator', () => switches.dispose());
-    release('the app timers', stopTimers);
+    release('the app services', releaseAppServices);
     release('the effect panel', () => effectGui.destroy());
     release('the shader document controller', () => shaderDocuments?.dispose());
     release('the global GUI', () => globalGui.destroy());
