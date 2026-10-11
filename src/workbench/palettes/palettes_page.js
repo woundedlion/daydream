@@ -36,24 +36,25 @@ import { createPointerDrag, innerRect } from '../../shared/pointer_drag.js';
 
 let activeTab = 'procedural';
 
+/** @param {string} tabName */
 function switchTab(tabName, updateUrl = true) {
   activeTab = tabName;
-  document.getElementById('export_code_kind').textContent = tabName === 'procedural'
+  /** @type {HTMLElement} */ (document.getElementById('export_code_kind')).textContent = tabName === 'procedural'
     ? 'Row for HS_PROCEDURAL_PALETTE_LIST in palettes.h' : 'Recipe builder body';
-  document.querySelector('.palette-shell').dataset.activeTab = tabName;
-  document.querySelectorAll('.tab-btn').forEach(btn => {
+  /** @type {HTMLElement} */ (document.querySelector('.palette-shell')).dataset.activeTab = tabName;
+  /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.tab-btn')).forEach(btn => {
     const selected = btn.dataset.tab === tabName;
     btn.classList.toggle('active', selected);
     btn.setAttribute('aria-selected', selected ? 'true' : 'false');
     btn.tabIndex = selected ? 0 : -1;
   });
-  document.querySelectorAll('.tab-content').forEach(content => {
+  /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.tab-content')).forEach(content => {
     const selected = content.id === `tab-content-${tabName}`;
     content.classList.toggle('active', selected);
     content.hidden = !selected;
   });
   // Named Palettes loads procedural coefficients, so it only applies here.
-  const palettesPanel = document.getElementById('named_palettes_panel');
+  const palettesPanel = /** @type {HTMLElement} */ (document.getElementById('named_palettes_panel'));
   if (palettesPanel) palettesPanel.style.display = (tabName === 'procedural') ? '' : 'none';
 
   if (updateUrl)
@@ -70,30 +71,40 @@ const DEFAULT_PARAMS = {
   D_R: 0.000, D_G: 0.330, D_B: 0.670
 };
 
+/** @type {ReturnType<typeof mountProceduralSliders>|null} */
 let proceduralSliders = null;
-let palette;
+/** @type {ProceduralPalette|GenerativePalette|null} */
+let palette = null;
+/** @type {(Omit<import('../../../generated/holosphere_wasm.js').PaletteOps, 'compileAndBakeV4'> & import('./palette_math.js').PaletteOps)|null} */
 let paletteOps = null;
+/** @type {import('../../../generated/holosphere_wasm.js').HolosphereModule|null} */
 let wasmModule = null;
 const recipeModel = new PaletteRecipeModel();
+/** @type {Array<{name:string,randomHue:boolean,recipe:import('./palette_controls.js').PaletteRecipe}>} */
 let effectPalettePresets = [];
 const paletteViewport = createPaletteViewport();
 
-let hueKeyWheelCanvas, hueKeyWheelCtx;
+/** @type {HTMLCanvasElement} */
+let hueKeyWheelCanvas;
+/** @type {CanvasRenderingContext2D|null} */
+let hueKeyWheelCtx;
+/** @type {ReturnType<typeof createHueKeyWheel>|null} */
 let hueKeyWheel = null;
 
 const FULL_VIEWPORT = Object.freeze({ start: 0, end: 1 });
 
 function renderRecipeWindow() {
-  const offsetSlider = document.getElementById(PALETTE_CONTROL_IDS.offset);
-  const spanSlider = document.getElementById(PALETTE_CONTROL_IDS.span);
+  const offsetSlider = /** @type {HTMLInputElement} */ (document.getElementById(PALETTE_CONTROL_IDS.offset));
+  const spanSlider = /** @type {HTMLInputElement} */ (document.getElementById(PALETTE_CONTROL_IDS.span));
   const { offset, span } = recipeModel.window;
-  spanSlider.value = span;
+  spanSlider.value = String(span);
   offsetSlider.max = String(1 - span);
-  offsetSlider.value = offset;
-  document.getElementById('gen_offset_value').textContent = offset.toFixed(3);
-  document.getElementById('gen_span_value').textContent = span.toFixed(3);
+  offsetSlider.value = String(offset);
+  /** @type {HTMLElement} */ (document.getElementById('gen_offset_value')).textContent = offset.toFixed(3);
+  /** @type {HTMLElement} */ (document.getElementById('gen_span_value')).textContent = span.toFixed(3);
 }
 
+/** @param {number} startPosition @param {number} endPosition */
 function zoomRecipeWindowControls(startPosition, endPosition) {
   const { offset, span } = zoomRecipeWindow(
     recipeModel.window, startPosition, endPosition);
@@ -104,7 +115,7 @@ function zoomRecipeWindowControls(startPosition, endPosition) {
 
 function visiblePhaseRange() {
   if (activeTab === 'procedural') return paletteViewport.value;
-  const { offset, span } = palette?.canonicalRecipe?.input ?? recipeModel.window;
+  const { offset, span } = (/** @type {GenerativePalette|null} */ (palette))?.canonicalRecipe?.input ?? recipeModel.window;
   return { start: offset, end: offset + span };
 }
 
@@ -112,32 +123,34 @@ function zoomed() {
   return paletteStripView(visiblePhaseRange()).zoomed;
 }
 
+/** @param {'lightness'|'chroma'} axisName */
 function axisControlElements(axisName) {
   const { minimum, maximum, curve, label, shortLabel } = PALETTE_AXIS_CONTROLS[axisName];
   return {
     label, shortLabel,
-    curve: document.getElementById(curve),
-    minimum: document.getElementById(minimum),
-    maximum: document.getElementById(maximum),
-    minimumLabel: document.getElementById(`${minimum}_label`),
-    maximumLabel: document.getElementById(`${maximum}_label`),
-    minimumValue: document.getElementById(`${minimum}_value`),
-    maximumValue: document.getElementById(`${maximum}_value`),
+    curve: /** @type {HTMLSelectElement} */ (document.getElementById(curve)),
+    minimum: /** @type {HTMLInputElement} */ (document.getElementById(minimum)),
+    maximum: /** @type {HTMLInputElement} */ (document.getElementById(maximum)),
+    minimumLabel: /** @type {HTMLElement} */ (document.getElementById(`${minimum}_label`)),
+    maximumLabel: /** @type {HTMLElement} */ (document.getElementById(`${maximum}_label`)),
+    minimumValue: /** @type {HTMLElement} */ (document.getElementById(`${minimum}_value`)),
+    maximumValue: /** @type {HTMLElement} */ (document.getElementById(`${maximum}_value`)),
   };
 }
 
+/** @param {'lightness'|'chroma'} axisName */
 function renderAxisControls(axisName) {
   const {
     label, shortLabel, curve, minimum, maximum, minimumLabel, maximumLabel,
     minimumValue, maximumValue,
   } = axisControlElements(axisName);
   const endpoints = recipeModel.axisEndpoints(axisName);
-  const curveName = recipeModel.reading(PALETTE_AXIS_CONTROLS[axisName].reading);
-  curve.value = curveName;
+  const curveName = String(recipeModel.reading(PALETTE_AXIS_CONTROLS[axisName].reading));
+  curve.value = String(curveName);
   minimum.min = maximum.min = '0';
   minimum.max = maximum.max = '1';
-  minimum.value = endpoints.minimum;
-  maximum.value = endpoints.maximum;
+  minimum.value = String(endpoints.minimum);
+  maximum.value = String(endpoints.maximum);
   const state = axisControlState({
     curve: curveName, minimum: endpoints.minimum, maximum: endpoints.maximum,
     label, shortLabel,
@@ -160,8 +173,9 @@ function renderAxisControls(axisName) {
   maximumValue.textContent = state.maximumText;
 }
 
+/** @param {'lightness'|'chroma'} axisName @param {'minimum'|'maximum'} end @param {Event} event */
 function handleAxisEndpointInput(axisName, end, event) {
-  const value = Number(event.target.value);
+  const value = Number((/** @type {HTMLInputElement|HTMLSelectElement} */ (event.target)).value);
   const { minimum, maximum } = recipeModel.axisEndpoints(axisName);
   if (end === 'minimum') recipeModel.setAxisEndpoints(axisName, value, maximum);
   else recipeModel.setAxisEndpoints(axisName, minimum, value);
@@ -169,8 +183,9 @@ function handleAxisEndpointInput(axisName, end, event) {
   scheduleUpdate();
 }
 
+/** @param {'lightness'|'chroma'} axisName @param {Event} event */
 function handleAxisCurveChange(axisName, event) {
-  recipeModel.setAxisCurve(axisName, event.target.value);
+  recipeModel.setAxisCurve(axisName, (/** @type {HTMLInputElement|HTMLSelectElement} */ (event.target)).value);
   renderRecipeControls();
   scheduleUpdate();
 }
@@ -178,6 +193,7 @@ function handleAxisCurveChange(axisName, event) {
 // Recipe readings shown on a slider: its element, the factor from the
 // reading's unit to the slider's, how many decimals the mirror label shows,
 // and the unit it is labelled in.
+/** @type {Array<{reading: import('./palette_recipe_model.js').PaletteAmountReading,id:string,scale:number,digits:number,suffix:string}>} */
 const RECIPE_SLIDER_DEFINITIONS = [
   { reading: 'spreadTurns', id: PALETTE_CONTROL_IDS.spreadDegrees, scale: 360, digits: 1, suffix: '°' },
   { reading: 'sweepTurns', id: PALETTE_CONTROL_IDS.sweepTurns, scale: 1, digits: 1, suffix: '' },
@@ -187,6 +203,7 @@ const RECIPE_SLIDER_DEFINITIONS = [
 ];
 
 // Recipe readings shown on a select, in the order they are written.
+/** @type {Array<import('./palette_recipe_model.js').PaletteChoiceReading|'hueMode'>} */
 const RECIPE_SELECT_READINGS = [
   'domain', 'hueMode', 'harmony', 'direction', 'colorPath', 'easing',
 ];
@@ -194,23 +211,24 @@ const RECIPE_SELECT_READINGS = [
 function renderRecipeSliders() {
   const loopSweep = recipeModel.reading('domain') === 'LOOP'
     && recipeModel.reading('hueMode') === 'SWEEP';
-  document.getElementById(PALETTE_CONTROL_IDS.sweepTurns).step = loopSweep ? '1' : '0.5';
+  /** @type {HTMLInputElement} */ (document.getElementById(PALETTE_CONTROL_IDS.sweepTurns)).step = loopSweep ? '1' : '0.5';
   for (const { reading, id, scale, digits, suffix } of RECIPE_SLIDER_DEFINITIONS) {
-    const value = recipeModel.reading(reading) * scale;
-    document.getElementById(id).value = value;
-    document.getElementById(`${id}_value`).textContent = `${value.toFixed(digits)}${suffix}`;
+    const value = Number(recipeModel.reading(reading)) * scale;
+    /** @type {HTMLInputElement} */ (document.getElementById(id)).value = String(value);
+    /** @type {HTMLElement} */ (document.getElementById(`${id}_value`)).textContent = `${value.toFixed(digits)}${suffix}`;
   }
 }
 
 function renderBaseHue() {
   const degrees = recipeModel.baseHueTurns * 360;
-  document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees).value = degrees;
-  document.getElementById('gen_base_hue_value').textContent =
+  /** @type {HTMLInputElement} */ (document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees)).value = String(degrees);
+  /** @type {HTMLElement} */ (document.getElementById('gen_base_hue_value')).textContent =
     `${Number(degrees.toFixed(1))}°`;
 }
 
 function renderRecipeAvailability() {
-  const availability = paletteRecipeAvailability(recipeModel.recipe());
+  const availability = paletteRecipeAvailability(/** @type {import('./palette_controls.js').PaletteRecipe} */ (recipeModel.recipe()));
+  /** @type {Array<[string,string,boolean]>} */
   const controls = [
     ['gen_base_hue_field', PALETTE_CONTROL_IDS.baseHueDegrees, availability.baseHue],
     ['gen_hue_mode_field', PALETTE_CONTROL_IDS.hueMode, availability.hueMode],
@@ -229,8 +247,8 @@ function renderRecipeAvailability() {
   ];
 
   for (const [fieldId, controlId, enabled] of controls) {
-    const field = document.getElementById(fieldId);
-    const control = document.getElementById(controlId);
+    const field = /** @type {HTMLElement} */ (document.getElementById(fieldId));
+    const control = /** @type {HTMLInputElement|HTMLSelectElement} */ (document.getElementById(controlId));
     field.classList.toggle('is-disabled', !enabled);
     field.setAttribute('role', 'group');
     field.setAttribute('aria-disabled', String(!enabled));
@@ -241,27 +259,29 @@ function renderRecipeAvailability() {
 /** Writes every generative control from the recipe model. */
 function renderRecipeControls() {
   for (const reading of RECIPE_SELECT_READINGS)
-    document.getElementById(PALETTE_CONTROL_IDS[reading]).value = recipeModel.reading(reading);
+    /** @type {HTMLSelectElement} */ (document.getElementById(PALETTE_CONTROL_IDS[reading])).value = String(recipeModel.reading(reading));
   renderRecipeSliders();
   renderBaseHue();
   renderRecipeWindow();
-  for (const axisName of Object.keys(PALETTE_AXIS_CONTROLS)) renderAxisControls(axisName);
+  for (const axisName of /** @type {Array<'lightness'|'chroma'>} */ (Object.keys(PALETTE_AXIS_CONTROLS))) renderAxisControls(axisName);
   renderRecipeAvailability();
 }
 
+/** @param {import('./palette_controls.js').PaletteRecipe} recipe */
 function loadRecipe(recipe) {
-  hueKeyWheel.clearStatus();
+  (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).clearStatus();
   recipeModel.loadRecipe(recipe);
   renderRecipeControls();
   scheduleUpdate();
 }
 
+/** @param {string} name */
 function loadRecipePreset(name) {
   loadRecipe(PALETTE_RECIPE_PRESETS[name]());
 }
 
 function buildEffectRecipePresets() {
-  const select = document.getElementById('effect_recipe_preset');
+  const select = /** @type {HTMLSelectElement} */ (document.getElementById('effect_recipe_preset'));
   for (const [index, preset] of effectPalettePresets.entries()) {
     const option = document.createElement('option');
     option.value = String(index);
@@ -278,23 +298,44 @@ function buildEffectRecipePresets() {
 }
 
 // Drag-to-zoom state
+/** @type {ReturnType<typeof createPointerDrag>|null} */
 let stripDrag = null;
 let isSelectionActive = false; // Tracks if drag is active AND within Y-bounds
 let dragStartPosition = 0.0;
 let dragEndPosition = 0.0;
+/** @type {ReturnType<typeof setTimeout>|null} */
 let copyFeedbackTimer = null;
 let copyRequestId = 0;
 // DOM elements, resolved in init() once the document has loaded.
-let colorStripCanvas, colorStripCtx, waveGraphCanvas, waveGraphCtx,
-  resetZoomButton, paletteRangeHeading, copyFeedback, copyFeedbackSwatch,
-  copyFeedbackStatus, copyFeedbackHex;
+/** @type {HTMLCanvasElement} */
+let waveGraphCanvas;
+/** @type {HTMLCanvasElement} */
+let colorStripCanvas;
+/** @type {CanvasRenderingContext2D|null} */
+let waveGraphCtx;
+/** @type {CanvasRenderingContext2D|null} */
+let colorStripCtx;
+/** @type {HTMLElement} */
+let resetZoomButton;
+/** @type {HTMLElement} */
+let paletteRangeHeading;
+/** @type {HTMLElement} */
+let copyFeedback;
+/** @type {HTMLElement} */
+let copyFeedbackSwatch;
+/** @type {HTMLElement} */
+let copyFeedbackStatus;
+/** @type {HTMLElement} */
+let copyFeedbackHex;
 
 // Owns the strip's offscreen gradient cache; built in init().
+/** @type {ReturnType<typeof createColorStripPainter>|null} */
 let colorStripPainter = null;
 
 /**
  * The normalized (0-1) X coordinate of a pointer event over the strip.
  */
+/** @param {PointerEvent} event */
 function getNormalizedX(event) {
   if (!colorStripCanvas) return 0;
   const rect = innerRect(colorStripCanvas);
@@ -305,6 +346,7 @@ function getNormalizedX(event) {
 /**
  * Handles the start of a drag or click on the color strip.
  */
+/** @param {PointerEvent} event @returns {boolean|void} */
 function handleDragStart(event) {
   if (!colorStripCanvas) return false;
 
@@ -320,6 +362,7 @@ function handleDragStart(event) {
  * Handles pointer movement during a drag.
  * Cancels selection if the pointer moves above or below the canvas.
  */
+/** @param {PointerEvent} event */
 function handleDragMove(event) {
   dragEndPosition = getNormalizedX(event);
 
@@ -337,6 +380,7 @@ function handleDragMove(event) {
 /**
  * Handles the end of a drag (zoom) or a simple click (copy color).
  */
+/** @param {PointerEvent} event */
 function handleDragEnd(event) {
   if (!colorStripCanvas) return;
 
@@ -381,6 +425,7 @@ function updateStripView() {
   if (paletteRangeHeading) paletteRangeHeading.textContent = view.heading;
 }
 
+/** @param {number|undefined} clientX @param {number|undefined} clientY */
 function feedbackPosition(clientX, clientY) {
   if (Number.isFinite(clientX) && Number.isFinite(clientY)) {
     return { x: clientX, y: clientY };
@@ -389,14 +434,16 @@ function feedbackPosition(clientX, clientY) {
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 }
 
-async function copyPaletteColor(position, clientX, clientY) {
+/** @param {number} position @param {number} [clientX] @param {number} [clientY] */
+async function copyPaletteColor(position, clientX = undefined, clientY = undefined) {
   if (!palette || !copyFeedback || !copyFeedbackSwatch
       || !copyFeedbackStatus || !copyFeedbackHex) return;
 
   const phase = activeTab === 'procedural'
     ? paletteViewport.map(position)
     : position;
-  const hex = linearRgbToHex(...palette.get(phase));
+  const [red, green, blue] = palette.get(phase);
+  const hex = linearRgbToHex(red, green, blue);
   const { x, y } = feedbackPosition(clientX, clientY);
   copyFeedbackSwatch.style.backgroundColor = hex;
   copyFeedbackHex.textContent = hex;
@@ -447,6 +494,7 @@ function zoomAroundCenter() {
   }
 }
 
+/** @param {KeyboardEvent} event */
 function handleStripKeyDown(event) {
   if ((event.key === 'Enter' || event.key === ' ') && !event.shiftKey) {
     copyPaletteColor(0.5).catch(reportCopyFailure);
@@ -478,6 +526,7 @@ function syncResetZoomButton() {
   }
 }
 
+/** @param {{start:number,end:number}|null} selectionRange */
 function drawColorStrip(selectionRange = null) {
   if (!palette) return;
   const viewport = activeTab === 'procedural' ? paletteViewport.value : FULL_VIEWPORT;
@@ -492,7 +541,7 @@ function drawColorStrip(selectionRange = null) {
 function drawPaletteWaveGraph() {
   let plotted = palette;
   if (activeTab === 'procedural') {
-    const view = proceduralParamsForViewport(proceduralSliders.values(), paletteViewport.value);
+    const view = proceduralParamsForViewport((/** @type {NonNullable<typeof proceduralSliders>} */ (proceduralSliders)).values(), paletteViewport.value);
     plotted = new ProceduralPalette(
       [view.A_R, view.A_G, view.A_B],
       [view.B_R, view.B_G, view.B_B],
@@ -500,7 +549,8 @@ function drawPaletteWaveGraph() {
       [view.D_R, view.D_G, view.D_B]);
   }
   if (!plotted) return;
-  drawWaveGraph({ canvas: waveGraphCanvas, ctx: waveGraphCtx, palette: plotted });
+  drawWaveGraph({ canvas: waveGraphCanvas,
+    ctx: /** @type {CanvasRenderingContext2D} */ (waveGraphCtx), palette: plotted });
   waveGraphCanvas.setAttribute('aria-label', waveGraphLabel(visiblePhaseRange()));
 }
 
@@ -509,8 +559,8 @@ function redrawForViewport() {
   if (engineHalted) return;
   drawColorStrip();
   drawPaletteWaveGraph();
-  if (activeTab === 'generative' && palette?.canonicalRecipe)
-    hueKeyWheel.draw(palette.canonicalRecipe);
+  if (activeTab === 'generative' && (/** @type {GenerativePalette|null} */ (palette))?.canonicalRecipe)
+    (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).draw(/** @type {import('./palette_controls.js').PaletteRecipe} */ ((/** @type {GenerativePalette} */ (palette)).canonicalRecipe));
   updateStripView();
   updatePaletteCodeOutput();
   syncResetZoomButton();
@@ -521,15 +571,15 @@ function redrawForViewport() {
  * Updates the code output block with the current parameters.
  */
 function updatePaletteCodeOutput() {
-  const codeOutput = document.getElementById('palette_code_output');
+  const codeOutput = /** @type {HTMLElement} */ (document.getElementById('palette_code_output'));
   if (!codeOutput) return;
 
   if (activeTab === 'procedural') {
     codeOutput.textContent = proceduralPaletteCpp(
-      proceduralParamsForViewport(proceduralSliders.values(), paletteViewport.value));
+      proceduralParamsForViewport((/** @type {NonNullable<typeof proceduralSliders>} */ (proceduralSliders)).values(), paletteViewport.value));
   } else {
     codeOutput.textContent = generativePaletteCpp(
-      palette?.canonicalRecipe ?? recipeModel.recipe());
+      (/** @type {GenerativePalette|null} */ (palette))?.canonicalRecipe ?? /** @type {import('./palette_controls.js').PaletteRecipe} */ (recipeModel.recipe()));
   }
 }
 
@@ -539,7 +589,7 @@ function updatePaletteCodeOutput() {
  * @param {{name:string, a:number[], b:number[], c:number[], d:number[]}} entry - The palette to load.
  */
 function loadNamedPalette(entry) {
-  proceduralSliders.setAll(proceduralPaletteParams(entry));
+  (/** @type {NonNullable<typeof proceduralSliders>} */ (proceduralSliders)).setAll(proceduralPaletteParams(entry));
   paletteViewport.reset();
   syncResetZoomButton();
   updateStripView();
@@ -551,7 +601,7 @@ function loadNamedPalette(entry) {
  * entry in NAMED_PROCEDURAL_PALETTES.
  */
 function buildPaletteGallery() {
-  const gallery = document.getElementById('palette_gallery');
+  const gallery = /** @type {HTMLElement} */ (document.getElementById('palette_gallery'));
   if (!gallery) return;
   NAMED_PROCEDURAL_PALETTES.forEach(entry => {
     const label = prettyPaletteName(entry.name);
@@ -582,7 +632,7 @@ function buildPaletteGallery() {
 function updatePalette() {
   if (engineHalted) return;
   if (activeTab === 'procedural') {
-    const parameters = proceduralSliders.values();
+    const parameters = (/** @type {NonNullable<typeof proceduralSliders>} */ (proceduralSliders)).values();
     const A = [parameters.A_R, parameters.A_G, parameters.A_B];
     const B = [parameters.B_R, parameters.B_G, parameters.B_B];
     const C = [parameters.C_R, parameters.C_G, parameters.C_B];
@@ -590,17 +640,17 @@ function updatePalette() {
     palette = new ProceduralPalette(A, B, C, D);
   } else {
     try {
-      palette = new GenerativePalette(recipeModel.recipe());
+      palette = new GenerativePalette(/** @type {import('./palette_controls.js').PaletteRecipe} */ (recipeModel.recipe()));
       const adjusted = paletteAdjustmentSummary(palette.status);
-      const status = document.getElementById('gen_status');
+      const status = /** @type {HTMLElement} */ (document.getElementById('gen_status'));
       status.dataset.status = 'valid';
       const message = adjusted ? `Recipe valid — ${adjusted}` : 'Recipe valid';
       if (status.textContent !== message) status.textContent = message;
     } catch (error) {
       if (engineTrapped(error)) return;
-      const status = document.getElementById('gen_status');
+      const status = /** @type {HTMLElement} */ (document.getElementById('gen_status'));
       status.dataset.status = 'error';
-      status.textContent = error.message;
+      status.textContent = error instanceof Error ? error.message : String(error);
       return;
     }
   }
@@ -609,7 +659,7 @@ function updatePalette() {
 
   drawPaletteWaveGraph();
   if (activeTab === 'generative')
-    hueKeyWheel.draw(palette.canonicalRecipe);
+    (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).draw(/** @type {import('./palette_controls.js').PaletteRecipe} */ ((/** @type {GenerativePalette} */ (palette)).canonicalRecipe));
   drawColorStrip();
   updateStripView();
   syncResetZoomButton();
@@ -623,13 +673,14 @@ const scheduleViewportRedraw = createFrameScheduler(redrawForViewport);
 
 let engineHalted = false;
 
+/** @param {unknown} error */
 function engineTrapped(error) {
   if (engineHalted) return true;
   return standDownIfHalted(error, wasmModule, (message) => {
     engineHalted = true;
     scheduleUpdate.cancel();
     scheduleViewportRedraw.cancel();
-    for (const control of document.querySelectorAll('input, select, button, textarea'))
+    for (const control of /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('input, select, button, textarea')))
       control.disabled = true;
     setPaletteOps(null);
     paletteOps = null;
@@ -648,9 +699,9 @@ async function init() {
     const { default: createHolosphereModule } = await import('../../../generated/holosphere_wasm.js');
     const wasm = await createHolosphereModule();
     wasmModule = wasm;
-    paletteOps = new wasm.PaletteOps();
+    paletteOps = /** @type {NonNullable<typeof paletteOps>} */ (new wasm.PaletteOps());
     setPaletteOps(paletteOps, wasm);
-    effectPalettePresets = Array.from(paletteOps.effectPresetsV4());
+    effectPalettePresets = /** @type {typeof effectPalettePresets} */ (Array.from(paletteOps.effectPresetsV4()));
   } catch (e) {
     if (wasmModule && engineTrapped(e)) return;
     setPaletteOps(null);
@@ -664,18 +715,18 @@ async function init() {
     return;
   }
 
-  colorStripCanvas = document.getElementById('colorStripCanvas');
+  colorStripCanvas = /** @type {HTMLCanvasElement} */ (document.getElementById('colorStripCanvas'));
   colorStripCtx = colorStripCanvas ? colorStripCanvas.getContext('2d') : null;
-  waveGraphCanvas = document.getElementById('waveGraphCanvas');
+  waveGraphCanvas = /** @type {HTMLCanvasElement} */ (document.getElementById('waveGraphCanvas'));
   waveGraphCtx = waveGraphCanvas ? waveGraphCanvas.getContext('2d') : null;
-  hueKeyWheelCanvas = document.getElementById('hueKeyWheelCanvas');
+  hueKeyWheelCanvas = /** @type {HTMLCanvasElement} */ (document.getElementById('hueKeyWheelCanvas'));
   hueKeyWheelCtx = hueKeyWheelCanvas ? hueKeyWheelCanvas.getContext('2d') : null;
-  resetZoomButton = document.getElementById('resetZoomButton');
-  paletteRangeHeading = document.getElementById('palette_range_heading');
-  copyFeedback = document.getElementById('palette_copy_feedback');
-  copyFeedbackSwatch = document.getElementById('palette_copy_swatch');
-  copyFeedbackStatus = document.getElementById('palette_copy_status');
-  copyFeedbackHex = document.getElementById('palette_copy_hex');
+  resetZoomButton = /** @type {HTMLButtonElement} */ (document.getElementById('resetZoomButton'));
+  paletteRangeHeading = /** @type {HTMLElement} */ (document.getElementById('palette_range_heading'));
+  copyFeedback = /** @type {HTMLElement} */ (document.getElementById('palette_copy_feedback'));
+  copyFeedbackSwatch = /** @type {HTMLElement} */ (document.getElementById('palette_copy_swatch'));
+  copyFeedbackStatus = /** @type {HTMLElement} */ (document.getElementById('palette_copy_status'));
+  copyFeedbackHex = /** @type {HTMLElement} */ (document.getElementById('palette_copy_hex'));
 
   if (!colorStripCanvas || !waveGraphCanvas || !hueKeyWheelCanvas ||
       !colorStripCtx || !waveGraphCtx || !hueKeyWheelCtx) {
@@ -694,20 +745,20 @@ async function init() {
     scheduleUpdate,
     onRecipeChange: renderRecipeControls,
     canvas: hueKeyWheelCanvas,
-    group: document.getElementById('hueKeyWheelGroup'),
-    status: document.getElementById('hue_key_status'),
+    group: /** @type {HTMLElement} */ (document.getElementById('hueKeyWheelGroup')),
+    status: /** @type {HTMLElement} */ (document.getElementById('hue_key_status')),
     painter: createHueKeyWheelPainter({ canvas: hueKeyWheelCanvas, ctx: hueKeyWheelCtx }),
   });
 
   // Tab buttons; activation follows focus.
-  const tabButtons = Array.from(document.querySelectorAll('.tab-btn[data-tab]'));
+  const tabButtons = Array.from(/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.tab-btn[data-tab]')));
   tabButtons.forEach((btn, index) => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    btn.addEventListener('click', () => switchTab(/** @type {string} */ (btn.dataset.tab)));
     btn.addEventListener('keydown', (event) => {
       const target = tablistKeyTarget(event.key, index, tabButtons.length);
       if (target === null) return;
       event.preventDefault();
-      switchTab(tabButtons[target].dataset.tab);
+      switchTab(/** @type {string} */ (tabButtons[target].dataset.tab));
       tabButtons[target].focus();
     });
   });
@@ -718,49 +769,49 @@ async function init() {
   buildEffectRecipePresets();
 
   // Generative palette controls.
-  const baseHueSlider = document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees);
-  baseHueSlider.addEventListener('keydown', hueKeyWheel.onBaseHueKeyDown);
+  const baseHueSlider = /** @type {HTMLInputElement} */ (document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees));
+  baseHueSlider.addEventListener('keydown', (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).onBaseHueKeyDown);
   baseHueSlider.addEventListener('input', handleBaseHueInput);
 
   for (const reading of RECIPE_SELECT_READINGS) {
-    document.getElementById(PALETTE_CONTROL_IDS[reading]).addEventListener('change', (event) => {
-      hueKeyWheel.clearStatus();
-      if (reading === 'hueMode') hueKeyWheel.onHueModeChange(event.target.value);
-      else recipeModel.setChoice(reading, event.target.value);
+    /** @type {HTMLSelectElement} */ (document.getElementById(PALETTE_CONTROL_IDS[reading])).addEventListener('change', (event) => {
+      (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).clearStatus();
+      if (reading === 'hueMode') (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).onHueModeChange((/** @type {HTMLInputElement|HTMLSelectElement} */ (event.target)).value);
+      else recipeModel.setChoice(reading, (/** @type {HTMLInputElement|HTMLSelectElement} */ (event.target)).value);
       renderRecipeControls();
       scheduleUpdate();
     });
   }
 
-  for (const axisName of Object.keys(PALETTE_AXIS_CONTROLS)) {
+  for (const axisName of /** @type {Array<'lightness'|'chroma'>} */ (Object.keys(PALETTE_AXIS_CONTROLS))) {
     const { curve, minimum, maximum } = axisControlElements(axisName);
     curve.addEventListener('change', (event) => handleAxisCurveChange(axisName, event));
     minimum.addEventListener('input', (event) => handleAxisEndpointInput(axisName, 'minimum', event));
     maximum.addEventListener('input', (event) => handleAxisEndpointInput(axisName, 'maximum', event));
   }
 
-  document.getElementById(PALETTE_CONTROL_IDS.offset).addEventListener('input', (event) => {
-    recipeModel.setWindow(Number(event.target.value), recipeModel.window.span);
+  /** @type {HTMLInputElement} */ (document.getElementById(PALETTE_CONTROL_IDS.offset)).addEventListener('input', (event) => {
+    recipeModel.setWindow(Number((/** @type {HTMLInputElement|HTMLSelectElement} */ (event.target)).value), recipeModel.window.span);
     renderRecipeWindow();
     scheduleUpdate();
   });
-  document.getElementById(PALETTE_CONTROL_IDS.span).addEventListener('input', (event) => {
-    recipeModel.setWindow(recipeModel.window.offset, Number(event.target.value));
+  /** @type {HTMLInputElement} */ (document.getElementById(PALETTE_CONTROL_IDS.span)).addEventListener('input', (event) => {
+    recipeModel.setWindow(recipeModel.window.offset, Number((/** @type {HTMLInputElement|HTMLSelectElement} */ (event.target)).value));
     renderRecipeWindow();
     scheduleUpdate();
   });
 
   for (const { reading, id, scale } of RECIPE_SLIDER_DEFINITIONS) {
-    document.getElementById(id).addEventListener('input', (event) => {
-      hueKeyWheel.clearStatus();
-      recipeModel.setAmount(reading, Number(event.target.value) / scale);
+    /** @type {HTMLInputElement} */ (document.getElementById(id)).addEventListener('input', (event) => {
+      (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).clearStatus();
+      recipeModel.setAmount(reading, Number((/** @type {HTMLInputElement|HTMLSelectElement} */ (event.target)).value) / scale);
       renderRecipeControls();
       scheduleUpdate();
     });
   }
 
-  document.querySelectorAll('[data-recipe-preset]').forEach((button) => {
-    button.addEventListener('click', () => loadRecipePreset(button.dataset.recipePreset));
+  /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-recipe-preset]')).forEach((button) => {
+    button.addEventListener('click', () => loadRecipePreset(/** @type {string} */ (button.dataset.recipePreset)));
   });
 
   renderRecipeControls();
@@ -772,7 +823,7 @@ async function init() {
     element: colorStripCanvas,
     onStart: handleDragStart,
     onMove: handleDragMove,
-    onEnd: handleDragEnd,
+    onEnd: /** @type {(event: PointerEvent|null) => void} */ (handleDragEnd),
     onCancel: handleDragCancel,
   });
   colorStripCanvas.addEventListener('keydown', handleStripKeyDown);
@@ -783,13 +834,13 @@ async function init() {
   }
 
   onPageTeardown(wireCopyBlock({
-    source: document.getElementById('palette_code_output'),
-    button: document.getElementById('copy_code_button'),
-    prompt: document.getElementById('copy_code_prompt'),
+    source: /** @type {HTMLElement} */ (document.getElementById('palette_code_output')),
+    button: /** @type {HTMLButtonElement} */ (document.getElementById('copy_code_button')),
+    prompt: /** @type {HTMLElement} */ (document.getElementById('copy_code_prompt')),
   }));
   const teardownExportFlyout = wireFlyout({
-    root: document.getElementById('export_flyout'),
-    trigger: document.getElementById('export_toggle'),
+    root: /** @type {HTMLElement} */ (document.getElementById('export_flyout')),
+    trigger: /** @type {HTMLButtonElement} */ (document.getElementById('export_toggle')),
   });
 
   switchTab(paletteTabFromSearch(window.location.search), false);
@@ -799,13 +850,13 @@ async function init() {
     scheduleViewportRedraw.cancel();
     copyRequestId += 1;
     if (copyFeedbackTimer !== null) clearTimeout(copyFeedbackTimer);
-    proceduralSliders.dispose();
+    (/** @type {NonNullable<typeof proceduralSliders>} */ (proceduralSliders)).dispose();
     teardownExportFlyout();
-    baseHueSlider.removeEventListener('keydown', hueKeyWheel.onBaseHueKeyDown);
+    baseHueSlider.removeEventListener('keydown', (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).onBaseHueKeyDown);
     window.removeEventListener('resize', scheduleViewportRedraw);
-    stripDrag.remove();
+    (/** @type {NonNullable<typeof stripDrag>} */ (stripDrag)).remove();
     colorStripCanvas.removeEventListener('keydown', handleStripKeyDown);
-    hueKeyWheel.dispose();
+    (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).dispose();
     setPaletteOps(null);
     if (wasmModule?.HS_MODULE_DEAD !== true)
       paletteOps?.delete();
@@ -816,8 +867,9 @@ async function init() {
 
 bootstrapTool(init, 'palette tool');
 
+/** @param {Event} event */
 function handleBaseHueInput(event) {
-  recipeModel.setBaseHue(Number(event.target.value) / 360);
+  recipeModel.setBaseHue(Number((/** @type {HTMLInputElement|HTMLSelectElement} */ (event.target)).value) / 360);
   renderBaseHue();
   scheduleUpdate();
 }

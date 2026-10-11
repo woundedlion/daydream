@@ -155,7 +155,6 @@ test('every not-checked module has a declaration file on the roster', () => {
 const TOOL_PAGE_EXEMPTIONS = {
   'src/workbench/lissajous/lissajous_page.js': 'Imports Three.js and builds a dynamic DOM controller without declared element types.',
   'src/workbench/mobius/mobius_page.js': 'Imports Three.js and builds a dynamic DOM controller without declared element types.',
-  'src/workbench/palettes/palettes_page.js': 'DOM element narrowing and callback parameter annotations are incomplete; it has no third-party import exemption.',
   'src/workbench/solids/solids_page.js': 'Imports Three.js and builds dynamic mesh-editing controls without declared element types.',
 };
 
