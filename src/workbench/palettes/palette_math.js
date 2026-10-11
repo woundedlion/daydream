@@ -312,11 +312,12 @@ export function paletteAdjustmentSummary(status) {
  * bridge returns views onto WASM memory, which the next call reuses, so the
  * results are copied out before they can be overwritten.
  * @param {PaletteRecipe} recipe - A V4 palette recipe.
- * @param {boolean} [inspect=true] - Whether to also bake the per-sample diagnostics the tool plots; false bakes the LUT alone.
+ * @param {Object} [options]
+ * @param {boolean} [options.inspect=true] - Whether to also bake the per-sample diagnostics the tool plots; false bakes the LUT alone.
  * @returns {PaletteCompileResult} The detached compile result; `status.code` is PaletteCompileCode.OK on success.
  * @throws {Error} When no PaletteOps bridge has been installed.
  */
-export function compilePaletteRecipe(recipe, inspect = true) {
+export function compilePaletteRecipe(recipe, { inspect = true } = {}) {
   if (!paletteOps) {
     throw new Error('PaletteOps bridge is not initialized');
   }
@@ -349,7 +350,7 @@ export class GenerativePalette {
    * @throws {Error} When the recipe does not compile, carrying the status code and field.
    */
   constructor(recipe) {
-    const result = compilePaletteRecipe(recipe, true);
+    const result = compilePaletteRecipe(recipe);
     if (result.status.code !== compileCodes.OK) throw new Error(paletteCompileError(result.status));
     this.canonicalRecipe = result.canonicalRecipe;
     this.status = result.status;

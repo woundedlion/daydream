@@ -346,7 +346,7 @@ test('compilePaletteRecipe selects the requested bridge operation and owns its b
   const ops = { compileAndBakeV4: compile('compile'), inspectV4: compile('inspect') };
   withPaletteOps(ops, () => {
     const inspected = compilePaletteRecipe(recipe);
-    const compiled = compilePaletteRecipe(recipe, false);
+    const compiled = compilePaletteRecipe(recipe, { inspect: false });
     assert.deepEqual(calls.map(([kind]) => kind), ['inspect', 'compile']);
     assert.notEqual(inspected.lut, lut);
     assert.notEqual(inspected.diagnostics, diagnostics);
