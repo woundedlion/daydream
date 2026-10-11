@@ -48,7 +48,7 @@ test('the reusable JavaScript suite runs all required checks', () => {
       line.trim().replace(/^- /, '') === `run: ${command}`),
       `${command} is absent from the reusable suite`);
   }
-  assert.match(suite, /name: Verify committed import map\s+run: \|\s+npm run importmap\s+git diff --exit-code/);
+  assert.match(suite, /name: Verify committed import map\s+run: \|\s+npm run importmap\s+git diff --exit-code -- vendor-importmap\.js/);
 });
 
 // No workflow is a tracked *.sh file, so the Lint shell step cannot see the
@@ -59,7 +59,10 @@ test('the reusable suite lints the workflow YAML and the bash inside it', () => 
   assert.match(suite, /8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8.*sha256sum --check --strict/);
   assert.ok(suite.indexOf('sha256sum --check --strict') < suite.indexOf('tar -xzf'));
   assert.doesNotMatch(suite, /pip install[^\n]*actionlint/);
-  assert.match(suite, /actionlint -verbose -oneline/);
+  const log = suite.match(/actionlint -verbose -oneline[^\n]*2> (\S+)/)?.[1];
+  assert.ok(log, 'actionlint writes its diagnostic log');
+  assert.ok(suite.includes(`test -s ${log}`), 'empty diagnostic logs fail closed');
+  assert.ok(suite.includes(`if grep -q 'Rule "shellcheck" was disabled' ${log}; then`));
   assert.match(suite, /Rule "shellcheck" was disabled[^\n]*\r?\n[^\n]*\r?\n\s*exit 1/,
     'a silently dropped shellcheck would leave every run: body unchecked');
 });

@@ -107,6 +107,7 @@ jobs:
             exit 1
           fi
           actionlint -verbose -oneline "${FILES[@]}" 2> /tmp/actionlint-verbose.txt
+          test -s /tmp/actionlint-verbose.txt
           if grep -q 'Rule "shellcheck" was disabled' /tmp/actionlint-verbose.txt; then
             echo "::error::actionlint ran without shellcheck — the run: bodies went unchecked"
             exit 1
