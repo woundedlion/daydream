@@ -783,21 +783,6 @@ export function movedHueKeyOffset(baseTurns, offset, wrappedTurn) {
 }
 
 /**
- * Moves one custom hue key onto the turn a drag landed on.
- * @param {number} baseTurns - The keys' base hue.
- * @param {number[]} offsets - The keys' current offsets from the base.
- * @param {number} keyIndex - Which key moved.
- * @param {number} wrappedTurn - The pointed-at hue, as read off the wheel.
- * @returns {number[]} A new offsets array; the other keys are unchanged and
- *   the moved key takes movedHueKeyOffset.
- */
-export function moveCustomHueKey(baseTurns, offsets, keyIndex, wrappedTurn) {
-  const nextOffsets = [...offsets];
-  nextOffsets[keyIndex] = movedHueKeyOffset(baseTurns, offsets[keyIndex], wrappedTurn);
-  return nextOffsets;
-}
-
-/**
  * Where a FALLOFF domain's fade (begun at t = 2/3) reaches zero visibility, as
  * core/color/palette_recipe.h defaults it.
  */

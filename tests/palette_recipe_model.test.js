@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PaletteRecipeModel } from '../src/workbench/palettes/palette_recipe_model.js';
 import {
-  PaletteV4, PALETTE_RECIPE_PRESETS, customHueKeyState, defaultPaletteRecipe,
+  PaletteV4, PALETTE_RECIPE_PRESETS, customHueKeyState, customHueTurns, defaultPaletteRecipe,
   movedHueKeyOffset, wrapTurns, zoomRecipeWindow,
 } from '../src/workbench/palettes/palette_controls.js';
 import { generativePaletteCpp } from '../src/workbench/palettes/palette_math.js';
@@ -194,8 +194,8 @@ test('a LOOP sweep rounds to whole turns inside the domain, mode and sweep opera
 
 test('hue keys move to the nearest representative and nudge by turns', () => {
   const model = new PaletteRecipeModel();
-  model.setBaseHue(0.98);
   model.applyHueModeTransition('CUSTOM');
+  model.setBaseHue(0.98);
   const base = model.baseHueTurns;
   const offset = model.customHueOffsets()[0];
   model.moveHueKey(0, 0.02);
@@ -261,4 +261,52 @@ test('scenario: LOOP domain under SWEEP, then the preset reloads clean', () => {
   assert.equal(exported(model), generativePaletteCpp(preset));
   assert.equal(model.reading('domain'), 'STRAIGHT');
   assert.equal(model.reading('hueMode'), 'HARMONY');
+});
+
+test('moving custom key A leaves the base and other authored keys unchanged', () => {
+  const offsets = [0, 0.25, -0.125];
+  const model = new PaletteRecipeModel();
+  model.applyHueModeTransition('CUSTOM');
+  model.setBaseHue(0.2);
+  model.customHueOffsets().splice(0, 3, ...offsets);
+  model.moveHueKey(0, 0.3);
+  const moved = model.customHueOffsets();
+
+  assert.deepEqual(offsets, [0, 0.25, -0.125]);
+  assert.ok(Math.abs(moved[0] - 0.1) < 1e-12);
+  assert.deepEqual(moved.slice(1), offsets.slice(1));
+  const turns = customHueTurns(0.2, moved);
+  assert.equal(turns[1], 0.45);
+  assert.ok(Math.abs(turns[2] - 0.075) < 1e-12);
+});
+
+test('moving custom key A across the seam follows the nearby turn', () => {
+  const offsets = [0, 0.14, -0.1];
+  const model = new PaletteRecipeModel();
+  model.applyHueModeTransition('CUSTOM');
+  model.setBaseHue(0.98);
+  model.customHueOffsets().splice(0, 3, ...offsets);
+  model.moveHueKey(0, 0.02);
+  const moved = model.customHueOffsets();
+  const turns = customHueTurns(0.98, moved);
+
+  assert.ok(Math.abs(turns[0] - 1.02) < 1e-12);
+  assert.ok(Math.abs(turns[1] - 1.12) < 1e-12);
+  assert.equal(turns[2], 0.88);
+  assert.ok(Math.abs(turns[1] - turns[0] - 0.1) < 1e-12);
+  assert.deepEqual(moved.slice(1), offsets.slice(1));
+});
+
+test('moving custom key B retains its seam-safe independent behavior', () => {
+  const offsets = [0, -0.96, -0.25];
+  const model = new PaletteRecipeModel();
+  model.applyHueModeTransition('CUSTOM');
+  model.setBaseHue(0.98);
+  model.customHueOffsets().splice(0, 3, ...offsets);
+  model.moveHueKey(1, 0.03);
+  const moved = model.customHueOffsets();
+
+  assert.equal(moved[0], offsets[0]);
+  assert.ok(Math.abs(moved[1] + 0.95) < 1e-12);
+  assert.equal(moved[2], offsets[2]);
 });
