@@ -206,12 +206,17 @@ export function createShaderDocumentController({
   initialEffect = null,
   win = globalThis,
 }) {
+  /** @param {unknown} error */
+  const markHalted = (error) => {
+    const module = getModule();
+    if (module && engineHalted(error, module)) module.HS_MODULE_DEAD = true;
+  };
   const selectEffect = (/** @type {string} */ effect) => {
     const module = getModule();
     if (module?.HS_MODULE_DEAD) return false;
     try { return readSelectEffect(effect); }
     catch (error) {
-      if (module && engineHalted(error, module)) module.HS_MODULE_DEAD = true;
+      markHalted(error);
       throw error;
     }
   };
@@ -402,8 +407,7 @@ export function createShaderDocumentController({
       scheduleDeepLink();
       return true;
     } catch (error) {
-      const module = getModule();
-      if (module && engineHalted(error, module)) module.HS_MODULE_DEAD = true;
+      markHalted(error);
       show(`The preview edit failed: ${errorDetail(error)}`, true);
       return false;
     }
@@ -489,8 +493,7 @@ export function createShaderDocumentController({
       scheduleDeepLink();
       return true;
     } catch (error) {
-      const module = getModule();
-      if (module && engineHalted(error, module)) module.HS_MODULE_DEAD = true;
+      markHalted(error);
       show(`The preview edit failed: ${errorDetail(error)}`, true);
       return false;
     }
@@ -787,6 +790,13 @@ export function createShaderDocumentController({
   const loadScratch = () =>
     loadSource(scratchChainDocument(operatorCatalog), SCRATCH_FILENAME);
 
+  const refuseLink = () => {
+    preserveRefusedLink = true;
+    clearLinkTimers();
+    linkPending = false;
+    linkGeneration += 1;
+  };
+
   /** @type {HTMLOptionElement | null} */
   let loadedSourceOption = null;
   /**
@@ -870,10 +880,7 @@ export function createShaderDocumentController({
       linkError = status.textContent || 'the linked state was refused';
     }
     if (linkError) {
-      preserveRefusedLink = true;
-      clearLinkTimers();
-      linkPending = false;
-      linkGeneration += 1;
+      refuseLink();
     }
     const query = new URLSearchParams(win.location?.search ?? '');
     const chainText = query.get(`fx.${CHAIN_SNAPSHOT_STORAGE_KEY}`);
@@ -901,10 +908,7 @@ export function createShaderDocumentController({
         return true;
       } catch (error) {
         linkError = errorDetail(error);
-        preserveRefusedLink = true;
-        clearLinkTimers();
-        linkPending = false;
-        linkGeneration += 1;
+        refuseLink();
       }
     }
     const requested = sourceCatalog.get(canonicalEffectId(initialEffect ?? ''))
@@ -918,6 +922,14 @@ export function createShaderDocumentController({
     selectedSource = sourceSelect.value;
     if (linkError) show(`The shader link could not be restored: ${linkError}.`, true);
     return loaded;
+  };
+
+  /** @param {string|null} effectId @param {string} filename @param {string} kind */
+  const adoptLoadedSource = async (effectId, filename, kind) => {
+    selectLoadedSource(effectId, filename, kind);
+    releaseOriginalLink();
+    scheduleDeepLink();
+    await flushDeepLink();
   };
 
   const allowSourceChange = () => {
@@ -938,10 +950,7 @@ export function createShaderDocumentController({
           sourceSelect.value = selectedSource;
           return;
         }
-        selectLoadedSource('', SCRATCH_FILENAME, '');
-        releaseOriginalLink();
-        scheduleDeepLink();
-        await flushDeepLink();
+        await adoptLoadedSource('', SCRATCH_FILENAME, '');
         return;
       }
       const entry = sourceCatalog.get(option.value);
@@ -953,10 +962,7 @@ export function createShaderDocumentController({
         sourceSelect.value = selectedSource;
         return;
       }
-      selectLoadedSource(entry.effectId, entry.filename, '');
-      releaseOriginalLink();
-      scheduleDeepLink();
-      await flushDeepLink();
+      await adoptLoadedSource(entry.effectId, entry.filename, '');
     } catch (error) {
       show(`Could not load shader source: ${errorDetail(error)}`, true);
     }
@@ -983,10 +989,7 @@ export function createShaderDocumentController({
       }
       if (!allowSourceChange()) return;
       if (!await loadSource(await file.text(), file.name)) return;
-      selectLoadedSource(null, file.name, 'Imported');
-      releaseOriginalLink();
-      scheduleDeepLink();
-      await flushDeepLink();
+      await adoptLoadedSource(null, file.name, 'Imported');
     } catch (error) {
       show(`Could not open shader document: ${errorDetail(error)}`, true);
     } finally {
