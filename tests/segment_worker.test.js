@@ -1017,6 +1017,22 @@ test('rebuild retries a coupled write after its prerequisite without reporting d
   } finally { capture.restore(); }
 });
 
+test('a successful pending replay clears a refused accepted-value warning', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  engineInstance.setParameter = (_name, value) => value === 1
+    ? ParamSetResult.INADMISSIBLE : ParamSetResult.APPLIED;
+  const capture = installConsoleCapture('error');
+  try {
+    await dispatch({type: 'setEffect', name: 'Waves', params: [
+      {name: 'A', acceptedValue: 1, value: 2},
+    ]});
+    assert.equal(capture.messages.length, 1);
+    posted.length = 0;
+    await dispatch({type: 'render'});
+    assert.equal(posted.find((p) => p.msg.type === 'frame').msg.warnings, undefined);
+  } finally { capture.restore(); }
+});
+
 for (const paused of [false, true]) test(`setEffect restores pause=${paused} after parameter replay`, async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   await dispatch({
