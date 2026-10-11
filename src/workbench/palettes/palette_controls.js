@@ -472,7 +472,9 @@ const AXIS_READOUT_DIGITS = 3;
  * @param {string|number} axis.maximum - The maximum slider's value.
  * @param {string} axis.label - The axis' full name, for accessible names.
  * @param {string} axis.shortLabel - Its name as the visible label shows it.
- * @returns {Object<string, string|boolean>} The bounds, labels, accessible names
+ * @returns {{constant:boolean, minimumLabel:string, maximumLabel:string,
+ *   minimumName:string, maximumName:string, minimumMin:string, minimumMax:string,
+ *   maximumMin:string, maximumMax:string, minimumText:string, maximumText:string}} The bounds, labels, accessible names
  *   and readouts to apply to the pair.
  */
 export function axisControlState({ curve, minimum, maximum, label, shortLabel }) {
