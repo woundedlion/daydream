@@ -646,7 +646,7 @@ export function start({
       ["click", onApplyNoticeDismiss, doc],
     ],
     switches,
-    stopTimers: () => { disposeEffectRoute(); testAllTicker.stop(); applyNotice.clear(); },
+    releaseAppServices: () => { disposeEffectRoute(); testAllTicker.stop(); applyNotice.clear(); },
     effectGui,
     shaderDocuments,
     globalGui: guiInstance,

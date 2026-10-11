@@ -217,7 +217,7 @@ function makeTeardown({
     pageTarget,
     listeners,
     switches: { dispose() { note('switches.dispose'); } },
-    stopTimers: () => note('stopTimers'),
+    releaseAppServices: () => note('releaseAppServices'),
     effectGui: { destroy() { note('effectGui.destroy'); } },
     shaderDocuments: { dispose() { note('shaderDocuments.dispose'); } },
     globalGui: { destroy() { note('globalGui.destroy'); } },
@@ -259,7 +259,7 @@ test('dispose releases in an order nothing can re-enter', () => {
     'remove click',
     'remove pagehide',
     'switches.dispose',
-    'stopTimers',
+    'releaseAppServices',
     'effectGui.destroy',
     'shaderDocuments.dispose',
     'globalGui.destroy',
@@ -334,7 +334,7 @@ test('a step that throws does not strand the releases behind it', () => {
     'remove click',
     'remove pagehide',
     'switches.dispose',
-    'stopTimers',
+    'releaseAppServices',
     'effectGui.destroy',
     'shaderDocuments.dispose',
     'recorder.dispose',
@@ -353,7 +353,7 @@ test('a step that throws does not strand the releases behind it', () => {
 
 test('every dispose step is independent of the ones before it', () => {
   const failing = new Set([
-    'switches.dispose', 'stopTimers', 'effectGui.destroy', 'shaderDocuments.dispose', 'globalGui.destroy',
+    'switches.dispose', 'releaseAppServices', 'effectGui.destroy', 'shaderDocuments.dispose', 'globalGui.destroy',
     'urlSync.dispose', 'sidebar.dispose', 'driver.dispose', 'strandSegmentWork', 'segments.dispose', 'removeOverlay',
   ]);
   const t = makeTeardown({ failing });
