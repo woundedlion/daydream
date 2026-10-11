@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { D2R_F32, OP_DEFS, KNOWN_OPS, PARAMETERIZED_OPS, SIMPLE_SEEDS, DEFINED_SEED_CONSTANTS } from '../src/workbench/solids/solid_codegen.js';
+import { D2R_F32, KNOWN_OPS, PARAMETERIZED_OPS, SIMPLE_SEEDS, DEFINED_SEED_CONSTANTS, seedOpParams } from '../src/workbench/solids/solid_codegen.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -32,9 +32,7 @@ test('opStepCpp emits the engine-unit OpStep initializer per op shape', () => {
 
 test('opStepCpp names an Op enumerator for every op the tool offers', () => {
   for (const op of KNOWN_OPS) {
-    const params = {};
-    for (const [key, def] of Object.entries(OP_DEFS[op].params)) params[key] = def.val;
-    assert.match(opStepCpp({ op, params }),
+    assert.match(opStepCpp({ op, params: seedOpParams(op, null) }),
       new RegExp(`^\\{Op::${op.toUpperCase()}[,}]`),
       `${op} must emit its own Op:: enumerator`);
   }
