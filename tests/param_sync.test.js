@@ -19,49 +19,49 @@ import {
 // the user is editing, and skips a redundant write when the value is unchanged.
 
 test('numeric: a changed value updates', () => {
-  assert.deepEqual(resolveParamSync(0.5, 0.8, false, false),
+  assert.deepEqual(resolveParamSync(0.5, 0.8),
     { update: true, value: 0.8 });
 });
 
 test('numeric: an unchanged value does not update (no redundant write)', () => {
-  assert.deepEqual(resolveParamSync(0.8, 0.8, false, false),
+  assert.deepEqual(resolveParamSync(0.8, 0.8),
     { update: false, value: 0.8 });
 });
 
 test('numeric: editing suppresses the update but still reports the coerced value', () => {
-  assert.deepEqual(resolveParamSync(0.5, 0.8, false, true),
+  assert.deepEqual(resolveParamSync(0.5, 0.8, { isEditing: true }),
     { update: false, value: 0.8 });
 });
 
 test('boolean: incoming is thresholded at 0.5 into a real boolean', () => {
-  assert.equal(resolveParamSync(false, 1, true, false).value, true);
-  assert.equal(resolveParamSync(true, 0, true, false).value, false);
-  assert.equal(resolveParamSync(false, 0.6, true, false).value, true);
-  assert.equal(resolveParamSync(true, 0.4, true, false).value, false);
-  assert.equal(resolveParamSync(true, 0.5, true, false).value, false);
+  assert.equal(resolveParamSync(false, 1, { isBoolean: true }).value, true);
+  assert.equal(resolveParamSync(true, 0, { isBoolean: true }).value, false);
+  assert.equal(resolveParamSync(false, 0.6, { isBoolean: true }).value, true);
+  assert.equal(resolveParamSync(true, 0.4, { isBoolean: true }).value, false);
+  assert.equal(resolveParamSync(true, 0.5, { isBoolean: true }).value, false);
 });
 
 test('boolean: a flip updates; a matching state does not', () => {
-  assert.deepEqual(resolveParamSync(false, 1, true, false),
+  assert.deepEqual(resolveParamSync(false, 1, { isBoolean: true }),
     { update: true, value: true });
-  assert.deepEqual(resolveParamSync(true, 1, true, false),
+  assert.deepEqual(resolveParamSync(true, 1, { isBoolean: true }),
     { update: false, value: true });
 });
 
 test('boolean: editing suppresses a flip', () => {
-  assert.deepEqual(resolveParamSync(false, 1, true, true),
+  assert.deepEqual(resolveParamSync(false, 1, { isBoolean: true, isEditing: true }),
     { update: false, value: true });
 });
 
 test('numeric: a NaN engine value never updates (no per-frame churn)', () => {
-  assert.deepEqual(resolveParamSync(0.5, NaN, false, false),
+  assert.deepEqual(resolveParamSync(0.5, NaN),
     { update: false, value: NaN });
-  assert.deepEqual(resolveParamSync(NaN, NaN, false, false),
+  assert.deepEqual(resolveParamSync(NaN, NaN),
     { update: false, value: NaN });
 });
 
 test('boolean: a NaN engine value never flips the toggle', () => {
-  assert.deepEqual(resolveParamSync(true, NaN, true, false),
+  assert.deepEqual(resolveParamSync(true, NaN, { isBoolean: true }),
     { update: false, value: false });
 });
 
