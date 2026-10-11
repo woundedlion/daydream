@@ -1,5 +1,5 @@
 import { createCommitQueue, createChainValidator, createOpGate } from '../src/workbench/solids/solid_validation.js';
-import { fakeModule as makeMeshOps } from './helpers/fake_meshops.js';
+import { fakeModule } from './helpers/fake_meshops.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -850,25 +850,24 @@ test('createCommitQueue survives a rejected commit', async () => {
   assert.deepEqual(log, ['after']);
 });
 
-const fakeModule = (onOp = () => {}, options = {}) => makeMeshOps({ ...options, onOp });
 
 /** Verifies the recorded reason is read back by identity and names its remedy. */
 test('meshOpFailure routes each recorded reason', () => {
-  const { Mod } = fakeModule(() => { }, { rejects: new Set(['base:cube']), reason: 'ARENA_EXHAUSTED' });
+  const { Mod } = fakeModule({ ...{ rejects: new Set(['base:cube']), reason: 'ARENA_EXHAUSTED' }, onOp: () => { } });
   assert.equal(Mod.MeshOps.fromSolidName('cube'), null);
   const exhausted = meshOpFailure(Mod, 'Base solid "cube"');
   assert.equal(exhausted.reason, 'ARENA_EXHAUSTED');
   assert.equal(exhausted.flush, true, 'only ARENA_EXHAUSTED is cleared by flushing the arenas');
   assert.match(exhausted.message, /^Base solid "cube" failed: /);
 
-  const unknown = fakeModule(() => { }, { rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' });
+  const unknown = fakeModule({ ...{ rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' }, onOp: () => { } });
   assert.equal(unknown.Mod.MeshOps.fromSolidName('nope'), null);
   const named = meshOpFailure(unknown.Mod, 'Base solid "nope"');
   assert.equal(named.reason, 'UNKNOWN_NAME');
   assert.equal(named.flush, false);
   assert.notEqual(named.message, exhausted.message, 'each reason must carry its own remedy');
 
-  const gone = fakeModule(() => { }, { rejects: new Set(['base:cube']), reason: 'ARENA_UNAVAILABLE' });
+  const gone = fakeModule({ ...{ rejects: new Set(['base:cube']), reason: 'ARENA_UNAVAILABLE' }, onOp: () => { } });
   assert.equal(gone.Mod.MeshOps.fromSolidName('cube'), null);
   const unavailable = meshOpFailure(gone.Mod, 'Base solid "cube"');
   assert.equal(unavailable.fatal, true, 'an unreservable tooling block leaves no call that can succeed');
@@ -897,7 +896,7 @@ test('meshOpFailure reports UNKNOWN for a recorded value outside the enum', () =
 
 /** Verifies the null-result handler reports and flushes by reason. */
 test('requireMeshResult surfaces the reason and applies its remedy', () => {
-  const { Mod, state } = fakeModule(() => { }, { rejects: new Set(['base:cube']) });
+  const { Mod, state } = fakeModule({ ...{ rejects: new Set(['base:cube']) }, onOp: () => { } });
   const shown = [];
   const ctx = { Mod, meshOps: Mod.MeshOps, onError: (m) => shown.push(m) };
 
@@ -915,7 +914,7 @@ test('requireMeshResult surfaces the reason and applies its remedy', () => {
 /** Verifies a reason with no flush remedy leaves the arenas alone. */
 test('requireMeshResult flushes only for the reason that calls for it', () => {
   const { Mod, state } = fakeModule(
-    () => { }, { rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' });
+    { ...{ rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' }, onOp: () => { } });
   const shown = [];
   assert.equal(requireMeshResult(Mod.MeshOps.fromSolidName('nope'), 'Base solid "nope"',
     { Mod, meshOps: Mod.MeshOps, onError: (m) => shown.push(m) }), null);
@@ -929,7 +928,7 @@ test('requireMeshResult flushes only for the reason that calls for it', () => {
  */
 test('requireMeshResult stands the tool down for an unreservable tooling block', () => {
   const { Mod, state } = fakeModule(
-    () => { }, { rejects: new Set(['base:cube']), reason: 'ARENA_UNAVAILABLE' });
+    { ...{ rejects: new Set(['base:cube']), reason: 'ARENA_UNAVAILABLE' }, onOp: () => { } });
   const shown = [];
   const fatal = [];
   const ctx = {
@@ -947,7 +946,7 @@ test('requireMeshResult stands the tool down for an unreservable tooling block',
 
 /** Verifies a recoverable failure keeps going to the transient line. */
 test('requireMeshResult leaves a recoverable failure on the transient line', () => {
-  const { Mod } = fakeModule(() => { }, { rejects: new Set(['base:cube']) });
+  const { Mod } = fakeModule({ ...{ rejects: new Set(['base:cube']) }, onOp: () => { } });
   const shown = [];
   const fatal = [];
   assert.equal(requireMeshResult(Mod.MeshOps.fromSolidName('cube'), 'Base solid "cube"',
@@ -994,9 +993,9 @@ test('createChainValidator accepts a chain that replays cleanly', async () => {
 
 /** Verifies a plain (non-trap) failure rejects the chain and still frees the mesh. */
 test('createChainValidator rejects a chain that throws, freeing its mesh', async () => {
-  const { Mod, state } = fakeModule((op) => {
+  const { Mod, state } = fakeModule({ onOp: (op) => {
     if (op === 'kis') throw new Error('op refused');
-  });
+  } });
   const validator = createChainValidator(async () => Mod);
   const verdict = await validator.chainIsValid('cube', ['kis']);
   assert.equal(verdict.ok, false);
@@ -1008,7 +1007,7 @@ test('createChainValidator rejects a chain that throws, freeing its mesh', async
 
 /** Verifies a soft-rejected base solid rejects the chain and reclaims the arena. */
 test('createChainValidator rejects a chain whose base solid comes back null', async () => {
-  const { Mod, state } = fakeModule(() => { }, { rejects: new Set(['base:cube']) });
+  const { Mod, state } = fakeModule({ ...{ rejects: new Set(['base:cube']) }, onOp: () => { } });
   const validator = createChainValidator(async () => Mod);
   assert.equal((await validator.chainIsValid('cube', ['dual'])).ok, false);
   assert.equal(state.live, 0);
@@ -1017,7 +1016,7 @@ test('createChainValidator rejects a chain whose base solid comes back null', as
 
 /** Verifies the classify pass the tool always runs is proven, not just called. */
 test('createChainValidator rejects a chain whose classify pass comes back null', async () => {
-  const { Mod, state } = fakeModule(() => { }, { rejects: new Set(['classifyFaces']) });
+  const { Mod, state } = fakeModule({ ...{ rejects: new Set(['classifyFaces']) }, onOp: () => { } });
   const validator = createChainValidator(async () => Mod);
   assert.equal((await validator.chainIsValid('cube', ['dual'])).ok, false);
   assert.equal(state.live, 0);
@@ -1031,14 +1030,14 @@ test('createChainValidator rejects a chain whose classify pass comes back null',
  */
 test('createChainValidator carries each rejection reason out to the caller', async () => {
   const arenaMod = fakeModule(
-    () => { }, { rejects: new Set(['classifyFaces']), reason: 'ARENA_EXHAUSTED' }).Mod;
+    { ...{ rejects: new Set(['classifyFaces']), reason: 'ARENA_EXHAUSTED' }, onOp: () => { } }).Mod;
   const arena = await createChainValidator(async () => arenaMod).chainIsValid('cube', ['dual']);
   assert.equal(arena.ok, false);
   assert.match(arena.message, /^Face classification failed: /);
   assert.match(arena.message, /remove an op/, 'the arena remedy must survive the gate');
 
   const overflowMod = fakeModule(
-    () => { }, { rejects: new Set(['base:cube']), reason: 'FACE_DEGREE_OVERFLOW' }).Mod;
+    { ...{ rejects: new Set(['base:cube']), reason: 'FACE_DEGREE_OVERFLOW' }, onOp: () => { } }).Mod;
   const overflow = await createChainValidator(async () => overflowMod).chainIsValid('cube', ['dual']);
   assert.equal(overflow.ok, false);
   assert.match(overflow.message, /^Base solid "cube" failed: /);
@@ -1053,7 +1052,7 @@ test('createChainValidator carries each rejection reason out to the caller', asy
  */
 test('createChainValidator refuses a chain whose argument the engine clamped', async () => {
   const calls = [];
-  const { Mod, state } = fakeModule((op) => calls.push(op));
+  const { Mod, state } = fakeModule({ onOp: (op) => calls.push(op) });
   Mod.MeshOps.getLastAdjusted = () => { calls.push('adjusted?'); return true; };
   const verdict = await createChainValidator(async () => Mod)
     .chainIsValid('cube', [{ op: 'hankin', params: { angle: 95 } }]);
@@ -1084,7 +1083,7 @@ test('createChainValidator reports no reason for a chain it accepts', async () =
 test('createChainValidator respawns after a WebAssembly trap', async () => {
   let spawns = 0;
   const modules = [
-    fakeModule(() => { throw new WebAssembly.RuntimeError('trap'); }).Mod,
+    fakeModule({ onOp: () => { throw new WebAssembly.RuntimeError('trap'); } }).Mod,
     fakeModule().Mod,
   ];
   const validator = createChainValidator(async () => modules[spawns++]);
@@ -1097,9 +1096,9 @@ test('createChainValidator respawns after a WebAssembly trap', async () => {
 /** Verifies an ordinary op failure leaves the instance in service. */
 test('createChainValidator keeps the instance after an op failure that is not a halt', async () => {
   let spawns = 0;
-  const { Mod } = fakeModule((op) => {
+  const { Mod } = fakeModule({ onOp: (op) => {
     if (op === 'kis') throw new Error('op refused');
-  });
+  } });
   const validator = createChainValidator(async () => { spawns++; return Mod; });
   assert.equal((await validator.chainIsValid('cube', ['kis'])).ok, false);
   assert.equal((await validator.chainIsValid('cube', ['dual'])).ok, true);
@@ -1224,9 +1223,9 @@ test('a full saved-solid list refuses before thumbnail capture', () => {
 /** Verifies a transient spawn failure is retried rather than disabling validation for good. */
 test('createChainValidator retries after a failed spawn', async () => {
   let spawns = 0;
-  const { Mod } = fakeModule((op) => {
+  const { Mod } = fakeModule({ onOp: (op) => {
     if (op === 'kis') throw new Error('op refused');
-  });
+  } });
   const validator = createChainValidator(async () => {
     if (spawns++ === 0) throw new Error('no wasm');
     return Mod;
@@ -1282,7 +1281,7 @@ test('createOpGate clears every candidate that replays', async () => {
 
 /** Verifies a candidate whose classify pass comes back null is blocked. */
 test('createOpGate blocks a candidate the bridge rejects', async () => {
-  const { Mod } = fakeModule(() => { }, { rejects: new Set(['classifyFaces']) });
+  const { Mod } = fakeModule({ ...{ rejects: new Set(['classifyFaces']) }, onOp: () => { } });
   const gate = createOpGate(createChainValidator(async () => Mod));
 
   const probe = await gate.refresh('cube', [], CANDIDATES);
@@ -1294,7 +1293,7 @@ test('createOpGate blocks a candidate the bridge rejects', async () => {
 test('createOpGate respawns mid-sweep after a candidate traps', async () => {
   let spawns = 0;
   const modules = [
-    fakeModule((op) => { if (op === 'ambo') throw new WebAssembly.RuntimeError('trap'); }).Mod,
+    fakeModule({ onOp: (op) => { if (op === 'ambo') throw new WebAssembly.RuntimeError('trap'); } }).Mod,
     fakeModule().Mod,
   ];
   const gate = createOpGate(createChainValidator(async () => modules[spawns++]));
@@ -1314,9 +1313,9 @@ test('createOpGate reclaims the arena and re-judges the candidate that filled it
   const rejects = new Set(['kis']);
   let seen = 0;
   // The arena is full for the first kis and reclaimed for the retry.
-  const { Mod, state } = fakeModule((op) => {
+  const { Mod, state } = fakeModule({ ...{ rejects }, onOp: (op) => {
     if (op === 'kis' && seen++ >= 1) rejects.delete('kis');
-  }, { rejects });
+  } });
   const gate = createOpGate(createChainValidator(async () => Mod));
 
   const probe = await gate.refresh('cube', [], CANDIDATES);
@@ -1328,7 +1327,7 @@ test('createOpGate reclaims the arena and re-judges the candidate that filled it
 
 /** Verifies a candidate that exhausts a reclaimed arena too is blocked, and only it. */
 test('createOpGate blocks a candidate that refills a reclaimed arena', async () => {
-  const { Mod } = fakeModule(() => { }, { rejects: new Set(['kis']) });
+  const { Mod } = fakeModule({ ...{ rejects: new Set(['kis']) }, onOp: () => { } });
   const gate = createOpGate(createChainValidator(async () => Mod));
 
   const probe = await gate.refresh('cube', [], CANDIDATES);
@@ -1339,7 +1338,7 @@ test('createOpGate blocks a candidate that refills a reclaimed arena', async () 
 /** Verifies a chain whose topology is unchanged is not re-swept. */
 test('createOpGate skips a pass whose base and op names repeat', async () => {
   const probes = [];
-  const { Mod } = fakeModule((op) => probes.push(op));
+  const { Mod } = fakeModule({ onOp: (op) => probes.push(op) });
   const gate = createOpGate(createChainValidator(async () => Mod));
   const ops = [{ op: 'truncate', params: { t: 0.33 } }];
 
@@ -1360,7 +1359,7 @@ test('createOpGate skips a pass whose base and op names repeat', async () => {
 test('createOpGate re-sweeps when a param crosses the ambo lowering', async () => {
   for (const op of ['truncate', 'bevel']) {
     const probes = [];
-    const { Mod } = fakeModule((name) => probes.push(name));
+    const { Mod } = fakeModule({ onOp: (name) => probes.push(name) });
     const gate = createOpGate(createChainValidator(async () => Mod));
 
     assert.notEqual(await gate.refresh('cube', [{ op, params: { t: 0.5 } }], CANDIDATES), null,
@@ -1458,7 +1457,7 @@ test('createOpGate re-sweeps a chain whose last pass was incomplete', async () =
  * own rejection path does.
  */
 test('createOpGate frees the standing chain when its rebuild is rejected', async () => {
-  const { Mod, state } = fakeModule(() => { }, { rejects: new Set(['kis']) });
+  const { Mod, state } = fakeModule({ ...{ rejects: new Set(['kis']) }, onOp: () => { } });
   const gate = createOpGate(createChainValidator(async () => Mod));
 
   const probe = await gate.refresh('cube', [{ op: 'kis', params: {} }], CANDIDATES);
@@ -1469,8 +1468,7 @@ test('createOpGate frees the standing chain when its rebuild is rejected', async
 
 /** Verifies a base the registry does not hold leaves the sweep incomplete, not blocking. */
 test('createOpGate reports an unbuildable base as an incomplete pass', async () => {
-  const { Mod } = fakeModule(() => { },
-    { rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' });
+  const { Mod } = fakeModule({ ...{ rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' }, onOp: () => { } });
   const gate = createOpGate(createChainValidator(async () => Mod));
 
   const probe = await gate.refresh('nope', [], CANDIDATES);
@@ -1639,7 +1637,7 @@ test('long star seeds match formatter-derived namespace continuations', () => {
 
 test('createOpGate re-sweeps the last complete chain after an incomplete verdict', async () => {
   const healthy = fakeModule().Mod;
-  const trapped = fakeModule((op) => { if (op === 'ambo') throw new WebAssembly.RuntimeError('trap'); }).Mod;
+  const trapped = fakeModule({ onOp: (op) => { if (op === 'ambo') throw new WebAssembly.RuntimeError('trap'); } }).Mod;
   let pass = 0;
   const modules = [healthy, trapped, null, healthy];
   const validator = {
