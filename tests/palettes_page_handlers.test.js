@@ -15,6 +15,15 @@ test('tab switches rebuild the palette when browser URL updates are refused', ()
     button.dataset.tab = 'generative';
     const panel = fakeElement();
     panel.id = 'tab-content-generative';
+    const outgoingButton = fakeElement();
+    outgoingButton.dataset.tab = 'procedural';
+    outgoingButton.classList.add('active');
+    outgoingButton.setAttribute('aria-selected', 'true');
+    outgoingButton.tabIndex = 0;
+    const outgoingPanel = fakeElement();
+    outgoingPanel.id = 'tab-content-procedural';
+    outgoingPanel.classList.add('active');
+    outgoingPanel.hidden = false;
     let updated = 0;
     const urls = [];
     let replaced;
@@ -26,7 +35,8 @@ test('tab switches rebuild the palette when browser URL updates are refused', ()
       activeTab: 'procedural', window: { location: { href: 'https://example.test/tools/palettes.html' } },
       document: {
         getElementById: () => fakeElement(), querySelector: () => fakeElement(),
-        querySelectorAll: selector => selector === '.tab-btn' ? [button] : [panel],
+        querySelectorAll: selector => selector === '.tab-btn'
+          ? [button, outgoingButton] : [panel, outgoingPanel],
       },
       paletteTabUrl: (url, tab) => `${url}?tab=${tab}`,
       replaceUrl: url => { replaced = replaceUrl(url, win); }, updatePalette: () => { updated++; },
@@ -37,7 +47,15 @@ test('tab switches rebuild the palette when browser URL updates are refused', ()
     assert.deepEqual(captured.messages, refused ? ['URL update skipped: Error: rate limit'] : []);
     assert.equal(updated, 1);
     assert.equal(button.tabIndex, 0);
+    assert.equal(button.classList.contains('active'), true);
+    assert.equal(button.getAttribute('aria-selected'), 'true');
     assert.equal(panel.hidden, false);
+    assert.equal(panel.classList.contains('active'), true);
+    assert.equal(outgoingButton.classList.contains('active'), false);
+    assert.equal(outgoingButton.getAttribute('aria-selected'), 'false');
+    assert.equal(outgoingButton.tabIndex, -1);
+    assert.equal(outgoingPanel.classList.contains('active'), false);
+    assert.equal(outgoingPanel.hidden, true);
     assert.equal(context.activeTab, 'generative');
   }
 });
