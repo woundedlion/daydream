@@ -1,10 +1,10 @@
 import { after, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { installEngineBundle, runtimePath, RUNTIME_PATHS } from '../scripts/install-engine-bundle.mjs';
+import { scratchDir } from './helpers/fixture_repo.js';
 
 const AMBIENT_BUNDLE_PIN = process.env.HOLOSPHERE_BUNDLE_PIN;
 beforeEach(() => { delete process.env.HOLOSPHERE_BUNDLE_PIN; });
@@ -19,8 +19,7 @@ after(() => {
  * @returns {{bundle: string, destination: string, write: (base: string, path: string, text: string) => void}} The fixture paths and a writer.
  */
 function fixture(t, shape = () => {}) {
-  const root = mkdtempSync(join(tmpdir(), 'daydream-bundle-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = scratchDir(t, 'daydream-bundle-');
   const bundle = join(root, 'bundle');
   const destination = join(root, 'daydream');
   const write = (base, path, text) => {

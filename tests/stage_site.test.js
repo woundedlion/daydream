@@ -2,13 +2,12 @@ import { after, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { installEngineBundle } from '../scripts/install-engine-bundle.mjs';
 import { sitePaths, stageSite, verifiedEnginePaths } from '../scripts/stage-site.mjs';
-import { isolatedGitEnv } from './helpers/fixture_repo.js';
+import { isolatedGitEnv, scratchDir } from './helpers/fixture_repo.js';
 
 const AMBIENT_BUNDLE_PIN = process.env.HOLOSPHERE_BUNDLE_PIN;
 beforeEach(() => { delete process.env.HOLOSPHERE_BUNDLE_PIN; });
@@ -18,8 +17,7 @@ after(() => {
 });
 
 function fixture(t, readme = 'new README.md') {
-  const scratch = mkdtempSync(join(tmpdir(), 'stage-site-'));
-  t.after(() => rmSync(scratch, { recursive: true, force: true }));
+  const scratch = scratchDir(t, 'stage-site-');
   const root = join(scratch, 'repo');
   const bundle = join(scratch, 'bundle');
   const site = join(scratch, 'site');

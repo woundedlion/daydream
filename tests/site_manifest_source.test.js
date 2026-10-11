@@ -1,18 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, copyFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { appendFileSync, copyFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RUNTIME_PATHS, runtimePath } from '../scripts/install-engine-bundle.mjs';
-import { isolatedGitEnv } from './helpers/fixture_repo.js';
+import { isolatedGitEnv, scratchDir } from './helpers/fixture_repo.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 
 test('source manifest checks accept absent installed assets but reject untracked frontend', (t) => {
-  const root = mkdtempSync(join(tmpdir(), 'daydream-source-manifest-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = scratchDir(t, 'daydream-source-manifest-');
   const env = isolatedGitEnv();
   delete env.ENGINE_BUNDLE_DIR;
   delete env.NODE_TEST_CONTEXT;

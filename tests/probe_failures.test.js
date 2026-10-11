@@ -1,7 +1,6 @@
 import { closeProbeResources, checks, isMain, measureChecks } from '../scripts/probe_harness.mjs';
 import { feedbackAtClick, probeColorStrip, probeHueWheel, rgbMovedTogether } from '../scripts/palettes-probe.mjs';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
@@ -14,6 +13,7 @@ import {
 } from '../scripts/panel-probe.mjs';
 import { probeChain, probeNumericInputs } from '../scripts/solids-probe.mjs';
 import { probePad } from '../scripts/mobius-probe.mjs';
+import { scratchDir } from './helpers/fixture_repo.js';
 
 const PROBES = [
   ['workbench-probe.mjs', 'probeDocumentActions', probeDocumentActions],
@@ -46,11 +46,10 @@ const PROBES = [
 ];
 
 test('isMain recognizes an entry module reached through a junction', (t) => {
-  const temp = mkdtempSync(join(tmpdir(), 'probe-entry-'));
+  const temp = scratchDir(t, 'probe-entry-');
   const original = process.argv[1];
   t.after(() => {
     process.argv[1] = original;
-    rmSync(temp, { recursive: true, force: true });
   });
   const scripts = fileURLToPath(new URL('../scripts', import.meta.url));
   symlinkSync(scripts, join(temp, 'scripts'), 'junction');

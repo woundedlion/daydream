@@ -1,9 +1,8 @@
 import { test } from 'node:test';
-import { findBash } from './helpers/fixture_repo.js';
+import { findBash, scratchDir } from './helpers/fixture_repo.js';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync, mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync, readFileSync, mkdirSync, writeFileSync, symlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -354,8 +353,7 @@ test('engine selection snapshots current master and preserves an explicit pair',
   const selected = 'b'.repeat(40);
   const shell = findBash();
   if (!shell) { t.skip('Bash is unavailable'); return; }
-  const scratch = mkdtempSync(join(tmpdir(), 'daydream-engine-selection-'));
-  t.after(() => rmSync(scratch, { recursive: true, force: true }));
+  const scratch = scratchDir(t, 'daydream-engine-selection-');
   for (const pin of ['', selected]) {
     const output = join(scratch, pin || 'master');
     const result = spawnSync(shell, ['-e', '-s'], {
@@ -407,18 +405,14 @@ test('pre-push requires lint and typecheck to succeed', () => {
   }
 });
 
-test('the CI gate executes through a linked checkout path', () => {
-  const scratch = mkdtempSync(join(tmpdir(), 'daydream-cli-link-'));
-  try {
-    const linked = join(scratch, 'checkout');
-    symlinkSync(REPO, linked, process.platform === 'win32' ? 'junction' : 'dir');
-    const result = spawnSync(process.execPath, [join(linked, 'scripts/verify-ci-green.mjs')],
-      { encoding: 'utf8', cwd: linked });
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /unusable required-job results: no required-job results were supplied/);
-  } finally {
-    rmSync(scratch, { recursive: true, force: true });
-  }
+test('the CI gate executes through a linked checkout path', (t) => {
+  const scratch = scratchDir(t, 'daydream-cli-link-');
+  const linked = join(scratch, 'checkout');
+  symlinkSync(REPO, linked, process.platform === 'win32' ? 'junction' : 'dir');
+  const result = spawnSync(process.execPath, [join(linked, 'scripts/verify-ci-green.mjs')],
+    { encoding: 'utf8', cwd: linked });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /unusable required-job results: no required-job results were supplied/);
 });
 
 test('local pushes check source while paired browser coverage remains mandatory in CI', () => {
@@ -445,25 +439,21 @@ for (const [results, status, output] of [
   });
 }
 
-test('the CI gate CLI rejects an ungated job before evaluating results', () => {
-  const scratch = mkdtempSync(join(tmpdir(), 'daydream-ungated-cli-'));
-  try {
-    mkdirSync(join(scratch, '.github/workflows'), { recursive: true });
-    for (const [path, terminal] of GATED_WORKFLOWS) {
-      writeFileSync(join(scratch, path),
-        `jobs:\n  build:\n    runs-on: ubuntu-latest\n  ${terminal}:\n    needs: [build]\n  forgotten:\n    runs-on: ubuntu-latest\n`);
-    }
-    const result = spawnSync(process.execPath,
-      [join(REPO, 'scripts/verify-ci-green.mjs')], {
-        cwd: scratch, encoding: 'utf8',
-        env: { ...process.env, RESULTS: '{}' },
-      });
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /job 'forgotten' is absent/);
-    assert.doesNotMatch(result.stderr, /required-job results/);
-  } finally {
-    rmSync(scratch, { recursive: true, force: true });
+test('the CI gate CLI rejects an ungated job before evaluating results', (t) => {
+  const scratch = scratchDir(t, 'daydream-ungated-cli-');
+  mkdirSync(join(scratch, '.github/workflows'), { recursive: true });
+  for (const [path, terminal] of GATED_WORKFLOWS) {
+    writeFileSync(join(scratch, path),
+      `jobs:\n  build:\n    runs-on: ubuntu-latest\n  ${terminal}:\n    needs: [build]\n  forgotten:\n    runs-on: ubuntu-latest\n`);
   }
+  const result = spawnSync(process.execPath,
+    [join(REPO, 'scripts/verify-ci-green.mjs')], {
+      cwd: scratch, encoding: 'utf8',
+      env: { ...process.env, RESULTS: '{}' },
+    });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /job 'forgotten' is absent/);
+  assert.doesNotMatch(result.stderr, /required-job results/);
 });
 
 test('required suite steps execute without suppression', () => {
@@ -517,8 +507,7 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
   if (!shell) { t.skip('Bash is unavailable'); return; }
   const gate = workflowText(`engine-bundle.yml`);
   const block = gate.split('      - name: Download the verified engine bundle\n')[1].split('      - name:')[0];
-  const root = mkdtempSync(join(tmpdir(), 'engine-retries-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = scratchDir(t, 'engine-retries-');
   const body = block.split('        run: |\n')[1].replace(/^ {10}/gm, '')
     .replaceAll('/tmp/engine-bundle.zip', '"$FIXTURE_ROOT/bundle.zip"');
   const stubs = `
