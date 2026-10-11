@@ -165,7 +165,14 @@ export function installSegmentWorker() {
     for (const field of /** @type {const} */ (['acceptedValue', 'value'])) {
       const writes = params.flatMap((p) => typeof p[field] === 'number'
         ? [{ name: p.name, value: p[field] }] : []);
-      for (const { name, result } of replayParameterWrites(writes, writer, wasmModule.ParamSetResult)) {
+      const refusals = replayParameterWrites(writes, writer, wasmModule.ParamSetResult);
+      const rejected = new Set(refusals.map(({name}) => name));
+      for (const {name} of writes) {
+        if (rejected.has(name)) continue;
+        divergenceWarnings.delete(`param:${name}`);
+        if (paramRejectedKey.startsWith(`${name}:`)) paramRejectedKey = '';
+      }
+      for (const { name, result } of refusals) {
         reportParamRejected(name, result);
       }
     }
