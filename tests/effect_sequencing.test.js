@@ -747,6 +747,14 @@ test('a refused chain restore rejects a resolution transaction before rebuilding
   assert.equal(app.log.includes('effectGui.build'), false);
 });
 
+test('resolution correction discards the outgoing chain snapshot and parameter URL', () => {
+  const app = makeApp({resolution: 'Lo', effect: 'Gamma', chainSnapshot: {schemaVersion: 2}});
+  assert.equal(app.pipeline.applyResolution(true), ApplyResult.APPLIED);
+  assert.equal(app.log.includes('chain.capture'), true);
+  assert.equal(app.log.includes('chain.restore'), false);
+  assert.equal(app.log.includes('clearEffectParamUrl'), true);
+});
+
 test('rollback captures and restores complete chain runtime without individual parameter replay', () => {
   const effect = makeEffectControls({Speed: 0.25}, true);
   const chain = {schemaVersion: 2, runtime: [{instance: 'sample', kind: 'source-clock-v1', state: {primary: 1.25}}]};
