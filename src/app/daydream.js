@@ -9,7 +9,7 @@ import { GlobalStatsView } from "../ui/global_stats_view.js";
 import { MAX_DISPLAY_CAP_PERCENT, createDisplayCapsBinding } from "../renderer/display_caps.js";
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
 import { Daydream } from "../renderer/driver.js";
-import { MOBILE_BREAKPOINT_PX } from "../shared/layout.js";
+import { MOBILE_MEDIA_QUERY } from "../shared/layout.js";
 import { GUI, resetGUI } from "../ui/gui.js";
 import { EffectSidebar } from "../ui/sidebar.js";
 import {
@@ -394,7 +394,7 @@ export function start({
 
   const guiInstance = createGui({ autoPlace: false, title: 'View' }, 'view');
   guiInstance.domElement.classList.add('global-gui');
-  if (win.matchMedia?.(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`).matches ?? false) {
+  if (win.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false) {
     guiInstance.close();
   }
   const guiContainer = doc.getElementById('gui-container');
@@ -470,7 +470,7 @@ export function start({
     host: {
       createGui: () => createGui({ autoPlace: false, title: 'Effect' }, 'fx'),
       container: () => shaderWorkbench ? null : doc.getElementById('gui-container'),
-      isMobile: () => win.matchMedia?.(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`).matches ?? false,
+      isMobile: () => win.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false,
       copyText: copyToClipboard,
       applyEffect: () => {
         const rejected = apply.applyEffect() !== ApplyResult.APPLIED;
