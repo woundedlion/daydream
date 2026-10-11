@@ -18,7 +18,7 @@ import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../../effects/effect_persistence.js'
 import { copyToClipboard } from '../../shared/copy_text.js';
 import { downloadBlob } from '../../shared/download_file.js';
 import {
-  COMPILER_URL, decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
+  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
 } from './shader_deeplink.js';
 
 const PATTERN_CATALOG_URL = '../../../generated/shader/patterns/catalog.json';
@@ -200,7 +200,7 @@ export function createShaderDocumentController({
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     return response.text();
   },
-  importCompiler = () => import(COMPILER_URL),
+  importCompiler = () => import('../../../generated/shader/shader_workbench.mjs'),
   download = (filename, source) => defaultDownload(doc, filename, source),
   initialEffect = null,
   win = globalThis,

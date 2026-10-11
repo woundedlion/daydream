@@ -33,8 +33,10 @@ export function vendorAddonsFromSource(src, file) {
   for (const body of sources) {
     const ast = parse(body, { ecmaVersion: 'latest', sourceType: 'module', range: true });
     localUrls = new Set();
-    for (const node of ast.body) {
-      if (node.type !== 'VariableDeclaration' || node.kind !== 'const') continue;
+    for (const statement of ast.body) {
+      const node = statement.type === 'ExportNamedDeclaration'
+        ? statement.declaration : statement;
+      if (node?.type !== 'VariableDeclaration' || node.kind !== 'const') continue;
       for (const declaration of node.declarations) {
         const member = declaration.init;
         const call = member?.object;

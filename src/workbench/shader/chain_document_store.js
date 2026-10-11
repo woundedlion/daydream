@@ -6,7 +6,7 @@
 
 import { LABEL_PATTERN, declarationFromCatalogField as parameterFromField }
   from '../../../generated/shader/shader_workbench.mjs';
-import { CHAIN_SNAPSHOT_SCHEMA_VERSION, COMPILER_URL } from './shader_deeplink.js';
+import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from './shader_deeplink.js';
 
 /** @typedef {{id: string, name: string|null, min: number, max: number, default: *, curve?: string, topology?: false}} CatalogNumericField */
 /** @typedef {{id: string, topology: true, values: string[], default: *}} CatalogTopologyField */
@@ -138,7 +138,7 @@ export function scratchChainDocument(catalog, chain = DEFAULT_SCRATCH_CHAIN) {
 export async function createChainDocumentStore({
   document,
   catalog,
-  importCompiler = () => import(COMPILER_URL),
+  importCompiler = () => import('../../../generated/shader/shader_workbench.mjs'),
 }) {
   const compiler = await importCompiler();
   if (catalog === null || typeof catalog !== 'object' ||
