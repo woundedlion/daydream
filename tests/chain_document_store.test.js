@@ -217,6 +217,10 @@ test('an unknown catalog curve is refused instead of becoming linear', async () 
   const result = store.replaceSpan(PROJECT, 0, [{ operator: operator.id }]);
   assert.equal(result.ok, false);
   assert.match(result.diagnostics[0].message, /unknown catalog curve "future-curve"/);
+  assert.equal(result.diagnostics[0].code, 'INVALID_CATALOG_FIELD');
+  assert.equal(store.canUndo(), false);
+  assert.equal(store.canRedo(), false);
+  assert.equal(store.undo(), false);
   assert.deepEqual(store.document(), before);
 });
 
