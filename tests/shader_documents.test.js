@@ -1,3 +1,4 @@
+import { canonicalEffectId } from '../src/effects/effect_identity.js';
 import { fixedDerivedBinding, compileShaderDocument, DEFAULT_LIMITS, exportShaderDocumentJson, validateShaderDocument } from '../generated/shader/shader_workbench.mjs';
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -733,7 +734,7 @@ test('a deep-linked document id opens that document', async () => {
 // The scratch route names no document, and neither does a
 // stale id, so both open the scratch chain.
 test('a deep link naming no catalog document opens the scratch chain', async () => {
-  for (const initialEffect of ['ShaderChain', 'retired-pattern', null]) {
+  for (const initialEffect of ['shader-chain', 'retired-pattern', null]) {
     const harness = workbench({ initialEffect });
 
     assert.equal(await harness.controller.init(), true);
@@ -752,7 +753,7 @@ test('choosing a catalog source previews it through the interpreter', async () =
 
   await chooseCatalogSource(harness);
 
-  assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain']);
+  assert.deepEqual(harness.selections, [canonicalEffectId('shader-chain'), canonicalEffectId('shader-chain')]);
   assert.deepEqual(harness.engine.selected, [],
     'no fixed-effect reference preset is staged for an interpreted load');
   assert.deepEqual(harness.engine.chained.at(-1),
@@ -787,7 +788,7 @@ test('the parity toggle swaps the preview onto the compiled build and back', asy
 
   toggle.dispatch('click');
 
-  assert.equal(harness.selections.at(-1), 'ShaderChain');
+  assert.equal(harness.selections.at(-1), 'shader-chain');
   assert.equal(toggle.getAttribute('aria-pressed'), 'false');
   assert.deepEqual(harness.engine.writes.at(-1), ['sample.pattern-freq', 2]);
 });
@@ -800,7 +801,7 @@ test('a refused parity preset restores the interpreter and preserves the refusal
 
   toggle.dispatch('click');
 
-  assert.deepEqual(harness.selections.slice(-2), ['KaleidoscopeFlowers', 'ShaderChain']);
+  assert.deepEqual(harness.selections.slice(-2), ['KaleidoscopeFlowers', 'shader-chain']);
   assert.equal(toggle.getAttribute('aria-pressed'), 'false');
   assert.deepEqual(harness.engine.writes.at(-1), ['sample.pattern-freq', 2]);
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'error');
@@ -814,7 +815,7 @@ test('an imported study the catalog does not carry has no parity build', async (
 
   assert.equal(await harness.controller.loadSource(
     shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), true);
-  assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain']);
+  assert.deepEqual(harness.selections, [canonicalEffectId('shader-chain'), canonicalEffectId('shader-chain')]);
   assert.deepEqual(harness.engine.selected, [],
     'the dynamic path stages no fixed-effect reference preset');
   assert.deepEqual(harness.engine.chained.at(-1),
@@ -967,10 +968,10 @@ test('the workbench roster admits every effect the controller selects', async ()
   await onChange(select)();
   harness.elements.get('shader-parity-toggle').dispatch('click');
   assert.deepEqual(harness.selections, [
-    'ShaderChain', 'ShaderChain', 'ShaderChain', 'ShaderChain', 'kaleidoscope-flowers',
+    'shader-chain', 'shader-chain', 'shader-chain', 'shader-chain', 'kaleidoscope-flowers',
   ]);
   for (const effect of harness.selections) {
-    assert.ok(WORKBENCH_EFFECTS.includes(effect),
+    assert.ok(WORKBENCH_EFFECTS.map(canonicalEffectId).includes(effect),
       `the workbench page must know the effect "${effect}"`);
   }
 });
@@ -985,7 +986,7 @@ test('returning to the scratch source reopens the default chain', async () => {
 
   await onChange(select)();
 
-  assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain', 'ShaderChain']);
+  assert.deepEqual(harness.selections, ['shader-chain', 'shader-chain', 'shader-chain']);
   const presets = harness.elements.get('shader-preset-select');
   assert.deepEqual(presets.options.map((option) => option.textContent),
     ['Catalog Defaults']);
@@ -1109,8 +1110,8 @@ async function editorWorkbench({
     selectEffect: (effect) => {
       selections.push(effect);
       if (!selectEffect(effect)) return false;
-      current = effect === 'ShaderChain' ? engine : compiledEngine;
-      if (effect === 'ShaderChain') engine.setEffect(effect);
+      current = effect === 'shader-chain' ? engine : compiledEngine;
+      if (effect === 'shader-chain') engine.setEffect(effect);
       return true;
     },
     syncEffectGui: () => { ran.gui += 1; },
@@ -1175,7 +1176,7 @@ const displayedParameter = (harness, label, parameterId) => stripChips(harness)
 test('the scratch document opens as a live, editable chain', async () => {
   const harness = await editorWorkbench({ source: null });
 
-  assert.deepEqual(harness.selections, ['ShaderChain']);
+  assert.deepEqual(harness.selections, ['shader-chain']);
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
     ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v3',
       'colorize.generated-palette.v3']);
@@ -1532,7 +1533,7 @@ test('a malformed shader state link falls back to an editable scratch chain', as
 
 test('a dynamic document builds the strip, and edits re-apply through the engine', async () => {
   const harness = await editorWorkbench();
-  assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain']);
+  assert.deepEqual(harness.selections, [canonicalEffectId('shader-chain'), canonicalEffectId('shader-chain')]);
   assert.equal(harness.engine.chainCalls.length, 2);
   assert.equal(harness.engine.chainCalls.at(-1).length, 6);
   assert.equal(stripChips(harness).length, 6);
@@ -1621,7 +1622,7 @@ test('the parity toggle disarms on a descriptor edit, not on a bypass', async ()
   const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
   const toggle = harness.elements.get('shader-parity-toggle');
   assert.equal(toggle.disabled, false, 'the loaded digest matches a promoted effect');
-  assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain'],
+  assert.deepEqual(harness.selections, [canonicalEffectId('shader-chain'), canonicalEffectId('shader-chain')],
     'a shipped pattern still previews through the interpreter');
 
   stripChips(harness).find((chip) => chip.dataset.label === 'lens')
@@ -1673,7 +1674,7 @@ test('a descriptor edit under the compiled build returns the preview to the inte
 
   clickPlaneBandEntry(harness, 'warp.wave-shear.v2');
 
-  assert.equal(harness.selections.at(-1), 'ShaderChain');
+  assert.equal(harness.selections.at(-1), 'shader-chain');
   assert.equal(toggle.disabled, true);
   assert.equal(toggle.getAttribute('aria-pressed'), 'false');
   assert.equal(harness.engine.chainCalls.at(-1).length, 7,
@@ -2136,7 +2137,7 @@ test('noncatalog shader links have their own source option', async () => {
 
 test('a chain snapshot restores its program and accepted parameters into the editor', async () => {
   const engine = new FakeChainEngine();
-  engine.setEffect('ShaderChain');
+  engine.setEffect('shader-chain');
   engine.setParameter('sample.pattern-freq', 2.25);
   engine.setAnimationsPaused(true);
   const bindings = engine.getShaderChainBindings();
@@ -2158,13 +2159,13 @@ test('a chain snapshot restores its program and accepted parameters into the edi
 
 test('a refused chain snapshot rolls the engine back and keeps the link', async () => {
   const engine = new FakeChainEngine();
-  engine.setEffect('ShaderChain');
+  engine.setEffect('shader-chain');
   const snapshot = { ...engine.getShaderChainBindings().getSnapshot(), runtime: [] };
   const restores = [];
   const harness = await editorWorkbench({ source: null,
     search: `?effect=ShaderChain&fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(snapshot))}`,
     prepare: (target) => {
-      target.setEffect('ShaderChain');
+      target.setEffect('shader-chain');
       target.setParameter('sample.pattern-freq', 2.25);
       const bindings = target.getShaderChainBindings.bind(target);
       target.getShaderChainBindings = () => {
@@ -2190,7 +2191,7 @@ test('a refused chain snapshot rolls the engine back and keeps the link', async 
 
 test('a chain snapshot naming an unknown parameter is refused before adoption', async () => {
   const engine = new FakeChainEngine();
-  engine.setEffect('ShaderChain');
+  engine.setEffect('shader-chain');
   const snapshot = engine.getShaderChainBindings().getSnapshot();
   snapshot.parameters = [...snapshot.parameters, { name: 'missing.parameter', value: 0 }];
   const harness = await editorWorkbench({ source: null,

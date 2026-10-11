@@ -547,3 +547,13 @@ test('active effect scrolls the list horizontally and the container vertically',
   assert.equal(container.scrollTop, 30);
   assert.equal(b.scrollIntoViewCalls, 0);
 });
+
+test('canonical buttons retain display-keyed size and preset metadata', () => {
+  const { sidebar } = makeSidebar();
+  sidebar.setEffects(['comets'], {Comets: 2048}, {Comets: 12});
+  const button = sidebar.buttons.get('comets');
+  assert.equal(button.dataset.effect, 'comets');
+  assert.equal(button.children[0].textContent, 'Comets (12)');
+  assert.match(button.getAttribute('aria-label'), /^Comets, 12 presets/);
+  assert.equal(sidebar.items[0].size, 2048);
+});

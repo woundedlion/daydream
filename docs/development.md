@@ -112,3 +112,17 @@ caches. Ordinary effects restart their animation and simulation history;
 parameters, typed runtime, palette state, clocks and seeds. Settings survive effect
 and resolution changes, and update the preview while paused. Firmware retains its
 compiled physical profile.
+
+## Effect identities
+
+The installed `generated/engine_contract.mjs` exports canonical effect IDs,
+display labels and legacy aliases from the compiled engine. Curated resolution
+lists retain their display names and order; the app resolves those names to
+canonical IDs for engine selection and URL state. Sidebar labels, size and
+preset metadata retain the engine's display names.
+
+Legacy curated root links open the simulator. Canonical document root links
+open the authoring page. Simulator shares for those documents include
+`view=simulator`; the dedicated `tools/shader.html` route accepts either name
+form and removes simulator context when constructing an authoring URL.
+Parameter keys remain in the `fx` namespace.
