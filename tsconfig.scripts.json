@@ -12,6 +12,7 @@
   },
   "files": [
     "scripts/deployment-pair.mjs",
+    "scripts/copy-engine-contracts.mjs",
     "scripts/stage-site.mjs",
     "scripts/install-engine-bundle.mjs"
   ]

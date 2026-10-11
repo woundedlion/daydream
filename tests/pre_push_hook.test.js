@@ -1,3 +1,4 @@
+import { ENGINE_CONTRACT_PATHS } from '../scripts/install-engine-bundle.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -82,9 +83,15 @@ function snapshotFixture(t, { marker = false, suiteFailure = false } = {}) {
   const root = fixtureRoot(t);
   const env = isolatedGitEnv();
   delete env.NODE_TEST_CONTEXT;
-  for (const directory of ['.githooks', 'tests', 'node_modules', 'bin', 'tools'])
+  for (const directory of ['.githooks', 'tests', 'node_modules', 'bin', 'tools', 'scripts', 'generated'])
     mkdirSync(join(root, directory));
   writeFileSync(join(root, '.githooks/pre-push'), readFileSync(HOOK));
+  for (const script of ['copy-engine-contracts.mjs', 'install-engine-bundle.mjs'])
+    writeFileSync(join(root, 'scripts', script), readFileSync(resolve(HERE, '../scripts', script)));
+  for (const path of ENGINE_CONTRACT_PATHS)
+    writeFileSync(join(root, path), 'installed-contract');
+  writeFileSync(join(root, '.gitignore'), [...ENGINE_CONTRACT_PATHS].join('\n'));
+
   writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}');
   writeFileSync(join(root, 'package.json'), '{}');
   writeFileSync(join(root, 'package-lock.json'), '{}');
@@ -96,7 +103,7 @@ function snapshotFixture(t, { marker = false, suiteFailure = false } = {}) {
       suiteFailure && name === 'ci_workflow' ? 'throw new Error("fixture suite failed");' : '');
   const git = (...args) => execFileSync('git', ['-C', root, ...args], { env, encoding: 'utf8' });
   git('init', '-q');
-  git('add', '.githooks/pre-push', 'tests', 'package.json', 'package-lock.json',
+  git('add', '.githooks/pre-push', 'scripts', '.gitignore', 'tests', 'package.json', 'package-lock.json',
     'vendor-importmap.js', 'tools/tailwind.css', ...(marker ? ['marker'] : []));
   git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test',
     '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
@@ -228,6 +235,7 @@ for (const installStatus of [0, 19]) {
       writeFileSync(npm, '#!/bin/sh\n'
         + `printf '%s\\n' "$*" >> "${log}"\n`
         + `if [ "$1" = ci ]; then mkdir -p node_modules; echo '{}' > node_modules/.package-lock.json; exit ${installStatus}; fi\n`
+        + 'if [ "$2" = typecheck ]; then [ "$(cat generated/engine_contract.mjs)" = installed-contract ] || exit 29; fi\n'
         + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
         + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n');
       chmodSync(npm, 0o755);
@@ -263,7 +271,8 @@ for (const failure of ['none', 'lint', 'suite']) {
     const npm = join(root, 'bin/npm');
     writeFileSync(npm, `#!/bin/sh\nprintf '%s\\n' "npm $*" >> '${calls}'\n` + '[ "$(cat marker)" = committed ] || exit 23\n'
       + (failure === 'lint' ? '[ "$2" = lint ] && exit 31\n' : '')
-      + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
+      + 'if [ "$2" = typecheck ]; then [ "$(cat generated/engine_contract.mjs)" = installed-contract ] || exit 29; fi\n'
+        + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
       + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n');
     chmodSync(npm, 0o755);
     writeFileSync(join(root, 'marker'), 'working-tree-only\n');
