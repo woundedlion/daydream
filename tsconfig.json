@@ -22,6 +22,10 @@
   },
   "files": [
     "generated/holosphere_wasm.d.ts",
+    "generated/holosphere_bindings.d.ts",
+    "generated/engine_types.d.ts",
+    "generated/engine_contract.mjs",
+    "generated/segment_geometry.d.ts",
     "generated/shader/shader_workbench.d.mts",
     "generated/shader/composed_effect_roster.d.mts",
     "src/types/file_system_access.d.ts",

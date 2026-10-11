@@ -4,7 +4,8 @@
  */
 
 /** Simulation frames per second. */
-export const FPS = 16;
+export { FPS } from '../../generated/engine_contract.mjs';
+import { FPS } from '../../generated/engine_contract.mjs';
 
 /** Per-frame time (ms) above which a frame or segment is flagged as slow. */
 export const SLOW_FRAME_MS = 1000 / FPS;

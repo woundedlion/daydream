@@ -20,8 +20,11 @@ Holosphere owns that file and mirrors it into this checkout.
 stable independently of the source-module layout. `styles/` holds simulator CSS
 and Tailwind input; the tool stylesheets sit beside their HTML pages.
 
-Holosphere installs engine assets into `generated/`. Handwritten module
-declarations beside those outputs are tracked; the runtime outputs are ignored.
+Holosphere installs engine assets into `generated/`. Embind emits method and enum
+declarations; authored object schemas and loader extensions live in the engine
+checkout. The install generates browser FPS and numeric enum contracts from the
+bound module. Segment geometry is compiled from the firmware header to a small
+standalone JavaScript module. These installed outputs are ignored.
 See [deployment](deployment.md) for installing and verifying an engine package.
 
 Composed parameter definitions carry `group: {name, title, order}` from C++.

@@ -60,3 +60,10 @@ Thumbs.db
 # Documentation mirrored from Holosphere by the engine install.
 /README.md
 /docs/screenshots/
+
+/generated/holosphere_wasm.d.ts
+/generated/holosphere_bindings.d.ts
+/generated/engine_types.d.ts
+/generated/engine_contract.mjs
+/generated/segment_geometry.js
+/generated/segment_geometry.d.ts

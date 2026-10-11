@@ -12,6 +12,7 @@
 import {
   COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns, formatFloatCpp,
 } from '../../shared/cpp_format.js';
+import { NUMERIC_ENUMS } from '../../../generated/engine_contract.mjs';
 import { engineHalted } from '../../shared/engine_halt.js';
 
 /**
@@ -371,17 +372,7 @@ function dispatchOp(mesh, o, opName) {
 /**
  * The set of MeshOpResult keys the WASM bridge binds.
  */
-export const MESH_OP_RESULT_NAMES = [
-  'OK',
-  'UNKNOWN_NAME',
-  'CONNECTIVITY_OVERFLOW',
-  'FACE_DEGREE_OVERFLOW',
-  'ARENA_EXHAUSTED',
-  'NON_FINITE_ARG',
-  'ANGLE_OUT_OF_DOMAIN',
-  'STALE_WRAPPER',
-  'ARENA_UNAVAILABLE',
-];
+export const MESH_OP_RESULT_NAMES = Object.keys(NUMERIC_ENUMS.MeshOpResult);
 
 // Reason-specific tail of the message a null MeshOps result earns.
 /** @type {Object<string, string>} */

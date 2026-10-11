@@ -82,6 +82,7 @@ export class ModuleWarmer {
       const workerJs = drain('./segment_worker.js');
       const glueJs = drain('../../generated/holosphere_wasm.js');
       const layoutJs = drain('./segment_layout.js');
+      const geometryJs = drain('../../generated/segment_geometry.js');
       const protocolJs = drain('./worker_protocol.js');
       const haltJs = drain('../shared/engine_halt.js');
       const bindingsJs = drain('../engine/workbench_bindings.js');
@@ -96,6 +97,7 @@ export class ModuleWarmer {
         workerJs,
         glueJs,
         layoutJs,
+        geometryJs,
         protocolJs,
         haltJs,
         bindingsJs,

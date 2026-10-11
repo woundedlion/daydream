@@ -26,6 +26,7 @@ export const COVERAGE = [
   `--test-coverage-exclude=${fileURLToPath(new URL('./record-module-loads.mjs', import.meta.url))}`,
   '--test-coverage-exclude=generated/shader/**',
   '--test-coverage-exclude=generated/holosphere_wasm.js',
+  '--test-coverage-exclude=generated/segment_geometry.js',
   '--test-coverage-exclude=scripts/browser-smoke.mjs',
 ];
 

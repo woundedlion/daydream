@@ -6,7 +6,7 @@ export default [
   // eslint reads no .gitignore; these are generated, third-party or linked-checkout trees.
   {
     ignores: [
-      'generated/holosphere_wasm.js', 'generated/shader/*.mjs', 'vendor/**', 'three.js/**', 'engine/**',
+      'generated/holosphere_wasm.js', 'generated/segment_geometry.js', 'generated/shader/*.mjs', 'vendor/**', 'three.js/**', 'engine/**',
       '.worktrees/**', 'engine-bundle/**', '.hs-tmp-*/**', '.claude/**', 'prompts/**',
     ],
   },

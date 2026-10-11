@@ -128,3 +128,6 @@ LICENSE.txt
 # Documentation supplied by the verified engine bundle.
 README.md
 docs/screenshots/IslamicStars.png
+
+generated/engine_contract.mjs
+generated/segment_geometry.js
