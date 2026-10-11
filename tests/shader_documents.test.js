@@ -1435,14 +1435,20 @@ test('continuous shader edits cannot postpone a link write indefinitely', async 
   try {
     harness.urls.length = 0;
     const slider = sampleFrequencySlider(harness);
-    for (let value = 2; value <= 8; value += 1) {
-      slider.value = String(value);
+    const gap = SHADER_LINK_DEBOUNCE_MS - 1;
+    const gaps = Math.floor((SHADER_LINK_MAX_WAIT_MS - 1) / gap);
+    let reads;
+    for (let index = 0; index <= gaps; index += 1) {
+      slider.value = String(index + 2);
       slider.dispatch('input');
       harness.animationFrames.flush();
-      if (value < 8) mock.timers.tick(150);
+      reads = harness.pausedReads();
+      if (index < gaps) {
+        mock.timers.tick(gap);
+        assert.equal(harness.pausedReads(), reads);
+      }
     }
-    const reads = harness.pausedReads();
-    mock.timers.tick(SHADER_LINK_MAX_WAIT_MS - 900);
+    mock.timers.tick(SHADER_LINK_MAX_WAIT_MS - gaps * gap);
     assert.ok(harness.pausedReads() > reads, 'the max-wait timer started the write');
     mock.timers.reset();
     await harness.controller.flushDeepLink();
