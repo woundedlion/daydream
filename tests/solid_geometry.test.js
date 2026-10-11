@@ -22,31 +22,27 @@ test('faceNormal of a tilted triangle is its edge cross product', () => {
   });
 });
 
-test('isConvexFace accepts a convex face', () => {
-  const vertices = [
-    { x: 0, y: 0, z: 0 },
-    { x: 2, y: 0, z: 0 },
-    { x: 2, y: 2, z: 0 },
-    { x: 0, y: 2, z: 0 },
-  ];
-  assert.equal(isConvexFace(vertices, [0, 1, 2, 3]), true);
-});
-
-test('isConvexFace rejects a concave star face', () => {
-  const vertices = Array.from({ length: 10 }, (_, i) => {
-    const angle = i * Math.PI / 5;
-    const radius = i % 2 === 0 ? 2 : 0.8;
-    return { x: radius * Math.cos(angle), y: radius * Math.sin(angle), z: 0 };
-  });
-  assert.equal(isConvexFace(vertices, vertices.map((_, i) => i)), false);
-});
-
 const SQUARE = [
   { x: 0, y: 0, z: 0 },
   { x: 2, y: 0, z: 0 },
   { x: 2, y: 2, z: 0 },
   { x: 0, y: 2, z: 0 },
 ];
+
+/** A ten-point star alternating radius 2 and 0.8 in the z = 0 plane. */
+const STAR = Array.from({ length: 10 }, (_, i) => {
+  const angle = i * Math.PI / 5;
+  const radius = i % 2 === 0 ? 2 : 0.8;
+  return { x: radius * Math.cos(angle), y: radius * Math.sin(angle), z: 0 };
+});
+
+test('isConvexFace accepts a convex face', () => {
+  assert.equal(isConvexFace(SQUARE, [0, 1, 2, 3]), true);
+});
+
+test('isConvexFace rejects a concave star face', () => {
+  assert.equal(isConvexFace(STAR, STAR.map((_, i) => i)), false);
+});
 
 /** Collects fanTriangulateFace's emitted corners as flat x/y/z triples. */
 const fanCorners = (vertices, face, forceCentroid) => {
@@ -65,20 +61,15 @@ test('fanTriangulateFace fans a convex face from its first corner', () => {
 });
 
 test('fanTriangulateFace fans a non-convex face from its centroid', () => {
-  const star = Array.from({ length: 10 }, (_, i) => {
-    const angle = i * Math.PI / 5;
-    const radius = i % 2 === 0 ? 2 : 0.8;
-    return { x: radius * Math.cos(angle), y: radius * Math.sin(angle), z: 0 };
-  });
-  const face = star.map((_, i) => i);
-  const corners = fanCorners(star, face);
+  const face = STAR.map((_, i) => i);
+  const corners = fanCorners(STAR, face);
   // One triangle per edge, apex first, and no apex is a face vertex.
   assert.equal(corners.length, face.length * 3);
   for (let i = 0; i < corners.length; i += 3) {
     assert.deepEqual(corners[i], corners[0]);
-    assert.deepEqual(corners[i + 1], [star[i / 3].x, star[i / 3].y, star[i / 3].z]);
+    assert.deepEqual(corners[i + 1], [STAR[i / 3].x, STAR[i / 3].y, STAR[i / 3].z]);
     assert.deepEqual(corners[i + 2],
-      [star[(i / 3 + 1) % face.length].x, star[(i / 3 + 1) % face.length].y, 0]);
+      [STAR[(i / 3 + 1) % face.length].x, STAR[(i / 3 + 1) % face.length].y, 0]);
   }
   assert.ok(Math.hypot(corners[0][0], corners[0][1]) < 1e-9);
 });
