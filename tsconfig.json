@@ -91,6 +91,7 @@
     "src/shared/slider.js",
     "src/workbench/solids/solid_build.js",
     "src/workbench/solids/solid_codegen.js",
+    "src/workbench/solids/solid_validation.js",
     "src/workbench/solids/solid_geometry.js",
     "src/workbench/solids/solid_op_rows.js",
     "src/workbench/solids/solid_registry_codegen.js",

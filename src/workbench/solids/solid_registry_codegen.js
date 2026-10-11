@@ -54,7 +54,7 @@ export function primitiveCount(op) {
 
 /**
  * Replays flattened primitives on the sacrificial validator and checks endpoint and bridge budgets.
- * @param {import('./solid_codegen.js').ChainValidator} validator - Sacrificial engine provider.
+ * @param {import('./solid_validation.js').ChainValidator} validator - Sacrificial engine provider.
  * @param {import('./solid_codegen.js').SolidSpec} item - Saved solid and authored operations.
  * @param {?{seed:string, ops:Array<{op:string,param:number,twist:number}>}} baseRecipe - Flattened star-pattern base.
  * @returns {Promise<void>} Resolves when every primitive endpoint and bridge fits.

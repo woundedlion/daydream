@@ -1,3 +1,4 @@
+import { createCommitQueue, createChainValidator, createOpGate } from '../src/workbench/solids/solid_validation.js';
 import { fakeModule as makeMeshOps } from './helpers/fake_meshops.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,9 +31,6 @@ const {
   dropTargetIndex,
   reorderPreviewShift,
   movedOps,
-  createCommitQueue,
-  createChainValidator,
-  createOpGate,
   opTopologyKey,
   meshOpFailure,
   requireMeshResult,

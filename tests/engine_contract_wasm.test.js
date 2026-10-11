@@ -10,8 +10,9 @@ import createHolosphereModule from '../generated/holosphere_wasm.js';
 import { validateRegistryFaces } from '../src/workbench/solids/solid_registry_codegen.js';
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
+import { createChainValidator } from '../src/workbench/solids/solid_validation.js';
 import {
-  createChainValidator, KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
+  KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
   DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure,
 } from '../src/workbench/solids/solid_codegen.js';
 import {
