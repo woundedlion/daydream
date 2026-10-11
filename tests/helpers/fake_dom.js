@@ -725,6 +725,14 @@ export function fakeElement(tag = 'div', options = {}) {
       },
     });
   }
+  Object.defineProperty(element, 'hidden', {
+    enumerable: true, configurable: true,
+    get() { return Object.hasOwn(element.attributes, 'hidden'); },
+    set(value) {
+      if (value) element.setAttribute('hidden', '');
+      else element.removeAttribute('hidden');
+    },
+  });
   if (inPage) rooted.add(element);
   return element;
 }

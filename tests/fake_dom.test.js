@@ -957,3 +957,16 @@ test('focus before insertion leaves the active element unchanged', () => {
   assert.equal(doc.activeElement, button);
   assert.equal(button.focusCalls, 1);
 });
+
+test('hidden defaults to false and reflects its boolean attribute', () => {
+  const element = fakeElement('div');
+  assert.equal(element.hidden, false);
+  element.hidden = true;
+  assert.equal(element.getAttribute('hidden'), '');
+  element.hidden = false;
+  assert.equal(element.getAttribute('hidden'), null);
+  element.setAttribute('hidden', '');
+  assert.equal(element.hidden, true);
+  element.removeAttribute('hidden');
+  assert.equal(element.hidden, false);
+});
