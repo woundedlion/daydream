@@ -41,6 +41,7 @@ if [ "${DAYDREAM_PUSH_SNAPSHOT:-0}" != 1 ]; then
       else
         npm ci --ignore-scripts || exit 1
       fi
+      node "$source_root/scripts/copy-engine-contracts.mjs" "$source_root" . || exit 1
       DAYDREAM_PUSH_SNAPSHOT=1 sh "$source_root/.githooks/pre-push" </dev/null
     ) || exit 1
     cleanup || exit 1
