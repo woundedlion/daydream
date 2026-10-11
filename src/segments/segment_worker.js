@@ -212,201 +212,184 @@ export function installSegmentWorker() {
    */
   async function handleMessage(msg) {
     if (engineDead) return;
+    if (msg.type === 'init') {
+      // Version check precedes reading any other field or touching WASM.
+      if (msg.version !== PROTOCOL_VERSION) {
+        post({ type: 'engineRejected',
+               reason: `protocol version ${msg.version} != worker ${PROTOCOL_VERSION}`
+                       + ` (stale cached worker or controller)` });
+        return;
+      }
+      if (engine || wasmModule) {
+        post({ type: 'engineRejected', reason: 'duplicate init' });
+        return;
+      }
+
+      if (typeof msg.effectName !== 'string' || !msg.effectName.trim()) {
+        post({ type: 'engineRejected', reason: 'init requires an effect name' });
+        return;
+      }
+
+      paramRejectedKey = '';
+      divergenceWarnings = new Map();
+      segId = msg.segId;
+      totalSegs = msg.totalSegs;
+      paramRevision = msg.paramRevision;
+
+      /** @type {Parameters<typeof createHolosphereModule>[0]} */
+      const options = {};
+      // Only segment 0 prints engine logs; printErr stays live everywhere.
+      if (segId !== 0) options.print = () => {};
+      const compiled = msg.wasmModule;
+      let failInstantiation = () => {};
+      /** @type {Promise<null>} */
+      const instantiationFailed = new Promise((resolve) => {
+        failInstantiation = () => resolve(null);
+      });
+      if (compiled) {
+        // Each instance of the shared compilation owns a private heap.
+        options.instantiateWasm = (imports, onInstance) => {
+          WebAssembly.instantiate(compiled, imports).then(
+            (instance) => onInstance(instance, compiled),
+            // The glue's instantiate has no rejection path; settle the race here.
+            (error) => {
+              post({ type: 'engineRejected',
+                     reason: `shared module instantiate failed: ${error}`,
+                     sharedModule: true });
+              failInstantiation();
+            });
+          return {};
+        };
+      }
+      const mod = await Promise.race([createHolosphereModule(options), instantiationFailed]);
+      if (!mod) return;
+      wasmModule = mod;
+      engine = new mod.HolosphereEngine();
+      if (!engine.setDisplayCaps(msg.topCap ?? 0, msg.bottomCap ?? 0)) {
+        post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
+        return;
+      }
+      // The latch tracks the live engine; a fresh one starts unlatched.
+      awaitingEffect = false;
+      // A rejected resolution leaves no usable geometry.
+      if (engine.setResolution(msg.w, msg.h)
+          === wasmModule.ResolutionSetResult.UNSUPPORTED) {
+        post({ type: 'engineRejected',
+               reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
+        return;
+      }
+      canvasW = msg.w;
+      canvasH = msg.h;
+      segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
+
+      if (engine.setEffect(msg.effectName)
+          !== wasmModule.EffectSetResult.INSTALLED) {
+        post({ type: 'engineRejected',
+               reason: `setEffect(${msg.effectName}) rejected` });
+        return;
+      }
+      // Mirrors the engine-driven index without engaging the pause.
+      if (typeof msg.presetIndex === 'number') {
+        applyPreset(msg.presetIndex, 'synchronizePreset');
+      }
+      if (!restoreChainSnapshot(msg.chainSnapshot)) return;
+      replayParams(msg.params);
+      if (typeof msg.paused === 'boolean') engine.setAnimationsPaused(msg.paused);
+      if (typeof msg.poleLod === 'number') engine.setPoleLod(msg.poleLod);
+      // A rejected clip leaves no usable render geometry: report nothing ready.
+      if (!applyClip()) return;
+
+      post({ type: 'ready' });
+      return;
+    }
+    if (!engine || !wasmModule) {
+      if (msg.type === 'render') {
+        throw new Error('segment_worker: render before a completed init '
+          + `(engine=${engine ? 'set' : 'null'}, `
+          + `segRange=${segRange ? 'set' : 'null'})`);
+      }
+      if (!['setEffect', 'setResolution', 'setParameter', 'setAnimationsPaused',
+        'selectPreset', 'setDisplayCaps', 'setPoleLod'].includes(msg.type))
+        throw new Error(`segment_worker: unknown message type ${msg.type}`);
+      rejectBeforeInit(msg.type);
+      return;
+    }
     switch (msg.type) {
-      case 'init': {
-        // Version check precedes reading any other field or touching WASM.
-        if (msg.version !== PROTOCOL_VERSION) {
-          post({ type: 'engineRejected',
-                 reason: `protocol version ${msg.version} != worker ${PROTOCOL_VERSION}`
-                         + ` (stale cached worker or controller)` });
-          break;
-        }
-        if (engine || wasmModule) {
-          post({ type: 'engineRejected', reason: 'duplicate init' });
-          break;
-        }
-
-        if (typeof msg.effectName !== 'string' || !msg.effectName.trim()) {
-          post({ type: 'engineRejected', reason: 'init requires an effect name' });
-          break;
-        }
-
-        paramRejectedKey = '';
-        divergenceWarnings = new Map();
-        segId = msg.segId;
-        totalSegs = msg.totalSegs;
-        paramRevision = msg.paramRevision;
-
-        /** @type {Parameters<typeof createHolosphereModule>[0]} */
-        const options = {};
-        // Only segment 0 prints engine logs; printErr stays live everywhere.
-        if (segId !== 0) options.print = () => {};
-        const compiled = msg.wasmModule;
-        let failInstantiation = () => {};
-        /** @type {Promise<null>} */
-        const instantiationFailed = new Promise((resolve) => {
-          failInstantiation = () => resolve(null);
-        });
-        if (compiled) {
-          // Each instance of the shared compilation owns a private heap.
-          options.instantiateWasm = (imports, onInstance) => {
-            WebAssembly.instantiate(compiled, imports).then(
-              (instance) => onInstance(instance, compiled),
-              // The glue's instantiate has no rejection path; settle the race here.
-              (error) => {
-                post({ type: 'engineRejected',
-                       reason: `shared module instantiate failed: ${error}`,
-                       sharedModule: true });
-                failInstantiation();
-              });
-            return {};
-          };
-        }
-        const mod = await Promise.race([createHolosphereModule(options), instantiationFailed]);
-        if (!mod) break;
-        wasmModule = mod;
-        engine = new mod.HolosphereEngine();
-        if (!engine.setDisplayCaps(msg.topCap ?? 0, msg.bottomCap ?? 0)) {
-          post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
-          break;
-        }
-        // The latch tracks the live engine; a fresh one starts unlatched.
-        awaitingEffect = false;
-        // A rejected resolution leaves no usable geometry.
-        if (engine.setResolution(msg.w, msg.h)
-            === wasmModule.ResolutionSetResult.UNSUPPORTED) {
-          post({ type: 'engineRejected',
-                 reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
-          break;
-        }
-        canvasW = msg.w;
-        canvasH = msg.h;
-        segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
-
-        if (engine.setEffect(msg.effectName)
+      case 'setEffect': {
+        // INSTALLED is the sole success; either rejection keeps the old effect.
+        if (engine.setEffect(msg.name)
             !== wasmModule.EffectSetResult.INSTALLED) {
           post({ type: 'engineRejected',
-                 reason: `setEffect(${msg.effectName}) rejected` });
+                 reason: `setEffect(${msg.name}) rejected` });
           break;
         }
-        // Mirrors the engine-driven index without engaging the pause.
+        paramRejectedKey = '';
+        divergenceWarnings = new Map();
+        arenaMetricsWarned = false;
+        awaitingEffect = false;
+        // Mirrors the engine-driven index without the pause, as in 'init'.
         if (typeof msg.presetIndex === 'number') {
           applyPreset(msg.presetIndex, 'synchronizePreset');
         }
         if (!restoreChainSnapshot(msg.chainSnapshot)) break;
         replayParams(msg.params);
-        if (typeof msg.paused === 'boolean') engine.setAnimationsPaused(msg.paused);
-        if (typeof msg.poleLod === 'number') engine.setPoleLod(msg.poleLod);
-        // A rejected clip leaves no usable render geometry: report nothing ready.
-        if (!applyClip()) break;
-
-        post({ type: 'ready' });
-        break;
-      }
-
-      case 'setEffect': {
-        if (engine && wasmModule) {
-          // INSTALLED is the sole success; either rejection keeps the old effect.
-          if (engine.setEffect(msg.name)
-              !== wasmModule.EffectSetResult.INSTALLED) {
-            post({ type: 'engineRejected',
-                   reason: `setEffect(${msg.name}) rejected` });
-            break;
-          }
-          paramRejectedKey = '';
-          divergenceWarnings = new Map();
-          arenaMetricsWarned = false;
-          awaitingEffect = false;
-          // Mirrors the engine-driven index without the pause, as in 'init'.
-          if (typeof msg.presetIndex === 'number') {
-            applyPreset(msg.presetIndex, 'synchronizePreset');
-          }
-          if (!restoreChainSnapshot(msg.chainSnapshot)) break;
-          replayParams(msg.params);
-          if (typeof msg.paused === 'boolean') {
-            engine.setAnimationsPaused(msg.paused);
-          }
-          paramRevision = msg.paramRevision;
-          // A rejected clip leaves no usable render geometry, as in 'init'.
-          if (!applyClip()) break;
-        } else {
-          rejectBeforeInit(msg.type);
+        if (typeof msg.paused === 'boolean') {
+          engine.setAnimationsPaused(msg.paused);
         }
+        paramRevision = msg.paramRevision;
+        // A rejected clip leaves no usable render geometry, as in 'init'.
+        if (!applyClip()) break;
         break;
       }
 
       case 'setResolution': {
-        if (engine && wasmModule) {
-          // RESIZED and ALREADY_ACTIVE both commit; RESIZED also dropped the
-          // effect and the clip.
-          const resolutionResult = engine.setResolution(msg.w, msg.h);
-          if (resolutionResult === wasmModule.ResolutionSetResult.UNSUPPORTED) {
-            post({ type: 'engineRejected',
-                   reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
-            break;
-          }
-          if (resolutionResult === wasmModule.ResolutionSetResult.RESIZED) {
-            awaitingEffect = true;
-          }
-          canvasW = msg.w;
-          canvasH = msg.h;
-          arenaMetricsWarned = false;
-          segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
-        } else {
-          rejectBeforeInit(msg.type);
+        // RESIZED and ALREADY_ACTIVE both commit; RESIZED also dropped the
+        // effect and the clip.
+        const resolutionResult = engine.setResolution(msg.w, msg.h);
+        if (resolutionResult === wasmModule.ResolutionSetResult.UNSUPPORTED) {
+          post({ type: 'engineRejected',
+                 reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
+          break;
         }
+        if (resolutionResult === wasmModule.ResolutionSetResult.RESIZED) {
+          awaitingEffect = true;
+        }
+        canvasW = msg.w;
+        canvasH = msg.h;
+        arenaMetricsWarned = false;
+        segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
         break;
       }
 
       case 'setParameter': {
-        if (engine && wasmModule) {
-          applyParam(msg.name, msg.value);
-          paramRevision = msg.paramRevision;
-        } else {
-          rejectBeforeInit(msg.type);
-        }
+        applyParam(msg.name, msg.value);
+        paramRevision = msg.paramRevision;
         break;
       }
 
       case 'setAnimationsPaused': {
-        if (engine && wasmModule) {
-          engine.setAnimationsPaused(msg.paused);
-        } else {
-          rejectBeforeInit(msg.type);
-        }
+        engine.setAnimationsPaused(msg.paused);
         break;
       }
 
       case 'selectPreset': {
-        if (engine && wasmModule) {
-          applyPreset(msg.index);
-          paramRevision = msg.paramRevision;
-        } else {
-          rejectBeforeInit(msg.type);
-        }
+        applyPreset(msg.index);
+        paramRevision = msg.paramRevision;
         break;
       }
 
       case 'setDisplayCaps': {
-        if (engine && wasmModule) {
-          if (!engine.setDisplayCaps(msg.topCap, msg.bottomCap)) {
-            post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
-            break;
-          }
-          arenaMetricsWarned = false;
-          applyClip();
-        } else {
-          rejectBeforeInit(msg.type);
+        if (!engine.setDisplayCaps(msg.topCap, msg.bottomCap)) {
+          post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
+          break;
         }
+        arenaMetricsWarned = false;
+        applyClip();
         break;
       }
 
       case 'setPoleLod': {
-        if (engine && wasmModule) {
-          engine.setPoleLod(msg.value);
-        } else {
-          rejectBeforeInit(msg.type);
-        }
+        engine.setPoleLod(msg.value);
         break;
       }
 
