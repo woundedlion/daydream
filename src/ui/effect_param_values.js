@@ -34,7 +34,8 @@ import { resolveParamSync, paramValueSkew, selectorControlValue } from "../effec
  * @param {() => Node|null|undefined} deps.focusedElement - The document's focused
  *   element.
  * @param {(message: string) => void} deps.logWarn - Console sink.
- * @returns {{syncValues: (display: ParamDisplay, advanced: boolean, presetAdvanced: boolean) => void,
+ * @returns {{syncValues: (display: ParamDisplay,
+ *     options: {advanced: boolean, presetAdvanced: boolean}) => void,
  *   adoptRequestedEnums: (display: ParamDisplay, focused: Node|null) => void,
  *   resetSkew: () => void}}
  */
@@ -71,13 +72,14 @@ export function createParamValueSync({
    * Push the live parameter values into the displayed controllers without
    * clobbering a control being dragged or typed into.
    * @param {ParamDisplay} display - The displayed controllers.
-   * @param {boolean} advanced - Whether the simulation stepped this frame;
+   * @param {Object} options
+   * @param {boolean} options.advanced - Whether the simulation stepped this frame;
    *   gates only the enum-definition marshal.
-   * @param {boolean} presetAdvanced - Whether the live preset moved off the
+   * @param {boolean} options.presetAdvanced - Whether the live preset moved off the
    *   displayed one.
    * @returns {void}
    */
-  function syncValues(display, advanced, presetAdvanced) {
+  function syncValues(display, { advanced, presetAdvanced }) {
     if (!display.hasParams) return;
     // One focus read for the whole pass: at most one element has focus.
     const focused = focusedElement() ?? null;
