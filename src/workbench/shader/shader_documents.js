@@ -838,19 +838,18 @@ export function createShaderDocumentController({
             { catalog: operatorCatalog });
           if (compiled.status !== 'VALID')
             throw new Error(`${filename}: ${diagnosticText(compiled)}`);
-          return [effectId, filename, source, compiled];
+          return {
+            effectId,
+            filename,
+            source,
+            compiled,
+            descriptorDigest: compiled.descriptor_digest,
+            presetIds: compiled.document.preset_bank.presets.map(
+              (/** @type {*} */ preset) => preset.preset_id),
+          };
         }));
-      sourceCatalog = new Map(entries.map(([effectId, filename, source, compiled]) =>
-        [effectId, {
-          effectId,
-          filename,
-          source,
-          compiled,
-          descriptorDigest: compiled.descriptor_digest,
-          presetIds: compiled.document.preset_bank.presets.map(
-            (/** @type {*} */ preset) => preset.preset_id),
-        }]));
-      for (const [effectId] of entries) {
+      sourceCatalog = new Map(entries.map((entry) => [entry.effectId, entry]));
+      for (const { effectId } of entries) {
         const option = doc.createElement('option');
         option.value = effectId;
         option.textContent = patternCatalog.product_group.children
