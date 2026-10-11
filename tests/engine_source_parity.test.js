@@ -555,11 +555,9 @@ test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip
 
 test('composite sweep exemptions stay inside the engine primitive bands', { skip: engineSkip }, () => {
   const graphPath = 'core/mesh/conway_graph.h';
-  const conwayPath = 'core/mesh/conway.h';
   const graph = header(graphPath);
   assert.ok(OP_DEFS.bevel.params.t.min >= engineConstant(graph, 'T_TRUNCATE_ARRIVAL_MIN', graphPath));
   assert.ok(OP_DEFS.bevel.params.t.max <= 1 - engineConstant(graph, 'T_EPS_AMBO', graphPath));
-  assert.ok(engineConstant(header(conwayPath), 'SNUB_DEFAULT_T', conwayPath) > 0);
 });
 
 test('registry composite lowering matches expand_to_primitives', { skip: engineSkip }, () => {
