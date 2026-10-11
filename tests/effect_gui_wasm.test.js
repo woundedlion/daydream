@@ -154,7 +154,7 @@ test('composed engine definitions publish complete pipeline groups', async () =>
   try {
     for (const resolution of [[96, 20], [288, 144]]) {
       assert.notEqual(engine.setResolution(...resolution), module.ResolutionSetResult.UNSUPPORTED, resolution.join('x'));
-      for (const effect of ['LatticeMelt', 'KaleidoscopeSmooth', 'AshCloud', 'ChromaticLichen']) {
+      for (const effect of ['KaleidoscopeMelt', 'KaleidoscopeSmooth', 'AshCloud', 'ChromaticLichen']) {
         assert.equal(engine.setEffect(effect), module.EffectSetResult.INSTALLED, effect);
         const parameters = engine.getParameterDefinitions();
         const assignments = stageGrouping(parameters)?.assignments;
