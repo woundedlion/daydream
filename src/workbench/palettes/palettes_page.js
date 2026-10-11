@@ -63,11 +63,11 @@ function switchTab(tabName, updateUrl = true) {
 }
 
 
-const defaultParams = {
-  A_R: 0.500, A_G: 0.500, A_B: 0.500, // Base (0.0 to 1.0)
-  B_R: 0.500, B_G: 0.500, B_B: 0.500, // Amplitude (0.0 to 1.0)
-  C_R: 1.000, C_G: 1.000, C_B: 1.000, // Frequency (-5.0 to 5.0)
-  D_R: 0.000, D_G: 0.330, D_B: 0.670  // Phase (-1.0 to 2.0)
+const DEFAULT_PARAMS = {
+  A_R: 0.500, A_G: 0.500, A_B: 0.500,
+  B_R: 0.500, B_G: 0.500, B_B: 0.500,
+  C_R: 1.000, C_G: 1.000, C_B: 1.000,
+  D_R: 0.000, D_G: 0.330, D_B: 0.670
 };
 
 let proceduralSliders = null;
@@ -81,7 +81,7 @@ const paletteViewport = createPaletteViewport();
 let hueKeyWheelCanvas, hueKeyWheelCtx;
 let hueKeyWheel = null;
 
-const fullViewport = Object.freeze({ start: 0, end: 1 });
+const FULL_VIEWPORT = Object.freeze({ start: 0, end: 1 });
 
 function renderRecipeWindow() {
   const offsetSlider = document.getElementById(PALETTE_CONTROL_IDS.offset);
@@ -178,7 +178,7 @@ function handleAxisCurveChange(axisName, event) {
 // Recipe readings shown on a slider: its element, the factor from the
 // reading's unit to the slider's, how many decimals the mirror label shows,
 // and the unit it is labelled in.
-const recipeSliderDefinitions = [
+const RECIPE_SLIDER_DEFINITIONS = [
   { reading: 'spreadTurns', id: PALETTE_CONTROL_IDS.spreadDegrees, scale: 360, digits: 1, suffix: '°' },
   { reading: 'sweepTurns', id: PALETTE_CONTROL_IDS.sweepTurns, scale: 1, digits: 1, suffix: '' },
   { reading: 'hueTorsion', id: PALETTE_CONTROL_IDS.hueTorsion, scale: 1, digits: 1, suffix: '' },
@@ -195,7 +195,7 @@ function renderRecipeSliders() {
   const loopSweep = recipeModel.reading('domain') === 'LOOP'
     && recipeModel.reading('hueMode') === 'SWEEP';
   document.getElementById(PALETTE_CONTROL_IDS.sweepTurns).step = loopSweep ? '1' : '0.5';
-  for (const { reading, id, scale, digits, suffix } of recipeSliderDefinitions) {
+  for (const { reading, id, scale, digits, suffix } of RECIPE_SLIDER_DEFINITIONS) {
     const value = recipeModel.reading(reading) * scale;
     document.getElementById(id).value = value;
     document.getElementById(`${id}_value`).textContent = `${value.toFixed(digits)}${suffix}`;
@@ -480,7 +480,7 @@ function syncResetZoomButton() {
 
 function drawColorStrip(selectionRange = null) {
   if (!palette) return;
-  const viewport = activeTab === 'procedural' ? paletteViewport.value : fullViewport;
+  const viewport = activeTab === 'procedural' ? paletteViewport.value : FULL_VIEWPORT;
   colorStripPainter?.draw(palette, selectionRange, viewport);
 }
 
@@ -712,7 +712,7 @@ async function init() {
     });
   });
 
-  proceduralSliders = mountProceduralSliders({ defaults: defaultParams, scheduleUpdate });
+  proceduralSliders = mountProceduralSliders({ defaults: DEFAULT_PARAMS, scheduleUpdate });
 
   buildPaletteGallery();
   buildEffectRecipePresets();
@@ -750,7 +750,7 @@ async function init() {
     scheduleUpdate();
   });
 
-  for (const { reading, id, scale } of recipeSliderDefinitions) {
+  for (const { reading, id, scale } of RECIPE_SLIDER_DEFINITIONS) {
     document.getElementById(id).addEventListener('input', (event) => {
       hueKeyWheel.clearStatus();
       recipeModel.setAmount(reading, Number(event.target.value) / scale);
