@@ -565,7 +565,7 @@ test('index boots through the entry module and bootstrap.js stays importable', (
     performance.setResourceTimingBufferSize = () => { widened++; };
     const touched = [];
     globalThis.document = new Proxy({}, {
-      get: (_target, key) => { touched.push(String(key)); return undefined; },
+      get: (target, key) => { touched.push(String(key)); return undefined; },
     });
     await import(${JSON.stringify(new URL('../src/app/bootstrap.js', import.meta.url).href)});
     await new Promise((resolve) => setImmediate(resolve));
