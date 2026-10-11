@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import {
   bootRemedy, bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
-  StaleModuleError, STALE_MODULE_REMEDY, VENDOR_REMEDY,
+  StaleModuleError, STALE_MODULE_REMEDY, VENDOR_REMEDY, REFRESH_DEADLINE_MS,
 } from '../src/app/bootstrap.js';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
@@ -237,9 +237,10 @@ test('the reload sweep runs on the deadline’s abort signal', async () => {
 // A stalled connection fires no error of its own.
 test('refreshWithDeadline aborts a stalled sweep and releases the reload', async () => {
   let expire = null;
+  let requestedDelay = null;
   let cleared = 0;
   const timers = {
-    setTimeout: (fn) => { expire = fn; return { unref() {} }; },
+    setTimeout: (fn, delay) => { expire = fn; requestedDelay = delay; return { unref() {} }; },
     clearTimeout: () => { cleared += 1; },
   };
   let swept = null;
@@ -248,6 +249,7 @@ test('refreshWithDeadline aborts a stalled sweep and releases the reload', async
     return new Promise(() => {});
   }, { timers });
 
+  assert.equal(requestedDelay, REFRESH_DEADLINE_MS);
   expire();
   await settled;
 
