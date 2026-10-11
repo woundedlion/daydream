@@ -67,6 +67,23 @@ test('attempted pairs suppress scheduled retries independently of success', asyn
   assert.equal(calls[1][1].state, 'pending');
 });
 
+for (const event of ['push', 'schedule']) {
+  test(`resolve ${event} retries a failed pair only for pushes`, async (t) => {
+    const root = mkdtempSync(join(tmpdir(), 'deployment-retry-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const env = { GITHUB_REPOSITORY: repo, GITHUB_SHA: pair.daydream,
+      GITHUB_EVENT_NAME: event, GITHUB_OUTPUT: join(root, 'outputs'),
+      PAIR_FILE: join(root, 'pair.json') };
+    await run('resolve', env, async (path) => {
+      if (path.includes('statuses')) return [{ state: 'failure' }];
+      if (path.includes('deployments')) return [{ id: 42, payload: pair }];
+      return heads(path);
+    });
+    assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'),
+      new RegExp(`deploy=${event === 'push'}`));
+  });
+}
+
 test('GitHub API supports public reads, authenticated writes and surfaces HTTP errors', async () => {
   const calls = [];
   const fetcher = async (...args) => { calls.push(args); return { ok: true, json: async () => ({ ok: 1 }) }; };
