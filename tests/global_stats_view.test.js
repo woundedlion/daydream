@@ -125,11 +125,11 @@ test('update lands each arena in its own row as usage|high-water|capacity KiB', 
   assert.equal(byId['stat-stack'].textContent, '9.0|32');
 });
 
-test('update mirrors every arena row into the mobile cells', () => {
+test('update mirrors every stats row into the mobile cells', () => {
   const { doc, byId } = makeDoc();
   new GlobalStatsView(doc).update(1, metrics());
 
-  for (const row of ['scratchA', 'scratchB', 'persist', 'stack']) {
+  for (const row of Object.keys(STATS_CELL_IDS)) {
     assert.notEqual(byId[STATS_CELL_IDS[row][0]].textContent, '', row);
   }
 
