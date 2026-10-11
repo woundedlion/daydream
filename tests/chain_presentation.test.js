@@ -1,6 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createChainPresentation } from '../src/workbench/shader/chain_presentation.js';
+import { createChainPresentation, formatNumericValue } from '../src/workbench/shader/chain_presentation.js';
+
+test('numeric readouts retain the shortest binary32 spelling across scales', () => {
+  for (const [value, text] of [
+    [3.14159274, '3.1415927'], [0.100000001, '0.1'], [1 / 3, '0.33333333'],
+    [1e-7, '1e-7'], [47.8000031, '47.800003'],
+  ]) {
+    assert.equal(formatNumericValue(value), text);
+    assert.equal(Math.fround(Number(text)), Math.fround(value));
+  }
+});
 
 const op = (id, input, output = input) => ({ id, input, output, name: id, params: [] });
 const rotate = op('rotate', 'sphere');
