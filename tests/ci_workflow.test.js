@@ -371,11 +371,13 @@ test('actionlint enumerates both workflow extensions', () => {
   assert.ok(suite.includes("git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml'"));
 });
 
-test('expiring bundles warn and expired bundles explain the producing-run remedy', () => {
+test('expiring bundles warn and expired bundles explain fresh dispatch recovery', () => {
   const gate = workflowText(`engine-bundle.yml`);
   assert.match(gate, /::warning::Engine bundle expires/);
   assert.match(gate, /if \[ "\$expired" = true \]/);
-  assert.match(gate, /gh run rerun \$run_id --repo woundedlion\/pov/);
+  assert.equal((gate.match(/gh workflow run ci\.yml --repo woundedlion\/pov --ref master/g) ?? []).length, 3);
+  assert.equal((gate.match(/If master has advanced, select the current verified engine SHA/g) ?? []).length, 3);
+  assert.doesNotMatch(gate, /gh run rerun/);
 });
 
 test('engine bundle callers grant Actions read at the bundle gate, not workflow scope', () => {
