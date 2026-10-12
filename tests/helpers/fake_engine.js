@@ -34,11 +34,6 @@ const CHAIN_CATALOG_TEXT = readFileSync(
  * and an injectable refusal.
  */
 export class FakeChainEngine {
-  /** The pinned operator catalog, byte-identical to the module export. */
-  static getShaderChainCatalog() {
-    return CHAIN_CATALOG_TEXT;
-  }
-
   constructor() {
     this.catalog = JSON.parse(CHAIN_CATALOG_TEXT);
     this.bindings = {
