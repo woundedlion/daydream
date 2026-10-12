@@ -222,7 +222,7 @@ test('the wave graph draws band edges, clamp boundaries, and three channels', ()
   drawWaveGraph({ canvas, ctx, palette: fakePalette() });
 
   const { yTop, yBottom, toY } = waveGraphBand(100);
-  assert.deepEqual(ctx.ops[0], ['fillRect', 0, 0, 16, 100],
+  assert.deepEqual(ctx.ops.filter(([name]) => name !== 'setTransform')[0], ['fillRect', 0, 0, 16, 100],
     'the opaque background is the first paint; nothing clears ahead of it');
 
   const moves = ctx.ops.filter(([n]) => n === 'moveTo').map(([, x, y]) => [x, y]);

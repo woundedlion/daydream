@@ -321,6 +321,8 @@ test('the wheel caps display density at two and caches the resized raster', (t) 
   assert.equal(canvas.width, 272);
   assert.equal(canvas.height, 272);
   assert.equal(first.scale, 272 / 256);
+  assert.deepEqual(ctx.ops.find(([name]) => name === 'setTransform'),
+    ['setTransform', 272 / 256, 0, 0, 272 / 256, 0, 0]);
   painter.draw({ ...view, selectedKey: 1 });
   assert.equal(ctx.rasters, 1);
   canvas.clientWidth = canvas.clientHeight = 160;
