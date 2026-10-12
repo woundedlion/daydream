@@ -773,7 +773,13 @@ export async function createChainDocumentStore({
   };
 }
 
-/** @param {*} snapshot @param {*} catalog @returns {*} */
+/**
+ * Builds an editable document from an executable chain snapshot.
+ * @param {*} snapshot - Schema-v2 program and accepted parameter values.
+ * @param {*} catalog - Operator catalog used to declare parameters and defaults.
+ * @returns {*} The imported document; enum8 option indices map to authored option IDs.
+ * @throws {Error} If the snapshot schema is unsupported or a parameter is unknown.
+ */
 export function documentFromChainSnapshot(snapshot, catalog) {
   if (snapshot?.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION || !Array.isArray(snapshot.chain)
       || !Array.isArray(snapshot.parameters)) throw new Error('unsupported chain snapshot');
