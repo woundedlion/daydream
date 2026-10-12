@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24.13.0'
       - id: pair
@@ -51,7 +51,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/deployment-pair.mjs attempt
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: deployment-pair
           path: deployment-pair.json
@@ -116,11 +116,11 @@ jobs:
         with:
           ref: ${{ needs.resolve.outputs.daydream }}
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24.13.0'
       - name: Download the engine package for this deployment
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: verified-engine-bundle
           path: engine-bundle
@@ -129,7 +129,7 @@ jobs:
           HOLOSPHERE_BUNDLE_PIN: ${{ needs.resolve.outputs.holosphere }}
         run: node scripts/install-engine-bundle.mjs engine-bundle
       - name: Download deployment pair
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: deployment-pair
           path: .
@@ -160,7 +160,7 @@ jobs:
         run: node scripts/deployment-pair.mjs check
       - id: deployment
         if: steps.current.outputs.current == 'true'
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
       - name: Verify published engine MIME types
         if: steps.current.outputs.current == 'true'
         env:
