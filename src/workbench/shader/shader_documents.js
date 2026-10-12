@@ -984,7 +984,10 @@ export function createShaderDocumentController({
   };
   const onPresetChange = () => {
     if (!applyPreset(presetSelect.value)) {
+      const refusal = status?.textContent ?? 'The preset could not be applied.';
       presetSelect.value = active?.presetId ?? '';
+      if (active) applyPreset(active.presetId);
+      showError(refusal);
       return;
     }
     releaseOriginalLink();

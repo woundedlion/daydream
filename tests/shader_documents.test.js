@@ -1302,14 +1302,27 @@ test('a load whose preset the engine refuses puts the program back', async () =>
     harness.elements.get('shader-preset-select').options.map((o) => o.value), presets);
 });
 
-test('a refused preset restores the dropdown selection', async () => {
+test('a refused preset restores the preview and dropdown while preserving the refusal', async () => {
   const harness = await editorWorkbench();
   const select = harness.elements.get('shader-preset-select');
   const previous = select.value;
-  harness.engine.bindings.setShaderChainParameters = () => ParamSetResult.INADMISSIBLE;
+  const previousWrites = harness.engine.writes.slice();
+  const write = harness.engine.bindings.setShaderChainParameters;
+  let refused = false;
+  harness.engine.bindings.setShaderChainParameters = (writes) => {
+    if (refused) return write(writes);
+    refused = true;
+    return ParamSetResult.INADMISSIBLE;
+  };
   select.value = select.options.find((option) => option.value !== previous).value;
   select.dispatch('change');
   assert.equal(select.value, previous);
+  const restored = harness.engine.writes.slice(previousWrites.length);
+  assert.ok(restored.length > 0, 'the previous preset must be applied again');
+  const expected = new Map(previousWrites);
+  for (const [id, value] of restored) assert.equal(value, expected.get(id), id);
+  assert.ok(restored.some(([id, value]) => id === 'sample.pattern-freq'
+    && value === Math.fround(3.881)));
   assert.match(harness.elements.get('shader-document-status').textContent, /INADMISSIBLE/);
 });
 
