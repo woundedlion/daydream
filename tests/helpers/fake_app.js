@@ -294,7 +294,7 @@ export function fakeDriver() {
       this.frames += 1;
       Daydream.prototype.render.call(this, adapter);
     },
-    dispose() { this.disposed = true; },
+    dispose() { this.disposed = true; this.recorder = null; },
   };
 }
 

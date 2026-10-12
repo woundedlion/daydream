@@ -411,7 +411,6 @@ function makeLoadHandlers({ start = () => {}, teardown = 'present' } = {}) {
   const handlers = createModuleLoadHandlers({
     teardown: () => (teardown === 'present' ? appTeardown : null),
     start: (module) => { log.push(`start ${module.name}`); start(appTeardown); },
-    discardStartup: () => log.push('discardStartup'),
     reportFailure: (err) => log.push(`reportFailure ${err.message}`),
   });
   return { handlers, log, appTeardown };
@@ -436,13 +435,14 @@ test('a module that arrives after a page discard never starts the app', () => {
     'startup would re-enter a disposed scene and leak a fresh engine');
 });
 
-test('a discard landing during startup releases what startup built', () => {
+test('startup disposal runs only the app teardown', () => {
   const h = makeLoadHandlers({ start: (appTeardown) => appTeardown.dispose() });
 
   h.handlers.onModuleReady({ name: 'wasm' });
 
-  assert.deepEqual(h.log, ['start wasm', 'dispose', 'discardStartup'],
-    'dispose runs once, so the engine built behind it is nobody else\'s to free');
+  assert.deepEqual(h.log, ['start wasm', 'dispose']);
+  h.handlers.onModuleReady({ name: 'late' });
+  assert.deepEqual(h.log, ['start wasm', 'dispose']);
 });
 
 test('a failed module load reports the failure and tears the app down', () => {
@@ -1011,7 +1011,7 @@ test('failure reporting cannot prevent teardown', () => {
   let disposed = false;
   const handlers = createModuleLoadHandlers({
     teardown: () => ({ disposed: () => disposed, dispose: () => { disposed = true; } }),
-    start: () => {}, discardStartup: () => {},
+    start: () => {},
     reportFailure: () => { throw new Error('report failed'); },
   });
   assert.throws(() => handlers.onModuleFailed(new Error('boot failed')), /report failed/);
@@ -1032,7 +1032,6 @@ test('a startup module trap reports its remedy and stops the test walk before te
   const handlers = createModuleLoadHandlers({
     teardown: () => ({ disposed: () => false, dispose: () => log.push('dispose') }),
     start: () => { throw new WebAssembly.RuntimeError('unreachable'); },
-    discardStartup: () => assert.fail('startup did not complete'),
     reportFailure,
   });
   await Promise.resolve({}).then(handlers.onModuleReady).catch(handlers.onModuleFailed);

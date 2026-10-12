@@ -381,10 +381,6 @@ export function start({
         appTeardown?.dispose();
       }
     },
-    discardStartup: () => {
-      host.dispose();
-      daydream.recorder = null;
-    },
     reportFailure: reportModuleFailure,
   });
 
