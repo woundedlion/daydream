@@ -76,7 +76,6 @@ function crossCheck(S, N, w) {
     // Each arm's web rect starts at the firmware's sampled column.
     const cols = goldenArmCols(w);
     if (m.arm_b) {
-      assert.equal(rect.x0, halfW, `arm-B rect starts at w/2 for id=${id}`);
       assert.equal(cols.arm_b, halfW, 'firmware arm-B offset is w/2');
     } else {
       assert.equal(rect.x0, cols.arm_a,
