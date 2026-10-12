@@ -109,6 +109,7 @@ export class BufferGeometry {
 export class Float32BufferAttribute {
   /** @param {Array<number>} array @param {number} itemSize */
   constructor(array, itemSize) { this.array = new Float32Array(array); this.itemSize = itemSize; }
+  get count() { return this.array.length / this.itemSize; }
 }
 
 export class MeshBasicMaterial {

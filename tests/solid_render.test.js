@@ -340,3 +340,13 @@ test('a reflex-first face normal points outwards and degenerate faces remain fin
     assert.ok([end.x, end.y, end.z].every(Number.isFinite));
   }
 });
+
+test('geodesic face colouring emits one colour per tessellated position', () => {
+  const { renderer, scene, materials } = setup();
+  renderer.render(tetrahedron(), view({ showGeodesics: true, colorizeFaces: true, showFaces: true }),
+    Int32Array.from([0, 1, 1, 2]));
+  const mesh = find(scene, 'Mesh');
+  assert.equal(mesh.material, materials.faceColorize);
+  assert.ok(mesh.geometry.attributes.position.count > 12);
+  assert.equal(mesh.geometry.attributes.color.count, mesh.geometry.attributes.position.count);
+});
