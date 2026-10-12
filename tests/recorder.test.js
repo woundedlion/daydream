@@ -365,6 +365,12 @@ test('isSupported answers true where captureStream and MediaRecorder both exist'
 });
 
 test('toggle starts then stops, reporting the true state each time', (t) => {
+  const warnings = installConsoleCapture('warn');
+  t.after(() => {
+    warnings.restore();
+    assert.equal(warnings.messages.length, 1);
+    for (const message of warnings.messages) assert.match(message, /session produced no data/);
+  });
   t.after(installRecorderEnv());
   const rec = new VideoRecorder(recordableCanvas());
   rec.download = () => {};
@@ -385,6 +391,12 @@ test('toggle starts then stops, reporting the true state each time', (t) => {
 });
 
 test('elapsed time follows the recording wall-clock lifecycle', (t) => {
+  const warnings = installConsoleCapture('warn');
+  t.after(() => {
+    warnings.restore();
+    assert.equal(warnings.messages.length, 1);
+    for (const message of warnings.messages) assert.match(message, /session produced no data/);
+  });
   t.after(installRecorderEnv());
   let nowMs = 10_000;
   let clockReads = 0;
@@ -421,6 +433,12 @@ test('elapsed time follows the recording wall-clock lifecycle', (t) => {
 
 /** abort() still finalizes the output; an idle recorder reports nothing. */
 test('abort stops a live session and tells the host', (t) => {
+  const warnings = installConsoleCapture('warn');
+  t.after(() => {
+    warnings.restore();
+    assert.equal(warnings.messages.length, 1);
+    for (const message of warnings.messages) assert.match(message, /session produced no data/);
+  });
   t.after(installRecorderEnv());
   const captured = installConsoleCapture('error');
   t.after(captured.restore);
@@ -896,6 +914,12 @@ test('a late file close failure reports its session without stopping a new recor
 });
 
 test('the encoder is opened at the configured bitrate', (t) => {
+  const warnings = installConsoleCapture('warn');
+  t.after(() => {
+    warnings.restore();
+    assert.equal(warnings.messages.length, 1);
+    for (const message of warnings.messages) assert.match(message, /session produced no data/);
+  });
   t.after(installRecorderEnv());
   const auto = new VideoRecorder(recordableCanvas());
   auto.download = () => {};
@@ -914,6 +938,12 @@ test('the encoder is opened at the configured bitrate', (t) => {
 });
 
 test('the save picker is offered the timestamped name and the container filter', async (t) => {
+  const warnings = installConsoleCapture('warn');
+  t.after(() => {
+    warnings.restore();
+    assert.equal(warnings.messages.length, 2);
+    for (const message of warnings.messages) assert.match(message, /session produced no data/);
+  });
   t.after(installRecorderEnv());
   t.after(() => mock.timers.reset());
   const picked = [];
