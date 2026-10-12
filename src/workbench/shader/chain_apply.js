@@ -88,12 +88,9 @@ export function applyChainDocument({
     engine.getParameterDefinitions());
   /** @type {Array<{name: string, value: number}>} */
   const writes = [];
-  for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
+  for (const [parameterId, value] of Object.entries(preset.values ?? {})) {
     const dot = parameterId.indexOf('.');
     if (dot > 0 && bypassed.has(parameterId.slice(0, dot))) continue;
-    const definition = definitions.find(
-      (candidate) => candidate.name === parameterId);
-    if (!definition) return refuse(`the chain registered no parameter "${parameterId}"`);
     const write = resolveParameterWrite(definitions, parameterId, value);
     if (typeof write === 'string') return refuse(write);
     writes.push({name: write.name, value: write.stored});
