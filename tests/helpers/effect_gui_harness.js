@@ -209,8 +209,9 @@ export function makeHarness({
       setParam: (name, value) => {
         writes.push(`engine:${name}=${value}`);
         const p = state.params.find((d) => d.name === name);
-        if (p && pausesOnWrite(p)) engine.paused = true;
-        return onEngineParam(name, value, state) !== false;
+        const accepted = onEngineParam(name, value, state) !== false;
+        if (accepted && p && pausesOnWrite(p)) engine.paused = true;
+        return accepted;
       },
       setAnimationsPaused: (paused) => {
         writes.push(`paused:${paused}`);

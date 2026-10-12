@@ -867,3 +867,12 @@ test('Reset moves focus nowhere when the panel never held it', () => {
   assert.equal(h.gui().ctrl('reset').$button.focusCalls, 0);
   assert.equal(h.gui().ctrl('Speed').$input.focusCalls, 0);
 });
+
+test('a refused animated write leaves the pause toggle unchanged', () => {
+  const h = makeHarness({ params: [SPEED], onEngineParam: () => false });
+  h.panel.build();
+  h.panel.applyAnimationPause();
+  h.gui().ctrl('Speed').setValue(0.6);
+  assert.equal(h.engine.paused, false);
+  assert.equal(h.gui().ctrl('pause').getValue(), false);
+});
