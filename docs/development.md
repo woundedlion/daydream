@@ -76,10 +76,12 @@ page. The other `scripts/*-probe.mjs` commands exercise tool interactions and
 the simulator's effect panel. These scripts require Chrome, Chromium, or Edge;
 set `CHROME_PATH` if the browser is outside the standard installation paths.
 
-When moving a runtime module, update its imports, HTML references,
+When adding or moving a runtime module, update its imports, HTML references,
 `site_manifest.txt`, typecheck roster, and tests. Worker URLs and module-relative
 asset fetches must resolve from their new locations. The publication manifest
 and test-discovery checks validate these references and module coverage.
+Update the daydream source-tree row in Holosphere README §9.2 too; its exhaustive
+module inventory is validated in the Holosphere checkout with `just docs-check`.
 
 After changing Tailwind classes in HTML or browser source, run
 `npm run generate:tailwind` and commit `tools/tailwind.css` with the source change.
