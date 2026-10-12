@@ -273,10 +273,10 @@ test('moving custom key A leaves the base and other authored keys unchanged', ()
   model.moveHueKey(0, 0.3);
   const moved = model.customHueOffsets();
 
-  assert.deepEqual(offsets, [0, 0.25, -0.125]);
+  assert.equal(model.baseHueTurns, 0.2, 'moving key A preserves the base hue');
   assert.ok(Math.abs(moved[0] - 0.1) < 1e-12);
   assert.deepEqual(moved.slice(1), offsets.slice(1));
-  const turns = customHueTurns(0.2, moved);
+  const turns = customHueTurns(model.baseHueTurns, moved);
   assert.equal(turns[1], 0.45);
   assert.ok(Math.abs(turns[2] - 0.075) < 1e-12);
 });
