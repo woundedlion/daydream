@@ -633,15 +633,15 @@ export function fakeElement(tag = 'div', options = {}) {
     value: fakeDataset(element),
   });
   if (DISABLEABLE_TAGS.has(element.tagName)) {
-    let disabled = false;
     Object.defineProperty(element, 'disabled', {
       enumerable: true,
       configurable: true,
-      get() { return disabled; },
+      get() { return Object.hasOwn(element.attributes, 'disabled'); },
       set(value) {
-        disabled = Boolean(value);
+        if (value) element.setAttribute('disabled', '');
+        else element.removeAttribute('disabled');
         const doc = activeDocument();
-        if (disabled && doc?.activeElement === element) doc.activeElement = doc.body;
+        if (element.disabled && doc?.activeElement === element) doc.activeElement = doc.body;
       },
     });
   }
