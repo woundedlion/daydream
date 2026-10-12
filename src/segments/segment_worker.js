@@ -395,11 +395,8 @@ export function installSegmentWorker() {
 
       case 'render': {
         // Fail fast: no reply would leave the frame outstanding until the watchdog.
-        if (!engine || !segRange) {
-          throw new Error('segment_worker: render before a completed init '
-            + `(engine=${engine ? 'set' : 'null'}, `
-            + `segRange=${segRange ? 'set' : 'null'})`);
-        }
+        if (!segRange)
+          throw new Error('segment_worker: render without a configured segment range');
         // A missing setEffect is the controller's sequencing fault; report it.
         if (awaitingEffect) {
           post({

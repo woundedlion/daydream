@@ -1362,3 +1362,14 @@ test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {
   assert.equal(PROTOCOL_VERSION, PROTOCOL_SHAPE_PIN.version,
     'PROTOCOL_SHAPE_PIN.version tracks PROTOCOL_VERSION; re-pin both together');
 });
+
+test('render after rejected init faults on the missing segment range', async () => {
+  nextCapsRejected = true;
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  assert.ok(engineInstance);
+  posted.length = 0;
+  const captured = await captureTimeouts(async () => { await dispatch({ type: 'render' }); });
+  assert.equal(posted.length, 0);
+  assert.equal(captured.length, 1);
+  assert.throws(() => captured[0](), /render without a configured segment range/);
+});
