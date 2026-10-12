@@ -731,8 +731,9 @@ test('Mobius preset descriptions retain AA contrast when active', () => {
 });
 
 
-test('the entry script and syntax failures share the guarded load failure overlay', () => {
-  const source = read('index.html');
+for (const page of ['index.html', 'tools/shader.html']) {
+ test(`${page} entry script and syntax failures share the guarded load failure overlay`, () => {
+  const source = read(...page.split('/'));
   const inline = source.match(/<script>([\s\S]*?)<\/script>/)[1];
   const overlay = fakeElement('div');
   const listeners = [];
@@ -742,7 +743,7 @@ test('the entry script and syntax failures share the guarded load failure overla
     window: { addEventListener: (type, fn) => listeners.push(fn), removeEventListener() {} },
   };
   runInNewContext(inline + '\nthis.showFailure = showLoadFailure;', context);
-  assert.match(source, /src="src\/app\/main\.js" onerror="showLoadFailure\(\)"/);
+  assert.match(source, /src="(?:\.\.\/)?src\/app\/main\.js" onerror="showLoadFailure\(\)"/);
   listeners[0]({ error: new Error('ordinary') });
   assert.equal(overlay.classList.contains('error'), false);
   listeners[0]({ error: new SyntaxError('bad module') });
@@ -755,6 +756,7 @@ test('the entry script and syntax failures share the guarded load failure overla
   current = null;
   assert.doesNotThrow(() => context.showFailure());
 });
+}
 
 
 test('shared keyboard rings outrank Firefox preflight without changing stylesheet order', () => {
