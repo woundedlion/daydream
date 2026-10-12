@@ -237,9 +237,7 @@ test('wireCopyBlock wires the button and block triggers', async () => {
 
   const detach = wireCopyBlock({ source, button, prompt, block });
   button.dispatch('click');
-  await Promise.resolve();
   block.dispatch('click');
-  await Promise.resolve();
 
   assert.equal(block.tabIndex, -1);
   assert.equal(block.getAttribute('role'), null);
@@ -247,14 +245,13 @@ test('wireCopyBlock wires the button and block triggers', async () => {
   let prevented = 0;
   for (const key of ['Enter', ' ', 'Tab']) {
     if (block.dispatch('keydown', { key }).defaultPrevented) prevented++;
-    await Promise.resolve();
-  }
+    }
   assert.equal(prevented, 0);
   assert.deepEqual(writes, Array(2).fill('generated output'));
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(prompt.textContent, 'Copied!');
   detach();
   button.dispatch('click');
   block.dispatch('click');
-  await Promise.resolve();
   assert.equal(writes.length, 2);
 });
