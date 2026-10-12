@@ -127,7 +127,7 @@ export function scratchChainDocument(catalog, chain = DEFAULT_SCRATCH_CHAIN) {
  * Creates the chain editor's document state machine: a validated chain
  * document, a selection, a session bypass set and an undo history. Every
  * mutation (`replaceSpan`, the one structural chain edit, plus `relabel` and
- * `setPresetValue`) builds a whole candidate document and commits it
+ * `setPresetValues`) builds a whole candidate document and commits it
  * atomically through one step that refuses anything the v2 validator rejects.
  * @param {Object} options - Store dependencies.
  * @param {*} options.document - A compiled (post-expansion, valid) v2 document.
@@ -596,31 +596,38 @@ export async function createChainDocumentStore({
    * same control collapse into one undo entry, so undoing a drag restores the
    * value the run started from; any other edit, undo or redo ends the run.
    * @param {string} presetId - The preset the value belongs to.
-   * @param {string} parameterId - A catalog `<label>.<field>` parameter id.
-   * @param {*} value - The value to store; an enum8 takes its option id.
+   * @param {Object<string, *>} values - Catalog parameter IDs and their values; enum8 takes its option id.
    * @param {(() => EditResult)|null} [admit] - Admission before changing document or history.
    * @returns {EditResult} The outcome; a refusal leaves the store untouched.
    */
-  const setPresetValue = (presetId, parameterId, value, admit = null) => {
+  const setPresetValues = (presetId, values, admit = null) => {
     const index = doc.preset_bank.presets.findIndex(
       (/** @type {{preset_id: string}} */ preset) => preset.preset_id === presetId);
     if (index < 0)
       return refusal('UNKNOWN_PRESET', '$.preset_bank.presets',
         `the preset bank carries no preset "${presetId}"`);
     const candidate = structuredClone(doc);
-    if (!candidate.descriptor.parameters.some(
-      (/** @type {{id: string}} */ parameter) => parameter.id === parameterId)) {
-      const entry = chain().find((entry) => parameterId.startsWith(`${entry.label}.`));
-      const field = entry && operatorOf(entry).params.find(
-        (field) => `${entry.label}.${field.id}` === parameterId);
-      if (!entry || !field)
-        return refusal('UNKNOWN_PARAMETER', '$.descriptor.parameters',
-          `the catalog carries no parameter "${parameterId}" for this chain`);
-      addParameter(candidate, parameterFromField(entry.label, field, entry.operator));
+    for (const [parameterId, value] of Object.entries(values)) {
+      if (!candidate.descriptor.parameters.some(
+        (/** @type {{id: string}} */ parameter) => parameter.id === parameterId)) {
+        const entry = chain().find((entry) => parameterId.startsWith(`${entry.label}.`));
+        const field = entry && operatorOf(entry).params.find(
+          (field) => `${entry.label}.${field.id}` === parameterId);
+        if (!entry || !field)
+          return refusal('UNKNOWN_PARAMETER', '$.descriptor.parameters',
+            `the catalog carries no parameter "${parameterId}" for this chain`);
+        addParameter(candidate, parameterFromField(entry.label, field, entry.operator));
+      }
+      candidate.preset_bank.presets[index].values[parameterId] = value;
     }
-    candidate.preset_bank.presets[index].values[parameterId] = value;
-    return commit(candidate, `${presetId} ${parameterId}`, admit);
+    return commit(candidate, `${presetId} ${Object.keys(values).join(' ')}`, admit);
   };
+
+  /** Stores one preset value in a coalesced control edit.
+   * @param {string} presetId @param {string} parameterId @param {*} value
+   * @param {(() => EditResult)|null} [admit] @returns {EditResult} */
+  const setPresetValue = (presetId, parameterId, value, admit = null) =>
+    setPresetValues(presetId, { [parameterId]: value }, admit);
 
   return {
     /** @returns {*} An isolated copy of the current (always-valid) document. */
@@ -726,6 +733,7 @@ export async function createChainDocumentStore({
     replaceSpan,
     relabel,
     setPresetValue,
+    setPresetValues,
 
     /** Ends a control's coalesced value run so its next gesture opens a new entry. */
     endValueRun: () => { coalesceKey = null; },

@@ -1023,8 +1023,8 @@ const HEX_PATTERN_CATALOG = JSON.stringify({
  * it a different engine surface from the chain interpreter's.
  * @returns {Object} The engine.
  */
-function compiledBuildEngine() {
-  const definitions = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT).descriptor.parameters.map((parameter) => ({
+function compiledBuildEngine(source = KALEIDOSCOPE_HEX_BRIGHT) {
+  const definitions = JSON.parse(source).descriptor.parameters.map((parameter) => ({
     name: engineParameterName(parameter.id),
     ...(parameter.storage === 'enum8' ? { options: [...parameter.domain.values] } : {}),
   }));
@@ -1062,7 +1062,7 @@ async function editorWorkbench({
 } = {}) {
   const engine = new FakeChainEngine();
   prepare(engine);
-  const compiledEngine = compiledBuildEngine();
+  const compiledEngine = compiledBuildEngine(source ?? KALEIDOSCOPE_HEX_BRIGHT);
   let animationsPaused = paused;
   // writeDeepLink builds its link state synchronously, reading the pause seam
   // once, so the count tells a write a timer started from one still pending.
@@ -1131,7 +1131,8 @@ async function editorWorkbench({
     setParamFilter: (filter) => filters.push(filter),
     fetchText: patternFetch(
       { 'kaleidoscope_hex_bright.shader.json': KALEIDOSCOPE_HEX_BRIGHT,
-        'alien_core.shader.json': JSON.stringify(promotedDocument('alien_core.shader.json')) }, patternCatalog),
+        'alien_core.shader.json': JSON.stringify(promotedDocument('alien_core.shader.json')),
+        'grid_space.shader.json': JSON.stringify(promotedDocument('grid_space.shader.json')) }, patternCatalog),
     importCompiler: () => import('../generated/shader/shader_workbench.mjs'),
     download: (filename, source) => downloads.push([filename, source]),
     win,
@@ -2315,4 +2316,29 @@ test('fixed document presets preserve sparse option IDs and refuse numeric gaps'
       assert.deepEqual(engine.writes, [['Pattern Freq', 6]]);
     }
   }
+});
+
+test('compiled lattice edits update the derived period atomically and reapply', async () => {
+  const source = JSON.stringify(promotedDocument('grid_space.shader.json'));
+  const harness = await editorWorkbench({ source, patternCatalog: JSON.stringify({
+    source_documents: { 'grid-space': 'grid_space.shader.json' },
+    product_group: { children: [{ effect_id: 'grid-space', display_name: 'Grid Space' }] },
+  }) });
+  const original = savedValues(harness);
+  const toggle = harness.elements.get('shader-parity-toggle');
+  assert.equal(toggle.disabled, false);
+  toggle.dispatch('click');
+  const edit = stageEditor(harness, 'sample');
+  edit('sample.lattice-cell-scale', 2.7);
+  edit('sample.lattice-cell-scale', 3.1);
+  const values = savedValues(harness);
+  assert.equal(values['warp1.lattice-period'], Math.fround(1 / Math.fround(3.1)));
+  await onChange(harness.elements.get('shader-preset-select'))();
+  assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
+  harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
+  assert.deepEqual(savedValues(harness), original);
+  harness.elements.get('chain-strip').querySelector('.chain-redo').dispatch('click');
+  assert.deepEqual(savedValues(harness), values);
+  toggle.dispatch('click');
+  assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
 });

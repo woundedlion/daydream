@@ -459,7 +459,18 @@ export function createShaderDocumentController({
     try {
       if (chainUi === null || active === null || active.presetId === null) return false;
       const addsDeclaration = !chainUi.store.declares(parameterId);
-      const result = chainUi.store.setPresetValue(active.presetId, parameterId, value, () => {
+      const document = chainUi.store.document();
+      const presetValues = document.preset_bank.presets
+        .find((/** @type {*} */ preset) => preset.preset_id === active.presetId).values;
+      const values = { [parameterId]: value };
+      if (active.compiledSide) {
+        for (const id of Object.keys(presetValues)) {
+          const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, presetValues);
+          if (binding?.sourceId === parameterId)
+            values[id] = Math.fround(1 / Math.fround(value));
+        }
+      }
+      const result = chainUi.store.setPresetValues(active.presetId, values, () => {
         if (addsDeclaration && active.compiledSide) return { ok: true };
         const engine = getEngine();
         const module = getModule();
