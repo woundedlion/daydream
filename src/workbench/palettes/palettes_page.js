@@ -334,8 +334,9 @@ let colorStripPainter = null;
 
 /**
  * The normalized (0-1) X coordinate of a pointer event over the strip.
+ * @param {PointerEvent} event - Pointer position.
+ * @returns {number} The clamped coordinate, or zero when the strip has no width.
  */
-/** @param {PointerEvent} event */
 function getNormalizedX(event) {
   if (!colorStripCanvas) return 0;
   const rect = innerRect(colorStripCanvas);

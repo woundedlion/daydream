@@ -7,6 +7,7 @@
 
 import { replaceUrl } from '../../shared/url.js';
 
+/** Absolute URL of the installed shader document compiler. */
 export const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
 const PREFIX = '#shader=v2.';
 const MAX_PAYLOAD_CHARS = 65536;
@@ -93,7 +94,12 @@ async function transform(bytes, operation) {
   return readBytes(stream, MAX_STATE_BYTES);
 }
 
-/** @param {*} state @returns {Promise<string>} */
+/**
+ * Encodes complete authoring state as a compressed versioned hash.
+ * @param {*} state - Document, preset, bypasses, pause and optional runtime snapshot.
+ * @returns {Promise<string>} The shader hash.
+ * @throws {Error} If state is invalid or its encoded size exceeds the link limits.
+ */
 export async function encodeShaderStateHash(state) {
   const value = normalizedState(state);
   const compact = {
@@ -111,7 +117,12 @@ export async function encodeShaderStateHash(state) {
   return `${PREFIX}${payload}`;
 }
 
-/** @param {string} hash @returns {Promise<*|null>} */
+/**
+ * Decodes a shader hash and validates its authoring-state shape.
+ * @param {string} hash - The URL fragment.
+ * @returns {Promise<*|null>} Authoring state, or null for an unrelated fragment.
+ * @throws {Error} For an unsupported shader version, invalid payload/state or oversized state.
+ */
 export async function decodeShaderStateHash(hash) {
   if (!hash.startsWith(PREFIX)) {
     if (hash.startsWith('#shader=')) throw new Error('unsupported shader link version');
@@ -144,7 +155,12 @@ export async function decodeShaderStateHash(hash) {
   });
 }
 
-/** @param {string} hash @param {*} [win] */
+/**
+ * Replaces the current shader fragment while preserving path and query.
+ * @param {string} hash - The encoded shader fragment.
+ * @param {*} [win] - Browser location and history host.
+ * @returns {boolean} Whether the URL was replaced; false when history is unavailable or refuses.
+ */
 export function replaceShaderStateHash(hash, win = globalThis) {
   if (!win.location || !win.history?.replaceState) return false;
   const path = `${win.location.pathname}${win.location.search}${hash}`;
