@@ -369,7 +369,7 @@ function seedConstantCpp(seedName) {
 }
 
 /**
- * Emits the solids.h registry paste for a saved solid: a Category::Complex
+ * Emits the solids.h registry paste for a saved solid: a Category::COMPLEX
  * islamic_registry entry with its generator, OpStep table and Recipe mirror.
  * A star base is flattened onto its own seed with its authored chain prepended;
  * a seed without a SEED_* constant gets that constant's definition first.
@@ -380,6 +380,7 @@ function seedConstantCpp(seedName) {
  */
 export function generateRegistryCpp(item, baseRecipe = null) {
   const { funcName } = generateFuncAndRecipe(item);
+  const displayName = item.base + funcName.slice(item.base.replace(/([a-z0-9])([A-Z])/g, '$1_$2').length);
   if ((item.fCount ?? 0) > MAX_BUILD_FACES) {
     throw new Error(`generateRegistryCpp: mesh has ${item.fCount} faces; IslamicStars supports at most ${MAX_BUILD_FACES}`);
   }
@@ -431,13 +432,11 @@ export function generateRegistryCpp(item, baseRecipe = null) {
     + `${table.prefix}${stepList.join(`,\n${' '.repeat(table.indent)}`)},\n};\n// clang-format on\n`
     + `${docCommentCpp(`Recipe mirror of IslamicStarPatterns::${funcName}.`)}\n`
     + `${recipeDefinitionCpp(recipeName, `SEED_${upperSnake(seedName)}`, stepsName)}\n\n`
-    + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
-    + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
-    + '// fail.\n'
+    + '// Append this Entry to islamic_registry.\n'
     + fillCpp([
-      `{"${funcName}",`,
+      `{"${displayName}",`,
       `IslamicStarPatterns::${funcName},`,
-      'Category::Complex,',
+      'Category::COMPLEX,',
       `&${recipeName}},`,
     ], INDENT, INDENT + 1);
 }

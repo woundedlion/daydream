@@ -17,8 +17,8 @@ import { generativePaletteCpp } from '../src/workbench/palettes/palette_math.js'
 import { defaultPaletteRecipe } from '../src/workbench/palettes/palette_controls.js';
 import { closingDomain, lissajousCodeString } from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
-import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS, MORPH_SWEEP, OP_DEFS } from '../src/workbench/solids/solid_codegen.js';
-import { MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount, LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
+import { generateFuncAndRecipe, DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS, MORPH_SWEEP, OP_DEFS } from '../src/workbench/solids/solid_codegen.js';
+import { generateRegistryCpp, MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount, LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
 import { MAX_DISPLAY_CAP_PERCENT } from '../src/renderer/display_caps.js';
 import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../src/workbench/shader/shader_deeplink.js';
 
@@ -634,4 +634,19 @@ test('palettes.html recipe sliders stay inside the limits the engine compiler ac
   const { min, max } = slider('gen_falloff');
   assert.ok(Number(falloff[1]) / Number(falloff[2]) < min && max < Number(falloff[3]),
     `gen_falloff [${min}, ${max}] leaves the open falloff_start interval`);
+});
+
+test('solid exports name engine categories and generator identifiers', { skip: engineSkip }, () => {
+  const solids = header(SOLIDS_H);
+  const generators = header('core/mesh/procedural_solids.h');
+  const category = generateRegistryCpp({ base: 'cube', ops: ['kis'] }).match(/Category::(\w+)/)[1];
+  assert.match(solids, new RegExp(`enum class Category {[^}]*\\b${category}\\b`));
+  const entries = [...solids.matchAll(/\{"(\w+)",\s*(\w+)::(\w+),/g)];
+  assert.ok(entries.length > SIMPLE_SEEDS.length);
+  for (const [, base, namespace, identifier] of entries) {
+    const { funcName, recipe } = generateFuncAndRecipe({ base, ops: ['kis'] }, namespace);
+    assert.equal(funcName, `${identifier}_kis`, base);
+    assert.match(recipe, new RegExp(`${namespace}::${identifier}\\(a, b\\)`));
+    assert.match(generators, new RegExp(`\\b${identifier}\\s*\\(`));
+  }
 });

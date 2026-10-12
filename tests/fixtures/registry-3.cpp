@@ -10,9 +10,7 @@ inline constexpr OpStep ICOSAHEDRON_KIS_GYRO_HK54_STEPS[] = {
 inline constexpr Recipe ICOSAHEDRON_KIS_GYRO_HK54_RECIPE =
     make_recipe(SEED_ICOSAHEDRON, ICOSAHEDRON_KIS_GYRO_HK54_STEPS);
 
-// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.
-// Until they agree, its size static_assert and the NUM_ENTRIES sum both
-// fail.
+// Append this Entry to islamic_registry.
     {"icosahedron_kis_gyro_hk54",
-     IslamicStarPatterns::icosahedron_kis_gyro_hk54, Category::Complex,
+     IslamicStarPatterns::icosahedron_kis_gyro_hk54, Category::COMPLEX,
      &ICOSAHEDRON_KIS_GYRO_HK54_RECIPE},

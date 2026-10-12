@@ -513,7 +513,8 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
     throw new Error(`generateFuncAndRecipe: op chain is empty; the emitted function would redefine the seed "${item.base}" and recurse into itself`);
   }
 
-  let nameParts = [item.base];
+  const baseIdentifier = item.base.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+  let nameParts = [baseIdentifier];
   let chain = '';
 
   item.ops.forEach(o => {
@@ -573,7 +574,7 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
   });
 
   const funcName = nameParts.join('');
-  const seed = baseNamespace === '' ? item.base : `${baseNamespace}::${item.base}`;
+  const seed = baseNamespace === '' ? baseIdentifier : `${baseNamespace}::${baseIdentifier}`;
   const recipe = `SolidBuilder(${seed}(a, b), a, b)${chain}.build()`;
 
   return { funcName, recipe };

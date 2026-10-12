@@ -102,22 +102,11 @@ const REGISTRY_CHAINS = [
     { seed: 'icosahedron', ops: [chainStep('kis')] }],
 ];
 
-/**
- * Adding the entry grows islamic_registry, which fails its size static_assert
- * and the NUM_ENTRIES sum until ISLAMIC_COUNT is raised to match.
- */
-test('every paste names the static_asserts a new entry breaks', () => {
-  for (const [item, baseRecipe] of REGISTRY_CHAINS) {
-    assert.match(generateRegistryCpp(item, baseRecipe), /raise ISLAMIC_COUNT by one/,
-      `${item.base} pastes without the ISLAMIC_COUNT bump`);
-  }
-});
-
-test('generateRegistryCpp never emits a Category::Simple entry', () => {
+test('registry pastes use the derived count and complex category', () => {
   for (const [item, baseRecipe] of REGISTRY_CHAINS) {
     const code = generateRegistryCpp(item, baseRecipe);
-    assert.match(code, /Category::Complex/, `${item.base} must be Complex`);
-    assert.doesNotMatch(code, /Category::Simple/);
+    assert.match(code, /Category::COMPLEX/);
+    assert.doesNotMatch(code, /ISLAMIC_COUNT|Category::SIMPLE/);
   }
 });
 
