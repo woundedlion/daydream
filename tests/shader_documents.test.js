@@ -1626,7 +1626,7 @@ test('preset and stage writes preserve the animation state', async () => {
     'preset writes do not leave the chain frozen');
   const toggle = harness.elements.get('shader-animation-toggle');
   assert.equal(toggle.disabled, false);
-  assert.equal(toggle.textContent, 'Pause animation');
+  assert.equal(toggle.textContent, 'Pause Presets');
 
   stageEditor(harness, 'sample')('sample.pattern-freq', 7);
   assert.equal(harness.animationsPaused(), false,
@@ -1634,7 +1634,7 @@ test('preset and stage writes preserve the animation state', async () => {
 
   toggle.dispatch('click');
   assert.equal(harness.animationsPaused(), true);
-  assert.equal(toggle.textContent, 'Pause animation');
+  assert.equal(toggle.textContent, 'Pause Presets');
   assert.equal(toggle.getAttribute('aria-pressed'), 'true');
   stageEditor(harness, 'sample')('sample.pattern-freq', 8);
   assert.equal(harness.animationsPaused(), true,
