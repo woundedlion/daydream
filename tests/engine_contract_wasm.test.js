@@ -192,7 +192,8 @@ const heapBytes = () => engine.getPixels().buffer.byteLength;
 const INITIAL_HEAP_BYTES = heapBytes();
 
 // Structured payload shapes are authored separately from emitted bindings.
-const DTS = readFileSync(new URL('../generated/engine_types.d.ts', import.meta.url), 'utf8');
+const DTS_PATH = 'generated/engine_types.d.ts';
+const DTS = readFileSync(new URL(`../${DTS_PATH}`, import.meta.url), 'utf8');
 
 /**
  * Reads a file the engine's LF export is pinned against. A CRLF working-tree
@@ -212,7 +213,7 @@ const readPinned = (url) => readFileSync(url, 'utf8').replaceAll('\r\n', '\n');
 function interfaceBody(name) {
   const at = DTS.search(new RegExp(
     `export (?:interface ${name}(?: extends [A-Za-z_]\\w*)?|type ${name} =) \\{`));
-  assert.ok(at >= 0, `generated/holosphere_wasm.d.ts must declare interface ${name}`);
+  assert.ok(at >= 0, `${DTS_PATH} must declare interface ${name}`);
   const end = DTS.indexOf('\n}', at);
   assert.ok(end > at, `interface ${name} must be closed at column 0`);
   return DTS.slice(at, end).replace(/\/\*[\s\S]*?\*\//g, '');
@@ -251,17 +252,17 @@ function assertDeclaredShape(name, value) {
   const keys = Object.keys(value);
   for (const key of keys) {
     assert.ok(members.has(key),
-      `generated/holosphere_wasm.d.ts declares no ${name}.${key}, which the module returns`);
+      `${DTS_PATH} declares no ${name}.${key}, which the module returns`);
   }
   for (const [member, optional] of members) {
     assert.ok(optional || keys.includes(member),
-      `generated/holosphere_wasm.d.ts declares ${name}.${member}, which the module `
+      `${DTS_PATH} declares ${name}.${member}, which the module `
       + 'does not return');
   }
 }
 
 // Return-value shapes for the engine binding methods.
-test('generated/holosphere_wasm.d.ts declares the object shapes the engine returns', () => {
+test(`${DTS_PATH} declares the object shapes the engine returns`, () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 
   const metrics = engine.getArenaMetrics();
