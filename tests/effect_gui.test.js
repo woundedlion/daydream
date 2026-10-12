@@ -635,7 +635,7 @@ test('editing a control writes the engine and the worker pool as floats', () => 
   ]);
 });
 
-test('the pause toggle is offered for animated params or any preset', () => {
+test('the pause toggle is offered without requiring animated params or a preset bank', () => {
   const animated = makeHarness({ params: [SPEED] });
   animated.panel.build();
   assert.equal(animated.gui().ctrl('pause').label, 'Pause Presets');
@@ -643,8 +643,12 @@ test('the pause toggle is offered for animated params or any preset', () => {
 
   const staticNoPresets = makeHarness();
   staticNoPresets.panel.build();
-  assert.equal(staticNoPresets.gui().ctrl('pause'), undefined);
-  assert.equal(staticNoPresets.panel.active().pause.controller, null);
+  assert.equal(staticNoPresets.gui().ctrl('pause').label, 'Pause Presets');
+  staticNoPresets.panel.applyAnimationPause();
+  staticNoPresets.writes.length = 0;
+  staticNoPresets.gui().ctrl('pause').setValue(true);
+  staticNoPresets.gui().ctrl('pause').setValue(false);
+  assert.deepEqual(staticNoPresets.writes, ['paused:true', 'paused:false']);
 
   const singlePreset = makeHarness({ presetCount: 1 });
   singlePreset.panel.build();
@@ -750,16 +754,16 @@ test('without the pause accessor the panel falls back to the animated flag', () 
   assert.deepEqual(h.writes.filter((w) => w.startsWith('paused')), ['paused:true']);
 });
 
-test('an effect with no animated param never touches the pause state', () => {
+test('ordinary parameter tuning keeps preset advancement running', () => {
   const STATIC = { name: 'Width', value: 1, min: 0, max: 2 };
-  const h = makeHarness({ params: [STATIC], pausesOnWrite: () => true });
+  const h = makeHarness({ params: [STATIC], pausesOnWrite: () => false });
   h.panel.build();
   h.panel.applyAnimationPause();
   h.writes.length = 0;
 
   h.gui().ctrl('Width').setValue(1.5);
 
-  assert.equal(h.panel.active().pause.controller, null);
+  assert.equal(h.panel.active().pause.controller.getValue(), false);
   assert.deepEqual(h.writes, ['engine:Width=1.5', 'worker:Width=1.5']);
 });
 
