@@ -1479,6 +1479,7 @@ function renderMesh() {
   updateIndexLabelNotice(state.showIndices && meshData.vertices.length >= MAX_INDEX_LABELS);
 
   renderBaseSolid();
+  if (!currentMeshIsCurrent) return;
   const stats = document.getElementById('meshStats');
   const statsText = meshStatsLine(meshData, edgeCount);
   if (stats.textContent !== statsText) stats.textContent = statsText;
