@@ -473,7 +473,7 @@ export async function probeStrip(tab) {
     disabled: node instanceof HTMLButtonElement ? node.disabled : true,
     text: node.textContent ?? '',
   }));
-  check(!animation.disabled && animation.text === 'Pause animation',
+  check(!animation.disabled && animation.text === 'Pause Presets',
     `animation is running after preset/control writes (${animation.text})`);
 
   const panels = await boxOf(tab, '#gui-container');

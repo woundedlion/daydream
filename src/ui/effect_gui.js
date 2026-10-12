@@ -377,8 +377,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
 
   /**
-   * Add the "Pause Animation" toggle when the effect has an animated param or
-   * any preset available for manual selection (selecting one pauses animation).
+   * Add the "Pause Presets" toggle when the effect has an animated param or
+   * any preset available for manual selection (selecting one pauses advancement).
    * @param {EffectRecord} fx - The effect record being built.
    * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
    * @param {Object} [options]
@@ -395,7 +395,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     /**
      * Adopt a pause transition, applying it immediately after initial hydration
      * has been committed to the rebuilt renderers.
-     * @param {boolean} v - True to freeze animations, false to resume.
+     * @param {boolean} v - True to hold presets and parameter drivers, false to resume.
      * @returns {void}
      */
     const transitionPaused = (v) => {
@@ -426,14 +426,14 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       const add = hydrate
         ? (/** @type {any[]} */ ...args) => fx.gui.add(...args)
         : (/** @type {any[]} */ ...args) => fx.gui.addUnhydrated(...args);
-      controller = add(animationState, 'pause').name('Pause Animation');
+      controller = add(animationState, 'pause').name('Pause Presets');
       controller?.onChange(transitionPaused);
     }
     return { animationState, controller, setPaused, show };
   }
 
   /**
-   * Re-seat the pause toggle on the engine's own animation state after a
+   * Re-seat the pause toggle on the engine's own preset pause state after a
    * parameter write: writing an animation-driven param pauses implicitly. The
    * toggle's transition carries the adopted state on to the worker pool.
    * @param {{animationState: {pause: boolean}, controller: GuiController|null,
