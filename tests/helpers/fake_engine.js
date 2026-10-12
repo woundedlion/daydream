@@ -5,12 +5,6 @@ import { readFileSync } from 'node:fs';
 
 import { CLASS_METHODS } from '../../generated/engine_contract.mjs';
 
-/** Calls which individual fakes may omit. */
-export const ENGINE_OPTIONAL_METHODS = [
-  'getEffectIdentities', 'getShaderChainBindings', 'getAnimationsPaused', 'getPresetIds', 'getPoleLod', 'delete',
-];
-export const ENGINE_METHODS = CLASS_METHODS.HolosphereEngine
-  .filter((name) => !ENGINE_OPTIONAL_METHODS.includes(name));
 export const SHADER_CHAIN_BINDING_METHODS = CLASS_METHODS.ShaderChainBindings;
 
 export const ParamSetResult = enumeration('ParamSetResult');
