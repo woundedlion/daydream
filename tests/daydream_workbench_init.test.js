@@ -1,20 +1,28 @@
 // The composition root's handling of a rejected shader-workbench init, with the
 // document controller replaced by a module mock.
-import { mock, test } from 'node:test';
+import { mock, test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { restoreDocumentAfterEach } from './helpers/fake_dom.js';
 import { installConsoleCapture } from './helpers/fake_console.js';
+import { getActiveURLSync, URL_FLUSH_DEBOUNCE_MS } from '../src/app/state.js';
+import { canonicalEffectId } from '../src/effects/effect_identity.js';
 import { MODULE_TRAP_NOTICE } from '../src/app/app_lifecycle.js';
 
 let initFailure = null;
+let initResult = null;
+let preserveLink = false;
+let callbacks;
+beforeEach(() => { initFailure = null; initResult = null; preserveLink = false; });
+afterEach(() => mock.timers.reset());
 let controllers = 0;
 mock.module('../src/workbench/shader/shader_documents.js', {
   namedExports: {
-    createShaderDocumentController: () => {
+    createShaderDocumentController: (dependencies) => {
+      callbacks = dependencies;
       controllers += 1;
       return {
-        init: () => Promise.reject(initFailure()),
-        preservesOriginalLink: () => false,
+        init: () => initFailure ? Promise.reject(initFailure()) : initResult,
+        preservesOriginalLink: () => preserveLink,
         dispose() {},
       };
     },
@@ -71,4 +79,76 @@ test('a workbench init that trapped the module releases the app', async () => {
   const overlay = app.elements.get('loading-overlay');
   assert.equal(overlay.classList.contains('error'), true);
   assert.ok(overlay.children.some((child) => child.textContent === MODULE_TRAP_NOTICE));
+});
+
+test('a resolved workbench init releases pending URL writes', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  let resolve;
+  initResult = new Promise((done) => { resolve = done; });
+  const app = startApp({ daydreamMode: 'shader-workbench',
+    search: '?effect=ShaderChain', loadModule: async () => fakeWasmModule() });
+  await app.teardown.ready;
+  mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+  assert.deepEqual(app.urlWrites, []);
+  resolve(true);
+  await new Promise((done) => setImmediate(done));
+  mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+  assert.equal(app.urlWrites.length, 1);
+});
+
+test('release of the original link resumes URL writes once', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  preserveLink = true;
+  initResult = Promise.resolve(true);
+  const app = startApp({ daydreamMode: 'shader-workbench',
+    search: '?effect=ShaderChain', loadModule: async () => fakeWasmModule() });
+  await app.teardown.ready;
+  await new Promise((done) => setImmediate(done));
+  mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+  assert.deepEqual(app.urlWrites, []);
+  callbacks.onOriginalLinkReleased();
+  mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+  assert.equal(app.urlWrites.length, 1);
+  callbacks.onOriginalLinkReleased();
+  mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+  assert.equal(app.urlWrites.length, 1);
+});
+
+test('workbench effect selection resolves a legacy alias to its canonical URL identity', async () => {
+  initResult = Promise.resolve(true);
+  const module = fakeWasmModule();
+  const selected = [];
+  module.HolosphereEngine.prototype.setEffect = (effect) => {
+    selected.push(effect);
+    return module.EffectSetResult.INSTALLED;
+  };
+  const app = startApp({ daydreamMode: 'shader-workbench',
+    search: '?effect=ShaderChain', loadModule: async () => module });
+  await app.teardown.ready;
+  await new Promise((done) => setImmediate(done));
+  assert.equal(callbacks.selectEffect('AshCloud'), true);
+  assert.equal(selected.at(-1), canonicalEffectId('AshCloud'));
+  getActiveURLSync().flush();
+  assert.equal(new URL(app.urlWrites.at(-1), 'https://example.test').searchParams.get('effect'),
+    canonicalEffectId('AshCloud'));
+});
+
+test('a constructor that traps marks boot failure with the module remedy', async () => {
+  const module = fakeWasmModule();
+  module.HolosphereEngine = class {
+    static isLive() { return false; }
+    constructor() {
+      module.HS_MODULE_DEAD = true;
+      throw new WebAssembly.RuntimeError('unreachable');
+    }
+  };
+  const capture = installConsoleCapture('error', 'warn', 'log');
+  try {
+    const app = startApp({ loadModule: async () => module });
+    await app.teardown.ready;
+    assert.equal(app.teardown.disposed(), true);
+    assert.ok(app.elements.get('loading-overlay').children
+      .some((child) => child.textContent === MODULE_TRAP_NOTICE));
+    assert.ok(capture.messages.some((message) => /Failed to initialize/.test(message)));
+  } finally { capture.restore(); }
 });
