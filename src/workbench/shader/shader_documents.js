@@ -464,8 +464,9 @@ export function createShaderDocumentController({
         .find((/** @type {*} */ preset) => preset.preset_id === active.presetId).values;
       const values = { [parameterId]: value };
       if (active.compiledSide) {
+        const editedPresetValues = { ...presetValues, [parameterId]: value };
         for (const id of Object.keys(presetValues)) {
-          const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, { ...presetValues, [parameterId]: value });
+          const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, editedPresetValues);
           if (binding?.sourceId === parameterId)
             values[id] = binding.expected;
         }
