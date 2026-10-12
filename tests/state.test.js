@@ -398,32 +398,27 @@ test('URLSync bounds its retries of a refused history write', () => {
   }
 });
 
-test('URLSync will not let a concurrent write shorten an armed retry', () => {
+test('URLSync will not let a concurrent write shorten an armed retry', (t) => {
   const { history, timer, written } = installRefusingHistoryWindow('rate limit');
-  const warn = console.warn;
-  console.warn = () => {};
-  try {
-    const state = new AppState({ effect: 'Voronoi' });
-    const sync = new URLSync(state, ['effect']);
+  t.mock.method(console, 'warn', () => {});
+  const state = new AppState({ effect: 'Voronoi' });
+  const sync = new URLSync(state, ['effect']);
 
-    sync.flush();
-    assert.deepEqual(timer.delays, [URL_FLUSH_RETRY_MS], 'the refusal armed the retry');
+  sync.flush();
+  assert.deepEqual(timer.delays, [URL_FLUSH_RETRY_MS], 'the refusal armed the retry');
 
-    sync.setParam('scale', 3);
-    assert.deepEqual(timer.delays, [URL_FLUSH_RETRY_MS],
-      'an ad-hoc write did not re-arm at the debounce');
+  sync.setParam('scale', 3);
+  assert.deepEqual(timer.delays, [URL_FLUSH_RETRY_MS],
+    'an ad-hoc write did not re-arm at the debounce');
 
-    state.set('effect', 'Hankin');
-    assert.deepEqual(timer.delays, [URL_FLUSH_RETRY_MS],
-      'a tracked-key change did not re-arm at the debounce either');
+  state.set('effect', 'Hankin');
+  assert.deepEqual(timer.delays, [URL_FLUSH_RETRY_MS],
+    'a tracked-key change did not re-arm at the debounce either');
 
-    history.refuse = false;
-    timer.fire();
-    assert.deepEqual(written, ['/sim?effect=Hankin&scale=3'],
-      'the armed retry flushes both concurrent writes');
-  } finally {
-    console.warn = warn;
-  }
+  history.refuse = false;
+  timer.fire();
+  assert.deepEqual(written, ['/sim?effect=Hankin&scale=3'],
+    'the armed retry flushes both concurrent writes');
 });
 
 test('URLSync reads initial tracked keys from the URL into state', () => {
@@ -531,33 +526,28 @@ test('URLSync suspend disarms the flush the constructor already armed', () => {
   }
 });
 
-test('URLSync resume keeps a suspended retry at the ladder delay', () => {
+test('URLSync resume keeps a suspended retry at the ladder delay', (t) => {
   const timer = fakeUrlTimer();
-  const warn = console.warn;
-  console.warn = () => {};
+  t.mock.method(console, 'warn', () => {});
   installWindow({
     location: { search: '?effect=bogus', pathname: '/sim' },
     history: { replaceState: () => { throw new Error('rate limited'); } },
     setTimeout: timer.setTimeout,
     clearTimeout: timer.clearTimeout,
   });
-  try {
-    const state = new AppState({ effect: 'ShaderChain' });
-    const sync = new URLSync(state, ['effect'], { effect: (v) => v === 'Shader' });
-    assert.deepEqual(timer.delays, [URL_FLUSH_DEBOUNCE_MS]);
-    timer.fire();
-    assert.deepEqual(timer.delays, [URL_FLUSH_DEBOUNCE_MS, URL_FLUSH_RETRY_MS],
-      'the refusal armed the ladder');
+  const state = new AppState({ effect: 'ShaderChain' });
+  const sync = new URLSync(state, ['effect'], { effect: (v) => v === 'Shader' });
+  assert.deepEqual(timer.delays, [URL_FLUSH_DEBOUNCE_MS]);
+  timer.fire();
+  assert.deepEqual(timer.delays, [URL_FLUSH_DEBOUNCE_MS, URL_FLUSH_RETRY_MS],
+    'the refusal armed the ladder');
 
-    sync.suspend();
-    assert.equal(timer.armed(), false);
-    sync.resume();
-    assert.ok(timer.armed(), 'resume must re-arm the pending retry');
-    assert.equal(timer.delays.at(-1), URL_FLUSH_RETRY_MS,
-      'resume pulled the ladder forward to the debounce');
-  } finally {
-    console.warn = warn;
-  }
+  sync.suspend();
+  assert.equal(timer.armed(), false);
+  sync.resume();
+  assert.ok(timer.armed(), 'resume must re-arm the pending retry');
+  assert.equal(timer.delays.at(-1), URL_FLUSH_RETRY_MS,
+    'resume pulled the ladder forward to the debounce');
 });
 
 test('URLSync validator rejects an invalid URL value and keeps the default', () => {
