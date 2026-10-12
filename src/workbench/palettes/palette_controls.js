@@ -943,10 +943,17 @@ export function applyPaletteControls(recipe, controls) {
     // The keys carry the base hue; the engine canonicalizes the field away.
     recipe.hue.baseTurns = 0;
   }
+  if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM)
+    recipe.hue.customTurns = [...DEFAULT_HUE.customTurns];
   recipe.lightness.curve = paletteEnumOrdinal('curve', controls.lightnessCurve);
   recipe.chroma.curve = paletteEnumOrdinal('curve', controls.chromaCurve);
   applyAxisEndpoints(recipe.lightness, controls.lightness);
   applyAxisEndpoints(recipe.chroma, controls.chroma);
+  const defaults = defaultPaletteRecipe();
+  for (const name of ['lightness', 'chroma']) {
+    if (recipe[name].curve !== PaletteV4.curve.CUSTOM)
+      recipe[name].custom = [...defaults[name].custom];
+  }
   const keyCount = controlKeyCount(recipe);
   resampleCustomAxis(recipe.lightness, templateKeyCount, keyCount);
   resampleCustomAxis(recipe.chroma, templateKeyCount, keyCount);
