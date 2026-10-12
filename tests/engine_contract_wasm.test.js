@@ -903,6 +903,37 @@ test('getParamGeneration and setPoleLod stay exported', () => {
   engine.setPoleLod(0);
 });
 
+test('DisplacementField exposes selectable phase presets and preserves paused tuning', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)));
+  engine.setAnimationsPaused(false);
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED);
+  assert.equal(engine.getPresetCount(), 2);
+  assert.deepEqual(engine.getPresetIds(), ['noise', 'balls']);
+  assert.equal(engine.getPresetIndex(), 0);
+
+  assert.equal(engine.selectPresetById('balls'), true);
+  assert.equal(engine.getPresetIndex(), 1);
+  assert.equal(engine.getAnimationsPaused(), true);
+  assert.equal(engine.setParameter('Ball Amp', 0.6), M.ParamSetResult.APPLIED);
+  for (let frame = 0; frame < 32; ++frame) engine.drawFrame();
+  assert.equal(engine.getPresetIndex(), 1);
+  assert.ok(Math.abs(engine.getParameterDefinitions().find(p => p.name === 'Ball Amp').value - 0.6) < 1e-6);
+  assert.ok(engine.getPixels().some(value => value > 0));
+
+  assert.equal(engine.nextPreset(), true);
+  assert.equal(engine.getPresetIndex(), 0);
+  assert.equal(engine.getAnimationsPaused(), true);
+  assert.ok(Math.abs(engine.getParameterDefinitions().find(p => p.name === 'Ball Amp').value - 0.1) < 1e-6);
+  assert.equal(engine.previousPreset(), true);
+  assert.equal(engine.getPresetIndex(), 1);
+  assert.equal(engine.selectPresetById('missing'), false);
+  assert.equal(engine.getPresetIndex(), 1);
+  engine.setAnimationsPaused(false);
+  assert.equal(engine.synchronizePreset(0), true);
+  assert.equal(engine.getPresetIndex(), 0);
+  assert.equal(engine.getAnimationsPaused(), false);
+});
+
 test('getPresetIds names the presets selectPresetById answers to', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 
