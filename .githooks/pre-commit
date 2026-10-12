@@ -11,6 +11,11 @@ if ! git diff --cached --check; then
   exit 1
 fi
 
+if ! command -v node >/dev/null 2>&1; then
+  echo "[pre-commit] node not found; Node.js is required."
+  exit 1
+fi
+
 JAVASCRIPT_FILES="$(printf '%s\n' "$PRESENT" | grep -E '\.(js|mjs)$' || true)"
 if [ -n "$JAVASCRIPT_FILES" ]; then
   if [ ! -x node_modules/.bin/eslint ]; then
@@ -23,11 +28,6 @@ if [ -n "$JAVASCRIPT_FILES" ]; then
   done <<EOF
 $JAVASCRIPT_FILES
 EOF
-fi
-
-if ! command -v node >/dev/null 2>&1; then
-  echo "[pre-commit] node not found; Node.js is required for publication checks."
-  exit 1
 fi
 
 SNAPSHOT_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/daydream-pre-commit.XXXXXX")"
