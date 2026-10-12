@@ -116,8 +116,8 @@ test('input updates the readout and aria-valuetext before onInput', () => {
 });
 
 /**
- * Verifies setValue writes all three parts of the control at once â€” thumb,
- * readout, and aria-valuetext â€” without firing onInput, since the caller
+ * Verifies setValue writes all three parts of the control at once — thumb,
+ * readout, and aria-valuetext — without firing onInput, since the caller
  * already holds the value it is pushing.
  */
 test('setValue drives thumb, readout and aria-valuetext without firing onInput', () => {
