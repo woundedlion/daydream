@@ -941,3 +941,21 @@ test('both axes the tab edits by their endpoints are on the roster', () => {
         `palettes.html must carry a ${id} control`);
   }
 });
+
+test('leaving CUSTOM hue and axis modes clears inactive custom slots', () => {
+  const template = defaultPaletteRecipe();
+  template.hue.mode = PaletteV4.hueMode.CUSTOM;
+  template.hue.customTurns = [0.1, 0.2, 0.3, 0.4];
+  for (const name of ['lightness', 'chroma']) {
+    template[name].curve = PaletteV4.curve.CUSTOM;
+    template[name].custom = [0.2, 0.4, 0.6, 0.8];
+  }
+  const controls = paletteControlsFromRecipe(template);
+  controls.hueMode = 'HARMONY';
+  controls.lightnessCurve = controls.chromaCurve = 'CONSTANT';
+  const recipe = paletteRecipeFromControls(template, controls);
+  const defaults = defaultPaletteRecipe();
+  assert.deepEqual(recipe.hue.customTurns, defaults.hue.customTurns);
+  for (const name of ['lightness', 'chroma'])
+    assert.deepEqual(recipe[name].custom, defaults[name].custom);
+});

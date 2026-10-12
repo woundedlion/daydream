@@ -20,6 +20,8 @@ import {
 } from './helpers/fake_engine.js';
 import { isViewLive, refreshPixelView } from '../src/renderer/pixel_view.js';
 import { DEFAULT_EFFECT, resolutionPresets } from '../src/effects/effect_roster.js';
+import { paletteControlsFromRecipe, paletteRecipeFromControls, PaletteV4 } from '../src/workbench/palettes/palette_controls.js';
+import { paletteAdjustmentSummary } from '../src/workbench/palettes/palette_math.js';
 import { stageGrouping } from '../src/effects/shader_stages.js';
 
 // Capture the bridge's diagnostics for clamped MeshOps arguments.
@@ -1576,5 +1578,25 @@ test('generated effect identities install canonical and legacy IDs with the same
         return engine.getPresetIds();
       })(), request);
     }
+  }
+});
+
+test('palette CUSTOM transitions send canonical recipes to WASM', () => {
+  const ops = new M.PaletteOps();
+  try {
+    const template = Array.from(ops.effectPresetsV4()).find((preset) => /BZ.*Reaction/i.test(preset.name)).recipe;
+    const controls = paletteControlsFromRecipe(template);
+    controls.hueMode = 'HARMONY';
+    controls.lightnessCurve = controls.chromaCurve = 'CONSTANT';
+    template.hue.mode = PaletteV4.hueMode.CUSTOM;
+    template.hue.customTurns = [0.1, 0.2, 0.3, 0.4];
+    for (const name of ['lightness', 'chroma']) {
+      template[name].curve = PaletteV4.curve.CUSTOM;
+      template[name].custom = [0.2, 0.4, 0.6, 0.8];
+    }
+    const recipe = paletteRecipeFromControls(template, controls);
+    assert.equal(paletteAdjustmentSummary(ops.inspectV4(recipe).status), '');
+  } finally {
+    ops.delete();
   }
 });
