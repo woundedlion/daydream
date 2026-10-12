@@ -1,6 +1,6 @@
 // SegmentController harness: the fake render driver, the controller factory,
 // worker message drivers, and the console/global guards each suite installs.
-import { mock, beforeEach, after } from 'node:test';
+import { mock, beforeEach, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { installDocument } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
@@ -24,6 +24,7 @@ export const driver = {
 export function setDisplayGrid(width, height) {
   driver.W = width; driver.H = height;
   driver.pixels = new Uint16Array(width * height * 3);
+  driver.dotMesh.instanceColor.array = driver.pixels;
 }
 
 const EXPECTED_CONSOLE_MESSAGES = {
@@ -50,6 +51,12 @@ const PASSTHROUGH_CONSOLE_MESSAGES = {
   error: [/^\(node:\d+\) ExperimentalWarning: Module mocking is an experimental feature/],
 };
 export const capturedConsole = [];
+let expectedDiagnostics = [];
+
+/** @param {Array<[string, string]>} diagnostics - Expected warnings/errors for this test. */
+export function expectSegmentDiagnostics(diagnostics) {
+  expectedDiagnostics = diagnostics;
+}
 
 /**
  * Install the per-file console capture, per-test driver reset, global
@@ -70,6 +77,8 @@ export function installSegmentControllerHarness() {
     }));
 
   beforeEach(() => {
+    capturedConsole.length = 0;
+    expectedDiagnostics = [];
     driver.W = 0;
     driver.H = 0;
     driver.pixels = null;
@@ -83,6 +92,13 @@ export function installSegmentControllerHarness() {
     FakeWorker.reset();
   });
 
+  afterEach(() => {
+    const diagnostics = capturedConsole
+      .filter(({method, args}) => method !== 'log' && !(PASSTHROUGH_CONSOLE_MESSAGES[method] ?? [])
+        .some((pattern) => pattern.test(String(args[0]))))
+      .map(({method, args}) => [method, String(args[0])]);
+    assert.deepEqual(diagnostics, expectedDiagnostics, 'per-test segment diagnostics');
+  });
   const savedGlobals = { Worker: globalThis.Worker, document: globalThis.document };
   const restoreGlobal = (key, val) => {
     if (val === undefined) delete globalThis[key];
@@ -93,17 +109,7 @@ export function installSegmentControllerHarness() {
     restoreGlobal('Worker', savedGlobals.Worker);
     restoreGlobal('document', savedGlobals.document);
 
-    const unexpected = capturedConsole.filter(({ method, args }) => {
-      const message = String(args[0]);
-      return !EXPECTED_CONSOLE_MESSAGES[method].some((pattern) => pattern.test(message))
-        && !(PASSTHROUGH_CONSOLE_MESSAGES[method] ?? [])
-          .some((pattern) => pattern.test(message));
-    });
-    assert.deepEqual(
-      unexpected.map(({ method, args }) => `${method}: ${args.map(String).join(' ')}`),
-      [],
-      'unexpected console diagnostics',
-    );
+
   });
 
   globalThis.Worker = FakeWorker;
