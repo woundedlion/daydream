@@ -21,7 +21,7 @@ export { copyToClipboard };
  * Copy `text`, then briefly swap an element's label to a "copied" message
  * (optionally toggling CSS classes) and restore it after `revertMs`.
  *
- * @param {string} text - Text to copy.
+ * @param {string|Promise<string>} text - Text to copy, optionally pending validation.
  * @param {Object} [opts] - Feedback options.
  * @param {FeedbackElement|undefined} [opts.element] - Element whose label flips on copy.
  * @param {string} [opts.copiedText='Copied!'] - Label shown on success.

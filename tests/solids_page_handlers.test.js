@@ -111,6 +111,45 @@ test('arena polling retries ordinary failures and stops cleanly on an engine hal
   assert.equal(context.arenaMetricsTimer, null);
 });
 
+test('registry copy hands pending validation to the clipboard during the click', async () => {
+  let finish;
+  const validation = new Promise(resolve => { finish = resolve; });
+  let pending;
+  const copied = [];
+  const copyCode = handler('copyCode', {
+    savedSolids: [{ base: 'cube', ops: [] }],
+    savedChainShapeError: () => null,
+    registrySolidNames: new Set(['cube']), islamicStarPatterns: [], CATALAN_BASES: new Set(),
+    generateRegistryCpp: () => 'registry code', validator: {},
+    validateRegistryFaces: () => validation,
+    copyWithFeedback: async text => { pending = text; copied.push(await text); return true; },
+    showCopyFailure: () => assert.fail('unexpected failure'),
+  });
+  const copying = copyCode(0, 'registry', {});
+  assert.ok(pending && typeof pending.then === 'function');
+  assert.deepEqual(copied, []);
+  finish();
+  await copying;
+  assert.deepEqual(copied, ['registry code']);
+});
+
+test('registry validation failures retain export diagnostics without copying', async () => {
+  const error = new Error('faces exceed registry limits');
+  const failures = [];
+  const copyCode = handler('copyCode', {
+    savedSolids: [{ base: 'cube', ops: [] }],
+    savedChainShapeError: () => null,
+    registrySolidNames: new Set(['cube']), islamicStarPatterns: [], CATALAN_BASES: new Set(),
+    generateRegistryCpp: () => 'unchecked code', validator: {},
+    validateRegistryFaces: async () => { throw error; },
+    copyWithFeedback: async text => { await text; assert.fail('unchecked copy'); },
+    engineTrapped: caught => { assert.equal(caught, error); return false; },
+    showCopyFailure: (button, message) => failures.push(message),
+  });
+  await copyCode(0, 'registry', {});
+  assert.deepEqual(failures, ['export failed: faces exceed registry limits']);
+});
+
 test('copying a star recipe contains bridge errors and reports engine halts', async () => {
   const error = new Error('recipe unavailable');
   const failures = [];

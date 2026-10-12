@@ -885,6 +885,7 @@ async function copyCode(index, lang, btn) {
 
   // A star-pattern base is not in simple_registry, so the Recipe flattens its chain.
   let code;
+  let validationError = null;
   try {
     if (lang === 'recipe_cpp') {
       code = generateRecipeCpp(item, seedNs);
@@ -902,8 +903,9 @@ async function copyCode(index, lang, btn) {
           return;
         }
       }
-      code = generateRegistryCpp(item, baseRecipe);
-      await validateRegistryFaces(validator, item, baseRecipe);
+      const registryCode = generateRegistryCpp(item, baseRecipe);
+      code = validateRegistryFaces(validator, item, baseRecipe)
+        .then(() => registryCode, (error) => { validationError = error; throw error; });
     } else {
       console.warn("Unsupported export type.");
       return;
@@ -920,6 +922,11 @@ async function copyCode(index, lang, btn) {
         failedText: 'Failed', failedClasses: ['text-red-400'] });
     if (!copied) showGateMsg('copy failed: the browser refused clipboard access');
   } catch (e) {
+    if (validationError) {
+      if (engineTrapped(validationError)) return;
+      showCopyFailure(btn, `export failed: ${validationError.message}`);
+      return;
+    }
     showCopyFailure(btn, `copy failed: ${e.message}`);
   }
 }
