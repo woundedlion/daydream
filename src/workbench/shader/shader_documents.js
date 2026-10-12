@@ -465,9 +465,9 @@ export function createShaderDocumentController({
       const values = { [parameterId]: value };
       if (active.compiledSide) {
         for (const id of Object.keys(presetValues)) {
-          const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, presetValues);
+          const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, { ...presetValues, [parameterId]: value });
           if (binding?.sourceId === parameterId)
-            values[id] = Math.fround(1 / Math.fround(value));
+            values[id] = binding.expected;
         }
       }
       const result = chainUi.store.setPresetValues(active.presetId, values, () => {
