@@ -50,7 +50,7 @@ test('default warm uses its served module URL, global fetch, and clears its dead
 
 test('warmModules revalidates the whole worker module graph', async () => {
   const calls = [];
-  const response = { arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) };
+  const response = { arrayBuffer: () => Promise.resolve(EMPTY_WASM.buffer) };
   await warmModules({
     baseUrl: 'http://localhost:8000/src/segments/segment_controller.js',
     minIntervalMs: 0,
@@ -75,7 +75,9 @@ test('warmModules revalidates the whole worker module graph', async () => {
 });
 
 test('a stalled warm is abandoned on its deadline so the spawn still runs',
-  async () => {
+  async (t) => {
+    const warnings = [];
+    t.mock.method(console, 'warn', (...args) => warnings.push(args.join(' ')));
     const warmer = new ModuleWarmer();
     await warmer.warm({
       baseUrl: 'http://localhost:8000/stalled/src/segments/segment_controller.js',
@@ -112,6 +114,8 @@ test('a stalled warm is abandoned on its deadline so the spawn still runs',
     await warm;
 
     assert.equal(aborted, GRAPH.length, 'every stalled re-fetch was aborted');
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /module warm did not finish within/);
     assert.equal(warmer.module, null,
       'the abandoned warm hands the pool a module it never revalidated');
   });
@@ -119,7 +123,7 @@ test('a stalled warm is abandoned on its deadline so the spawn still runs',
 test('a re-warm inside the dedupe window is skipped', async () => {
   let calls = 0;
   let now = 0;
-  const response = { arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) };
+  const response = { arrayBuffer: () => Promise.resolve(EMPTY_WASM.buffer) };
   const deps = {
     baseUrl: 'http://localhost:8000/src/segments/segment_controller.js',
     minIntervalMs: WARM_INTERVAL_MS,
@@ -141,7 +145,7 @@ test('a re-warm inside the dedupe window is skipped', async () => {
 
 test('the dedupe window covers one base URL, not every caller in it', async () => {
   const seen = [];
-  const response = { arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) };
+  const response = { arrayBuffer: () => Promise.resolve(EMPTY_WASM.buffer) };
   const deps = {
     minIntervalMs: WARM_INTERVAL_MS,
     fetch: (url) => { seen.push(url.href); return Promise.resolve(response); },
@@ -194,7 +198,7 @@ test('a warm whose fetch throws synchronously does not claim the window', async 
     baseUrl, minIntervalMs: WARM_INTERVAL_MS, now: () => 0,
     fetch: () => {
       calls++;
-      return Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) });
+      return Promise.resolve({ arrayBuffer: () => Promise.resolve(EMPTY_WASM.buffer) });
     },
   });
   assert.equal(calls, GRAPH.length + 1,
@@ -235,7 +239,7 @@ test('a warm that settles behind a newer one leaves its module alone', async () 
     fetch: (url) => Promise.resolve({
       arrayBuffer: () => (url.pathname.endsWith('.wasm')
         ? binary()
-        : Promise.resolve(new ArrayBuffer(0))),
+        : Promise.resolve(EMPTY_WASM.buffer)),
     }),
   });
 
@@ -245,9 +249,12 @@ test('a warm that settles behind a newer one leaves its module alone', async () 
   assert.ok(fresh instanceof WebAssembly.Module, 'the newer warm compiled');
 
   releaseStale(Uint8Array.of(0, 0x61, 0x73, 0x6d, 9, 9, 9, 9).buffer);
-  const stub = mock.method(console, 'warn', () => {});
+  const warnings = [];
+  const stub = mock.method(console, 'warn', (...args) => warnings.push(args));
   try {
     await slow;
+    assert.equal(warnings.length, 1);
+    assert.match(String(warnings[0][0]), /shared WASM compile failed/);
   } finally {
     stub.mock.restore();
   }
@@ -266,7 +273,7 @@ test('a warm in flight when a worker refuses the module does not restore it', as
     fetch: (url) => Promise.resolve({
       arrayBuffer: () => (url.pathname.endsWith('.wasm')
         ? binary
-        : Promise.resolve(new ArrayBuffer(0))),
+        : Promise.resolve(EMPTY_WASM.buffer)),
     }),
   });
 
@@ -342,7 +349,7 @@ test('warm without fetch is a no-op', async (t) => {
     ...request,
     fetch: () => {
       calls++;
-      return Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) });
+      return Promise.resolve({ arrayBuffer: () => Promise.resolve(EMPTY_WASM.buffer) });
     },
   });
   assert.equal(calls, GRAPH.length + 1, 'the fetch-less warm claimed the dedupe window');
