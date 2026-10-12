@@ -792,21 +792,21 @@ test('movedOps returns a reordered deep copy', () => {
 
 /** Verifies the recorded reason is read back by identity and names its remedy. */
 test('meshOpFailure routes each recorded reason', () => {
-  const { Mod } = fakeModule({ ...{ rejects: new Set(['base:cube']), reason: 'ARENA_EXHAUSTED' }, onOp: () => { } });
+  const { Mod } = fakeModule({ rejects: new Set(['base:cube']), reason: 'ARENA_EXHAUSTED' });
   assert.equal(Mod.MeshOps.fromSolidName('cube'), null);
   const exhausted = meshOpFailure(Mod, 'Base solid "cube"');
   assert.equal(exhausted.reason, 'ARENA_EXHAUSTED');
   assert.equal(exhausted.flush, true, 'only ARENA_EXHAUSTED is cleared by flushing the arenas');
   assert.match(exhausted.message, /^Base solid "cube" failed: /);
 
-  const unknown = fakeModule({ ...{ rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' }, onOp: () => { } });
+  const unknown = fakeModule({ rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' });
   assert.equal(unknown.Mod.MeshOps.fromSolidName('nope'), null);
   const named = meshOpFailure(unknown.Mod, 'Base solid "nope"');
   assert.equal(named.reason, 'UNKNOWN_NAME');
   assert.equal(named.flush, false);
   assert.notEqual(named.message, exhausted.message, 'each reason must carry its own remedy');
 
-  const gone = fakeModule({ ...{ rejects: new Set(['base:cube']), reason: 'ARENA_UNAVAILABLE' }, onOp: () => { } });
+  const gone = fakeModule({ rejects: new Set(['base:cube']), reason: 'ARENA_UNAVAILABLE' });
   assert.equal(gone.Mod.MeshOps.fromSolidName('cube'), null);
   const unavailable = meshOpFailure(gone.Mod, 'Base solid "cube"');
   assert.equal(unavailable.fatal, true, 'an unreservable tooling block leaves no call that can succeed');
@@ -835,7 +835,7 @@ test('meshOpFailure reports UNKNOWN for a recorded value outside the enum', () =
 
 /** Verifies the null-result handler reports and flushes by reason. */
 test('requireMeshResult surfaces the reason and applies its remedy', () => {
-  const { Mod, state } = fakeModule({ ...{ rejects: new Set(['base:cube']) }, onOp: () => { } });
+  const { Mod, state } = fakeModule({ rejects: new Set(['base:cube']) });
   const shown = [];
   const ctx = { Mod, meshOps: Mod.MeshOps, onError: (m) => shown.push(m) };
 
@@ -853,7 +853,7 @@ test('requireMeshResult surfaces the reason and applies its remedy', () => {
 /** Verifies a reason with no flush remedy leaves the arenas alone. */
 test('requireMeshResult flushes only for the reason that calls for it', () => {
   const { Mod, state } = fakeModule(
-    { ...{ rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' }, onOp: () => { } });
+    { rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' });
   const shown = [];
   assert.equal(requireMeshResult(Mod.MeshOps.fromSolidName('nope'), 'Base solid "nope"',
     { Mod, meshOps: Mod.MeshOps, onError: (m) => shown.push(m) }), null);
@@ -867,7 +867,7 @@ test('requireMeshResult flushes only for the reason that calls for it', () => {
  */
 test('requireMeshResult stands the tool down for an unreservable tooling block', () => {
   const { Mod, state } = fakeModule(
-    { ...{ rejects: new Set(['base:cube']), reason: 'ARENA_UNAVAILABLE' }, onOp: () => { } });
+    { rejects: new Set(['base:cube']), reason: 'ARENA_UNAVAILABLE' });
   const shown = [];
   const fatal = [];
   const ctx = {
@@ -885,7 +885,7 @@ test('requireMeshResult stands the tool down for an unreservable tooling block',
 
 /** Verifies a recoverable failure keeps going to the transient line. */
 test('requireMeshResult leaves a recoverable failure on the transient line', () => {
-  const { Mod } = fakeModule({ ...{ rejects: new Set(['base:cube']) }, onOp: () => { } });
+  const { Mod } = fakeModule({ rejects: new Set(['base:cube']) });
   const shown = [];
   const fatal = [];
   assert.equal(requireMeshResult(Mod.MeshOps.fromSolidName('cube'), 'Base solid "cube"',
