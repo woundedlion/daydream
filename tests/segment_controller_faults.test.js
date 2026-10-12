@@ -203,7 +203,6 @@ test('a startup abort with nothing constructed still recovers on a rebuild', () 
   FakeWorker.failConstructionAt = -1;
   c.setResolution(4, 4);
   c.setEffect('AfterResize');
-  assert.equal(c.workers.length, 2);
   assert.equal(c.faulted, false, 'recreating the pool cleared the fault latch');
   assert.equal(c.workers.length, 2, 'a fresh pool of workers was built');
 });
