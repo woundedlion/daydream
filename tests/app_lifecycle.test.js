@@ -10,6 +10,7 @@ import {
   createAppTeardown,
   createFrameLoopGuard,
   FRAME_GUARD_REARM_FRAMES,
+  MODULE_TRAP_NOTICE,
   createGlobalKeydownHandler,
   createModuleLoadHandlers,
   loadWithDeadline,
@@ -658,6 +659,24 @@ test('a frame guard stringifies a thrown value carrying no message', () => {
 });
 
 // A terminal module flag stops frames even when the simulated frame body returns normally.
+
+test('a thrown RuntimeError latches module death without a separate death flag', () => {
+  let frames = 0;
+  let releases = 0;
+  const { guarded, reported } = makeFrameGuard(() => {
+    frames += 1;
+    throw new WebAssembly.RuntimeError('unreachable');
+  }, {
+    moduleDead: (error) => error instanceof WebAssembly.RuntimeError,
+    onModuleDead: () => { releases += 1; },
+  });
+
+  for (let i = 0; i < FRAME_GUARD_REARM_FRAMES * 2; i++) guarded();
+
+  assert.equal(frames, 1);
+  assert.equal(releases, 1);
+  assert.deepEqual(reported, [MODULE_TRAP_NOTICE]);
+});
 
 test('a dead module stops the frames, releases the app, and names the reload', () => {
   let frames = 0;
