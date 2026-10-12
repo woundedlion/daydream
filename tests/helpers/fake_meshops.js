@@ -59,3 +59,14 @@ export function fakeModule({ rejects = new Set(), reason = 'ARENA_EXHAUSTED',
   };
   return { Mod, state };
 }
+
+/** @param {Array<{op: string, args: Array<*>}>} [calls] @returns {Object} Recording mesh double. */
+export function stubMesh(calls = []) {
+  const mesh = new Proxy({}, {
+    get: (target, op) => (...args) => {
+      calls.push({ op, args });
+      return mesh;
+    },
+  });
+  return mesh;
+}
