@@ -772,3 +772,24 @@ test('externally rendered stage parameters build no stage folders', () => {
   assert.equal(h.panel.active().stageFolders.size, 0);
   assert.deepEqual(h.panel.active().paramNames, params.map((parameter) => parameter.name));
 });
+
+for (const move of [false, true]) {
+  test(`same-count warnings refresh when ${move ? 'the parameter changes' : 'the text changes'}`, () => {
+    const h = makeHarness({ params: [{ ...SPEED, warning: 'first warning' }, { ...GLOW }] });
+    h.panel.build();
+    h.panel.mount();
+    h.state.params = move ? [{ ...SPEED }, { ...GLOW, warning: 'moved warning' }]
+      : [{ ...SPEED, warning: 'new warning' }, { ...GLOW }];
+    h.gui().ctrl('Speed').setValue(0.8);
+    h.panel.sync();
+    const speed = h.gui().ctrl('Speed').domElement;
+    const glow = h.gui().ctrl('Glow').domElement;
+    const marked = move ? glow : speed;
+    const clear = move ? speed : glow;
+    assert.equal(marked.querySelector('.param-warning-note').textContent,
+      move ? 'moved warning' : 'new warning');
+    assert.equal(marked.querySelector('input').getAttribute('aria-invalid'), 'true');
+    assert.equal(clear.querySelector('.param-warning-note'), null);
+    assert.notEqual(clear.querySelector('input').getAttribute('aria-invalid'), 'true');
+  });
+}
