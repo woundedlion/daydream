@@ -640,18 +640,11 @@ test('a start that never began a session keeps the reason it was given', async (
     + 'explanation the user was given with one that is also untrue');
 });
 
-test('the discard path releases what the refused startup had already built', async () => {
+test('a refused startup releases the engine and recorder through teardown', async () => {
   const module = fakeWasmModule({ refusedWidth: 288 });
   const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
-
-  assert.equal(module.deletes(), 1,
-    'a WASM engine handle must be deleted, not merely dropped, and the startup '
-    + 'that lost the disposal race owns everything it built: the page teardown '
-    + 'and the discard path both release through EngineHost.dispose(), so '
-    + 'whichever of them gets there frees it and neither can drift');
-  assert.equal(app.driver.recorder, null,
-    'the recorder the startup hung on the driver captures a stream from a '
-    + 'canvas the teardown has already released');
+  assert.equal(module.deletes(), 1);
+  assert.equal(app.driver.recorder, null);
 });
 
 test('the segment-count control marks the count no hardware produces', () => {

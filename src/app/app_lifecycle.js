@@ -407,16 +407,13 @@ export function loadWithDeadline(load, {
  * Build the handlers for the main WASM module promise, guarded against a page
  * discard that settles first.
  *
- * Startup is skipped once the app is disposed; a disposal that lands during
- * startup releases what startup built. A load failure disposes the app.
+ * Startup is skipped once the app is disposed. A load failure disposes the app.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {() => ?{dispose: Function, disposed: () => boolean}} deps.teardown -
  *   Reads the app teardown, or null if none is set.
  * @param {(module: Object) => void} deps.start - Brings the app up on the
  *   loaded module.
- * @param {() => void} deps.discardStartup - Releases the engine, recorder, and
- *   adapter start() built when disposal won the race.
  * @param {(err: *) => void} deps.reportFailure - Renders the load-failure UI.
  * @returns {{onModuleReady: (module: Object) => void,
  *   onModuleFailed: (err: *) => void}} The fulfillment and rejection handlers.
@@ -424,7 +421,6 @@ export function loadWithDeadline(load, {
 export function createModuleLoadHandlers({
   teardown,
   start,
-  discardStartup,
   reportFailure,
 }) {
   const disposed = () => teardown()?.disposed() === true;
@@ -432,7 +428,6 @@ export function createModuleLoadHandlers({
     onModuleReady(module) {
       if (disposed()) return;
       start(module);
-      if (disposed()) discardStartup();
     },
     onModuleFailed(err) {
       if (disposed()) return;
