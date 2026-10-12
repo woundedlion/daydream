@@ -14,8 +14,6 @@ inline constexpr OpStep CUBE_TRUNCATE33_STEPS[] = {
 inline constexpr Recipe CUBE_TRUNCATE33_RECIPE =
     make_recipe(SEED_CUBE, CUBE_TRUNCATE33_STEPS);
 
-// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.
-// Until they agree, its size static_assert and the NUM_ENTRIES sum both
-// fail.
-    {"cube_truncate33", IslamicStarPatterns::cube_truncate33, Category::Complex,
+// Append this Entry to islamic_registry.
+    {"cube_truncate33", IslamicStarPatterns::cube_truncate33, Category::COMPLEX,
      &CUBE_TRUNCATE33_RECIPE},

@@ -1,5 +1,5 @@
 // clang-format off
-/** Step table for truncatedIcosahedron_ambo_relax100_truncate01_hk59. */
+/** Step table for truncated_icosahedron_ambo_relax100_truncate01_hk59. */
 inline constexpr OpStep
     TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_STEPS[] = {
         {Op::AMBO},
@@ -10,17 +10,15 @@ inline constexpr OpStep
 // clang-format on
 /**
  * Recipe mirror of
- * IslamicStarPatterns::truncatedIcosahedron_ambo_relax100_truncate01_hk59.
+ * IslamicStarPatterns::truncated_icosahedron_ambo_relax100_truncate01_hk59.
  */
 inline constexpr Recipe
     TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_RECIPE =
         make_recipe(SEED_TRUNCATED_ICOSAHEDRON,
                     TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_STEPS);
 
-// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.
-// Until they agree, its size static_assert and the NUM_ENTRIES sum both
-// fail.
+// Append this Entry to islamic_registry.
     {"truncatedIcosahedron_ambo_relax100_truncate01_hk59",
-     IslamicStarPatterns::truncatedIcosahedron_ambo_relax100_truncate01_hk59,
-     Category::Complex,
+     IslamicStarPatterns::truncated_icosahedron_ambo_relax100_truncate01_hk59,
+     Category::COMPLEX,
      &TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_RECIPE},

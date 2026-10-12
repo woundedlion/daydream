@@ -314,21 +314,7 @@ test('generateRecipeCpp wraps a long function at the target header column limit'
     fCount: 602,
     iCount: 3600,
   }, 'Archimedean');
-  assert.equal(cpp,
-    '/**\n'
-    + ' * @brief Builds the truncatedIcosahedron_hk58_chamfer63 star pattern (V=1200,\n'
-    + ' * F=602, I=3600).\n'
-    + ' * @param a First arena in the alternating construction pair.\n'
-    + ' * @param b Second arena; the result may borrow storage from either arena.\n'
-    + ' * @return The resulting star-pattern mesh.\n'
-    + ' */\n'
-    + 'FLASHMEM static PolyMesh truncatedIcosahedron_hk58_chamfer63(Arena &a,\n'
-    + '                                                             Arena &b) {\n'
-    + '  return SolidBuilder(Archimedean::truncatedIcosahedron(a, b), a, b)\n'
-    + '      .hankin(58.0f * D2R)\n'
-    + '      .chamfer(0.63f)\n'
-    + '      .build();\n'
-    + '}');
+  assert.equal(cpp, readFileSync(new URL('./fixtures/recipe-archimedean.cpp', import.meta.url), 'utf8').trimEnd());
 });
 
 /**
@@ -340,7 +326,7 @@ test('generateRecipeCpp breaks after the return type when the name fills the lin
     base: 'truncatedIcosidodecahedron',
     ops: [{ op: 'truncate', params: { t: 0.5 } }, 'ambo', 'dual'],
   }, 'Archimedean');
-  assert.match(cpp, /\nFLASHMEM static PolyMesh\ntruncatedIcosidodecahedron_truncate50_ambo_dual\(Arena &a, Arena &b\) \{\n/);
+  assert.match(cpp, /\nFLASHMEM static PolyMesh\ntruncated_icosidodecahedron_truncate50_ambo_dual\(Arena &a, Arena &b\) \{\n/);
 });
 
 /**
@@ -386,9 +372,9 @@ test('generateRecipeCpp keeps every breakable line within the column limit', () 
 /** Verifies a line that exactly fills the column limit stays whole and one past it wraps. */
 test('generateRecipeCpp wraps at the column limit, not one column early or late', () => {
   const signature = generateRecipeCpp({
-    base: 'truncatedIcosidodecahedron', ops: [{ op: 'relax', params: { iter: 9 } }],
+    base: 'a'.repeat(26), ops: [{ op: 'relax', params: { iter: 9 } }],
   }, 'Archimedean').split('\n').find((line) => line.startsWith('FLASHMEM'));
-  assert.equal(signature, 'FLASHMEM static PolyMesh truncatedIcosidodecahedron_relax9(Arena &a, Arena &b) {');
+  assert.equal(signature, `FLASHMEM static PolyMesh ${'a'.repeat(26)}_relax9(Arena &a, Arena &b) {`);
   assert.equal(signature.length, 80);
 
   const seedLines = (base) => {
@@ -396,13 +382,13 @@ test('generateRecipeCpp wraps at the column limit, not one column early or late'
     const start = lines.findIndex((line) => line.startsWith('  return '));
     return lines.slice(start, lines.indexOf('      .dual()'));
   };
-  assert.deepEqual(seedLines('truncatedIcosidodecahedron_hk5'), [
-    '  return SolidBuilder(IslamicStarPatterns::truncatedIcosidodecahedron_hk5(a, b),',
+  assert.deepEqual(seedLines('truncatedIcosidodecahedron_hk'), [
+    '  return SolidBuilder(IslamicStarPatterns::truncated_icosidodecahedron_hk(a, b),',
     '                      a, b)',
   ]);
   assert.deepEqual(seedLines('truncatedIcosidodecahedron_hk58'), [
     '  return SolidBuilder(',
-    '             IslamicStarPatterns::truncatedIcosidodecahedron_hk58(a, b), a, b)',
+    '             IslamicStarPatterns::truncated_icosidodecahedron_hk58(a, b), a, b)',
   ]);
 });
 
@@ -454,9 +440,9 @@ test('generateRecipeCpp emits counts no non-negative integer can escape', () => 
 test('the seed call is qualified with the base namespace', () => {
   const item = { base: 'rhombicTriacontahedron', ops: ['ambo'] };
   const { recipe } = generateFuncAndRecipe(item, 'Catalan');
-  assert.equal(recipe, 'SolidBuilder(Catalan::rhombicTriacontahedron(a, b), a, b).ambo().build()');
+  assert.equal(recipe, 'SolidBuilder(Catalan::rhombic_triacontahedron(a, b), a, b).ambo().build()');
   assert.ok(generateRecipeCpp(item, 'Catalan')
-    .includes('SolidBuilder(Catalan::rhombicTriacontahedron(a, b), a, b)'));
+    .includes('SolidBuilder(Catalan::rhombic_triacontahedron(a, b), a, b)'));
 });
 
 /** Verifies a pasteable function is never emitted without a valid namespace for its seed. */

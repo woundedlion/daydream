@@ -8,7 +8,7 @@ static_assert(
     "truncatedCuboctahedron");
 
 // clang-format off
-/** Step table for truncatedCuboctahedron_truncate33_truncate33_truncate33. */
+/** Step table for truncated_cuboctahedron_truncate33_truncate33_truncate33. */
 inline constexpr OpStep
     TRUNCATED_CUBOCTAHEDRON_TRUNCATE33_TRUNCATE33_TRUNCATE33_STEPS[] = {
         {Op::TRUNCATE, 0.33f},
@@ -18,7 +18,7 @@ inline constexpr OpStep
 // clang-format on
 /**
  * Recipe mirror of
- * IslamicStarPatterns::truncatedCuboctahedron_truncate33_truncate33_truncate33.
+ * IslamicStarPatterns::truncated_cuboctahedron_truncate33_truncate33_truncate33.
  */
 inline constexpr Recipe
     TRUNCATED_CUBOCTAHEDRON_TRUNCATE33_TRUNCATE33_TRUNCATE33_RECIPE =
@@ -26,11 +26,9 @@ inline constexpr Recipe
             SEED_TRUNCATED_CUBOCTAHEDRON,
             TRUNCATED_CUBOCTAHEDRON_TRUNCATE33_TRUNCATE33_TRUNCATE33_STEPS);
 
-// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.
-// Until they agree, its size static_assert and the NUM_ENTRIES sum both
-// fail.
+// Append this Entry to islamic_registry.
     {"truncatedCuboctahedron_truncate33_truncate33_truncate33",
      IslamicStarPatterns::
-         truncatedCuboctahedron_truncate33_truncate33_truncate33,
-     Category::Complex,
+         truncated_cuboctahedron_truncate33_truncate33_truncate33,
+     Category::COMPLEX,
      &TRUNCATED_CUBOCTAHEDRON_TRUNCATE33_TRUNCATE33_TRUNCATE33_RECIPE},
