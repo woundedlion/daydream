@@ -184,13 +184,6 @@ test('adapter decode rejects nested authoring and deletion from getters', async 
 const resolutionOk = (r) => r === M.ResolutionSetResult.RESIZED
   || r === M.ResolutionSetResult.ALREADY_ACTIVE;
 
-// The module exports no heap view, so the pixel buffer stands in for one: it
-// aliases the heap, so its ArrayBuffer is the heap's.
-const heapBytes = () => engine.getPixels().buffer.byteLength;
-// Read before any case runs; the growth case observes MeshOps' 16 MB block.
-// A resolution's first factory lookup can also grow the heap.
-const INITIAL_HEAP_BYTES = heapBytes();
-
 // Structured payload shapes are authored separately from emitted bindings.
 const DTS_PATH = 'generated/engine_types.d.ts';
 const DTS = readFileSync(new URL(`../${DTS_PATH}`, import.meta.url), 'utf8');
@@ -1096,39 +1089,43 @@ test('the preset methods answer the way the segmented path assumes', () => {
 // MeshOps' 16 MB tooling block is allocated lazily on first use and cannot fit
 // the heap the module starts with, so that first call grows it, which detaches
 // every live view.
-test('heap growth detaches a held pixel view and the re-fetch is live and identical', () => {
-  // Any earlier heap growth can leave this case nothing to observe.
-  assert.equal(heapBytes(), INITIAL_HEAP_BYTES,
-    'the heap has already grown after an earlier allocation (a resolution factory ' +
-    'lookup or a MeshOps case); this case requires the initial heap size');
-  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
-    'setEffect must succeed for a registered effect');
-  engine.setClip(0, W, 0, H);
-  engine.drawFrame();
+test('heap growth detaches a held pixel view and the re-fetch is live and identical', async () => {
+  const M = await createHolosphereModule({ print: sink, printErr: sink });
+  const engine = new M.HolosphereEngine();
+  try {
+    assert.ok([M.ResolutionSetResult.RESIZED, M.ResolutionSetResult.ALREADY_ACTIVE].includes(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+    assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+      'setEffect must succeed for a registered effect');
+    engine.setClip(0, W, 0, H);
+    engine.drawFrame();
 
-  const held = engine.getPixels();
-  assert.equal(isViewLive(held), true, 'a freshly fetched view must be live');
-  const snapshot = Array.from(held);
+    const held = engine.getPixels();
+    assert.equal(isViewLive(held), true, 'a freshly fetched view must be live');
+    const snapshot = Array.from(held);
 
-  const mesh = M.MeshOps.fromSolidName('cube');
-  assert.ok(mesh, 'fromSolidName("cube") must build a mesh');
-  mesh.delete();
-  M.MeshOps.clearToolingMemory();
+    const baselineBytes = held.buffer.byteLength;
+    const mesh = M.MeshOps.fromSolidName('cube');
+    assert.ok(mesh, 'fromSolidName("cube") must build a mesh');
+    mesh.delete();
+    M.MeshOps.clearToolingMemory();
 
-  assert.equal(isViewLive(held), false,
-    'the 16 MB tooling allocation must grow the heap and detach the held view; ' +
-    'if it no longer does, nothing exercises the detachment contract daydream.js ' +
-    'guards against every frame');
+    assert.ok(engine.getPixels().buffer.byteLength > baselineBytes);
+    assert.equal(isViewLive(held), false,
+      'the 16 MB tooling allocation must grow the heap and detach the held view; ' +
+      'if it no longer does, nothing exercises the detachment contract daydream.js ' +
+      'guards against every frame');
 
-  const { refreshed, view } = refreshPixelView(
-    held, () => engine.getPixels(), engine.getBufferLength());
-  assert.equal(refreshed, true, 'a detached view must be re-fetched');
-  assert.equal(isViewLive(view), true, 'the re-fetched view must alias live memory');
-  assert.equal(view.length, snapshot.length,
-    're-fetched view length must match the pre-growth view');
-  assert.deepEqual(Array.from(view), snapshot,
-    'growth must preserve the pixels: the re-fetched view must be byte-identical');
+    const { refreshed, view } = refreshPixelView(
+      held, () => engine.getPixels(), engine.getBufferLength());
+    assert.equal(refreshed, true, 'a detached view must be re-fetched');
+    assert.equal(isViewLive(view), true, 'the re-fetched view must alias live memory');
+    assert.equal(view.length, snapshot.length,
+      're-fetched view length must match the pre-growth view');
+    assert.deepEqual(Array.from(view), snapshot,
+      'growth must preserve the pixels: the re-fetched view must be byte-identical');
+  } finally {
+    engine.delete();
+  }
 });
 
 // Everything MeshOps binds that is not a Conway/SolidBuilder operator. The
