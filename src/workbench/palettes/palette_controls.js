@@ -292,6 +292,7 @@ export function createPaletteViewport() {
       if (low === high) return { start, end };
       const nextStart = map(low);
       const nextEnd = map(high);
+      if (nextEnd - nextStart < 0.01) return { start, end };
       start = nextStart;
       end = nextEnd;
       return { start, end };
