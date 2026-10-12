@@ -1092,3 +1092,34 @@ test('canonical and legacy URL normalization retains parameter keys', async (t) 
     assert.equal(active.dataset.effect, 'comets');
   }
 });
+
+test('segment resize failure destroys the pool and clears Enabled while boundaries remain wired', async (t) => {
+  const gui = fakeGui('view');
+  const notices = [];
+  const segments = { active: true, count: 2, showBoundaries: false, destroyed: 0,
+    create() { throw new Error('resize refused'); },
+    destroy() { this.destroyed += 1; }, updateStats() {},
+  };
+  t.mock.method(pageWarmer, 'warm', async () => {});
+  const guard = createSegmentedPovControls({ gui, segments, nav: { hardwareConcurrency: 8 },
+    win: {}, showNotice: (message) => notices.push(message) });
+  t.after(() => guard.dispose());
+  const controls = gui.folders[0].controllers;
+  const count = controls.find((control) => control.property === 'segments');
+  const enabled = controls.find((control) => control.property === 'segmented');
+  const capture = installConsoleCapture('error', 'warn');
+  try {
+    count.object.segments = 4;
+    await count.changed(4);
+  } finally { capture.restore(); }
+  assert.match(notices.at(-1), /Segmented POV resize failed:.*resize refused/);
+  assert.ok(capture.messages.some((message) => /resize failed/.test(message)));
+  assert.ok(segments.destroyed >= 1);
+  assert.equal(segments.active, false);
+  assert.equal(enabled.object.segmented, false);
+  const boundaries = controls.find((control) => control.property === 'boundaries');
+  boundaries.setValue(true);
+  assert.equal(segments.showBoundaries, true);
+  boundaries.setValue(false);
+  assert.equal(segments.showBoundaries, false);
+});
