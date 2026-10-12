@@ -3,9 +3,7 @@
 import { test } from 'node:test';
 import * as compiler from '../generated/shader/shader_workbench.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 import {
   DEFAULT_SCRATCH_CHAIN,
@@ -15,7 +13,6 @@ import {
   scratchChainDocument,
 } from '../src/workbench/shader/chain_document_store.js';
 import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../src/workbench/shader/shader_deeplink.js';
-import { scratchDir } from './helpers/fixture_repo.js';
 
 const CATALOG = JSON.parse(readFileSync(
   new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
@@ -1008,18 +1005,10 @@ test('the scratch document owns its chain', () => {
   assert.equal(Object.isFrozen(defaults.descriptor.chain[0]), false);
 });
 
-test('an injected compiler handles store validation', async (t) => {
-  const directory = scratchDir(t, 'chain-store-isolation-');
-  const path = join(directory, 'store.mjs');
-  writeFileSync(path, readFileSync(new URL('../src/workbench/shader/chain_document_store.js', import.meta.url), 'utf8')
-    .replace("from '../../../generated/shader/shader_workbench.mjs'",
-      `from '${new URL('../generated/shader/shader_workbench.mjs', import.meta.url).href}'`)
-    .replace("from './shader_deeplink.js'",
-      `from '${new URL('../src/workbench/shader/shader_deeplink.js', import.meta.url).href}'`));
-  const isolated = await import(pathToFileURL(path).href);
+test('an injected compiler handles store validation', async () => {
   let imports = 0;
   let validations = 0;
-  const store = await isolated.createChainDocumentStore({
+  const store = await createChainDocumentStore({
     document: structuredClone(BASE.document), catalog: CATALOG,
     importCompiler: async () => {
       imports++;
