@@ -252,6 +252,29 @@ test('a listener an earlier handler removed does not run', () => {
   assert.deepEqual(log, ['leaf']);
 });
 
+test('disabled reflects between the property and attribute and gates activation', () => {
+  const button = fakeElement('button');
+  let clicks = 0;
+  button.addEventListener('click', () => { clicks += 1; });
+  assert.equal(button.disabled, false);
+  button.disabled = true;
+  assert.equal(button.getAttribute('disabled'), '');
+  button.dispatch('click');
+  assert.equal(clicks, 0);
+  button.disabled = false;
+  assert.equal(button.getAttribute('disabled'), null);
+  button.dispatch('click');
+  assert.equal(clicks, 1);
+  button.setAttribute('disabled', 'false');
+  assert.equal(button.disabled, true);
+  button.dispatch('click');
+  assert.equal(clicks, 1);
+  button.removeAttribute('disabled');
+  assert.equal(button.disabled, false);
+  button.dispatch('click');
+  assert.equal(clicks, 2);
+});
+
 test('a disabled control prevents click propagation to ancestors', () => {
   const { leaf, log, listen } = chain();
   listen('root', 'root');
