@@ -1866,10 +1866,12 @@ test('every hand-built context stands in only for state the driver has', () => {
 test('ad-hoc contexts use fields assigned by the driver', () => {
   const source = readFileSync(new URL(import.meta.url), 'utf8');
   const tree = parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
+  let checked = 0;
   const visit = (node) => {
     if (!node || typeof node !== 'object') return;
     if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && /^ctx/.test(node.id.name)
         && node.init?.type === 'ObjectExpression') {
+      checked += 1;
       const fields = Object.fromEntries(node.init.properties
         .filter((property) => property.type === 'Property')
         .map((property) => [property.key.name ?? property.key.value, null]));
@@ -1881,6 +1883,7 @@ test('ad-hoc contexts use fields assigned by the driver', () => {
     }
   };
   visit(tree);
+  assert.ok(checked > 0);
 });
 
 test('dispose during a real Three animation callback cancels the rearmed frame', async () => {
