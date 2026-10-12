@@ -561,13 +561,12 @@ test('render marshals arena metrics into a plain object', async () => {
 });
 
 /** A failing getArenaMetrics is surfaced as null without dropping the frame. */
-test('render still posts a frame when getArenaMetrics throws', async () => {
+test('render still posts a frame when getArenaMetrics throws', async (t) => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   engineInstance.metricsThrows = true;
   posted.length = 0;
-  const warn = mock.method(console, 'warn', () => {});
+  t.mock.method(console, 'warn', () => {});
   await dispatch({ type: 'render' });
-  warn.mock.restore();
 
   const frame = posted.find((p) => p.msg.type === 'frame');
   assert.ok(frame, 'frame still posted');
@@ -756,13 +755,12 @@ test('a same-size setResolution keeps rendering without a setEffect', async () =
 });
 
 /** A structured-clone failure is reported immediately to the controller. */
-test('worker reports inbound message deserialization failures', () => {
+test('worker reports inbound message deserialization failures', (t) => {
   const error = { type: 'messageerror' };
-  const logged = mock.method(console, 'error', () => {});
+  t.mock.method(console, 'error', () => {});
 
   fakeSelf.onmessageerror(error);
 
-  logged.mock.restore();
   assert.deepEqual(posted.at(-1).msg, {
     type: 'engineRejected',
     reason: 'message deserialization failed',
