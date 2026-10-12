@@ -369,6 +369,15 @@ function seedConstantCpp(seedName) {
 }
 
 /**
+ * @param {import('./solid_codegen.js').SolidSpec} item - The solid spec.
+ * @param {string} funcName - Its generated C++ function name.
+ * @returns {string} The engine registry display name.
+ */
+export function registryDisplayName(item, funcName) {
+  return item.base + funcName.slice(item.base.replace(/([a-z0-9])([A-Z])/g, '$1_$2').length);
+}
+
+/**
  * Emits the solids.h registry paste for a saved solid: a Category::COMPLEX
  * islamic_registry entry with its generator, OpStep table and Recipe mirror.
  * A star base is flattened onto its own seed with its authored chain prepended;
@@ -380,7 +389,7 @@ function seedConstantCpp(seedName) {
  */
 export function generateRegistryCpp(item, baseRecipe = null) {
   const { funcName } = generateFuncAndRecipe(item);
-  const displayName = item.base + funcName.slice(item.base.replace(/([a-z0-9])([A-Z])/g, '$1_$2').length);
+  const displayName = registryDisplayName(item, funcName);
   if ((item.fCount ?? 0) > MAX_BUILD_FACES) {
     throw new Error(`generateRegistryCpp: mesh has ${item.fCount} faces; IslamicStars supports at most ${MAX_BUILD_FACES}`);
   }

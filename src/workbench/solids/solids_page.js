@@ -29,7 +29,7 @@ import {
 } from './solid_codegen.js';
 import { fanTriangulateFace, uniqueEdges } from './solid_geometry.js';
 import { buildBaseMesh, buildChainMesh } from './solid_build.js';
-import { generateRegistryCpp, validateRegistryFaces, MAX_RECIPE_STEPS } from './solid_registry_codegen.js';
+import { registryDisplayName, generateRegistryCpp, validateRegistryFaces, MAX_RECIPE_STEPS } from './solid_registry_codegen.js';
 import { buildOpRow, formatParamValue, syncSweepWarning } from './solid_op_rows.js';
 import { createMeshRenderer, meshStatsLine, meshCanvasLabel, MAX_INDEX_LABELS }
   from './solid_render.js';
@@ -734,7 +734,7 @@ function saveSolid() {
 
   // A name matching an engine registry entry would redefine it at paste time.
   const funcName = savedFuncName(item);
-  if (funcName && registrySolidNames.has(funcName)) {
+  if (funcName && registrySolidNames.has(registryDisplayName(item, funcName))) {
     showGateMsg(`saved: "${funcName}" is already in the engine registry — `
       + `the exported C++ would redefine it; vary an op parameter`);
   } else if (funcName && savedSolids.some(s => savedFuncName(s) === funcName)) {
@@ -773,7 +773,7 @@ function renderSavedList() {
     el.className = 'saved-item relative pr-6';
     const funcName = savedFuncName(item);
     const cardName = `${funcName ?? item.title} (card ${savedSolids.length - index})`;
-    const inRegistry = funcName !== null && registrySolidNames.has(funcName);
+    const inRegistry = funcName !== null && registrySolidNames.has(registryDisplayName(item, funcName));
     if (funcName && (inRegistry || nameCounts.get(funcName) > 1)) {
       el.classList.add('name-clash');
       el.title = inRegistry
