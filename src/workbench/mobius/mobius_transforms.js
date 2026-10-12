@@ -27,6 +27,25 @@ export function cmult(p, q) {
 }
 
 /**
+ * @param {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} coefficients
+ * @returns {{re:number, im:number}} The determinant AD - BC.
+ */
+export function mobiusDeterminant({ A, B, C, D }) {
+  const ad = cmult(A, D);
+  const bc = cmult(B, C);
+  return { re: ad.re - bc.re, im: ad.im - bc.im };
+}
+
+/**
+ * @param {Parameters<typeof mobiusDeterminant>[0]} coefficients
+ * @returns {boolean} Whether the determinant magnitude is below the warning threshold.
+ */
+export function isDegenerate(coefficients) {
+  const { re, im } = mobiusDeterminant(coefficients);
+  return Math.hypot(re, im) < 1e-3;
+}
+
+/**
  * Computes the complex sum p+q.
  * @param {{re:number, im:number}} p - First complex operand.
  * @param {{re:number, im:number}} q - Second complex operand.
