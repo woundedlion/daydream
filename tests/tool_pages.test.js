@@ -385,12 +385,11 @@ test('every served page\'s stylesheets define every class it uses', () => {
 // A module that builds no element carries no class.
 const BUILDS_ELEMENTS = /\bcreateElement\(|\.className\b|\.classList\b/;
 
-test('every shared or workbench module that builds an element can render on a served page', () => {
+test('every source module that builds an element can render on a served page', () => {
   const gated = new Set(SERVED_PAGES.flatMap(classSourcesFor));
-  const files = ['src/shared', 'src/workbench'].flatMap((directory) =>
-    readdirSync(join(REPO, directory), { recursive: true })
-      .filter((file) => file.endsWith('.js'))
-      .map((file) => `${directory}/${file.replaceAll('\\', '/')}`));
+  const files = readdirSync(join(REPO, 'src'), { recursive: true })
+    .filter((file) => file.endsWith('.js'))
+    .map((file) => `src/${file.replaceAll('\\', '/')}`);
   assert.ok(files.length > 0);
   for (const path of files) {
     if (!BUILDS_ELEMENTS.test(read(path))) continue;
