@@ -7,6 +7,7 @@
 import { enumChoices } from '../src/effects/param_sync.js';
 import { GUI as DeepLinkGUI } from '../src/ui/gui.js';
 import { createEffectGui } from '../src/ui/effect_gui.js';
+import { installConsoleCapture } from './helpers/fake_console.js';
 import { fakePanelGui } from './helpers/fake_app.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -283,6 +284,8 @@ test('addColor and addFolder hand back the shapes the GUI layer wraps', async ()
 for (const search of ['', '?test.value=x']) {
   test(`DeepLinkGUI and its double reject unsupported values with URL ${search}`, async (t) => {
     const logged = t.mock.method(console, 'error', () => {});
+    const warnings = installConsoleCapture('warn');
+    t.after(() => warnings.restore());
     const real = await realGUI();
     const gui = new DeepLinkGUI(real, 'test', null, {
       location: { search, pathname: '/', hash: '' },
@@ -304,6 +307,8 @@ for (const search of ['', '?test.value=x']) {
     assert.equal(logged.mock.callCount(), factories.length);
     assert.ok(gui.add({}, 'value', ['a', 'b']));
     assert.ok(fake.add({}, 'value', ['a', 'b']));
+    assert.equal(warnings.messages.length, search ? 1 : 0);
+    if (search) assert.match(warnings.messages[0], /ignoring out-of-range URL value/);
   });
 }
 
