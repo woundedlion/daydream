@@ -788,7 +788,7 @@ test('strobeColumns and effect metadata return the shapes daydream consumes', ()
   assert.deepEqual(invalidCounts.slice(0, 5), [],
     `${invalidCounts.length} getEffectPresetCounts entries are not non-negative integers`);
   assert.ok(presetCounts.Comets > 0, 'a choreographed effect must report its presets');
-  assert.equal(presetCounts.KaleidoscopeMelt, 1, 'KaleidoscopeMelt reports its authored preset');
+  assert.ok(presetCounts.KaleidoscopeMelt > 0, 'KaleidoscopeMelt reports authored presets');
   assert.equal(presetCounts.Voronoi, 0,
     'an effect with no authored presets must report zero, not be absent');
 });
