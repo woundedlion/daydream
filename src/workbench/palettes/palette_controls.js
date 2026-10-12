@@ -951,10 +951,10 @@ export function applyPaletteControls(recipe, controls) {
   applyAxisEndpoints(recipe.lightness, controls.lightness);
   applyAxisEndpoints(recipe.chroma, controls.chroma);
   const defaults = defaultPaletteRecipe();
-  for (const name of ['lightness', 'chroma']) {
-    if (recipe[name].curve !== PaletteV4.curve.CUSTOM)
-      recipe[name].custom = [...defaults[name].custom];
-  }
+  if (recipe.lightness.curve !== PaletteV4.curve.CUSTOM)
+    recipe.lightness.custom = [...defaults.lightness.custom];
+  if (recipe.chroma.curve !== PaletteV4.curve.CUSTOM)
+    recipe.chroma.custom = [...defaults.chroma.custom];
   const keyCount = controlKeyCount(recipe);
   resampleCustomAxis(recipe.lightness, templateKeyCount, keyCount);
   resampleCustomAxis(recipe.chroma, templateKeyCount, keyCount);
