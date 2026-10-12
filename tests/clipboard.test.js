@@ -29,9 +29,12 @@ function fakeButton(label, initialClasses = []) {
 }
 
 let savedNavigator;
+let savedClipboardItem;
 
 beforeEach(() => {
   savedNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  savedClipboardItem = Object.getOwnPropertyDescriptor(globalThis, 'ClipboardItem');
+  Object.defineProperty(globalThis, 'ClipboardItem', { value: undefined, configurable: true });
   Object.defineProperty(globalThis, 'navigator', {
     value: { clipboard: { writeText: async () => {} } },
     configurable: true,
@@ -41,6 +44,8 @@ beforeEach(() => {
 
 afterEach(() => {
   mock.timers.reset();
+  if (savedClipboardItem) Object.defineProperty(globalThis, 'ClipboardItem', savedClipboardItem);
+  else delete globalThis.ClipboardItem;
   Object.defineProperty(globalThis, 'navigator', savedNavigator);
 });
 
@@ -139,6 +144,58 @@ test('copy feedback replaces the prior outcome classes on re-entry', async () =>
 });
 
 /** Verifies the legacy textarea path copies and removes its temporary node. */
+test('pending text starts the clipboard write before validation resolves', async (t) => {
+  let finish;
+  const text = new Promise(resolve => { finish = resolve; });
+  let payload;
+  t.mock.property(globalThis, 'ClipboardItem', class {
+    constructor(items) { this.items = items; }
+  });
+  navigator.clipboard.write = async ([item]) => {
+    payload = item.items['text/plain'];
+    await payload;
+  };
+  const copied = copyToClipboard(text);
+  assert.ok(payload instanceof Promise, 'write must begin during the click');
+  finish('validated registry');
+  assert.equal(await copied, true);
+  const blob = await payload;
+  assert.equal(blob.type, 'text/plain');
+  assert.equal(await blob.text(), 'validated registry');
+});
+
+test('pending text retains writeText compatibility without ClipboardItem', async (t) => {
+  t.mock.property(globalThis, 'ClipboardItem', undefined);
+  let finish;
+  const text = new Promise(resolve => { finish = resolve; });
+  const written = [];
+  navigator.clipboard.writeText = async value => { written.push(value); };
+  const copied = copyToClipboard(text);
+  assert.deepEqual(written, []);
+  finish('validated registry');
+  assert.equal(await copied, true);
+  assert.deepEqual(written, ['validated registry']);
+});
+
+test('a refused promise clipboard write retains the writeText fallback', async (t) => {
+  t.mock.property(globalThis, 'ClipboardItem', class {});
+  navigator.clipboard.write = async () => { throw new Error('clipboard items unsupported'); };
+  const written = [];
+  navigator.clipboard.writeText = async value => { written.push(value); };
+  assert.equal(await copyToClipboard(Promise.resolve('validated registry')), true);
+  assert.deepEqual(written, ['validated registry']);
+});
+
+test('failed validation rejects pending copy without writing unchecked text', async (t) => {
+  t.mock.property(globalThis, 'ClipboardItem', class {
+    constructor(items) { this.items = items; }
+  });
+  navigator.clipboard.write = async ([item]) => { await item.items['text/plain']; };
+  navigator.clipboard.writeText = async () => assert.fail('unchecked fallback');
+  const error = new Error('invalid registry');
+  await assert.rejects(copyToClipboard(Promise.reject(error)), error);
+});
+
 test('copyToClipboard falls back to execCommand', async () => {
   Object.defineProperty(globalThis, 'navigator', {
     value: {},

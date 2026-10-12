@@ -5,10 +5,24 @@
 
 /**
  * Copy text using the async Clipboard API or a textarea fallback.
- * @param {string} text - Text to copy.
+ * @param {string|Promise<string>} text - Text to copy, optionally pending validation.
  * @returns {Promise<boolean>} Whether the copy succeeded.
  */
 export async function copyToClipboard(text) {
+  if (typeof text !== 'string' && navigator.clipboard?.write
+      && typeof ClipboardItem === 'function') {
+    const blob = text.then(value => new Blob([value], { type: 'text/plain' }));
+    void blob.catch(() => {});
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
+      return true;
+    } catch {
+      text = await text;
+    }
+  } else if (typeof text !== 'string') {
+    text = await text;
+  }
+
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(text);
