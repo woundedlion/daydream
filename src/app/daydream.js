@@ -165,6 +165,11 @@ export function start({
   syncRoute();
   let workbenchUrlPending = shaderWorkbench;
   if (workbenchUrlPending) urlSync.suspend();
+  const releaseWorkbenchUrl = () => {
+    if (!workbenchUrlPending) return;
+    workbenchUrlPending = false;
+    urlSync.resume();
+  };
   const availableEffects = (resolution) => shaderWorkbench
     ? WORKBENCH_EFFECTS.map(canonicalEffectId) : favoritesFor(resolution).map(canonicalEffectId);
 
@@ -358,15 +363,9 @@ export function start({
           () => loadingOverlay?.remove(),
         );
         shaderDocuments?.init().then(() => {
-          if (workbenchUrlPending && !shaderDocuments.preservesOriginalLink()) {
-            workbenchUrlPending = false;
-            urlSync.resume();
-          }
+          if (!shaderDocuments.preservesOriginalLink()) releaseWorkbenchUrl();
         }).catch((err) => {
-          if (workbenchUrlPending) {
-            workbenchUrlPending = false;
-            urlSync.resume();
-          }
+          releaseWorkbenchUrl();
           console.error('The shader workbench could not be initialized:', err);
           if (abandonOnModuleDeath(err)) return;
           applyNotice.show(
@@ -522,12 +521,7 @@ export function start({
 
   const shaderDocuments = shaderWorkbench ? createShaderDocumentController({
     doc,
-    onOriginalLinkReleased: () => {
-      if (workbenchUrlPending) {
-        workbenchUrlPending = false;
-        urlSync.resume();
-      }
-    },
+    onOriginalLinkReleased: releaseWorkbenchUrl,
     getEngine: () => host.engine,
     getModule: () => host.module,
     selectEffect: (effect) => {
