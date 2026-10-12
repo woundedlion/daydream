@@ -94,12 +94,12 @@ jobs:
                 fi
                 artifact="$(retry_api "repos/woundedlion/pov/actions/runs/$run_id/artifacts" --jq ".artifacts | map(select(.name == \"holosphere-engine-$PIN\")) | .[0] // empty | [.id, .expired, .expires_at] | @tsv")"
                 if [ -z "$artifact" ]; then
-                  echo "::error::successful POV CI for $PIN published no verified engine bundle, or it expired. Rerun: gh run rerun $run_id --repo woundedlion/pov"
+                  echo "::error::successful POV CI for $PIN published no verified engine bundle, or it expired. Rerun: gh run rerun $run_id --repo woundedlion/pov Unless DAYDREAM_DISPATCH_TOKEN is set, run daydream Deploy to GitHub Pages manually (workflow_dispatch) or use Re-run failed jobs; a full scheduled rerun skips an attempted pair."
                   exit 1
                 fi
                 read -r artifact_id expired expires_at <<< "$artifact"
                 if [ "$expired" = true ]; then
-                  echo "::error::Engine bundle expired. Rerun: gh run rerun $run_id --repo woundedlion/pov"
+                  echo "::error::Engine bundle expired. Rerun: gh run rerun $run_id --repo woundedlion/pov Unless DAYDREAM_DISPATCH_TOKEN is set, run daydream Deploy to GitHub Pages manually (workflow_dispatch) or use Re-run failed jobs; a full scheduled rerun skips an attempted pair."
                   exit 1
                 fi
                 remaining_days=$(( ($(date -d "$expires_at" +%s) - $(date +%s)) / 86400 ))
@@ -116,7 +116,7 @@ jobs:
               fi
             fi
             if [ "$SECONDS" -ge "$deadline" ]; then
-              echo "::error::no verified engine bundle became available for $PIN. Run POV CI at this commit, then retry this workflow."
+              echo "::error::no verified engine bundle became available for $PIN. Run POV CI at this commit, then retry this workflow. Unless DAYDREAM_DISPATCH_TOKEN is set, run daydream Deploy to GitHub Pages manually (workflow_dispatch) or use Re-run failed jobs; a full scheduled rerun skips an attempted pair."
               exit 1
             fi
             echo "Waiting for the engine bundle at $PIN."
