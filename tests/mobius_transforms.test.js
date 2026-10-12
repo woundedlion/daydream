@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { constructorToObject, glslConstants } from './helpers/source_transpile.js';
 
 const {
-  cmult, cadd, snapCoefficientComponent,
+  cmult, cadd, snapCoefficientComponent, mobiusDeterminant, isDegenerate,
   elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble, cayley,
   glslComplexFunctions, glslProjectionFunctions, mobiusCodeString,
   stereo, projectDiv, STEREO_INF, STEREO_POLE_EPS, STEREO_AZIMUTH_EPS,
@@ -25,17 +25,6 @@ function assertComplex(actual, re, im, msg) {
   assert.ok(
     Math.abs(actual.re - re) < EPS && Math.abs(actual.im - im) < EPS,
     `${msg || ''} got (${actual.re}, ${actual.im}); want (${re}, ${im})`);
-}
-
-/**
- * The determinant AD - BC of a Mobius coefficient set.
- * @param {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} coeffs - The {A,B,C,D} coefficient set.
- * @returns {{re:number, im:number}} The determinant.
- */
-function determinant({ A, B, C, D }) {
-  const ad = cmult(A, D);
-  const bc = cmult(B, C);
-  return { re: ad.re - bc.re, im: ad.im - bc.im };
 }
 
 // --- snapCoefficientComponent ----------------------------------------------------------
@@ -451,9 +440,9 @@ test('preset generators hold their determinant across a range of t', () => {
   const unimodular = { elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble };
   for (const t of [0, 0.1, 1, 2.5, 5, 10, 42]) {
     for (const [name, gen] of Object.entries(unimodular)) {
-      assertComplex(determinant(gen(t)), 1, 0, `${name}@${t} determinant`);
+      assertComplex(mobiusDeterminant(gen(t)), 1, 0, `${name}@${t} determinant`);
     }
-    const d = determinant(cayley(t));
+    const d = mobiusDeterminant(cayley(t));
     assert.ok(Math.hypot(d.re, d.im) > 0.5,
       `cayley@${t} determinant (${d.re}, ${d.im}) is degenerate`);
   }
@@ -466,5 +455,12 @@ test('projectDiv rescales subnormal nonzero divisor magnitudes', () => {
       3, -1, 'subnormal real divisor');
     assertComplex(projectDiv({ re: scale, im: 3 * scale }, { re: 0, im: scale }),
       3, -1, 'subnormal imaginary divisor');
+  }
+});
+
+test('degenerate warning uses a strict determinant magnitude threshold', () => {
+  const coefficients = { A: { re: 1, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 }, D: { re: 0, im: 0 } };
+  for (const [magnitude, expected] of [[0.000999, true], [0.001, false], [0.001001, false]]) {
+    assert.equal(isDegenerate({ ...coefficients, D: { re: 0, im: magnitude } }), expected);
   }
 });

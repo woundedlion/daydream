@@ -14,7 +14,7 @@ import {
   elliptic, hyperbolic, loxodromic, parabolic,
   inversion, tumble, cayley, snapCoefficientComponent,
   glslComplexFunctions, glslProjectionFunctions, mobiusCodeString,
-  MOBIUS_GRID_SCALE_R,
+  MOBIUS_GRID_SCALE_R, isDegenerate,
 } from './mobius_transforms.js';
 
 const config = {
@@ -124,10 +124,7 @@ const DEGENERATE_WARNING =
 const updateDegenerateWarning = () => {
   const el = document.getElementById('degenerateWarning');
   if (!el) return;
-  const { A, B, C, D } = config;
-  const detRe = (A.re * D.re - A.im * D.im) - (B.re * C.re - B.im * C.im);
-  const detIm = (A.re * D.im + A.im * D.re) - (B.re * C.im + B.im * C.re);
-  const degenerate = Math.hypot(detRe, detIm) < 1e-3;
+  const degenerate = isDegenerate(config);
   const text = degenerate ? DEGENERATE_WARNING : '';
   if (el.textContent !== text) el.textContent = text;
 };
