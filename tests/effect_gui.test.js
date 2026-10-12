@@ -5,8 +5,6 @@ import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
 import { createEffectGui } from '../src/ui/effect_gui.js';
 import { stageGrouping } from '../src/effects/shader_stages.js';
-const KALEIDOSCOPE_MELT_STAGE_ORDER = ['Camera', 'Surface Noise', 'Projection Frame', 'Projection', 'Function', 'Colorize'];
-const KALEIDOSCOPE_SMOOTH_STAGE_ORDER = ['Camera', 'Projection Frame', 'Projection', 'Planar Warp 2', 'Function', 'Colorize'];
 import {
   chainSnapshot,
   chainSnapshotParams,
@@ -19,6 +17,9 @@ import {
   wiring,
   chainParams,
 } from './helpers/effect_gui_harness.js';
+
+const KALEIDOSCOPE_MELT_STAGE_ORDER = ['Camera', 'Surface Noise', 'Projection Frame', 'Projection', 'Function', 'Colorize'];
+const KALEIDOSCOPE_SMOOTH_STAGE_ORDER = ['Camera', 'Projection Frame', 'Projection', 'Planar Warp 2', 'Function', 'Colorize'];
 
 restoreDocumentAfterEach();
 
@@ -68,21 +69,6 @@ test('construction rejects a drag target that listens to nothing', () => {
   deps.host.dragTarget = {};
   assert.throws(() => createEffectGui(deps), /host\.dragTarget must be an event target/);
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 test('sparse enum controls roundtrip numeric IDs and reject gaps before a write', () => {
   const parameter = { name: 'Pattern', value: 0, requestedValue: 6, acceptedValue: 0,
@@ -278,14 +264,6 @@ test('warp ownership follows registered groups independently of stream order', (
   assert.equal(assignments.get('Mirror Rotation'), 'Planar Warp 1');
   assert.equal(assignments.get('Mirror Cell X'), 'Planar Warp 2');
 });
-
-
-
-
-
-
-
-
 
 // build() turns the engine's parameter definitions into the effect record the
 // rest of the app reads.
