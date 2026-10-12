@@ -679,11 +679,14 @@ test('CSS readers ignore comments and honor later declarations', () => {
  * each in the cascade its page builds.
  */
 test('every colour a tools/ stylesheet declares clears the WCAG AA floor or says why not', () => {
+  const sweptNames = new Set();
+  let measured = 0;
   for (const { page, sheets } of SERVED_PAGES) {
     const cascade = sheets.map((sheet) => read(...sheet)).join('\n');
     const swept = sheets.filter(([dir, name]) => dir === 'tools' && name !== 'tailwind.css');
     for (const sheet of swept) {
       const name = sheet.at(-1);
+      sweptNames.add(name);
       const surfaces = CONTRAST_SURFACES[name] ?? {};
       const exempt = CONTRAST_EXEMPT[name] ?? {};
       const selectors = rules(read(...sheet)).filter(([, body]) => declaresColor(body))
@@ -693,6 +696,7 @@ test('every colour a tools/ stylesheet declares clears the WCAG AA floor or says
         assert.ok(surfaces[selector],
           `${page}: ${name} colours ${selector} against no listed surface and no exemption`);
         const ratio = contrast(cascade, selector, surfaces[selector]);
+        measured += 1;
         assert.ok(ratio >= AA_CONTRAST, `${name} ${selector} on ${surfaces[selector]} measures `
           + `${ratio.toFixed(2)}:1, under the ${AA_CONTRAST}:1 AA floor`);
       }
@@ -701,6 +705,9 @@ test('every colour a tools/ stylesheet declares clears the WCAG AA floor or says
         `${name} lists rules that declare no color`);
     }
   }
+  assert.deepEqual([...sweptNames].sort(),
+    [...new Set([...Object.keys(CONTRAST_SURFACES), ...Object.keys(CONTRAST_EXEMPT)])].sort());
+  assert.ok(measured > 0);
 });
 
 
