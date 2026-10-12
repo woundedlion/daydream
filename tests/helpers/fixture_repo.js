@@ -57,7 +57,7 @@ const MISSING_SH = 'no POSIX shell available';
 
 /**
  * Locates a repository git hook and the POSIX shell that runs it. Without a
- * shell its cases skip, unless DAYDREAM_HOOK_SH_REQUIRED is set.
+ * shell its cases skip, unless DAYDREAM_HOOK_SH_REQUIRED is 1.
  * @param {string} name - Hook basename under .githooks.
  * @returns {{hook: string, sh: string|null, skip: string|false,
  *   missing: string}} The hook path with forward slashes (MSYS sh does not
@@ -69,7 +69,7 @@ export const hookUnderTest = (name) => {
   return {
     hook: resolve(HOOKS_DIR, name).replace(/\\/g, '/'),
     sh,
-    skip: sh || process.env.DAYDREAM_HOOK_SH_REQUIRED ? false : MISSING_SH,
+    skip: sh || process.env.DAYDREAM_HOOK_SH_REQUIRED === '1' ? false : MISSING_SH,
     missing: MISSING_SH,
   };
 };
