@@ -959,3 +959,14 @@ test('leaving CUSTOM hue and axis modes clears inactive custom slots', () => {
   for (const name of ['lightness', 'chroma'])
     assert.deepEqual(recipe[name].custom, defaults[name].custom);
 });
+
+test('repeated procedural zoom preserves the last window above the minimum span', () => {
+  const viewport = createPaletteViewport();
+  for (let i = 0; i < 40; i++) {
+    const before = viewport.value;
+    const after = viewport.zoom(0.25, 0.75);
+    assert.ok(after.end - after.start >= 0.01);
+    if ((before.end - before.start) * 0.5 < 0.01) assert.deepEqual(after, before);
+  }
+  assert.equal(viewport.zoomed, true);
+});
