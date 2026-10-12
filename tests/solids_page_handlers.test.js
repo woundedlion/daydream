@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
-import { savedChainShapeError, savedSolidExportError } from '../src/workbench/solids/solid_codegen.js';
+import { generateFuncAndRecipe, savedChainShapeError, savedSolidExportError } from '../src/workbench/solids/solid_codegen.js';
+import { registryDisplayName } from '../src/workbench/solids/solid_registry_codegen.js';
 import { createPointerDrag } from '../src/shared/pointer_drag.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
@@ -758,4 +759,28 @@ test('base-solid arrows move focus without replacing the authored chain', () => 
   assert.deepEqual(choices.map(choice => choice.tabIndex), [0, -1, -1]);
   keydown({ key: 'Enter', currentTarget: choices[0], preventDefault: assert.fail });
   assert.equal(prevented, 2);
+});
+
+
+test('saving a camelCase registry recipe warns and flags its card', () => {
+  const list = fakeElement('div');
+  const messages = [];
+  const context = {
+    state: { base: 'truncatedIcosahedron', ops: [{ op: 'hankin', params: { angle: 58 } },
+      { op: 'chamfer', params: { t: 0.63 } }] },
+    currentMesh: { vertices: [], faces: [] }, currentMeshIsCurrent: true, wasmModule: {},
+    savedSolids: [], savedChainShapeError, generateFuncAndRecipe, registryDisplayName,
+    registrySolidNames: new Set(['truncatedIcosahedron_hk58_chamfer63']),
+    captureSavedSolidThumbnail: () => ({ dataURL: '' }), captureSavedThumbnail() {},
+    uniqueEdges: () => [], structuredClone, formatSolidName: String,
+    showGateMsg: (message) => messages.push(message), persistSavedSolids() {},
+    document: { getElementById: () => list, createElement: fakeElement },
+  };
+  context.savedFuncName = handler('savedFuncName', context);
+  context.renderSavedList = handler('renderSavedList', context);
+  handler('saveSolid', context)();
+  assert.equal(context.savedSolids.length, 1);
+  assert.match(messages[0], /already in the engine registry/);
+  assert.ok(list.children[0].classList.contains('name-clash'));
+  assert.match(list.children[0].title, /engine registry already defines/);
 });
