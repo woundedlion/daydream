@@ -8,6 +8,7 @@ import { repointDisplayAliases } from '../src/engine/display_aliases.js';
 import { SegmentController } from '../src/segments/segment_controller.js';
 import {
   installSegmentControllerHarness,
+  expectSegmentDiagnostics,
   driver,
   setDisplayGrid,
   makeController,
@@ -409,6 +410,7 @@ test('composite() marks the layout seams, not only the reported segments', () =>
 });
 
 test('composite() self-heals a broken display-buffer alias instead of throwing', () => {
+  expectSegmentDiagnostics([["error", "SegmentCompositor.composite: display-buffer alias diverged from getMemoryView() \u2014 re-pointing the display aliases at the composite target"]]);
   setDisplayGrid(4, 2);
 
   const c = makeController();
@@ -426,6 +428,7 @@ test('composite() self-heals a broken display-buffer alias instead of throwing',
 });
 
 test('composite() heals a diverged mesh alias even while driver.pixels is aligned', () => {
+  expectSegmentDiagnostics([["error", "SegmentCompositor.composite: display-buffer alias diverged from getMemoryView() \u2014 re-pointing the display aliases at the composite target"]]);
   setDisplayGrid(4, 2);
   // Split the alias pair: the GPU-side attribute reads a stale buffer while
   // driver.pixels still matches the composite target.
@@ -694,6 +697,7 @@ test('destroy() clears frameComposited so a respawning pool cannot capture black
 });
 
 test('a faulted pool keeps tick() from dispatching another doomed render', () => {
+  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: boom (w.js:1:1)"]]);
   const c = readyController(2);
   c.tick();
 
@@ -790,6 +794,7 @@ test('a fault latched by the overrun re-blit paints the overlay on the same tick
 });
 
 test('an init-phase fault still reaches the fault overlay (faulted checked before ready guard)', () => {
+  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: init boom (w.js:1:1)"]]);
   // A startup trap latches `faulted` but never sends 'ready'.
   const c = makeController();
   c.create(2);
@@ -830,6 +835,7 @@ test('the fault overlay is an alert that never takes focus', () => {
 });
 
 test('a fault latched outside tick() paints the overlay without waiting for one', () => {
+  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: hang (w.js:1:1)"]]);
   // A paused host need not tick, so the fault path paints the banner itself.
   const stats = fakeElement();
   const c = makeController();

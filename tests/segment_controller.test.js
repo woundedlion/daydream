@@ -16,6 +16,7 @@ import { ModuleWarmer, warmModules, EMPTY_WASM } from './fixtures/module_warmer_
 import { FAULT_POOL } from '../src/segments/worker_protocol.js';
 import {
   installSegmentControllerHarness,
+  expectSegmentDiagnostics,
   capturedConsole,
   driver,
   setDisplayGrid,
@@ -96,6 +97,7 @@ test('a compile failure drops the module the previous warm left', async () => {
 
 // A failed re-fetch is the same evidence as a failed compile.
 test('a failed binary re-fetch drops the module the previous warm left', async () => {
+  expectSegmentDiagnostics([["warn", "[Segmented] module warm failed"]]);
   const warmer = new ModuleWarmer();
   const serve = (binaryResponse) => ({
     baseUrl: 'http://localhost:8000/redeployed/segment_controller.js',
@@ -290,6 +292,7 @@ test('a generation overtaken by a resolution change is never published', async (
 });
 
 test('a generation cut short by a worker fault is never published', async () => {
+  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 1 error: boom (w.js:1:2)"]]);
   const c = readyController(2);
   c.tick();
   const results = c.frameState.results;
@@ -922,6 +925,7 @@ test('an in-flight frame cannot revert a selected preset', async () => {
 });
 
 test('a pool fault notifies the host once after workers stop', () => {
+  expectSegmentDiagnostics([["warn", "[Segmented] additional worker fault (seg 1): another failure \u2014 first fault already latched, UI shows that one"]]);
   const capturedFrom = capturedConsole.length;
   const faults = [];
   const controller = makeController({ onFault: (message) => {
