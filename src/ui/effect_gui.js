@@ -377,18 +377,15 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
 
   /**
-   * Add the "Pause Presets" toggle when the effect has an animated param or
-   * any preset available for manual selection (selecting one pauses advancement).
+   * Add the shared "Pause Presets" toggle for preset and phase advancement.
    * @param {EffectRecord} fx - The effect record being built.
-   * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
    * @param {Object} [options]
    * @param {boolean} [options.initialPause=false] - Initial pause state.
    * @param {boolean} [options.hydrate=true] - Read the stored pause value while constructing the toggle.
-   * @returns {PauseToggle} The toggle's state, its controller (null when
-   *   neither animation surface is available), its state transition, and its
-   *   display-only update.
+   * @returns {PauseToggle} The toggle's state, controller, state transition,
+   *   and display-only update.
    */
-  function addPauseToggle(fx, params, { initialPause = false, hydrate = true } = {}) {
+  function addPauseToggle(fx, { initialPause = false, hydrate = true } = {}) {
     const animationState = { pause: Boolean(initialPause) };
     /** @type {GuiController|null} */
     let controller = null;
@@ -422,13 +419,11 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       controller?.updateDisplay();
       fx.gui.writeStoredValue('pause', paused);
     };
-    if (params.some(p => p.animated) || getPresetCount() > 0) {
-      const add = hydrate
-        ? (/** @type {any[]} */ ...args) => fx.gui.add(...args)
-        : (/** @type {any[]} */ ...args) => fx.gui.addUnhydrated(...args);
-      controller = add(animationState, 'pause').name('Pause Presets');
-      controller?.onChange(transitionPaused);
-    }
+    const add = hydrate
+      ? (/** @type {any[]} */ ...args) => fx.gui.add(...args)
+      : (/** @type {any[]} */ ...args) => fx.gui.addUnhydrated(...args);
+    controller = add(animationState, 'pause').name('Pause Presets');
+    controller?.onChange(transitionPaused);
     return { animationState, controller, setPaused, show };
   }
 
@@ -613,7 +608,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       fx.paramGeneration = paramGeneration();
 
       fx.actions = addEffectActions(fx, params);
-      const pause = addPauseToggle(fx, params, { initialPause, hydrate: hydratePause });
+      const pause = addPauseToggle(fx, { initialPause, hydrate: hydratePause });
       addParamControllers(fx, params, pause, previousParamNames);
       fx.pause = pause;
       fx.hydrating = false;
