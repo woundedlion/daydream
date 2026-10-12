@@ -7,6 +7,7 @@ import { gzipSync } from 'node:zlib';
 
 import { shaderWorkbenchUrl, start } from '../src/app/daydream.js';
 import { WORKBENCH_EFFECTS } from '../src/effects/effect_roster.js';
+import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 import { scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
 import {
   decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
@@ -1059,6 +1060,7 @@ async function editorWorkbench({
   onOriginalLinkReleased = () => {},
   pausedFromEngine = false,
   prepare = () => {},
+  importCompiler = () => import('../generated/shader/shader_workbench.mjs'),
 } = {}) {
   const engine = new FakeChainEngine();
   prepare(engine);
@@ -1133,7 +1135,7 @@ async function editorWorkbench({
       { 'kaleidoscope_hex_bright.shader.json': KALEIDOSCOPE_HEX_BRIGHT,
         'alien_core.shader.json': JSON.stringify(promotedDocument('alien_core.shader.json')),
         'grid_space.shader.json': JSON.stringify(promotedDocument('grid_space.shader.json')) }, patternCatalog),
-    importCompiler: () => import('../generated/shader/shader_workbench.mjs'),
+    importCompiler,
     download: (filename, source) => downloads.push([filename, source]),
     win,
     initialEffect,
@@ -2352,3 +2354,41 @@ test('fixed apply resolves a registered secondary compiled control name', () => 
     BAKED, fixedDerivedBinding), null);
   assert.deepEqual(engine.writes, [['Affine Scale X', 2.5]]);
 });
+
+for (const failure of ['editor', 'runtime']) {
+  test(`a ${failure} adoption failure restores the document, strip and program`, async () => {
+    let refuseEditor = false;
+    const compiler = await import('../generated/shader/shader_workbench.mjs');
+    const harness = await editorWorkbench({ importCompiler: async () => ({ ...compiler,
+      validateShaderDocument(...args) {
+        if (refuseEditor) throw new Error('editor adoption refused');
+        return compiler.validateShaderDocument(...args);
+      },
+    }) });
+    const previous = savedValues(harness);
+    const strip = harness.elements.get('chain-strip').children[0];
+    const snapshot = callWorkbenchBinding(harness.engine, 'getSnapshot', []);
+    const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+    let session;
+    if (failure === 'editor') refuseEditor = true;
+    else {
+      session = { preset: document.preset_bank.presets[0].preset_id, bypassed: [],
+        paused: false, chainSnapshot: snapshot };
+      const original = harness.engine.getShaderChainBindings.bind(harness.engine);
+      let calls = 0;
+      harness.engine.getShaderChainBindings = () => {
+        const bindings = original();
+        const restore = bindings.restoreSnapshot;
+        bindings.restoreSnapshot = (value) => ++calls === 1
+          ? ChainSnapshotRestoreResult.INVALID_VALUE : restore(value);
+        return bindings;
+      };
+    }
+    assert.equal(await harness.controller.loadSource(document, 'refused.shader.json', null, session), false);
+    assert.match(harness.elements.get('shader-document-status').textContent,
+      failure === 'editor' ? /editor adoption refused/ : /runtime snapshot was rejected/);
+    assert.equal(harness.elements.get('chain-strip').children[0], strip);
+    assert.deepEqual(savedValues(harness), previous);
+    assert.deepEqual(callWorkbenchBinding(harness.engine, 'getSnapshot', []), snapshot);
+  });
+}

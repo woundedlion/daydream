@@ -651,7 +651,7 @@ export function createShaderDocumentController({
       } catch (error) {
         const detail = errorDetail(error);
         showError(`The chain editor could not adopt the document: ${detail}`);
-        return abandon();
+        return abandon({ written: true });
       }
     }
     if (session && chainUi) {
