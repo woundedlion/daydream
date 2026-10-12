@@ -528,6 +528,7 @@ test('tick() is a no-op until every worker has signalled ready', () => {
 
   assert.equal(c.frameState.renderInFlight, false, 'no render dispatched before ready');
   assert.equal(c.frameState.pending, 0);
+  assert.equal(c.workers.length, 2);
   for (const w of c.workers)
     assert.ok(!w.posted.some((m) => m.type === 'render'),
       'no worker received a render message');

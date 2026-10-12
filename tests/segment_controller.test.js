@@ -794,6 +794,7 @@ test('a pool spawned after the slider moved inherits the pole LOD', () => {
   const c = makeController();
   c.setPoleLod(0.8);
   c.create(2);
+  assert.equal(c.workers.length, 2);
 
   for (const w of c.workers) {
     const init = w.posted.find((m) => m.type === 'init');
@@ -804,11 +805,13 @@ test('a pool spawned after the slider moved inherits the pole LOD', () => {
 test('cap changes reach current workers and survive pool recreation', () => {
   const c = readyController(2);
   c.setDisplayCaps(2, 3);
+  assert.equal(c.workers.length, 2);
   for (const w of c.workers) {
     assert.deepEqual(w.posted.find((m) => m.type === 'setDisplayCaps'),
       { type: 'setDisplayCaps', topCap: 2, bottomCap: 3 });
   }
   c.create(2);
+  assert.equal(c.workers.length, 2);
   for (const w of c.workers) {
     const init = w.posted.find((m) => m.type === 'init');
     assert.equal(init.topCap, 2);
