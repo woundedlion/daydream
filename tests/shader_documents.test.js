@@ -2342,3 +2342,13 @@ test('compiled lattice edits update the derived period atomically and reapply', 
   toggle.dispatch('click');
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
 });
+
+test('fixed apply resolves a registered secondary compiled control name', () => {
+  const engine = fixedEngine(() => true);
+  engine.getParameterDefinitions = () => [{ name: 'Affine Scale X' }];
+  const compiled = fixedDocument();
+  compiled.document.preset_bank.presets[0].values = { 'warp1.scale-x': 2.5 };
+  assert.equal(applyFixedShaderDocument(engine, MODULE, compiled, 'noon', ['noon'],
+    BAKED, fixedDerivedBinding), null);
+  assert.deepEqual(engine.writes, [['Affine Scale X', 2.5]]);
+});
