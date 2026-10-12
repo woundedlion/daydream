@@ -172,7 +172,8 @@ describe(
 
     test('a linked worktree consumes the common-directory override token', { skip: SKIP }, () => {
       const linked = join(root, 'linked');
-      git(repo, 'worktree', 'add', '--detach', linked, mid);
+      execFileSync('git', ['worktree', 'add', '--detach', linked, mid],
+        { cwd: repo, env, encoding: 'utf8', stdio: 'pipe' });
       writeToken(old);
       assert.equal(runHook([`${mid} ${old} refs/heads/master`], 'prepared', linked).status, 0);
       assert.equal(existsSync(tokenPath()), false);

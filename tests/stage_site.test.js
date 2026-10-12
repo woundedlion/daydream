@@ -1,3 +1,4 @@
+import { installConsoleCapture } from './helpers/fake_console.js';
 import { after, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -43,7 +44,10 @@ function fixture(t, readme = 'new README.md') {
   files['generated/holosphere_wasm.sha'] = pair.holosphere;
   files['README.md'] = readme;
   writeEngineBundle(bundle, files);
-  installEngineBundle(bundle, root);
+  const capture = installConsoleCapture('log');
+  try { installEngineBundle(bundle, root); } finally { capture.restore(); }
+  assert.equal(capture.messages.length, 1);
+  assert.match(capture.messages[0], /^Installed \d+ engine assets/);
   return { root, bundle, site, pair, write, git, scratch };
 }
 

@@ -4,7 +4,12 @@ import { readdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
+import { installConsoleCapture } from './helpers/fake_console.js';
+beforeEach((t) => {
+  const capture = installConsoleCapture('log');
+  t.after(capture.restore);
+});
 import { runWorkbenchSections, probeDocumentActions, probeSnapshotImport, probeParity, probeStartupPersistence, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
 import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
 import {
