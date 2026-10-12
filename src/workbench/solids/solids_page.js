@@ -1,4 +1,3 @@
-import { createCommitQueue, createChainValidator, createOpGate } from './solid_validation.js';
 /*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
@@ -6,6 +5,7 @@ import { createCommitQueue, createChainValidator, createOpGate } from './solid_v
  * Page module for tools/solids.html.
  */
 import * as THREE from 'three';
+import { createCommitQueue, createChainValidator, createOpGate } from './solid_validation.js';
 import { initScene, copyWithFeedback, showFatalError, bootstrapTool, formatKB } from '../shared.js';
 import { standDownIfHalted } from '../../shared/engine_halt.js';
 import {
