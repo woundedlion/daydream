@@ -5,7 +5,7 @@
 
 import { canonicalEffectId, effectDisplayName } from "../../effects/effect_identity.js";
 import { engineHalted } from '../../shared/engine_halt.js';
-import { callWorkbenchBinding, shaderChainCatalog } from '../../engine/workbench_bindings.js';
+import { getChainSnapshot, restoreChainSnapshot, shaderChainCatalog } from '../../engine/workbench_bindings.js';
 import { enumConstantName } from '../../effects/param_sync.js';
 import { fieldOf as fieldSegment } from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
@@ -591,7 +591,7 @@ export function createShaderDocumentController({
       return false;
     }
     // Every load previews through the interpreter; a digest match arms the parity toggle.
-    const previousSnapshot = callWorkbenchBinding(getEngine(), 'getSnapshot', []);
+    const previousSnapshot = getChainSnapshot(getEngine());
     const official = [...sourceCatalog.values()].find((candidate) =>
       candidate.descriptorDigest === compiled.descriptor_digest) ?? null;
     // Ahead of the teardown, so a refusal leaves the current editor standing.
@@ -640,7 +640,7 @@ export function createShaderDocumentController({
       if (previous && (written || previous.compiledSide)) {
         const refusal = status.textContent;
         applyPreset(previous.presetId ?? presetSelect.value);
-        if (previousSnapshot) callWorkbenchBinding(getEngine(), 'restoreSnapshot', [previousSnapshot]);
+        if (previousSnapshot) restoreChainSnapshot(getEngine(), getModule(), previousSnapshot);
         showError(refusal ?? '');
       }
       return false;
@@ -673,7 +673,7 @@ export function createShaderDocumentController({
     syncParity();
     if (!applyPreset(presetId)) return abandon({ written: true });
     if (session?.chainSnapshot) {
-      const expected = callWorkbenchBinding(getEngine(), 'getSnapshot', []);
+      const expected = getChainSnapshot(getEngine());
       const snapshot = session.chainSnapshot;
       const values = new Map(snapshot.parameters.map((/** @type {*} */ entry) => [entry.name, entry.value]));
       if (!expected || JSON.stringify(expected.chain) !== JSON.stringify(snapshot.chain)
@@ -682,7 +682,7 @@ export function createShaderDocumentController({
         showError('The shader link snapshot does not match its document and preset.');
         return abandon({ written: true });
       }
-      if (callWorkbenchBinding(getEngine(), 'restoreSnapshot', [snapshot])
+      if (restoreChainSnapshot(getEngine(), getModule(), snapshot)
           !== getModule().ChainSnapshotRestoreResult.APPLIED) {
         showError('The shader link runtime snapshot was rejected.');
         return abandon({ written: true });
@@ -731,7 +731,7 @@ export function createShaderDocumentController({
     if (!linkPending || !active || active.presetId === null) return linkWrite;
     linkPending = false;
     const generation = linkGeneration;
-    const chainSnapshot = callWorkbenchBinding(getEngine(), 'getSnapshot', []);
+    const chainSnapshot = getChainSnapshot(getEngine());
     const state = {
       document: currentDocument(),
       preset: active.presetId,
@@ -902,12 +902,12 @@ export function createShaderDocumentController({
       try {
         const snapshot = JSON.parse(chainText);
         const imported = documentFromChainSnapshot(snapshot, operatorCatalog);
-        const previous = callWorkbenchBinding(getEngine(), 'getSnapshot', []);
+        const previous = getChainSnapshot(getEngine());
         if (!await loadSource(imported, 'imported.shader.json'))
           throw new Error(status.textContent || 'the imported chain could not be adopted');
-        const outcome = callWorkbenchBinding(getEngine(), 'restoreSnapshot', [snapshot]);
+        const outcome = restoreChainSnapshot(getEngine(), getModule(), snapshot);
         if (outcome !== getModule().ChainSnapshotRestoreResult.APPLIED) {
-          if (previous) callWorkbenchBinding(getEngine(), 'restoreSnapshot', [previous]);
+          if (previous) restoreChainSnapshot(getEngine(), getModule(), previous);
           throw new Error('the imported chain snapshot was rejected');
         }
         const paused = getAnimationsPaused();
