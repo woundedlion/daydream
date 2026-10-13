@@ -50,12 +50,12 @@ function harness() {
   const engine = new FakeChainEngine();
   engine.setEffect('ShaderChain');
   const order = [];
-  const originalChain = engine.bindings.setShaderChain.bind(engine);
+  const originalChain = engine.bindings.setShaderChain;
   engine.bindings.setShaderChain = (entries) => {
     order.push('setShaderChain');
     return originalChain(entries);
   };
-  const originalWrite = engine.bindings.setShaderChainParameters.bind(engine);
+  const originalWrite = engine.bindings.setShaderChainParameters;
   engine.bindings.setShaderChainParameters = (writes) => {
     order.push('setShaderChainParameters');
     return originalWrite(writes);
