@@ -880,3 +880,15 @@ test('a refused animated write leaves the pause toggle unchanged', () => {
   assert.equal(h.engine.paused, false);
   assert.equal(h.gui().ctrl('pause').getValue(), false);
 });
+
+
+test('an effect without preset pause capability has no pause control', () => {
+  const h = makeHarness({ params: [SPEED], canPausePresets: () => false });
+  h.panel.build();
+  assert.equal(Boolean(h.panel.active().pause.controller), false);
+  assert.equal(h.gui().ctrl('pause'), undefined);
+  h.panel.applyAnimationPause();
+  h.gui().ctrl('Speed').setValue(0.5);
+  h.panel.sync();
+  assert.equal(Boolean(h.panel.active().pause.controller), false);
+});

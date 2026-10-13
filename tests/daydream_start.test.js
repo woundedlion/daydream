@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { installConsoleCapture } from './helpers/fake_console.js';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
-import { trackedStartApp } from './helpers/fake_app.js';
+import { fakeWasmModule, trackedStartApp } from './helpers/fake_app.js';
 
 restoreDocumentAfterEach();
 const startApp = trackedStartApp();
@@ -170,4 +170,13 @@ test('authoring page accepts legacy and canonical document aliases', () => {
     assert.deepEqual(app.replaced, []);
     assert.ok(app.guis.length > 0);
   }
+});
+
+
+test('GSReactionDiffusion has no Pause Presets control', async () => {
+  const app = startApp({ search: '?effect=GSReactionDiffusion', loadModule: async () => fakeWasmModule() });
+  await app.teardown.ready;
+  const panel = app.guis.find((gui) => gui.namespace === 'fx');
+  assert.ok(panel);
+  assert.equal(panel.controllers.some((controller) => controller.property === 'pause'), false);
 });

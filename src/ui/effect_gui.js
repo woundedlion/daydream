@@ -79,6 +79,7 @@ const CONFIG_DEFAULTS = {
 const HOST_DEFAULTS = {
   focusedElement: () => null,
   paramFilter: () => null,
+  canPausePresets: () => true,
   /** @param {...any} args */
   logWarn: (...args) => console.warn(...args),
 };
@@ -177,6 +178,7 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  *   the active effect's parameters are rendered outside this panel: the panel
  *   builds no parameter controls, though every parameter still claims its
  *   value-stream slot. A change rebuilds the panel.
+ * @param {() => boolean} [deps.host.canPausePresets] - Whether the active effect offers preset pause.
  * @param {(message: string, error?: any) => void} [deps.host.logWarn] - Console sink.
  * @returns {{active: () => Object|null, liveParamValues: () => ArrayLike<number>|null,
  *   movePreset: (delta: number) => boolean,
@@ -204,7 +206,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   } = checkedGroup('config', config ?? {}, [], CONFIG_DEFAULTS);
   const {
     createGui, container: guiContainer, isMobile, dragTarget, copyText,
-    applyEffect, focusedElement, paramFilter, logWarn,
+    applyEffect, focusedElement, paramFilter, canPausePresets, logWarn,
   } = checkedGroup('host', host, HOST_MEMBERS, HOST_DEFAULTS);
   if (typeof dragTarget?.addEventListener !== 'function'
       || typeof dragTarget?.removeEventListener !== 'function') {
@@ -422,7 +424,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     const add = hydrate
       ? (/** @type {any[]} */ ...args) => fx.gui.add(...args)
       : (/** @type {any[]} */ ...args) => fx.gui.addUnhydrated(...args);
-    controller = add(animationState, 'pause').name('Pause Presets');
+    if (canPausePresets()) controller = add(animationState, 'pause').name('Pause Presets');
     controller?.onChange(transitionPaused);
     return { animationState, controller, setPaused, show };
   }

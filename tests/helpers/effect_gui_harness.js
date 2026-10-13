@@ -157,6 +157,7 @@ export function makeHarness({
   generation = 1,
   copyText = fakeCopyText(),
   isMobile = false,
+  canPausePresets = () => true,
   container = fakeElement('div', { connected: true }),
   hydrated = {},
   acceptedStored = {},
@@ -262,6 +263,7 @@ export function makeHarness({
       },
       container: () => state.container,
       isMobile: () => isMobile,
+      canPausePresets,
       copyText: state.copyText,
       applyEffect: () => {
         writes.push('applyEffect');
