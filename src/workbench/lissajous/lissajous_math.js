@@ -122,10 +122,11 @@ export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM, accept
  * @param {?{min: number, max: number}} [range] - Optional inclusive bounds on the
  *   snapped active frequency. The ratio search then prefers ratios landing inside
  *   them.
+ * @param {number} [direction=0] - Seek the next frequency in this direction (-1 or 1).
  * @returns {{ snappedActiveC: number, m: number, n: number, closingPeriod: number }} The
  *   snapped active frequency, the rational ratio m/n, and the curve's closing period T.
  */
-export const snapToRationalRatio = (activeC, passiveC, maxTerm = MAX_RATIONAL_TERM, range = null) => {
+export const snapToRationalRatio = (activeC, passiveC, maxTerm = MAX_RATIONAL_TERM, range = null, direction = 0) => {
   if (passiveC === 0) {
     return { snappedActiveC: activeC, m: 1, n: 1, closingPeriod: 0 };
   }
@@ -134,21 +135,28 @@ export const snapToRationalRatio = (activeC, passiveC, maxTerm = MAX_RATIONAL_TE
   // A pair that already closes within the denominator budget is left exactly
   // where it was authored.
   const closing = closingRatio(targetRatio, maxTerm);
-  if (closing !== null) {
+  if (!direction && closing !== null) {
     return { snappedActiveC: activeC, m: closing.M, n: closing.N,
       closingPeriod: (TWO_PI * closing.N) / passiveC };
   }
 
-  /** @type {((ratio: number) => boolean)|null} */
-  const inRange = range
-    ? (ratio) => passiveC * ratio >= range.min && passiveC * ratio <= range.max
-    : null;
+  /** @param {number} ratio */
+  const accepts = (ratio) => {
+    const candidate = passiveC * ratio;
+    return (!range || (candidate >= range.min && candidate <= range.max))
+      && (!direction || (candidate - activeC) * direction > 1e-10);
+  };
   // The range reaches ratios the denominator cap alone excludes: a control
   // running to 100 over a passive 5 holds every M/N up to 20·maxTerm.
   const reachable = range
     ? Math.ceil((Math.abs(range.max) / Math.abs(passiveC)) * maxTerm) : maxTerm;
   const maxNumerator = Math.min(MAX_SEARCH_NUMERATOR, Math.max(maxTerm, reachable));
-  const { M, N } = findBestRationalRatio(targetRatio, maxTerm, inRange, maxNumerator);
+  const { M, N } = findBestRationalRatio(targetRatio, maxTerm, accepts, maxNumerator);
+
+  if (direction && !accepts(M / N)) {
+    return { snappedActiveC: activeC, m: closing?.M ?? M, n: closing?.N ?? N,
+      closingPeriod: (TWO_PI * (closing?.N ?? N)) / passiveC };
+  }
 
   const snappedActiveC = passiveC * (M / N);
 
