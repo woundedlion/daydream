@@ -91,7 +91,7 @@ export async function probeStrip(tab) {
   });
   check(closedHeaders.icons.join('') === '◉←→×'
       && closedHeaders.rotateChildren.join(' ') === 'chain-chip-name '
-        + 'chain-chip-bypass chain-chip-move chain-chip-move chain-chip-remove chain-chip-pin'
+        + 'chain-chip-bypass chain-chip-move chain-chip-move chain-chip-pin chain-chip-remove'
       && closedHeaders.projectChildren.join(' ') === 'chain-chip-function-label chain-chip-pin'
       && closedHeaders.projectPrefix === 'Projection: '
       && closedHeaders.projectSelector !== 'none',

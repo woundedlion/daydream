@@ -201,6 +201,8 @@
 .chain-scroll-button {
   align-self: center;
   flex: 0 0 auto;
+  display: grid;
+  place-items: center;
   width: 100%;
   height: 1.25rem;
   margin: 0;
@@ -210,6 +212,8 @@
   background: var(--panel-bg);
   color: var(--panel-text);
   font: inherit;
+  font-size: 0.875rem;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -355,6 +359,10 @@
   font-size: 0.6875rem;
   line-height: 1;
   cursor: pointer;
+}
+
+.chain-chip-remove {
+  margin-inline-start: auto;
 }
 
 .chain-chip-pin:hover,

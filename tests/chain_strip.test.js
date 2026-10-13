@@ -182,7 +182,7 @@ test('endomorphisms carry controls; sockets carry only valid selectors', async (
   assert.match(remove.getAttribute('aria-label'), /^Remove .+ · lens$/);
   const controls = chipByLabel(h, 'camera').querySelector('.chain-chip-header')
     .querySelectorAll('button');
-  assert.deepEqual(controls.map((button) => button.textContent), ['◉', '↑', '↓', '×', '']);
+  assert.deepEqual(controls.map((button) => button.textContent), ['◉', '↑', '↓', '', '×']);
 });
 
 test('a socket names the function by the carrier its crossing produces', async () => {
