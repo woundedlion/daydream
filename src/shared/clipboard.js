@@ -31,7 +31,7 @@ export { copyToClipboard };
  * @param {string[]} [opts.copiedClasses=[]] - Classes added on success, removed on revert.
  * @param {string[]} [opts.failedClasses=[]] - Classes added on failure, removed on revert.
  * @param {string[]} [opts.idleClasses=[]] - Classes removed while flashed, restored on revert.
- * @returns {Promise<boolean>} Whether the copy succeeded.
+ * @returns {Promise<boolean>} Whether the copy succeeded; rejects with a pending text rejection.
  */
 export async function copyWithFeedback(text, opts = {}) {
   const success = await copyToClipboard(text);

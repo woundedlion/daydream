@@ -6,7 +6,7 @@
 /**
  * Copy text using the async Clipboard API or a textarea fallback.
  * @param {string|Promise<string>} text - Text to copy, optionally pending validation.
- * @returns {Promise<boolean>} Whether the copy succeeded.
+ * @returns {Promise<boolean>} Whether the copy succeeded; rejects with a pending text rejection.
  */
 export async function copyToClipboard(text) {
   if (typeof text !== 'string' && navigator.clipboard?.write
