@@ -731,7 +731,7 @@ export function createShaderDocumentController({
     clearLinkTimers();
     if (!linkPending || !active || active.presetId === null) return linkWrite;
     linkPending = false;
-    const generation = linkGeneration;
+    const generation = ++linkGeneration;
     const chainSnapshot = getChainSnapshot(getEngine());
     const state = {
       document: currentDocument(),
@@ -758,7 +758,6 @@ export function createShaderDocumentController({
 
   const scheduleDeepLink = () => {
     if (linkDisposed || preserveRefusedLink || !active || active.presetId === null) return;
-    linkGeneration += 1;
     linkPending = true;
     if (linkDebounceTimer !== null) clearTimeout(linkDebounceTimer);
     linkDebounceTimer = setTimeout(writeDeepLink, SHADER_LINK_DEBOUNCE_MS);
