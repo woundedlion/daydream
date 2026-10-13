@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
-import { generateFuncAndRecipe, savedChainShapeError, savedSolidExportError } from '../src/workbench/solids/solid_codegen.js';
+import { generateFuncAndRecipe, savedChainShapeError, savedSolidExportError, seedOpParams } from '../src/workbench/solids/solid_codegen.js';
 import { registryDisplayName } from '../src/workbench/solids/solid_registry_codegen.js';
 import { createPointerDrag } from '../src/shared/pointer_drag.js';
 import { fakeElement } from './helpers/fake_dom.js';
@@ -640,6 +640,29 @@ test('a fully valid saved list needs no recovery notice or rejected backup', () 
   assert.equal(loaded.entries.length, 1);
   assert.equal(loaded.rejected.length, 0);
   assert.equal(loaded.notice, '');
+});
+
+test('queued hankin seeds its angle from the preceding committed mesh', async () => {
+  const state = { base: 'cube', ops: [] };
+  const queued = [];
+  const triangle = { vertices: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 },
+    { x: 0.5, y: Math.sqrt(3) / 2, z: 0 }], faces: [[0, 1, 2]] };
+  const square = { vertices: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 },
+    { x: 1, y: 1, z: 0 }, { x: 0, y: 1, z: 0 }], faces: [[0, 1, 2, 3]] };
+  const context = {
+    state, MAX_RECIPE_STEPS: 255, currentMeshIsCurrent: true, currentMesh: square,
+    seedOpParams, queueCommit: (fn) => queued.push(fn),
+    chainIsValid: async () => ({ ok: true }),
+    setOps: (ops) => { state.ops = ops; }, renderOps() {},
+    update: () => { context.currentMesh = triangle; },
+    showGateMsg: (message) => assert.fail(message),
+  };
+  const addOp = handler('addOp', context);
+  addOp('kis');
+  addOp('hankin');
+  assert.equal(state.ops.length, 0);
+  for (const task of queued) await task();
+  assert.equal(state.ops[1].params.angle, 30);
 });
 
 test('two adds queued at one below the op cap commit only the first', async () => {
