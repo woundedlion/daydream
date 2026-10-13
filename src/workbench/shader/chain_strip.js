@@ -1047,7 +1047,10 @@ export function createChainStrip({
     button.type = 'button';
     button.setAttribute('aria-label', direction < 0
       ? 'Scroll shader chain up' : 'Scroll shader chain down');
-    button.textContent = direction < 0 ? '⌃' : '⌄';
+    const icon = el('span', direction < 0
+      ? 'chain-scroll-icon chain-scroll-icon--up' : 'chain-scroll-icon');
+    icon.setAttribute('aria-hidden', 'true');
+    button.appendChild(icon);
     button.addEventListener('click', () => scrollPipeline(viewport, direction));
     return button;
   };
