@@ -91,7 +91,7 @@ const SOCKET_FUNCTIONS = {
  * @param {() => void} options.onApply - Runs after every committed structural
  *   edit, undo/redo and bypass toggle.
  * @param {(label: string|null) => void} [options.onSelect] - Runs when the
- *   selected instance changes, which is also what expands the chip's controls.
+ *   selected instance changes.
  * @param {() => string|null} [options.presetId] - The preset the inline stage
  *   controls read and write; null falls back to the document's first.
  * @param {(parameterId: string, value: *) => boolean|void} [options.onEditParameter] -
@@ -132,8 +132,10 @@ export function createChainStrip({
    * builds its rows whether or not it is the expanded one.
    */
   const rows = new Map();
-  /** @type {Map<*, {press: (event: *) => void, release: (event: *) => void}>} */
+  /** @type {Map<*, {press: (event: *) => void, release: (event: *) => void, open: () => void}>} */
   const disclosures = new Map();
+  /** @type {Set<string>} */
+  const pinnedLabels = new Set();
 
   /**
    * @param {string} tag - Element tag.
@@ -211,6 +213,7 @@ export function createChainStrip({
     if (!store.setSelectedLabel(selected)) return;
     if (selected !== null) focusedLabel = selected;
     render({ focusLabel: label });
+    if (label !== null) disclosures.get(chipByLabel(label))?.open();
     notifySelection();
   };
 
@@ -384,6 +387,7 @@ export function createChainStrip({
         : (after[choice.start]?.label ?? null);
       if (kind === 'insert') store.setSelectedLabel(focusLabel);
       commit(focusLabel);
+      if (focusLabel !== null) disclosures.get(chipByLabel(focusLabel))?.open();
     };
 
     /** @type {Array<*>} */
@@ -685,6 +689,7 @@ export function createChainStrip({
         report(result);
         return;
       }
+      if (pinnedLabels.delete(entry.label)) pinnedLabels.add(next);
       commit(next);
     });
     row.appendChild(field);
@@ -789,7 +794,7 @@ export function createChainStrip({
     const isBypassed = bypassed.has(entry.label);
     const declared = declarations.filter(
       (declaration) => declaration.id.startsWith(`${entry.label}.`));
-    const expanded = isSelected;
+    const expanded = pinnedLabels.has(entry.label);
     const chip = el('div', 'chain-chip'
       + (crossing ? ' chain-chip--socket' : ' chain-chip--stage')
       + (expanded ? ' chain-chip--expanded' : '')
@@ -905,6 +910,26 @@ export function createChainStrip({
       header.appendChild(remove);
     }
 
+    const pin = el('button', 'chain-chip-pin');
+    pin.type = 'button';
+    const pinIcon = el('span', 'chain-chip-pin-icon');
+    pinIcon.setAttribute('aria-hidden', 'true');
+    pin.appendChild(pinIcon);
+    const syncPin = () => {
+      const pinned = pinnedLabels.has(entry.label);
+      pin.setAttribute('aria-pressed', String(pinned));
+      pin.setAttribute('aria-label', `${pinned ? 'Unpin' : 'Pin'} ${op.name} · ${entry.label}`);
+      pin.setAttribute('title', pinned ? 'Unpin panel' : 'Pin panel');
+    };
+    syncPin();
+    pin.addEventListener('click', (/** @type {*} */ event) => {
+      event.stopPropagation();
+      if (!pinnedLabels.delete(entry.label)) pinnedLabels.add(entry.label);
+      syncPin();
+      chip.classList.add('chain-chip--expanded');
+      markDeactivated();
+    });
+    header.appendChild(pin);
     chip.appendChild(header);
     chip.appendChild(paramsElement(entry, declared));
 
@@ -914,7 +939,7 @@ export function createChainStrip({
       if (clickedHeader) select(entry.label);
     });
     const setTransientOpen = (/** @type {boolean} */ open) => {
-      if (store.selectedLabel() === entry.label) return;
+      if (pinnedLabels.has(entry.label)) return;
       chip.classList.toggle('chain-chip--expanded', open);
       if (open) markDeactivated();
     };
@@ -923,7 +948,7 @@ export function createChainStrip({
     /** @type {number|null} */
     let draggingPointer = null;
     const dismiss = () => {
-      if (store.selectedLabel() === entry.label) return;
+      if (pinnedLabels.has(entry.label)) return;
       dismissing = true;
       try {
         if (doc.activeElement !== chip && chip.contains(doc.activeElement)) chip.focus();
@@ -933,6 +958,7 @@ export function createChainStrip({
       }
     };
     disclosures.set(chip, {
+      open: () => setTransientOpen(true),
       press(event) {
         if (!chip.contains(event.target)) {
           draggingPointer = null;
@@ -965,7 +991,7 @@ export function createChainStrip({
     });
     chip.addEventListener('keydown', (/** @type {*} */ event) => {
       if (event.key === 'Escape' && !event.defaultPrevented
-          && store.selectedLabel() !== entry.label) {
+          && !pinnedLabels.has(entry.label)) {
         event.preventDefault();
         event.stopPropagation();
         draggingPointer = null;
@@ -1054,6 +1080,9 @@ export function createChainStrip({
     const selected = store.selectedLabel();
     const bypassed = new Set(store.bypassedLabels());
     const labels = chain.map((entry) => entry.label);
+    for (const label of pinnedLabels) {
+      if (!labels.includes(label)) pinnedLabels.delete(label);
+    }
     const tabLabel = focusLabel !== null && labels.includes(focusLabel) ? focusLabel
       : focusedLabel !== null && labels.includes(focusedLabel) ? focusedLabel
       : selected ?? labels[0] ?? null;
