@@ -896,18 +896,6 @@ export function createChainStrip({
       });
       header.appendChild(earlier);
       header.appendChild(later);
-      const remove = el('button', 'chain-chip-remove');
-      remove.type = 'button';
-      remove.setAttribute('tabindex', '0');
-      remove.setAttribute('aria-keyshortcuts', 'Delete Backspace');
-      remove.setAttribute('aria-label', `Remove ${op.name} · ${entry.label}`);
-      remove.setAttribute('title', 'Delete');
-      remove.textContent = '×';
-      remove.addEventListener('click', (/** @type {*} */ event) => {
-        event.stopPropagation();
-        removeChip(index);
-      });
-      header.appendChild(remove);
     }
 
     const pin = el('button', 'chain-chip-pin');
@@ -930,6 +918,20 @@ export function createChainStrip({
       markDeactivated();
     });
     header.appendChild(pin);
+    if (!crossing) {
+      const remove = el('button', 'chain-chip-remove');
+      remove.type = 'button';
+      remove.setAttribute('tabindex', '0');
+      remove.setAttribute('aria-keyshortcuts', 'Delete Backspace');
+      remove.setAttribute('aria-label', `Remove ${op.name} · ${entry.label}`);
+      remove.setAttribute('title', 'Delete');
+      remove.textContent = '×';
+      remove.addEventListener('click', (/** @type {*} */ event) => {
+        event.stopPropagation();
+        removeChip(index);
+      });
+      header.appendChild(remove);
+    }
     chip.appendChild(header);
     chip.appendChild(paramsElement(entry, declared));
 
