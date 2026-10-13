@@ -1302,14 +1302,13 @@ function addOp(opName) {
     showGateMsg(`rejected: a chain carries at most ${MAX_RECIPE_STEPS} ops`);
     return;
   }
-  const newOp = { op: opName, params: seedOpParams(opName, currentMeshIsCurrent ? currentMesh : null) };
   queueCommit(async () => {
     // Earlier queued adds can fill the chain before this runs.
     if (state.ops.length >= MAX_RECIPE_STEPS) {
       showGateMsg(`rejected: a chain carries at most ${MAX_RECIPE_STEPS} ops`);
       return;
     }
-    // Gating is async, so validate the exact candidate.
+    const newOp = { op: opName, params: seedOpParams(opName, currentMeshIsCurrent ? currentMesh : null) };
     const check = await chainIsValid(state.base, [...state.ops, newOp]);
     if (!check.ok) {
       showGateMsg(`rejected: ${check.message}`);
