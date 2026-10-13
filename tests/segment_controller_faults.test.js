@@ -591,7 +591,9 @@ test('a single missing segment is named directly in the watchdog fault', () => {
     const c = makeController();
     c.create(2);
     deliverBooted(c, 0);
-    deliverReady(c, 0); // seg 0 fully up; seg 1 never readies
+    deliverBooted(c, 1);
+    deliverReady(c, 0);
+    assert.deepEqual(clock.pendingAt(BOOT_WATCHDOG_MS), []);
     clock.fireOnly(INIT_WATCHDOG_MS, 'one init watchdog armed at the init deadline');
     assert.equal(c.faulted, true);
     assert.match(c.faultInfo.message, /never ready: 1/);
