@@ -908,7 +908,7 @@ function applyAxisEndpoints(axis, endpoints) {
 
 /**
  * paletteRecipeFromControls in place: overwrites the reading-driven fields of
- * a recipe that already holds the template, without allocating.
+ * a recipe that already holds the template.
  * @param {PaletteRecipe} recipe - A copy of the template; rewritten in place.
  * @param {Readonly<PaletteControlReadings>} controls - The control readings.
  * @returns {PaletteRecipe} `recipe`.
