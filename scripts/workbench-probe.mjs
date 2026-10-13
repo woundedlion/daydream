@@ -567,10 +567,15 @@ export async function probeStrip(tab) {
   const narrowPalette = await boxOf(tab, '.chain-palette');
   const narrowLeft = Math.max(8,
     Math.min(narrowAnchor.x, 700 - narrowPalette.width - 8));
+  const narrowTop = Math.max(8, Math.min(narrowAnchor.y + narrowAnchor.height + 4,
+    VIEWPORT.height - narrowPalette.height - 8));
   check(Math.abs(narrowPalette.x - narrowLeft) < 1
-      && narrowPalette.y >= narrowAnchor.y + narrowAnchor.height
-      && narrowPalette.x >= 8 && narrowPalette.x + narrowPalette.width <= 692,
-  'the anchored palette stays inside a narrow viewport');
+      && Math.abs(narrowPalette.y - narrowTop) < 1
+      && narrowPalette.x >= 8 && narrowPalette.x + narrowPalette.width <= 692
+      && narrowPalette.y >= 8
+      && narrowPalette.y + narrowPalette.height <= VIEWPORT.height - 8 + 1,
+  `the narrow palette ${JSON.stringify(narrowPalette)} stays clamped to `
+    + `${narrowLeft},${narrowTop} from anchor ${JSON.stringify(narrowAnchor)}`);
   await tab.keyboard.press('Escape');
 
   await tab.setViewport({ width: VIEWPORT.width, height: 300 });
