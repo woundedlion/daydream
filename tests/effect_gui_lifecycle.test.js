@@ -357,13 +357,12 @@ test('a slider drag defers persistence to the pointer release', () => {
 });
 
 test('a ShaderChain drag writes one chain snapshot, at the release', () => {
-  const snapshot = (hue) => chainSnapshot(hue);
   const h = makeHarness({
     params: chainSnapshotParams(),
     chainSnapshotEnabled: true,
-    chainSnapshot: snapshot(0),
+    chainSnapshot: chainSnapshot(0),
     onEngineParam: (name, value, state) => {
-      if (name === 'colorize.hue-shift') state.chainSnapshot = snapshot(value);
+      if (name === 'colorize.hue-shift') state.chainSnapshot = chainSnapshot(value);
     },
   });
   h.panel.build();
@@ -379,7 +378,7 @@ test('a ShaderChain drag writes one chain snapshot, at the release', () => {
   h.dragTarget.dispatch('pointerup', pointerUp());
 
   assert.deepEqual(h.gui().storedWrites, [
-    [CHAIN_SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot(0.5))],
+    [CHAIN_SNAPSHOT_STORAGE_KEY, JSON.stringify(chainSnapshot(0.5))],
   ], 'the release deep-links the state the last move would have');
 });
 test('a schema rebuild mid-drag still lands the write the drag deferred', () => {
@@ -412,14 +411,13 @@ test('a schema rebuild mid-drag still lands the write the drag deferred', () => 
 });
 
 test('a schema rebuild mid-drag lands the whole workbench snapshot', () => {
-  const snapshot = (hue) => chainSnapshot(hue);
   const h = makeHarness({
     params: chainSnapshotParams(),
     chainSnapshotEnabled: true,
-    chainSnapshot: snapshot(0),
+    chainSnapshot: chainSnapshot(0),
     generation: 3,
     onEngineParam: (name, value, state) => {
-      if (name === 'colorize.hue-shift') state.chainSnapshot = snapshot(value);
+      if (name === 'colorize.hue-shift') state.chainSnapshot = chainSnapshot(value);
     },
   });
   h.panel.build();
@@ -435,7 +433,7 @@ test('a schema rebuild mid-drag lands the whole workbench snapshot', () => {
 
   assert.equal(h.guis.length, 2, 'the schema rebuilt under the drag');
   assert.deepEqual(dragged.storedWrites, [
-    [CHAIN_SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot(0.5))],
+    [CHAIN_SNAPSHOT_STORAGE_KEY, JSON.stringify(chainSnapshot(0.5))],
   ], 'the configuration a reload restores is the dragged one');
 });
 
