@@ -89,7 +89,7 @@ export async function probeStrip(tab) {
       projectSelector: getComputedStyle(functionLabel).display,
     };
   });
-  check(closedHeaders.icons.join('') === '◉←→×'
+  check(closedHeaders.icons.join('') === '◉↑↓×'
       && closedHeaders.rotateChildren.join(' ') === 'chain-chip-name '
         + 'chain-chip-bypass chain-chip-move chain-chip-move chain-chip-pin chain-chip-remove'
       && closedHeaders.projectChildren.join(' ') === 'chain-chip-function-label chain-chip-pin'
@@ -99,7 +99,7 @@ export async function probeStrip(tab) {
   const closedGeometry = await tab.evaluate(() => {
     const box = (selector) => {
       const rect = document.querySelector(selector).getBoundingClientRect();
-      return { top: rect.top, height: rect.height };
+      return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, height: rect.height };
     };
     const band = document.querySelector('.chain-band[data-carrier="sphere"]');
     return {
@@ -108,9 +108,11 @@ export async function probeStrip(tab) {
       frameTop: Number.parseFloat(getComputedStyle(band, '::before').top),
     };
   });
-  check(Math.abs(closedGeometry.transition.top - closedGeometry.domain.top) < 1
-      && Math.abs(closedGeometry.transition.height - closedGeometry.domain.height) < 1,
-  `closed domain/transition cards align at ${Math.round(closedGeometry.domain.top)}`
+  check(closedGeometry.transition.top >= closedGeometry.domain.bottom
+      && Math.abs(closedGeometry.transition.left - closedGeometry.domain.left) < 2
+      && Math.abs(closedGeometry.transition.right - closedGeometry.domain.right) < 2
+      && closedGeometry.domain.height <= 32 && closedGeometry.transition.height <= 32,
+  `closed domain/transition cards stack at ${Math.round(closedGeometry.domain.top)}`
     + `/${Math.round(closedGeometry.transition.top)}px and stand `
     + `${Math.round(closedGeometry.domain.height)}`
     + `/${Math.round(closedGeometry.transition.height)}px tall`);
@@ -266,8 +268,9 @@ export async function probeStrip(tab) {
     frame: Number.parseFloat(getComputedStyle(node, '::before').height),
   }));
   check(openDomain.band > collapsedDomain.band
-      && Math.abs(openDomain.frame - collapsedDomain.frame) < 1,
-  `an open stage leaves the domain frame at ${Math.round(openDomain.frame)}px`);
+      && Math.abs((openDomain.frame - collapsedDomain.frame)
+        - (openDomain.band - collapsedDomain.band)) < 1,
+  `an open stage grows its enclosing domain frame to ${Math.round(openDomain.frame)}px`);
   await tab.mouse.move(0, 0);
 
   const layout = await tab.evaluate(() => {
@@ -295,6 +298,7 @@ export async function probeStrip(tab) {
       separate,
       strip: box(document.getElementById('chain-strip')),
       main: box(document.querySelector('.main-area')),
+      preview: box(document.getElementById('canvas-container')),
       stripOpacity: getComputedStyle(document.getElementById('chain-strip')).opacity,
       textOpacities: [...document.querySelectorAll(
         '#chain-strip .chain-chip-function-label, #chain-strip .chain-param-name')]
@@ -312,14 +316,16 @@ export async function probeStrip(tab) {
     'stage cards stay inside their bands without overlapping');
   check(layout.chipBoxes.every((box) => box.width <= 560),
     'collapsed stage headers remain bounded while reserving their open width');
-  check(layout.stripPosition === 'absolute'
+  check(layout.stripPosition === 'relative'
+      && layout.strip.right <= layout.preview.left
+      && Math.abs(layout.strip.height - layout.preview.height) < 1
       && Math.abs(layout.strip.top - layout.main.top) < 1
       && Number(layout.stripOpacity) === 1
       && layout.textOpacities.length > 0
       && layout.textOpacities.every((opacity) => opacity === 1),
-  'the pipeline overlays the preview with fully opaque active text');
+  'the pipeline sits beside the preview with fully opaque active text');
   check(layout.main.height > VIEWPORT.height * 0.8,
-    `the preview retains ${Math.round(layout.main.height)}px beneath the pipeline`);
+    `the preview retains ${Math.round(layout.main.height)}px alongside the pipeline`);
 
   const scrollHits = await tab.$$eval('.chain-scroll-button', (nodes) => nodes.map((node) => {
     const rect = node.getBoundingClientRect();
@@ -328,6 +334,14 @@ export async function probeStrip(tab) {
   }));
   check(scrollHits.length === 2 && scrollHits.every((reached) => reached),
     'the floating panels leave both scroll buttons on top');
+  const scrollIcons = await tab.$$eval('.chain-scroll-button', (nodes) => nodes.map((node) => {
+    const button = node.getBoundingClientRect();
+    const icon = node.querySelector('.chain-scroll-icon').getBoundingClientRect();
+    return Math.abs((icon.top + icon.bottom) - (button.top + button.bottom)) < 1
+      && Math.abs((icon.left + icon.right) - (button.left + button.right)) < 1;
+  }));
+  check(scrollIcons.length === 2 && scrollIcons.every(Boolean),
+    'both scroll chevrons are centered horizontally and vertically in their buttons');
 
   // A `<input type=range>` re-snaps its value onto its step grid, and a fake DOM
   // does not: only a real browser shows whether an authored value survives being
@@ -364,6 +378,8 @@ export async function probeStrip(tab) {
       + (invalid.length > 0 ? ` (${invalid.join(', ')} do not)` : ''));
 
   const add = '.chain-band[data-carrier="plane"] .chain-band-add';
+  await tab.mouse.move(0, 0);
+  await tab.focus(add);
   await (await tab.waitForSelector(add)).click();
   await tab.waitForSelector('.chain-palette-entry');
   const choices = await tab.$$eval('.chain-palette-entry', (nodes) => nodes.map((node) => ({
@@ -392,6 +408,8 @@ export async function probeStrip(tab) {
 
   // A palette that survives a press elsewhere outlives the chain it was opened
   // over; the fake DOM models neither the press nor the focus move.
+  await tab.mouse.move(0, 0);
+  await tab.focus(add);
   await (await tab.waitForSelector(add)).click();
   await tab.waitForSelector('.chain-palette-entry');
   check(await tab.$eval('.chain-palette .chain-palette-entry',
@@ -436,11 +454,12 @@ export async function probeStrip(tab) {
     (node) => getComputedStyle(node).position);
   const expectedPaletteLeft = Math.max(8,
     Math.min(anchorBox.x, VIEWPORT.width - paletteBox.width - 8));
+  const expectedPaletteTop = Math.max(8,
+    Math.min(anchorBox.y + anchorBox.height + 4, VIEWPORT.height - paletteBox.height - 8));
   check(palettePosition === 'fixed'
       && Math.abs(paletteBox.x - expectedPaletteLeft) < 1
-      && paletteBox.y >= anchorBox.y + anchorBox.height
-      && paletteBox.y - anchorBox.y - anchorBox.height <= 8,
-  `the palette opens under its anchor at ${Math.round(paletteBox.x)},`
+      && Math.abs(paletteBox.y - expectedPaletteTop) < 1,
+  `the palette stays anchored within the viewport at ${Math.round(paletteBox.x)},`
     + `${Math.round(paletteBox.y)}px`);
   const elsewhere = await boxOf(tab,
     '.chain-band[data-carrier="sphere"] .chain-band-title');
@@ -472,8 +491,9 @@ export async function probeStrip(tab) {
   await tab.waitForFunction(() => document.querySelectorAll(
     '.chain-band[data-carrier="sphere"] .chain-chip').length === 2);
   const sphereBandAfter = await boxOf(tab, '.chain-band[data-carrier="sphere"]');
-  check(sphereBandAfter.width > sphereBandBefore.width,
-    `adding a stage widens its domain (${Math.round(sphereBandBefore.width)}px → ${Math.round(sphereBandAfter.width)}px)`);
+  check(sphereBandAfter.height > sphereBandBefore.height
+      && Math.abs(sphereBandAfter.width - sphereBandBefore.width) < 1,
+    `adding a stage grows its domain vertically (${Math.round(sphereBandBefore.height)}px → ${Math.round(sphereBandAfter.height)}px)`);
   const sphereBefore = await bandChipNames(tab, 'sphere');
   const moveLater = '.chain-band[data-carrier="sphere"]'
     + ' .chain-chip-move[aria-label$="later"]:not(:disabled)';
@@ -539,6 +559,8 @@ export async function probeStrip(tab) {
 
   await tab.setViewport({ width: 700, height: VIEWPORT.height });
   await tab.waitForFunction(() => window.innerWidth === 700);
+  await tab.mouse.move(0, 0);
+  await tab.focus(add);
   await (await tab.waitForSelector(add)).click();
   await tab.waitForSelector('.chain-palette-entry');
   const narrowAnchor = await boxOf(tab, add);
@@ -551,12 +573,22 @@ export async function probeStrip(tab) {
   'the anchored palette stays inside a narrow viewport');
   await tab.keyboard.press('Escape');
 
-  // Short enough that the palette cannot open below its anchor at all: the
-  // vertical clamp has to lift it and cap its height, which the full-height
-  // viewport above never asks for.
+  await tab.setViewport({ width: VIEWPORT.width, height: 300 });
+  await tab.mouse.move(0, 0);
+  await tab.focus(add);
+  await (await tab.waitForSelector(add)).click();
+  await tab.waitForSelector('.chain-palette-entry');
+  const liftedAnchor = await boxOf(tab, add);
+  const liftedPalette = await boxOf(tab, '.chain-palette');
+  check(liftedPalette.y < liftedAnchor.y + liftedAnchor.height
+      && liftedPalette.y >= 8 && liftedPalette.y + liftedPalette.height <= 293,
+  'the palette lifts above its anchor inside a short usable sidebar');
+  await tab.keyboard.press('Escape');
+
   await tab.setViewport({ width: VIEWPORT.width, height: SHORT_HEIGHT });
   await tab.waitForFunction((height) => window.innerHeight === height, {}, SHORT_HEIGHT);
-  await (await tab.waitForSelector(add)).click();
+  await tab.$eval(add, (node) => node.focus());
+  await tab.keyboard.press('Enter');
   await tab.waitForSelector('.chain-palette-entry');
   const shortAnchor = await boxOf(tab, add);
   const shortPalette = await boxOf(tab, '.chain-palette');
@@ -573,6 +605,7 @@ export async function probeStrip(tab) {
   check(capped.overflow === 'auto' && capped.scrollable,
     'the capped palette scrolls to its remaining entries');
   await tab.keyboard.press('Escape');
+  await tab.setViewport(VIEWPORT);
 
   // A source that reads the sphere directly collapses the plane crossing, so
   // that carrier holds no gap, chip or socket and is drawn no band at all.
