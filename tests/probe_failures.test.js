@@ -317,3 +317,50 @@ test('workbench sections continue after interaction and close failures', async (
   assert.match(failures[1], /first close:.*close failed/);
   assert.equal(failures[2], 'assertion failed');
 });
+
+test('workbench startup holds only the catalog request and releases it before teardown', async () => {
+  const events = [];
+  let requestHandler;
+  let catalogRequest;
+  const tab = {
+    setRequestInterception: async (enabled) => { assert.equal(enabled, true); },
+    on: (event, handler) => { assert.equal(event, 'request'); requestHandler = handler; },
+    waitForFunction: async () => {},
+    waitForSelector: async () => { await catalogRequest; events.push('ready'); },
+    evaluate: async () => { events.push('defaults checked'); return true; },
+    $eval: async () => true,
+    close: async () => { events.push('closed'); },
+  };
+  const failures = await runWorkbenchSections(async ({ prepare }) => {
+    await prepare(tab);
+    await requestHandler({
+      url: () => 'http://localhost/tools/shader.css',
+      continue: async () => { events.push('stylesheet'); },
+    });
+    catalogRequest = requestHandler({
+      url: () => 'http://localhost/generated/shader/engine_catalog.json',
+      continue: async () => { events.push('catalog'); },
+    });
+    assert.deepEqual(events, ['stylesheet']);
+    return tab;
+  }, [probeStartupPersistence]);
+  assert.deepEqual(failures, []);
+  assert.deepEqual(events, ['stylesheet', 'defaults checked', 'catalog', 'ready', 'closed']);
+});
+
+test('the parity probe reports a compiled preset refusal after a successful document load', async () => {
+  const selectors = [];
+  const failures = await probeParity({
+    select: async (selector, value) => {
+      assert.equal(selector, '#shader-document-select');
+      assert.equal(value, 'ash-cloud');
+    },
+    waitForFunction: async () => {},
+    waitForSelector: async (selector) => ({ click: async () => { selectors.push(selector); } }),
+    $eval: async (selector) => selector === '#shader-parity-toggle'
+      ? { armed: true, status: 'ok' }
+      : { status: 'error', text: 'unknown parameter' },
+  });
+  assert.deepEqual(selectors, ['#shader-parity-toggle']);
+  assert.deepEqual(failures, ['the compiled build takes every authored value (unknown parameter)']);
+});
