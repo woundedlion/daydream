@@ -1447,6 +1447,21 @@ test('continuous shader edits debounce link writes and keep the latest state', a
 
 test('continuous shader edits cannot postpone a link write indefinitely', async () => {
   const harness = await editorWorkbench({ source: null });
+  let releaseEncode;
+  const encodingGate = new Promise((resolve) => { releaseEncode = resolve; });
+  let finishEncode;
+  const encoded = new Promise((resolve) => { finishEncode = resolve; });
+  const compression = mock.method(globalThis, 'CompressionStream', function () {
+    const chunks = [];
+    return new TransformStream({
+      transform(chunk) { chunks.push(chunk); },
+      async flush(controller) {
+        await encodingGate;
+        controller.enqueue(gzipSync(Buffer.concat(chunks)));
+        finishEncode();
+      },
+    });
+  });
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     harness.urls.length = 0;
@@ -1466,11 +1481,28 @@ test('continuous shader edits cannot postpone a link write indefinitely', async 
     }
     mock.timers.tick(SHADER_LINK_MAX_WAIT_MS - gaps * gap);
     assert.ok(harness.pausedReads() > reads, 'the max-wait timer started the write');
-    mock.timers.reset();
-    await harness.controller.flushDeepLink();
+    assert.equal(harness.urls.length, 0, 'the encoding is still in flight');
+
+    slider.value = '9';
+    slider.dispatch('input');
+    harness.animationFrames.flush();
+    releaseEncode();
+    await encoded;
+    await new Promise((resolve) => setImmediate(resolve));
 
     assert.equal(harness.urls.length, 1);
+    const state = await decodeShaderStateHash(harness.win.location.hash);
+    assert.equal(state.document.preset_bank.presets[0]
+      .values['sample.pattern-freq'], gaps + 2);
+
+    mock.timers.tick(SHADER_LINK_DEBOUNCE_MS);
+    await harness.controller.flushDeepLink();
+    assert.equal(harness.urls.length, 2);
+    assert.equal((await decodeShaderStateHash(harness.win.location.hash))
+      .document.preset_bank.presets[0].values['sample.pattern-freq'], 9);
   } finally {
+    releaseEncode();
+    compression.mock.restore();
     mock.timers.reset();
   }
 });
