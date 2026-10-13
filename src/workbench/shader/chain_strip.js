@@ -132,6 +132,8 @@ export function createChainStrip({
    * builds its rows whether or not it is the expanded one.
    */
   const rows = new Map();
+  /** @type {Map<*, {press: (event: *) => void, release: (event: *) => void}>} */
+  const disclosures = new Map();
 
   /**
    * @param {string} tag - Element tag.
@@ -316,14 +318,19 @@ export function createChainStrip({
   };
 
   /**
-   * Dismisses an open palette on a press outside it.
+   * Tracks slider presses and dismisses panels outside the pressed target.
    * @param {*} event - A pointerdown anywhere in the document.
    * @returns {void}
    */
-  const dismissPalette = (event) => {
+  const pointerDown = (event) => {
+    for (const disclosure of disclosures.values()) disclosure.press(event);
     if (palette === null || palette.element.contains(event.target)
         || palette.anchor.contains(event.target)) return;
     closePalette();
+  };
+
+  const releaseDisclosure = (/** @type {*} */ event) => {
+    for (const disclosure of disclosures.values()) disclosure.release(event);
   };
 
   /**
@@ -912,27 +919,62 @@ export function createChainStrip({
       if (open) markDeactivated();
     };
     let hovered = false;
-    let focusInside = false;
+    let dismissing = false;
+    /** @type {number|null} */
+    let draggingPointer = null;
+    const dismiss = () => {
+      if (store.selectedLabel() === entry.label) return;
+      dismissing = true;
+      try {
+        if (doc.activeElement !== chip && chip.contains(doc.activeElement)) chip.focus();
+        setTransientOpen(false);
+      } finally {
+        dismissing = false;
+      }
+    };
+    disclosures.set(chip, {
+      press(event) {
+        if (!chip.contains(event.target)) {
+          draggingPointer = null;
+          dismiss();
+        } else if (event.target?.type === 'range' && event.button === 0) {
+          draggingPointer = event.pointerId;
+        }
+      },
+      release(event) {
+        if (draggingPointer === null || draggingPointer !== event.pointerId) return;
+        draggingPointer = null;
+        if (!hovered) dismiss();
+      },
+    });
     chip.addEventListener('mouseenter', () => {
       hovered = true;
-      setTransientOpen(hovered || focusInside);
+      setTransientOpen(true);
     });
     chip.addEventListener('mouseleave', () => {
       hovered = false;
-      setTransientOpen(hovered || focusInside);
+      if (draggingPointer === null) dismiss();
     });
     chip.addEventListener('focusin', () => {
-      focusInside = true;
-      if (!restoringFocus) setTransientOpen(hovered || focusInside);
+      if (!restoringFocus && !dismissing) setTransientOpen(true);
     });
     chip.addEventListener('focusout', (/** @type {*} */ event) => {
       const next = event.relatedTarget ?? null;
       if (next !== null && chip.contains(next)) return;
-      focusInside = false;
-      setTransientOpen(hovered || focusInside);
+      setTransientOpen(false);
     });
-    chip.addEventListener('keydown',
-      (/** @type {*} */ event) => chipKeydown(event, index, entry, crossing, chip));
+    chip.addEventListener('keydown', (/** @type {*} */ event) => {
+      if (event.key === 'Escape' && !event.defaultPrevented
+          && store.selectedLabel() !== entry.label) {
+        event.preventDefault();
+        event.stopPropagation();
+        draggingPointer = null;
+        dismiss();
+        return;
+      }
+      if (event.key === 'Tab') setTransientOpen(true);
+      chipKeydown(event, index, entry, crossing, chip);
+    });
     return chip;
   };
 
@@ -997,6 +1039,7 @@ export function createChainStrip({
     palette = null;
     const layout = bandLayout();
     rows.clear();
+    disclosures.clear();
 
     const snapshot = store.document();
     declarations = store.parameterDeclarations();
@@ -1138,7 +1181,9 @@ export function createChainStrip({
   // Bound after the first render: a throwing render returns no destroy().
   render();
   container.addEventListener('keydown', historyKeydown);
-  doc.addEventListener('pointerdown', dismissPalette);
+  doc.addEventListener('pointerdown', pointerDown, true);
+  doc.addEventListener('pointerup', releaseDisclosure);
+  doc.addEventListener('pointercancel', releaseDisclosure);
 
   return {
     render,
@@ -1164,7 +1209,10 @@ export function createChainStrip({
       scheduleSliderEdit.cancel();
       pendingSliderEdit = null;
       container.removeEventListener('keydown', historyKeydown);
-      doc.removeEventListener('pointerdown', dismissPalette);
+      doc.removeEventListener('pointerdown', pointerDown, true);
+      doc.removeEventListener('pointerup', releaseDisclosure);
+      doc.removeEventListener('pointercancel', releaseDisclosure);
+      disclosures.clear();
       container.replaceChildren();
     },
   };

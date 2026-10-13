@@ -819,7 +819,7 @@ test('pointer gestures never start a chip drag', async () => {
   for (const chip of chips(h))
     assert.deepEqual(chip.listeners.filter((listener) => listener.type.startsWith('pointer')), []);
   assert.equal(h.doc.listenerCount('pointermove'), 0);
-  assert.equal(h.doc.listenerCount('pointerup'), 0);
+  assert.equal(h.doc.listenerCount('pointerup'), 1);
 });
 
 test('a strip whose first render throws binds nothing to the mount', async () => {
@@ -863,6 +863,9 @@ test('destroy detaches the strip listeners and empties the strip', async () => {
 
   h.strip.destroy();
   assert.equal(h.container.childNodes.length, 0);
+  assert.equal(h.doc.listenerCount('pointerdown'), 0);
+  assert.equal(h.doc.listenerCount('pointerup'), 0);
+  assert.equal(h.doc.listenerCount('pointercancel'), 0);
   assert.deepEqual(h.container.listeners, [],
     'the next document reuses the mount, so nothing may stay bound to it');
 
@@ -1451,18 +1454,80 @@ test('parameters baked into the active build cannot commit edits', async () => {
 });
 
 
-test('hover and focus independently keep stage controls open', async () => {
+test('leaving an unpinned stage closes controls even with focus inside', async () => {
   const h = await makeStrip();
   const chip = chipByLabel(h, 'sample');
   chip.dispatch('mouseenter');
-  chip.dispatch('focusin');
-  chip.dispatch('mouseleave');
-  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
-  chip.dispatch('mouseenter');
-  chip.dispatch('focusout', { relatedTarget: null });
-  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
+  const readout = rowFor(h, 'sample', 'sample.pattern-freq').querySelector('.chain-param-value');
+  readout.focus();
+  readout.dispatch('focusin');
   chip.dispatch('mouseleave');
   assert.equal(chip.classList.contains('chain-chip--expanded'), false);
+  assert.equal(h.doc.activeElement, chip);
+  chip.dispatch('mouseenter');
+  chip.dispatch('focusout', { relatedTarget: null });
+  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
+});
+
+test('keyboard focus opens controls, stays within the stage and closes on exit', async () => {
+  const h = await makeStrip();
+  const chip = chipByLabel(h, 'sample');
+  const control = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
+  chip.dispatch('focusin');
+  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
+  chip.dispatch('focusout', { relatedTarget: control });
+  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
+  control.dispatch('focusout', { relatedTarget: chipByLabel(h, 'colorize') });
+  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
+});
+
+test('Escape dismisses a transient stage and Tab can reopen its controls', async () => {
+  const h = await makeStrip();
+  const chip = chipByLabel(h, 'sample');
+  const control = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
+  chip.dispatch('mouseenter');
+  control.focus();
+  control.dispatch('focusin');
+  const escape = control.dispatch('keydown', { key: 'Escape' });
+  assert.equal(escape.defaultPrevented, true);
+  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
+  assert.equal(h.doc.activeElement, chip);
+  chip.dispatch('keydown', { key: 'Tab' });
+  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
+});
+
+test('outside pointer presses dismiss transients without unpinning selected stages', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'camera').dispatch('click');
+  const pinned = chipByLabel(h, 'camera');
+  const chip = chipByLabel(h, 'sample');
+  chip.dispatch('mouseenter');
+  h.doc.dispatch('pointerdown', { target: h.doc.body });
+  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
+  assert.equal(pinned.classList.contains('chain-chip--expanded'), true);
+  pinned.dispatch('mouseleave');
+  pinned.dispatch('focusout');
+  pinned.dispatch('keydown', { key: 'Escape' });
+  assert.equal(pinned.classList.contains('chain-chip--expanded'), true);
+});
+
+test('range drags stay open until their pointer is released outside', async () => {
+  for (const release of ['pointerup', 'pointercancel']) {
+    const h = await makeStrip();
+    const chip = chipByLabel(h, 'sample');
+    const slider = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
+    chip.dispatch('mouseenter');
+    h.doc.dispatch('pointerdown', { target: slider, button: 0, pointerId: 5 });
+    slider.focus();
+    slider.dispatch('focusin');
+    chip.dispatch('mouseleave');
+    assert.equal(chip.classList.contains('chain-chip--expanded'), true);
+    h.doc.dispatch('pointerup', { pointerId: 6 });
+    assert.equal(chip.classList.contains('chain-chip--expanded'), true);
+    h.doc.dispatch(release, { pointerId: 5 });
+    assert.equal(chip.classList.contains('chain-chip--expanded'), false);
+    h.strip.destroy();
+  }
 });
 
 
