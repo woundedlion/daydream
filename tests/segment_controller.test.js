@@ -63,8 +63,7 @@ test('a warmed binary is compiled once and handed to every worker', async () => 
   c.destroy();
 });
 
-// The artifacts are unversioned, so a re-fetch that fails to compile means the
-// held module no longer matches the served binary.
+// Glue is revalidated on every warm; a compile failure invalidates the held module.
 test('a compile failure drops the module the previous warm left', async () => {
   const warmer = new ModuleWarmer();
   const serve = (bytes) => ({
