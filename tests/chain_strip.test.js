@@ -1078,22 +1078,20 @@ test('the readout carries no step grid and nudges by arrow key', async () => {
     'a grid based at min would report stepMismatch on the stored value');
 
   const before = Number(value.value);
-  value.dispatch('keydown', { key: 'ArrowUp', preventDefault: () => {} });
+  assert.equal(value.dispatch('keydown', { key: 'ArrowUp' }).defaultPrevented, true);
   assert.equal(Math.fround(Number(value.value)), Math.fround(before + nudge));
   assert.equal(Math.fround(Number(slider.value)), Math.fround(before + nudge));
   assert.equal(h.edits.at(-1)[0], 'sample.pattern-freq');
   assert.equal(Math.fround(h.edits.at(-1)[1]), Math.fround(before + nudge));
 
-  value.dispatch('keydown', { key: 'ArrowDown', preventDefault: () => {} });
+  assert.equal(value.dispatch('keydown', { key: 'ArrowDown' }).defaultPrevented, true);
   assert.equal(Math.fround(Number(value.value)), Math.fround(before));
 
   const editsBefore = h.edits.length;
   const commitsBefore = h.commits.length;
-  let prevented = 0;
   value.value = '5.5';
-  value.dispatch('keydown', { key: 'Enter', preventDefault: () => { prevented++; } });
+  assert.equal(value.dispatch('keydown', { key: 'Enter' }).defaultPrevented, false);
   assert.equal(value.value, '5.5', 'other keys are left to the input');
-  assert.equal(prevented, 0);
   assert.equal(h.edits.length, editsBefore);
   assert.equal(h.commits.length, commitsBefore);
 });

@@ -302,8 +302,8 @@ function fakeStyle() {
  * root-first, then the dispatching node's capture listeners, then its bubble
  * listeners, then the non-capture listeners back up to the root. The event
  * carries `target` (the dispatching node unless the caller names one),
- * `currentTarget`, stopPropagation() and stopImmediatePropagation(); the two
- * stop methods are the event's own and overwrite any the caller passed. Focus,
+ * `currentTarget`, preventDefault(), stopPropagation() and
+ * stopImmediatePropagation(); these methods overwrite any the caller passed. Focus,
  * blur, enter/leave, load and scroll do not bubble unless `bubbles` is set.
  * Activation events (click, auxclick, dblclick) on a disabled form control are
  * not dispatched; other DISABLED_DEAF_EVENTS skip its own listeners and still
