@@ -143,7 +143,6 @@ test('copy feedback replaces the prior outcome classes on re-entry', async () =>
   assert.equal(el.textContent, 'Copy');
 });
 
-/** Verifies the legacy textarea path copies and removes its temporary node. */
 test('pending text starts the clipboard write before validation resolves', async (t) => {
   let finish;
   const text = new Promise(resolve => { finish = resolve; });
@@ -196,6 +195,7 @@ test('failed validation rejects pending copy without writing unchecked text', as
   await assert.rejects(copyToClipboard(Promise.reject(error)), error);
 });
 
+/** Verifies the legacy textarea path copies and removes its temporary node. */
 test('copyToClipboard falls back to execCommand', async () => {
   Object.defineProperty(globalThis, 'navigator', {
     value: {},
