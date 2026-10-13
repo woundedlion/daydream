@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import {
   bootRemedy, bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
   StaleModuleError, STALE_MODULE_REMEDY, VENDOR_REMEDY, REFRESH_DEADLINE_MS,
@@ -585,8 +585,13 @@ test('index boots through the entry module and bootstrap.js stays importable', (
 
 test('index identifies new-window tool links and associates stats headers', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  const toolLinks = [...html.matchAll(/<a href="tools\/[^"]+"[^>]+>.*?<\/a>/g)];
-  assert.equal(toolLinks.length, 5);
+  const expectedTools = readdirSync(new URL('../tools/', import.meta.url))
+    .filter((name) => name.endsWith('.html')).sort();
+  const linkedTools = [...html.matchAll(/href="tools\/([^"]+)"/g)]
+    .map(([, name]) => name).sort();
+  assert.deepEqual(linkedTools, expectedTools);
+  const toolLinks = [...html.matchAll(/<a\b[^>]*href="tools\/[^"]+"[^>]*>.*?<\/a>/g)];
+  assert.equal(toolLinks.length, linkedTools.length);
   for (const [link] of toolLinks) {
     assert.match(link, /target="_blank"/);
     assert.match(link, /rel="noopener"/);
