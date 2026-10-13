@@ -91,8 +91,8 @@ export async function probeStrip(tab) {
   });
   check(closedHeaders.icons.join('') === '◉←→×'
       && closedHeaders.rotateChildren.join(' ') === 'chain-chip-name '
-        + 'chain-chip-bypass chain-chip-move chain-chip-move chain-chip-remove'
-      && closedHeaders.projectChildren.join('') === 'chain-chip-function-label'
+        + 'chain-chip-bypass chain-chip-move chain-chip-move chain-chip-remove chain-chip-pin'
+      && closedHeaders.projectChildren.join(' ') === 'chain-chip-function-label chain-chip-pin'
       && closedHeaders.projectPrefix === 'Projection: '
       && closedHeaders.projectSelector !== 'none',
   'closed domain and transition cards omit instance ids');
@@ -206,20 +206,35 @@ export async function probeStrip(tab) {
     'releasing a slider outside dismisses its unpinned controls');
   await tab.mouse.move(0, 0);
 
-  await tab.mouse.click(closedCard.x + 2, closedCard.y + closedCard.height / 2);
+  const projectPin = '.chain-chip[data-label="project"] .chain-chip-pin';
+  const rotatePin = `${rotateChip} .chain-chip-pin`;
+  await (await tab.waitForSelector(projectPin)).click();
+  await (await tab.waitForSelector(rotatePin)).click();
   await tab.mouse.move(0, 0);
-  check(await tab.$eval('.chain-chip[data-label="project"]',
-    (node) => node.classList.contains('chain-chip--expanded') === true),
-  'click pins a stage card open after mouse leave');
-  const pinnedCard = await boxOf(tab, '.chain-chip[data-label="project"]');
+  check(await tab.$$eval('.chain-chip-pin[aria-pressed="true"]', (pins) =>
+    pins.length === 2 && pins.every((pin) =>
+      pin.getAttribute('aria-label').startsWith('Unpin ')
+      && pin.closest('.chain-chip').classList.contains('chain-chip--expanded'))),
+  'stage and socket pin buttons keep multiple panels open after mouse leave');
   check(await tab.$eval('.chain-chip[data-label="project"]',
     (node, expected) => getComputedStyle(node).backgroundColor === expected,
     closedBackground),
   `a pinned stage keeps its opaque ${closedBackground} panel`);
-  await tab.mouse.click(pinnedCard.x + 2, pinnedCard.y + pinnedCard.height / 2);
-  check(await tab.$eval('.chain-chip[data-label="project"]',
-    (node) => node.classList.contains('chain-chip--expanded') === false),
-  'clicking a pinned stage header closes it');
+  await tab.$eval(rotatePin, (node) => node.focus());
+  await tab.keyboard.press('Space');
+  await tab.mouse.move(0, 0);
+  await tab.keyboard.press('Escape');
+  check(await tab.$eval(rotateChip, (node) =>
+    !node.classList.contains('chain-chip--expanded')
+    && node.querySelector('.chain-chip-pin').getAttribute('aria-pressed') === 'false'),
+  'keyboard unpin restores normal Escape dismissal');
+  check(await tab.$eval(projectPin, (node) => node.getAttribute('aria-pressed') === 'true'),
+    'unpinning one panel preserves the other pin');
+  await tab.$eval(projectPin, (node) => node.focus());
+  await tab.keyboard.press('Enter');
+  await tab.keyboard.press('Escape');
+  check(await tab.$eval(projectPin, (node) => node.getAttribute('aria-pressed') === 'false'),
+    'Enter toggles the focused pin button');
 
   await tab.mouse.click(closedCard.x + 2, closedCard.y + closedCard.height / 2);
   const elsewhereLabel = (await tab.$$eval('.chain-chip', (nodes) => nodes.map(
@@ -490,7 +505,7 @@ export async function probeStrip(tab) {
   const track = '.chain-chip[data-label="rotate"]'
     + ' .chain-param[data-parameter="rotate.wander"] .chain-param-control';
   await (await tab.waitForSelector(
-    '.chain-chip[data-label="rotate"] .chain-chip-name')).click();
+    '.chain-chip[data-label="rotate"] .chain-chip-pin')).click();
   const before = Number(await tab.$eval(track, (node) => node.value));
   const slider = await boxOf(tab, track);
   await tab.mouse.click(slider.x + slider.width * SLIDER_FRACTION, centre(slider).y);

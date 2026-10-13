@@ -307,6 +307,7 @@
   text-decoration: line-through;
 }
 
+.chain-chip-pin,
 .chain-chip-remove,
 .chain-chip-bypass,
 .chain-chip-move {
@@ -326,6 +327,8 @@
   cursor: pointer;
 }
 
+.chain-chip-pin:hover,
+.chain-chip-pin:focus-visible,
 .chain-chip-remove:hover,
 .chain-chip-remove:focus-visible,
 .chain-chip-bypass:hover:not(:disabled),
@@ -342,6 +345,7 @@
   cursor: default;
 }
 
+.chain-chip-pin[aria-pressed="true"],
 .chain-chip-bypass[aria-pressed="true"] {
   border-color: var(--accent);
   color: var(--accent);
@@ -350,6 +354,18 @@
 .chain-chip-bypass:disabled[aria-pressed="true"] {
   border-color: var(--panel-border);
   color: var(--panel-border);
+}
+
+.chain-chip-pin-icon {
+  width: 0.8125rem;
+  height: 0.8125rem;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 3h8M9 3v7l-3 4v2h12v-2l-3-4V3M12 16v6' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  transform: rotate(35deg);
+}
+
+.chain-chip-pin[aria-pressed="true"] .chain-chip-pin-icon {
+  transform: none;
 }
 
 .chain-chip-function-label {
