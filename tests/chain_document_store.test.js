@@ -775,12 +775,20 @@ test('arena accounting honors per_param_name_bytes when declared', async () => {
 });
 
 test('insertion legality costs the operator at its gap, not at the chain end', async () => {
-  const operators = new Map(CATALOG.operators.map((operator) => [operator.id, operator]));
+  const fixture = structuredClone(CATALOG);
+  fixture.budgets.per_op_overhead_bytes = 0;
+  fixture.budgets.per_param_name_bytes = 0;
+  for (const operator of fixture.operators) operator.blocks = {};
+  const operators = new Map(fixture.operators.map((operator) => [operator.id, operator]));
+  operators.get('sphere.rotate.v2').blocks = { param: { size: 1, align: 8 } };
+  operators.get('project.stereographic.v2').blocks = { param: { size: 1, align: 8 } };
+  operators.get('sphere.lens.glitch.v2').blocks = { param: { size: 1, align: 1 } };
+  operators.get('sphere.lens.twist.v2').blocks = { param: { size: 4, align: 4 } };
   const baseOps = BASE.document.descriptor.chain.map((entry) => operators.get(entry.operator));
   const bytesAt = (id, index) => compiler.chainArenaBytes(
-    [...baseOps.slice(0, index), operators.get(id), ...baseOps.slice(index)], CATALOG.budgets);
+    [...baseOps.slice(0, index), operators.get(id), ...baseOps.slice(index)], fixture.budgets);
   const legalityAt = async (id, index, arenaBytes) => {
-    const catalog = structuredClone(CATALOG);
+    const catalog = structuredClone(fixture);
     catalog.budgets.arena_bytes = arenaBytes;
     const store = await makeStore({ catalog });
     const entry = store.legalInsertions(index).find((candidate) => candidate.operator.id === id);
@@ -788,10 +796,10 @@ test('insertion legality costs the operator at its gap, not at the chain end', a
     return entry;
   };
 
-  const kaleidoscope = 'sphere.lens.kaleidoscope.v2';
-  assert.ok(bytesAt(kaleidoscope, 0) > bytesAt(kaleidoscope, baseOps.length),
+  const glitch = 'sphere.lens.glitch.v2';
+  assert.ok(bytesAt(glitch, 0) > bytesAt(glitch, baseOps.length),
     'alignment padding makes the gap dearer than the end');
-  const dearer = await legalityAt(kaleidoscope, 0, bytesAt(kaleidoscope, 0) - 1);
+  const dearer = await legalityAt(glitch, 0, bytesAt(glitch, 0) - 1);
   assert.equal(dearer.legal, false);
   assert.match(dearer.reason, /arena bytes/);
 

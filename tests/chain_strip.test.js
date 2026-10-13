@@ -961,11 +961,11 @@ test('stage controls open under keyboard focus as they do under the pointer', as
 
 test('a fixed stage expands to explain its parameters and allow renaming', async () => {
   const h = await makeStrip();
-  bandFor(h, 'sphere').querySelector('.chain-band-add').dispatch('click');
-  paletteEntries(h).find((entry) => entry.dataset.operator === 'sphere.lens.glitch.v2')
+  bandFor(h, 'field').querySelector('.chain-band-add').dispatch('click');
+  paletteEntries(h).find((entry) => entry.dataset.operator === 'field.transfer.ridge.v2')
     .dispatch('click');
   const label = h.store.chain()
-    .find((entry) => entry.operator === 'sphere.lens.glitch.v2').label;
+    .find((entry) => entry.operator === 'field.transfer.ridge.v2').label;
   assert.deepEqual(declarationsFor(h, label), []);
 
   const chip = chipByLabel(h, label);
@@ -1593,4 +1593,45 @@ test('band insertion closes after pointer focusout and retains keyboard toggles'
     add.dispatch('click');
     assert.equal(add.getAttribute('aria-expanded'), 'false');
   }
+});
+
+test('loaded twist and glitch stages expose omitted controls and persist slider edits', async () => {
+  const source = scratchChainDocument(CATALOG, [
+    { label: 'twist', operator: 'sphere.lens.twist.v2' },
+    { label: 'glitch', operator: 'sphere.lens.glitch.v2' },
+    { label: 'project', operator: 'project.stereographic.v2' },
+    { label: 'sample', operator: 'sample.grid.v3' },
+    { label: 'color', operator: 'colorize.generated-palette.v3' },
+  ]);
+  const controls = [
+    ['twist', 'origin-phi', 0, 0.5],
+    ['twist', 'origin-lambda', 0, 1.25],
+    ['glitch', 'polar-multiplier', 2, 4],
+    ['glitch', 'azimuth-multiplier', 3, -2],
+  ];
+  const omitted = controls.map(([label, field]) => `${label}.${field}`);
+  source.descriptor.parameters = source.descriptor.parameters.filter(
+    (parameter) => !omitted.includes(parameter.id));
+  source.descriptor.serialization.fields = source.descriptor.parameters.map(
+    (parameter) => parameter.id);
+  for (const preset of source.preset_bank.presets)
+    for (const id of omitted) delete preset.values[id];
+  const h = await makeStrip({ source, writeThrough: true });
+  assert.deepEqual(h.store.document(), source);
+  for (const [label, field, initial, value] of controls) {
+    chipByLabel(h, label).dispatch('click');
+    const id = `${label}.${field}`;
+    const slider = controlIn(rowFor(h, label, id));
+    assert.equal(slider.type, 'range');
+    assert.equal(Number(slider.value), initial);
+    slider.value = String(value);
+    slider.dispatch('input');
+    runFrame();
+    assert.deepEqual(h.edits.at(-1), [id, value]);
+    assert.equal(h.store.document().preset_bank.presets[0].values[id], value);
+    assert.ok(h.store.document().descriptor.parameters.some((parameter) => parameter.id === id));
+  }
+  assert.equal(h.edits.length, 4);
+  assert.deepEqual(h.applied, []);
+  assert.equal(h.store.compile().status, 'VALID');
 });
