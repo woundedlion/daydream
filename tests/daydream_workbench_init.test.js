@@ -152,3 +152,17 @@ test('a constructor that traps marks boot failure with the module remedy', async
     assert.ok(capture.messages.some((message) => /Failed to initialize/.test(message)));
   } finally { capture.restore(); }
 });
+
+
+test('workbench global arrows leave compiled presets under toolbar control', async () => {
+  initResult = Promise.resolve(true);
+  const module = fakeWasmModule();
+  module.HolosphereEngine.prototype.getPresetCount = () => 3;
+  const app = startApp({ daydreamMode: 'shader-workbench', loadModule: async () => module });
+  await app.teardown.ready;
+  await new Promise((resolve) => setImmediate(resolve));
+  const move = [];
+  app.driver.keydown = (event, movePreset) => move.push(movePreset(1));
+  app.listeners.find(({ type }) => type === 'keydown').handler({ key: 'ArrowRight' });
+  assert.deepEqual(move, [false]);
+});

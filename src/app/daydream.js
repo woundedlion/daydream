@@ -605,7 +605,7 @@ export function start({
     showNotice: (message) => applyNotice.show(message, RECORD_NOTICE),
   });
   const onKeyDown = createGlobalKeydownHandler({
-    dispatch: (e) => daydream.keydown(e, (delta) => effectGui.movePreset(delta)),
+    dispatch: (e) => daydream.keydown(e, (delta) => !shaderWorkbench && effectGui.movePreset(delta)),
   });
   win.addEventListener("keydown", onKeyDown);
 
