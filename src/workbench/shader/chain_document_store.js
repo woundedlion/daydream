@@ -591,11 +591,11 @@ export async function createChainDocumentStore({
   };
 
   /**
-   * Writes one preset's value for one parameter through the same validator and
-   * the same history as a structural edit. Consecutive writes to the
-   * same control collapse into one undo entry, so undoing a drag restores the
-   * value the run started from; any other edit, undo or redo ends the run.
-   * @param {string} presetId - The preset the value belongs to.
+   * Writes one preset's values for one or more parameters atomically through
+   * the same validator and history as a structural edit. Consecutive writes to
+   * the same preset and identical ordered parameter IDs collapse into one undo
+   * entry; any other edit, undo or redo ends the run.
+   * @param {string} presetId - The preset the values belong to.
    * @param {Object<string, *>} values - Catalog parameter IDs and their values; enum8 takes its option id.
    * @param {(() => EditResult)|null} [admit] - Admission before changing document or history.
    * @returns {EditResult} The outcome; a refusal leaves the store untouched.
