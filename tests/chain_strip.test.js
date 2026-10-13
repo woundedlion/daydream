@@ -38,7 +38,8 @@ restoreDocumentAfterEach();
  *   acceptParameter?: () => boolean, source?: Object}} [seams] - The preset the inline controls read,
  *   omitted the strip falls back to the document's first; whether a bypass
  *   reaches what is rendering; and whether inline edits reach the store as the
- *   page writes them; whether a parameter is live in the active build; and the
+ *   page writes them; whether a parameter is live in the active build; whether
+ *   the page accepts an inline edit (false models a refused write); and the
  *   document the store opens on.
  * @returns {Promise<Object>} The harness.
  */
