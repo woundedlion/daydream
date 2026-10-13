@@ -164,6 +164,48 @@ export async function probeStrip(tab) {
     (node) => node.classList.contains('chain-chip--expanded') === false),
   'losing focus closes the card again');
 
+  const rotateChip = '.chain-chip[data-label="rotate"]';
+  const rotateReadout = `${rotateChip} .chain-param-value`;
+  await (await tab.waitForSelector(`${rotateChip} .chain-chip-header`)).hover();
+  await (await tab.waitForSelector(rotateReadout)).click();
+  await tab.mouse.move(0, 0);
+  check(await tab.$eval(rotateChip, (node) =>
+    !node.classList.contains('chain-chip--expanded') && document.activeElement === node),
+  'mouse leave dismisses click-focused controls and returns focus to the stage');
+
+  await (await tab.waitForSelector(`${rotateChip} .chain-chip-header`)).hover();
+  await (await tab.waitForSelector(rotateReadout)).click();
+  await tab.keyboard.press('Escape');
+  check(await tab.$eval(rotateChip, (node) =>
+    !node.classList.contains('chain-chip--expanded') && document.activeElement === node),
+  'Escape dismisses controls without the returned focus reopening them');
+  await tab.keyboard.press('Tab');
+  check(await tab.$eval(rotateChip, (node) =>
+    node.classList.contains('chain-chip--expanded')
+      && node.contains(document.activeElement) && document.activeElement !== node),
+  'Tab reopens dismissed controls for keyboard navigation');
+  await tab.$eval(rotateChip, (node) => {
+    const controls = node.querySelectorAll('input:not(:disabled), select:not(:disabled)');
+    const last = controls[controls.length - 1];
+    if (last instanceof HTMLElement) last.focus();
+  });
+  await tab.keyboard.press('Tab');
+  check(await tab.$eval(rotateChip, (node) => !node.classList.contains('chain-chip--expanded')),
+    'Tab leaving a stage closes it even while the pointer remains inside');
+  await tab.mouse.move(0, 0);
+
+  await (await tab.waitForSelector(`${rotateChip} .chain-chip-header`)).hover();
+  const dragTrack = await boxOf(tab, `${rotateChip} input[type="range"]`);
+  await tab.mouse.move(dragTrack.x + dragTrack.width / 2, dragTrack.y + dragTrack.height / 2);
+  await tab.mouse.down();
+  await tab.mouse.move(dragTrack.x + dragTrack.width / 2, 0);
+  check(await tab.$eval(rotateChip, (node) => node.classList.contains('chain-chip--expanded')),
+    'a slider drag keeps its controls visible after leaving the stage');
+  await tab.mouse.up();
+  check(await tab.$eval(rotateChip, (node) => !node.classList.contains('chain-chip--expanded')),
+    'releasing a slider outside dismisses its unpinned controls');
+  await tab.mouse.move(0, 0);
+
   await tab.mouse.click(closedCard.x + 2, closedCard.y + closedCard.height / 2);
   await tab.mouse.move(0, 0);
   check(await tab.$eval('.chain-chip[data-label="project"]',
