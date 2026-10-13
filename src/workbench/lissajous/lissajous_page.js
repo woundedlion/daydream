@@ -96,8 +96,9 @@ const scheduleUpdate = createFrameScheduler(() => {
  * Snaps the active frequency (C1 or C2) to maintain a simple rational ratio with the passive frequency.
  * @param {string} activeId 'C1' or 'C2'.
  * @param {number} rawNewValue The raw slider value from the input event.
+ * @param {number} [direction=0] - Keyboard movement direction.
  */
-const snapFrequencies = (activeId, rawNewValue) => {
+const snapFrequencies = (activeId, rawNewValue, direction = 0) => {
   if (!state.isRationalLocked) return;
 
   const passiveId = activeId === 'C1' ? 'C2' : 'C1';
@@ -110,7 +111,7 @@ const snapFrequencies = (activeId, rawNewValue) => {
   // compute the closing domain.
   const { snappedActiveC, closingPeriod: newDomain } = snapToRationalRatio(
     rawActiveC, passiveC, MAX_RATIONAL_TERM,
-    { min: activeConfig.min, max: activeConfig.max });
+    { min: activeConfig.min, max: activeConfig.max }, direction);
 
   state[activeId] = snappedActiveC;
 
@@ -174,6 +175,18 @@ const mountSlider = (id, params) => {
       scheduleUpdate();
     }
   });
+  if (id === 'C1' || id === 'C2') {
+    const slider = sliderHandles[id].slider;
+    const onKeyDown = (event) => {
+      if (!state.isRationalLocked) return;
+      const direction = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 }[event.key];
+      if (!direction) return;
+      event.preventDefault();
+      snapFrequencies(id, state[id] * scale, direction);
+    };
+    slider.addEventListener('keydown', onKeyDown);
+    onPageTeardown(() => slider.removeEventListener('keydown', onKeyDown));
+  }
 };
 
 const init = () => {

@@ -340,3 +340,21 @@ test('domainClosureWarning flags only domains that do not close', () => {
   assert.ok(warning, 'authored 5.909 domain does not close at C₂ = 1.06');
   assert.match(warning, /5\.928/);
 });
+
+
+test('directed rational snap advances from an existing closing ratio', () => {
+  const range = { min: 0.01, max: 100 };
+  const next = snapToRationalRatio(12, 5, 8, range, 1);
+  const previous = snapToRationalRatio(12, 5, 8, range, -1);
+  assert.ok(Math.abs(next.snappedActiveC - 5 * 17 / 7) < 1e-12);
+  assert.ok(Math.abs(previous.snappedActiveC - 5 * 19 / 8) < 1e-12);
+  assert.equal(next.n, 7);
+  assert.equal(previous.n, 8);
+  assert.equal(snapToRationalRatio(12, 5, 8, range).snappedActiveC, 12);
+});
+
+test('directed rational snap stays within bounds when no next ratio exists', () => {
+  const range = { min: 1, max: 12 };
+  assert.equal(snapToRationalRatio(12, 5, 8, range, 1).snappedActiveC, 12);
+  assert.equal(snapToRationalRatio(1, 5, 8, range, -1).snappedActiveC, 1);
+});
