@@ -109,9 +109,13 @@ test('a steady frame rewrites neither the arena rows nor the perf class', () => 
 
   view.update(1, metrics());
 
-  assert.deepEqual(writes, ['perf:text', 'perf:text'],
-    'only the duration moves every frame; the rest costs a layout invalidation '
-    + 'per cell per tick unless it is written on a crossing');
+  assert.deepEqual(writes.filter((write) => write !== 'perf:text'), []);
+
+  const perfText = byId['perf-stats'].textContent;
+  view.update(2, metrics());
+  assert.notEqual(byId['perf-stats'].textContent, perfText);
+  assert.equal(byId['perf-stats-mobile'].textContent, byId['perf-stats'].textContent);
+  assert.deepEqual(writes.filter((write) => write !== 'perf:text'), []);
 });
 
 test('update lands each arena in its own row as usage|high-water|capacity KiB', () => {
