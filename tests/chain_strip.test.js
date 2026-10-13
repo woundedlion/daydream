@@ -182,7 +182,7 @@ test('endomorphisms carry controls; sockets carry only valid selectors', async (
   assert.match(remove.getAttribute('aria-label'), /^Remove .+ · lens$/);
   const controls = chipByLabel(h, 'camera').querySelector('.chain-chip-header')
     .querySelectorAll('button');
-  assert.deepEqual(controls.map((button) => button.textContent), ['◉', '←', '→', '×', '']);
+  assert.deepEqual(controls.map((button) => button.textContent), ['◉', '↑', '↓', '×', '']);
 });
 
 test('a socket names the function by the carrier its crossing produces', async () => {
@@ -279,49 +279,49 @@ test('pipeline arrows, wheel and background arrow keys scroll the viewport', asy
   assert.equal(viewport.getAttribute('role'), 'group');
   assert.equal(viewport.getAttribute('aria-label'), 'Scrollable shader chain');
   const buttons = h.container.querySelectorAll('.chain-scroll-button');
-  viewport.clientWidth = 400;
-  viewport.scrollWidth = 1600;
-  viewport.scrollLeft = 0;
+  viewport.clientHeight = 400;
+  viewport.scrollHeight = 1600;
+  viewport.scrollTop = 0;
 
   buttons[1].dispatch('click');
-  assert.equal(viewport.scrollLeft, 300);
+  assert.equal(viewport.scrollTop, 300);
   buttons[0].dispatch('click');
-  assert.equal(viewport.scrollLeft, 0);
+  assert.equal(viewport.scrollTop, 0);
 
-  const vertical = viewport.dispatch('wheel', { deltaX: 0, deltaY: 120 });
-  assert.equal(viewport.scrollLeft, 0);
-  assert.equal(vertical.defaultPrevented, false);
-  const wheel = viewport.dispatch('wheel', { deltaX: 120, deltaY: 0 });
-  assert.equal(viewport.scrollLeft, 120);
+  const horizontal = viewport.dispatch('wheel', { deltaX: 120, deltaY: 0 });
+  assert.equal(viewport.scrollTop, 0);
+  assert.equal(horizontal.defaultPrevented, false);
+  const wheel = viewport.dispatch('wheel', { deltaX: 0, deltaY: 120 });
+  assert.equal(viewport.scrollTop, 120);
   assert.equal(wheel.defaultPrevented, true);
 
-  const right = viewport.dispatch('keydown', { key: 'ArrowRight' });
-  assert.equal(viewport.scrollLeft, 420);
+  const right = viewport.dispatch('keydown', { key: 'ArrowDown' });
+  assert.equal(viewport.scrollTop, 420);
   assert.equal(right.defaultPrevented, true);
-  viewport.dispatch('keydown', { key: 'ArrowLeft' });
-  assert.equal(viewport.scrollLeft, 120);
+  viewport.dispatch('keydown', { key: 'ArrowUp' });
+  assert.equal(viewport.scrollTop, 120);
 });
 
 test('the wheel reads deltaMode and yields when the strip cannot scroll', async () => {
   const h = await makeStrip();
   const viewport = h.container.querySelector('.chain-strip-viewport');
-  viewport.clientWidth = 400;
-  viewport.scrollWidth = 1600;
-  viewport.scrollLeft = 0;
+  viewport.clientHeight = 400;
+  viewport.scrollHeight = 1600;
+  viewport.scrollTop = 0;
 
-  viewport.dispatch('wheel', { deltaX: 3, deltaY: 0, deltaMode: 1 });
-  assert.equal(viewport.scrollLeft, 48, 'a line-mode notch is not 3 pixels');
-  viewport.scrollLeft = 0;
-  viewport.dispatch('wheel', { deltaX: 1, deltaY: 0, deltaMode: 2 });
-  assert.equal(viewport.scrollLeft, 400, 'a page-mode notch is one viewport');
+  viewport.dispatch('wheel', { deltaX: 0, deltaY: 3, deltaMode: 1 });
+  assert.equal(viewport.scrollTop, 48, 'a line-mode notch is not 3 pixels');
+  viewport.scrollTop = 0;
+  viewport.dispatch('wheel', { deltaX: 0, deltaY: 1, deltaMode: 2 });
+  assert.equal(viewport.scrollTop, 400, 'a page-mode notch is one viewport');
 
-  viewport.dispatch('wheel', { deltaX: 5000, deltaY: 0 });
-  assert.equal(viewport.scrollLeft, 1200, 'the offset stops at the content edge');
+  viewport.dispatch('wheel', { deltaX: 0, deltaY: 5000 });
+  assert.equal(viewport.scrollTop, 1200, 'the offset stops at the content edge');
 
-  viewport.scrollWidth = 400;
-  viewport.scrollLeft = 0;
-  const idle = viewport.dispatch('wheel', { deltaX: 120, deltaY: 0 });
-  assert.equal(viewport.scrollLeft, 0);
+  viewport.scrollHeight = 400;
+  viewport.scrollTop = 0;
+  const idle = viewport.dispatch('wheel', { deltaX: 0, deltaY: 120 });
+  assert.equal(viewport.scrollTop, 0);
   assert.equal(idle.defaultPrevented, false,
     'a strip with nothing to scroll leaves the wheel to the page');
 });
@@ -329,14 +329,14 @@ test('the wheel reads deltaMode and yields when the strip cannot scroll', async 
 test('the viewport offset survives the rebuild a committed edit forces', async () => {
   const h = await makeStrip();
   const viewport = h.container.querySelector('.chain-strip-viewport');
-  viewport.clientWidth = 400;
-  viewport.scrollWidth = 1600;
-  viewport.scrollLeft = 40;
+  viewport.clientHeight = 400;
+  viewport.scrollHeight = 1600;
+  viewport.scrollTop = 40;
 
-  chipByLabel(h, 'camera').dispatch('keydown', { key: 'ArrowRight', altKey: true });
+  chipByLabel(h, 'camera').dispatch('keydown', { key: 'ArrowDown', altKey: true });
 
   assert.deepEqual(labels(h).slice(0, 2), ['lens', 'camera']);
-  assert.equal(h.container.querySelector('.chain-strip-viewport').scrollLeft, 40);
+  assert.equal(h.container.querySelector('.chain-strip-viewport').scrollTop, 40);
 });
 
 test('clicking a chip header toggles selection without pinning', async () => {

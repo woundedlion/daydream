@@ -495,9 +495,9 @@ export function createChainStrip({
     const inside = event.target !== chip;
     if (inside) return;
     const key = event.key;
-    if (key === 'ArrowRight' || key === 'ArrowLeft') {
+    if (['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft'].includes(key)) {
       event.preventDefault();
-      const forward = key === 'ArrowRight';
+      const forward = key === 'ArrowDown' || key === 'ArrowRight';
       if (!event.altKey) {
         focusChip(forward ? index + 1 : index - 1);
         return;
@@ -806,8 +806,8 @@ export function createChainStrip({
     if (isSelected) chip.setAttribute('aria-current', 'true');
     chip.setAttribute('tabindex', tabLabel === entry.label ? '0' : '-1');
     chip.setAttribute('aria-keyshortcuts',
-      crossing ? 'ArrowLeft ArrowRight Enter Space Delete Backspace Insert'
-        : 'ArrowLeft ArrowRight Alt+ArrowLeft Alt+ArrowRight Enter Space b Delete Backspace Insert');
+      crossing ? 'ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space Delete Backspace Insert'
+        : 'ArrowUp ArrowDown Alt+ArrowUp Alt+ArrowDown ArrowLeft ArrowRight Alt+ArrowLeft Alt+ArrowRight Enter Space b Delete Backspace Insert');
     chip.setAttribute('aria-label', `${op.name} · ${entry.label}`
       + (crossing ? `, ${op.input} to ${op.output}` : '')
       + (isBypassed ? ', bypassed' : ''));
@@ -873,8 +873,8 @@ export function createChainStrip({
       const earlier = el('button', 'chain-chip-move');
       earlier.type = 'button';
       earlier.setAttribute('tabindex', '0');
-      earlier.setAttribute('aria-keyshortcuts', 'Alt+ArrowLeft');
-      earlier.textContent = '←';
+      earlier.setAttribute('aria-keyshortcuts', 'Alt+ArrowUp');
+      earlier.textContent = '↑';
       earlier.disabled = !sharesBand(index, -1);
       earlier.setAttribute('aria-label', `Move ${op.name} · ${entry.label} earlier`);
       earlier.setAttribute('title', 'Move earlier');
@@ -885,8 +885,8 @@ export function createChainStrip({
       const later = el('button', 'chain-chip-move');
       later.type = 'button';
       later.setAttribute('tabindex', '0');
-      later.setAttribute('aria-keyshortcuts', 'Alt+ArrowRight');
-      later.textContent = '→';
+      later.setAttribute('aria-keyshortcuts', 'Alt+ArrowDown');
+      later.textContent = '↓';
       later.disabled = !sharesBand(index, 1);
       later.setAttribute('aria-label', `Move ${op.name} · ${entry.label} later`);
       later.setAttribute('title', 'Move later');
@@ -1034,9 +1034,9 @@ export function createChainStrip({
   /** @param {*} viewport @param {number} direction */
   const scrollPipeline = (viewport, direction) => {
     const distance = Math.max(MIN_SCROLL_STEP,
-      Number(viewport.clientWidth ?? 0) * SCROLL_STEP_RATIO);
-    viewport.scrollLeft = Math.max(0,
-      Number(viewport.scrollLeft ?? 0) + direction * distance);
+      Number(viewport.clientHeight ?? 0) * SCROLL_STEP_RATIO);
+    viewport.scrollTop = Math.max(0,
+      Number(viewport.scrollTop ?? 0) + direction * distance);
   };
 
   /** @param {*} viewport @param {number} direction @returns {*} */
@@ -1044,8 +1044,8 @@ export function createChainStrip({
     const button = el('button', 'chain-scroll-button');
     button.type = 'button';
     button.setAttribute('aria-label', direction < 0
-      ? 'Scroll shader chain left' : 'Scroll shader chain right');
-    button.textContent = direction < 0 ? '‹' : '›';
+      ? 'Scroll shader chain up' : 'Scroll shader chain down');
+    button.textContent = direction < 0 ? '⌃' : '⌄';
     button.addEventListener('click', () => scrollPipeline(viewport, direction));
     return button;
   };
@@ -1061,7 +1061,7 @@ export function createChainStrip({
     const active = doc.activeElement ?? null;
     const hadFocus = active !== null && container.contains(active);
     const scrolled = Number(
-      container.querySelector('.chain-strip-viewport')?.scrollLeft ?? 0);
+      container.querySelector('.chain-strip-viewport')?.scrollTop ?? 0);
     palette = null;
     const layout = bandLayout();
     rows.clear();
@@ -1140,29 +1140,29 @@ export function createChainStrip({
     viewport.setAttribute('aria-label', 'Scrollable shader chain');
     viewport.appendChild(strip);
     viewport.addEventListener('wheel', (/** @type {*} */ event) => {
-      const delta = event.shiftKey ? event.deltaY : event.deltaX;
+      const delta = event.deltaY;
       if (delta === 0) return;
-      const width = Number(viewport.clientWidth ?? 0);
-      const overflow = Number(viewport.scrollWidth ?? 0) - width;
+      const height = Number(viewport.clientHeight ?? 0);
+      const overflow = Number(viewport.scrollHeight ?? 0) - height;
       if (overflow <= 0) return;
       // deltaMode counts pixels, lines or pages.
       const scale = event.deltaMode === 1 ? WHEEL_LINE_PX
-        : event.deltaMode === 2 ? Math.max(MIN_SCROLL_STEP, width) : 1;
-      viewport.scrollLeft = Math.min(overflow,
-        Math.max(0, Number(viewport.scrollLeft ?? 0) + delta * scale));
+        : event.deltaMode === 2 ? Math.max(MIN_SCROLL_STEP, height) : 1;
+      viewport.scrollTop = Math.min(overflow,
+        Math.max(0, Number(viewport.scrollTop ?? 0) + delta * scale));
       event.preventDefault();
     }, { passive: false });
     viewport.addEventListener('keydown', (/** @type {*} */ event) => {
       if (event.target !== viewport
-        || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+        || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
       event.preventDefault();
-      scrollPipeline(viewport, event.key === 'ArrowLeft' ? -1 : 1);
+      scrollPipeline(viewport, event.key === 'ArrowUp' ? -1 : 1);
     });
 
     container.replaceChildren(actions, scrollButton(viewport, -1), viewport,
       scrollButton(viewport, 1));
-    // The horizontal scroll offset outlives the rebuild.
-    if (scrolled > 0) viewport.scrollLeft = scrolled;
+    // Preserve the scroll offset across rebuilds.
+    if (scrolled > 0) viewport.scrollTop = scrolled;
     markDeactivated();
 
     const target = focusLabel !== null ? chipByLabel(focusLabel) : null;

@@ -147,6 +147,7 @@ export class Daydream {
    * @param {Window|typeof globalThis} [dependencies.win] - Window the pixel
    *   ratio, the reload, the resize observer and the frame timer are read off.
    * @param {Navigator} [dependencies.nav] - Navigator carrying the webdriver flag.
+   * @param {boolean} [dependencies.pipOnRight] - Anchor the PiP at the bottom right.
    * @param {{update: Function, clear: Function}} [dependencies.statsView] - Optional frame metrics view.
    */
   constructor({
@@ -154,12 +155,14 @@ export class Daydream {
     win = globalThis,
     nav = globalThis.navigator,
     statsView = null,
+    pipOnRight = false,
   } = {}) {
     THREE.ColorManagement.enabled = true;
 
     this.doc = doc;
     this.win = win;
     this.nav = nav;
+    this.pipOnRight = pipOnRight;
 
     this.W = Daydream.DEFAULT_W;
     this.H = Daydream.DEFAULT_H;
@@ -456,7 +459,8 @@ export class Daydream {
   /**
    * Fit renderer, label layer, and both cameras to the container size. Sizes the
    * square PiP viewport to 30% of the smaller dimension, marks the viewport
-   * compact at or below MOBILE_BREAKPOINT_PX (which suppresses the PiP), and
+   * compact at or below MOBILE_BREAKPOINT_PX (using window width for a right
+   * PiP), and
    * re-fits the camera distance while it still equals the previous fit, so the
    * sphere fills ~85% of the view. User zoom is preserved.
    */
@@ -467,14 +471,14 @@ export class Daydream {
     // Skip a 0×0 container: aspect = 0/0 = NaN would poison the projection matrix.
     // The ResizeObserver re-invokes once laid out.
     if (width <= 0 || height <= 0) return;
-    this.compactViewport = width <= MOBILE_BREAKPOINT_PX;
+    this.compactViewport = (this.pipOnRight ? this.win.innerWidth : width) <= MOBILE_BREAKPOINT_PX;
     this.mainViewport.x = 0;
     this.mainViewport.y = 0;
     this.mainViewport.width = width;
     this.mainViewport.height = height;
 
     const pipSize = Math.floor(Math.min(width, height) * 0.3);
-    this.pipViewport.x = 0;
+    this.pipViewport.x = this.pipOnRight ? width - pipSize : 0;
     this.pipViewport.y = 0;
     this.pipViewport.width = pipSize;
     this.pipViewport.height = pipSize;
