@@ -248,8 +248,8 @@ function balancedParens(text) {
  * CSSStyleDeclaration stand-in. Writes are stringified, and a value the
  * property does not accept is dropped so the previous one stands: STYLE_VALUES
  * grammars where one exists, and for every property a check that the value
- * carries no STYLE_REJECTED token and closes its parentheses. Requires camelCase
- * property names and throws on dashed ones. An undeclared property reads back as
+ * carries no STYLE_REJECTED token and closes its parentheses. The fake models camelCase
+ * property names only and throws on dashed ones. An undeclared property reads back as
  * the empty string.
  * @returns {Object} The style view.
  */
@@ -260,7 +260,7 @@ function fakeStyle() {
     set: (declared, key, value) => {
       const name = String(key);
       if (name.includes('-')) {
-        throw new Error(`style is keyed camelCase, so "${name}" declares nothing`);
+        throw new Error(`the fake style models camelCase keys only; "${name}" is unsupported`);
       }
       const text = String(value);
       if (STYLE_REJECTED.test(text) || !balancedParens(text)) return true;
