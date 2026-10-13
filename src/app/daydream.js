@@ -106,7 +106,10 @@ export function start({
   doc = globalThis.document,
   win = globalThis,
   nav = globalThis.navigator,
-  createDriver = () => new Daydream({ doc, win, nav, statsView: new GlobalStatsView(doc) }),
+  createDriver = () => new Daydream({
+    doc, win, nav, statsView: new GlobalStatsView(doc),
+    pipOnRight: doc.documentElement?.dataset.daydreamMode === 'shader-workbench',
+  }),
   createGui = (options, namespace) => new GUI(options, namespace, null, win),
   loadModule = createHolosphereModule,
 } = {}) {

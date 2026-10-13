@@ -437,6 +437,9 @@ const CONTRAST_SURFACES = {
     '.tab-btn.active': '.tab-btn.active',
   },
   'shader.css': {
+    '.chain-strip-region': ['.chain-strip-region', '.layout-container'],
+    '.chain-strip-actions button, .chain-undo, .chain-redo': ['.chain-strip-region', '.layout-container'],
+    '.chain-strip-note': ['.chain-strip-region', '.layout-container'],
     '.shader-toolbar': ['.shader-toolbar', '.layout-container'],
     '.shader-toolbar label': ['.shader-toolbar', '.layout-container'],
     '.shader-toolbar select': '.shader-toolbar select',
@@ -491,11 +494,8 @@ const CONTRAST_EXEMPT = {
   'shader.css': {
     '.shader-toolbar button:disabled':
       'inactive control, which SC 1.4.3 exempts from the contrast floor',
-    '.chain-strip-region': 'the strip floats over the live canvas; no rule paints behind it',
-    '.chain-strip-actions button, .chain-undo, .chain-redo': 'floats over the live canvas on a transparent fill',
     '.chain-strip-actions button:disabled':
       'inactive control, which SC 1.4.3 exempts from the contrast floor',
-    '.chain-strip-note': 'floats over the live canvas; the strip paints no fill behind it',
     '.chain-band-title': 'band tint is 10% carrier over the live canvas',
     '.chain-band-add': 'band tint is 10% carrier over the live canvas',
     '.chain-chip-move:disabled, .chain-chip-bypass:disabled':

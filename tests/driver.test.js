@@ -210,6 +210,21 @@ test('setCanvasSize anchors a square PiP to the bottom-left corner', () => {
   assert.equal(ctx.pipCamera.aspect, 1, 'a non-square PiP camera distorts the corner view');
 });
 
+test('a right PiP stays visible beside a sidebar on desktop and follows resizes', () => {
+  const ctx = sizeCtx(896, 800);
+  ctx.pipOnRight = true;
+  ctx.win = { ...ctx.win, innerWidth: 1280 };
+  resize(ctx, 896, 800);
+  assert.equal(ctx.compactViewport, false);
+  assert.equal(ctx.pipViewport.x + ctx.pipViewport.width, 896);
+  assert.equal(ctx.pipViewport.y, 0);
+
+  ctx.win.innerWidth = 800;
+  resize(ctx, 440, 600);
+  assert.equal(ctx.compactViewport, true);
+  assert.equal(ctx.pipViewport.x + ctx.pipViewport.width, 440);
+});
+
 test('setCanvasSize sizes the PiP off the short side on a portrait container', () => {
   const ctx = sizeCtx(400, 1000);
   resize(ctx, 400, 1000);
