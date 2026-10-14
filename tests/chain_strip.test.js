@@ -295,9 +295,9 @@ test('pipeline arrows, wheel and background arrow keys scroll the viewport', asy
   assert.equal(viewport.scrollTop, 120);
   assert.equal(wheel.defaultPrevented, true);
 
-  const right = viewport.dispatch('keydown', { key: 'ArrowDown' });
+  const down = viewport.dispatch('keydown', { key: 'ArrowDown' });
   assert.equal(viewport.scrollTop, 420);
-  assert.equal(right.defaultPrevented, true);
+  assert.equal(down.defaultPrevented, true);
   viewport.dispatch('keydown', { key: 'ArrowUp' });
   assert.equal(viewport.scrollTop, 120);
 });
@@ -370,23 +370,32 @@ test('clicking a chip header toggles selection without pinning', async () => {
     'keyboard activation toggles selection like a click');
 });
 
-test('Left/Right rove focus without editing; Alt+Arrow moves the chip', async () => {
-  const h = await makeStrip();
-  const right = chipByLabel(h, 'camera').dispatch('keydown', { key: 'ArrowRight' });
-  assert.equal(right.defaultPrevented, true);
-  assert.equal(h.doc.activeElement.dataset.label, 'lens');
-  assert.equal(h.doc.activeElement.getAttribute('tabindex'), '0');
-  assert.deepEqual(h.applied, [], 'roving focus is not an edit');
+for (const [backward, forward] of [
+  ['ArrowLeft', 'ArrowRight'], ['ArrowUp', 'ArrowDown'],
+]) {
+  test(`${backward}/${forward} rove focus without editing; Alt+Arrow moves the chip`, async () => {
+    const h = await makeStrip();
+    const next = chipByLabel(h, 'camera').dispatch('keydown', { key: forward });
+    assert.equal(next.defaultPrevented, true);
+    assert.equal(h.doc.activeElement.dataset.label, 'lens');
+    assert.equal(h.doc.activeElement.getAttribute('tabindex'), '0');
+    const previous = chipByLabel(h, 'lens').dispatch('keydown', { key: backward });
+    assert.equal(previous.defaultPrevented, true);
+    assert.equal(h.doc.activeElement.dataset.label, 'camera');
+    assert.equal(h.doc.activeElement.getAttribute('tabindex'), '0');
+    assert.deepEqual(h.applied, [], 'roving focus is not an edit');
 
-  chipByLabel(h, 'lens').dispatch('keydown', { key: 'ArrowLeft', altKey: true });
-  assert.deepEqual(labels(h).slice(0, 2), ['lens', 'camera']);
-  assert.equal(h.applied.length, 1);
-  assert.equal(h.doc.activeElement.dataset.label, 'lens',
-    'focus rides the moved chip across the rebuild');
+    chipByLabel(h, 'lens').dispatch('keydown', { key: backward, altKey: true });
+    assert.deepEqual(labels(h).slice(0, 2), ['lens', 'camera']);
+    assert.equal(h.applied.length, 1);
+    assert.equal(h.doc.activeElement.dataset.label, 'lens',
+      'focus rides the moved chip across the rebuild');
 
-  chipByLabel(h, 'lens').dispatch('keydown', { key: 'ArrowRight', altKey: true });
-  assert.deepEqual(labels(h).slice(0, 2), ['camera', 'lens']);
-});
+    chipByLabel(h, 'lens').dispatch('keydown', { key: forward, altKey: true });
+    assert.deepEqual(labels(h).slice(0, 2), ['camera', 'lens']);
+    assert.equal(h.applied.length, 2);
+  });
+}
 
 test('Alt+Arrow reorders only where the move buttons are enabled', async () => {
   const h = await makeStrip();
