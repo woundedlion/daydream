@@ -85,10 +85,9 @@ test('reset restores the full palette viewport', () => {
 
 test('axis endpoints round-trip through center and range', () => {
   assert.deepEqual(axisFromEndpoints(0.16, 0.88), { center: 0.52, range: 0.72 });
-  assert.deepEqual(axisEndpoints({ center: 0.52, range: 0.72 }), {
-    minimum: 0.16000000000000003,
-    maximum: 0.88,
-  });
+  const endpoints = axisEndpoints({ center: 0.52, range: 0.72 });
+  assert.ok(Math.abs(endpoints.minimum - 0.16) < 1e-12);
+  assert.ok(Math.abs(endpoints.maximum - 0.88) < 1e-12);
   assert.deepEqual(axisFromEndpoints(0.88, 0.16), { center: 0.52, range: 0.72 });
 });
 
@@ -310,10 +309,12 @@ test('custom hue state preserves unwrapped offsets from existing custom recipes'
   recipe.hue.mode = PaletteV4.hueMode.CUSTOM;
   recipe.hue.customTurns = [0.98, 1.02, 0.73, 0];
 
-  assert.deepEqual(customHueKeyState(recipe), {
-    baseTurns: 0.98,
-    offsets: [0, 0.040000000000000036, -0.25],
-  });
+  const state = customHueKeyState(recipe);
+  assert.equal(state.baseTurns, 0.98);
+  assert.equal(state.offsets.length, 3);
+  assert.equal(state.offsets[0], 0);
+  assert.ok(Math.abs(state.offsets[1] - 0.04) < 1e-12);
+  assert.equal(state.offsets[2], -0.25);
 });
 
 test('moving the custom base hue rotates every key without changing offsets', () => {
@@ -458,7 +459,7 @@ test('active recipe fields are marshalled from the controls', () => {
     },
     lightness: {
       ...template.lightness,
-      curve: PaletteV4.curve.ASCENDING, center: 0.5, range: 0.6000000000000001,
+      curve: PaletteV4.curve.ASCENDING, center: 0.5, range: 0.6,
     },
     chroma: {
       ...template.chroma,
@@ -466,7 +467,7 @@ test('active recipe fields are marshalled from the controls', () => {
     },
     hueTorsion: 1.5,
   };
-  assert.deepEqual(paletteRecipeFromControls(template, CONTROL_READINGS), expected);
+  assertRecipeClose(paletteRecipeFromControls(template, CONTROL_READINGS), expected);
 
   const customTemplate = structuredClone(template);
   customTemplate.lightness.custom = [0.1, 0.2, 0.3, 0.4];
@@ -477,7 +478,7 @@ test('active recipe fields are marshalled from the controls', () => {
     domain: 'FALLOFF', hueMode: 'CUSTOM',
     lightnessCurve: 'CUSTOM', chromaCurve: 'CUSTOM',
   });
-  assert.deepEqual(custom, {
+  assertRecipeClose(custom, {
     ...expected,
     domain: PaletteV4.domain.FALLOFF,
     falloffStart: 0.85,
