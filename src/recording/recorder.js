@@ -76,7 +76,12 @@ export function selectMimeType(
 /**
  * Where a session's chunks go. The streaming variant's finish() returns a
  * promise that settles after the save or finalization attempt.
- * @typedef {{write: (data: Blob) => void, finish: () => (void|Promise<void>)}} VideoSink
+ * @typedef {{
+ *   write: (data: Blob) => void,
+ *   finish: () => (void|Promise<void>),
+ *   ready?: Promise<void>,
+ *   cancelled?: () => boolean,
+ * }} VideoSink
  */
 
 export class VideoRecorder {
@@ -116,6 +121,7 @@ export class VideoRecorder {
     this.frameInterval = frameInterval;
     this.now = now;
     this.recordingStartedAtMs = null;
+    this.starting = false;
     this.elapsedBaseSeconds = 0;
     this.elapsedSeconds = 0;
     // bitrateMbps, format, and targetHeight are latched at start().
@@ -158,7 +164,7 @@ export class VideoRecorder {
    * @returns {boolean} True while recording or paused in a background tab.
    */
   get isRecording() {
-    return this.mediaRecorder !== null && this.mediaRecorder.state !== 'inactive';
+    return this.starting || (this.mediaRecorder !== null && this.mediaRecorder.state !== 'inactive');
   }
 
   /**
@@ -342,35 +348,42 @@ export class VideoRecorder {
       if (live) this.onError?.(error);
     };
 
-    // Timeslice so ondataavailable delivers chunks incrementally.
     try {
-      recorder.start(RECORDER_TIMESLICE_MS);
-      this.elapsedSeconds = 0;
-      this.recordingStartedAtMs = this.now();
-      this.visibilityChanged();
+      sink = this.openSink(recorder, effectName, chunks, bitrateMbps);
     } catch (err) {
       recorder.ondataavailable = null;
       recorder.onstop = null;
       recorder.onerror = null;
       this.cleanup();
-      this.reportFailure('MediaRecorder start failed.', err);
+      this.reportFailure('output setup failed.', err);
       return;
     }
 
-    try {
-      sink = this.openSink(recorder, effectName, chunks, bitrateMbps);
-      const pending = chunks.splice(0);
-      for (const chunk of pending) sink.write(chunk);
-    } catch (err) {
-      recorder.ondataavailable = null;
-      recorder.onstop = null;
-      recorder.onerror = null;
-      recorder.stop();
-      // onstop is gone, so endSession() will not run: a sink the picker already
-      // opened has to be closed here or its file handle is never released.
-      sink?.finish();
-      this.cleanup();
-      this.reportFailure('output setup failed.', err);
+    const begin = () => {
+      if (this.mediaRecorder !== recorder || sink.cancelled?.()) return;
+      try {
+        recorder.start(RECORDER_TIMESLICE_MS);
+        this.starting = false;
+        this.elapsedSeconds = 0;
+        this.recordingStartedAtMs = this.now();
+        this.visibilityChanged();
+        const pending = chunks.splice(0);
+        for (const chunk of pending) sink.write(chunk);
+      } catch (err) {
+        recorder.ondataavailable = null;
+        recorder.onstop = null;
+        recorder.onerror = null;
+        sink.finish();
+        this.cleanup();
+        this.reportFailure('MediaRecorder start failed.', err);
+      }
+    };
+
+    if (sink.ready) {
+      this.starting = true;
+      sink.ready.then(begin);
+    } else {
+      begin();
     }
   }
 
@@ -379,6 +392,11 @@ export class VideoRecorder {
    * @returns {void}
    */
   stop() {
+    if (this.starting) {
+      this.starting = false;
+      this.cleanup();
+      return;
+    }
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       this.freezeElapsed();
       this.mediaRecorder.stop();
@@ -609,6 +627,8 @@ export class VideoRecorder {
     // Serialize chunks; create the writable on the first chunk, preserving files for empty sessions.
     let chain = Promise.resolve();
     return {
+      cancelled: () => aborted,
+      ready: opened,
       write: (data) => {
         if (overflowed || aborted || failed) return;
         if (picked && !handle && backlogBytes === 0) { hold(data); return; }
@@ -772,6 +792,7 @@ export class VideoRecorder {
    */
   cleanup() {
     this.freezeElapsed();
+    this.starting = false;
     this.mediaRecorder = null;
     this.chunks = [];
     if (this.stream) {
