@@ -56,7 +56,7 @@ test('the global GUI carries the controls a deep link names', () => {
   const root = guis[0];
 
   assert.deepEqual(root.controllers.map((c) => c.property),
-    ['resolution', 'testAll', 'labelAxes', 'cullBackSphere', 'showPip',
+    ['resolution', 'testAll', 'labelAxes', 'cullBackSphere', 'showPip', 'povFidelity',
       'columnFillOverlap', 'poleLod', 'topCap', 'bottomCap']);
   const segments = root.folders.find((f) => f.namespace === 'Segmented POV');
   assert.ok(segments, 'the segmented folder name is a deep-link key segment');
@@ -68,6 +68,15 @@ test('the global GUI carries the controls a deep link names', () => {
   const recording = root.folders.find((f) => f.namespace === 'Recording');
   assert.deepEqual(recording.controllers.map((c) => c.property),
     ['recQuality', 'recResolution', 'recFormat', 'record']);
+});
+
+test('POV fidelity defaults off and toggling it requests a repaint', () => {
+  const { guis, driver } = startApp();
+  const control = guis[0].controllers.find((c) => c.property === 'povFidelity');
+  assert.equal(control.getValue(), false);
+  control.setValue(true);
+  assert.equal(driver.povFidelity, true);
+  assert.equal(driver.invalidated, true);
 });
 
 test('a workbench-only effect deep link is handed to the workbench page', () => {
