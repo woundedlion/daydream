@@ -65,7 +65,7 @@ import {
 
 // Dwell time per effect while "Test All" cycles the active route's test roster.
 const TEST_ALL_INTERVAL_MS = 1000;
-const EXPECTED_SEGMENT_CONTROLLER_API_VERSION = 3;
+const EXPECTED_SEGMENT_CONTROLLER_API_VERSION = 4;
 
 if (SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION) {
   throw new StaleModuleError(
@@ -342,6 +342,7 @@ export function start({
       if (module.HolosphereEngine.isLive())
         throw new Error('HolosphereEngine is already live.');
       host.engine = new module.HolosphereEngine();
+      host.engine.setTemporalSampling(daydream.povFidelity);
 
       // Push the Pole LOD value set while host.engine was null.
       poleLod.replay();
@@ -555,6 +556,7 @@ export function start({
   guiInstance.add(daydream, 'labelAxes').name('Show Axes').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'showPip').name('Show PiP').onChange(() => daydream.invalidate());
+  let temporalSampling = daydream.povFidelity;
   const povFidelity = guiInstance.add(daydream, 'povFidelity').name('POV fidelity (16 Hz)').listen();
   const povResponse = guiInstance.add(daydream, 'povResponseScale', 0.5, 2, 0.05).name('Response timescale');
   const syncPovControls = () => {
@@ -562,7 +564,15 @@ export function start({
     else povResponse.disable();
     daydream.invalidate();
   };
-  povFidelity.onChange(syncPovControls);
+  povFidelity.onChange(() => {
+    const changed = temporalSampling !== daydream.povFidelity;
+    temporalSampling = daydream.povFidelity;
+    if (host.engine) host.engine.setTemporalSampling(daydream.povFidelity);
+    segments.setTemporalSampling(daydream.povFidelity);
+    if (changed && daydream.paused && host.adapter && !segments.ownsDisplay)
+      host.adapter.drawFrame();
+    syncPovControls();
+  });
   povResponse.onChange(() => daydream.invalidate());
   syncPovControls();
   guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions').listen().onChange(() => daydream.invalidate());

@@ -87,6 +87,7 @@ test('create posts each worker the whole init payload', () => {
       paused: true,
       presetIndex: 4,
       poleLod: 1.5,
+      temporalSampling: false,
       topCap: 0,
       bottomCap: 0,
       paramRevision: 1,
@@ -831,6 +832,7 @@ for (const [label, act] of [
   ['setParameter', (c) => c.setParameter('Speed', 0.5)],
   ['setAnimationsPaused', (c) => c.setAnimationsPaused(true)],
   ['setPoleLod', (c) => c.setPoleLod(1)],
+  ['setTemporalSampling', (c) => c.setTemporalSampling(true)],
   ['selectPreset', (c) => c.selectPreset(2)],
   ['setDisplayCaps', (c) => c.setDisplayCaps(0.1, 0.2)],
 ]) {
@@ -847,6 +849,7 @@ for (const [label, act] of [
 
     c.presetCount = 3;
     act(c);
+    if (label === 'setTemporalSampling') assert.equal(c.temporalSampling, true);
     if (label === 'selectPreset') assert.equal(c.presetIndex, 2);
     if (label === 'setDisplayCaps') assert.deepEqual([c.topCap, c.bottomCap], [0.1, 0.2]);
     assert.equal(c.faulted, true, 'the fault latch is held');

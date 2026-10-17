@@ -1012,3 +1012,38 @@ test('paused steps capture completed worker generations once after painting', as
   repaint();
   assert.deepEqual(captured, [100, 200], 'recording start captured an idle held frame');
 });
+
+
+test('temporal sampling reaches workers and survives pool recreation', () => {
+  const c = readyController(2);
+  assert.equal(c.temporalSampling, false);
+  for (const enabled of [true, false, true]) {
+    c.setTemporalSampling(enabled);
+    for (const w of c.workers)
+      assert.deepEqual(w.posted.at(-1), { type: 'setTemporalSampling', enabled });
+  }
+  c.create(2);
+  for (const w of c.workers)
+    assert.equal(w.posted.find((m) => m.type === 'init').temporalSampling, true);
+});
+
+test('paused sampling changes fence old results and dispatch a replacement', async () => {
+  setDisplayGrid(4, 2);
+  const c = readyController(2);
+  c.active = true;
+  c.tick();
+  driver.paused = true;
+  try {
+    c.setTemporalSampling(true);
+    assert.notEqual(c.frameState.inflightGen, c.frameState.renderGen);
+    await deliverGeneration(c);
+    assert.equal(c.frameState.renderInFlight, true);
+    assert.equal(c.frameState.inflightGen, c.frameState.renderGen);
+    assert.ok(c.frameState.results.every((frame) => frame === null));
+    await deliverGeneration(c, gridHalves());
+    assert.equal(c.frameState.renderInFlight, false);
+    assert.ok(driver.invalidations > 0);
+  } finally {
+    driver.paused = false;
+  }
+});

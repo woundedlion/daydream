@@ -106,7 +106,11 @@ opposing columns emitted at their sweep times. Each opposing column pair emits
 for one column interval. The causal response integrates captured emissions in
 linear RGB16, independently of browser repaint rate. Emissions before fidelity
 starts are black; enabling it midway through a sweep records only the remaining
-portion. Fidelity off displays the ordinary full-frame preview.
+portion. Fidelity off renders every column at one instant for the ordinary
+full-frame preview; fidelity on enables per-column temporal sampling in the main
+engine and segmented workers. Changing fidelity while paused draws one replacement
+engine frame and leaves playback paused. Worker frames computed for the old setting
+are discarded before publishing the replacement.
 
 When rendering falls behind, fidelity mode advances one engine frame and drops
 overdue whole intervals while keeping the fractional sweep time. The ordinary
@@ -129,8 +133,8 @@ in shared URLs. Only the current opposing pair is shown, applied after response
 integration. These markers rotate with the arms and do not identify a fixed
 longitude seam. The marker changes only the displayed image.
 
-This changes simulator presentation only; firmware and emitted source colors are
-unchanged. It is an idealized nonstrobed column-dwell model with an approximate
+This simulator control leaves the physical device's temporal sampling enabled.
+The preview uses an idealized nonstrobed column-dwell model with an approximate
 sustained visual response, not a calibrated human appearance model.
 
 The global **Top cap (%)** and **Bottom cap (%)** controls adjust the missing
