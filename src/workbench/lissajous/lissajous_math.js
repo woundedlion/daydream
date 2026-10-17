@@ -123,8 +123,9 @@ export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM, accept
  *   snapped active frequency. The ratio search then prefers ratios landing inside
  *   them.
  * @param {number} [direction=0] - Seek the next frequency in this direction (-1 or 1).
- * @returns {{ snappedActiveC: number, m: number, n: number, closingPeriod: number }} The
- *   snapped active frequency, the rational ratio m/n, and the curve's closing period T.
+ * @returns {{ snappedActiveC: number, m: number, n: number, closingPeriod: ?number }} The
+ *   snapped active frequency, the rational ratio m/n, and the curve's closing period T;
+ *   null when a directed snap holds at a bound on a pair with no closing ratio.
  */
 export const snapToRationalRatio = (activeC, passiveC, maxTerm = MAX_RATIONAL_TERM, range = null, direction = 0) => {
   if (passiveC === 0) {
@@ -154,8 +155,12 @@ export const snapToRationalRatio = (activeC, passiveC, maxTerm = MAX_RATIONAL_TE
   const { M, N } = findBestRationalRatio(targetRatio, maxTerm, accepts, maxNumerator);
 
   if (direction && !accepts(M / N)) {
-    return { snappedActiveC: activeC, m: closing?.M ?? M, n: closing?.N ?? N,
-      closingPeriod: (TWO_PI * (closing?.N ?? N)) / passiveC };
+    const own = closing ?? closingRatio(targetRatio, MAX_SEARCH_NUMERATOR);
+    if (own === null) {
+      return { snappedActiveC: activeC, m: M, n: N, closingPeriod: null };
+    }
+    return { snappedActiveC: activeC, m: own.M, n: own.N,
+      closingPeriod: (TWO_PI * own.N) / passiveC };
   }
 
   const snappedActiveC = passiveC * (M / N);
