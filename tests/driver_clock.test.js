@@ -11,13 +11,14 @@ const MAX_BACKLOG = Daydream.MAX_FRAME_BACKLOG_SECONDS;
 
 /** Minimal `this` for advanceFrameClock: a drain-counting timer plus the fields
  *  it reads. */
-function fixture({ delta, paused = false, timeAccumulator = 0 }) {
+function fixture({ delta, paused = false, timeAccumulator = 0, povFidelity = false }) {
   const ctx = {
     clock: {
       update: () => { ctx.updateCalls++; },
       getDelta: () => { ctx.getDeltaCalls++; return delta; },
     },
     paused,
+    povFidelity,
     timeAccumulator,
     frameInterval: FRAME_INTERVAL,
     updateCalls: 0,
@@ -55,4 +56,28 @@ test('a long stall advances at most one frame and drops the excess backlog', () 
   assert.equal(advance(ctx), true, 'a long stall did not advance a frame');
   assert.ok(Math.abs(ctx.timeAccumulator - (MAX_BACKLOG - FRAME_INTERVAL)) < 1e-9,
     'the backlog was not clamped to the cap');
+});
+
+test('POV fidelity retains fractional sweep time after repeated overdue frames', () => {
+  const ctx = fixture({ delta: FRAME_INTERVAL * 2.25, povFidelity: true });
+  for (const phase of [0.25, 0.5, 0.75, 0, 0.25]) {
+    assert.equal(advance(ctx), true);
+    assert.equal(ctx.timeAccumulator, FRAME_INTERVAL * phase);
+  }
+  assert.equal(ctx.getDeltaCalls, 5);
+});
+
+test('POV fidelity preserves the phase of a stall beyond the ordinary backlog cap', () => {
+  const ctx = fixture({ delta: MAX_BACKLOG + FRAME_INTERVAL * 2.25, povFidelity: true });
+  assert.equal(advance(ctx), true);
+  assert.equal(ctx.timeAccumulator, FRAME_INTERVAL * 0.25);
+});
+
+test('POV fidelity retains partial intervals while running and paused', () => {
+  const ctx = fixture({ delta: FRAME_INTERVAL * 0.25, povFidelity: true });
+  assert.equal(advance(ctx), false);
+  assert.equal(ctx.timeAccumulator, FRAME_INTERVAL * 0.25);
+  ctx.paused = true;
+  assert.equal(advance(ctx), false);
+  assert.equal(ctx.timeAccumulator, FRAME_INTERVAL * 0.25);
 });
