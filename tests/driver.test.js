@@ -637,6 +637,54 @@ function renderCtx(colors, log) {
   };
 }
 
+test('visual presentation repaints within columns and preserves paused samples and engine aliases', () => {
+  const colors = new Uint16Array(8 * 2 * 3).fill(10000);
+  const ctx = renderCtx(colors, []);
+  Object.assign(ctx, {
+    W: 8, H: 2, pixels: colors, povFidelity: true, povSweep: null,
+    povPresentation: 'visual', povResponseScale: 1, paused: false,
+    stepSimulation: Daydream.prototype.stepSimulation,
+  });
+  let painted, paints = 0, delta = 0;
+  ctx.clock.getDelta = () => delta;
+  ctx.renderMainView = () => {
+    painted = ctx.dotMesh.instanceColor.array.slice();
+    paints++;
+  };
+  const render = () => Daydream.prototype.render.call(ctx, {
+    drawFrame: () => assert.fail('presentation advanced the engine'),
+  });
+  render();
+  assert.ok(painted.every((value) => value === 0));
+  delta = ctx.frameInterval * 0.2;
+  render();
+  const earlier = painted[0];
+  assert.ok(earlier > 0);
+  delta = ctx.frameInterval * 0.02;
+  render();
+  assert.equal(ctx.povSweep.column, 1);
+  assert.ok(painted[0] > earlier);
+  assert.equal(paints, 3);
+  assert.equal(ctx.dotMesh.instanceColor.array, colors);
+  ctx.paused = true;
+  render();
+  assert.equal(paints, 3);
+  const history = ctx.povSweep.emissions.map(({ pixels }) => pixels.slice());
+  ctx.povResponseScale = 2;
+  ctx.needsRender = true;
+  render();
+  assert.ok(painted[0] < earlier);
+  const frozen = painted.slice();
+  colors.fill(20000);
+  ctx.needsRender = true;
+  render();
+  assert.deepEqual(painted, frozen);
+  assert.deepEqual(ctx.povSweep.emissions.map(({ pixels }) => pixels), history);
+  ctx.povFidelity = false;
+  render();
+  assert.deepEqual(painted, colors);
+});
+
 test('camera presentation repaints within a column and freezes without advancing the engine', () => {
   const colors = new Uint16Array(8 * 2 * 3).fill(10000);
   const ctx = renderCtx(colors, []);

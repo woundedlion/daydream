@@ -4,20 +4,46 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+/**
+ * @param {number} age Age in units of the gamma time constant.
+ * @returns {number} Survival probability of the nine-stage sustained response.
+ */
+export function sustainedSurvival(age) {
+  if (age <= 0) return 1;
+  let term = 1;
+  let sum = 1;
+  for (let k = 1; k <= 8; k++) {
+    term *= age / k;
+    sum += term;
+  }
+  return Math.min(1, Math.exp(-age) * sum);
+}
+
 /** Persistent two-arm display, sampled from one frozen image per half-turn. */
 export class PovSweep {
   /** Maximum shutter duration, in half-turns. */
   static MAX_EXPOSURE_FRAMES = 4;
+  /** Sustained-channel gamma time constant in milliseconds. */
+  static RESPONSE_TAU_MS = 4.94;
+  /** Largest exploratory multiplier of the response time constant. */
+  static MAX_RESPONSE_SCALE = 2;
+  /** Retained response duration in time constants. */
+  static RESPONSE_TAIL_TAU = 40;
 
   /**
    * @param {number} width
    * @param {number} height
    * @param {Uint16Array} initial
    * @param {number} [initialFraction=0] Start of recorded emissions in this half-turn.
+   * @param {number} [frameMs=62.5] Half-turn duration in milliseconds.
    */
-  constructor(width, height, initial, initialFraction = 0) {
+  constructor(width, height, initial, initialFraction = 0, frameMs = 62.5) {
     this.width = width;
     this.height = height;
+    this.frameMs = frameMs;
+    this.historyFrames = Math.max(PovSweep.MAX_EXPOSURE_FRAMES + 1,
+      Math.ceil(PovSweep.RESPONSE_TAIL_TAU * PovSweep.RESPONSE_TAU_MS
+        * PovSweep.MAX_RESPONSE_SCALE / frameMs) + 1);
     this.source = initial.slice();
     this.previous = initial.slice();
     this.pixels = initial.slice();
@@ -26,7 +52,7 @@ export class PovSweep {
     /** @type {Uint16Array | null} */
     this.exposurePixels = null;
     this.emissions = [{ pixels: initial.slice(), start: initialFraction }];
-    this.exposureWeights = new Float64Array(PovSweep.MAX_EXPOSURE_FRAMES + 1);
+    this.exposureWeights = new Float64Array(this.historyFrames);
     this.column = 0;
   }
 
@@ -55,7 +81,7 @@ export class PovSweep {
   /** @param {Uint16Array} source Next half-turn's image. */
   beginFrame(source) {
     this.replaceFrame(source);
-    const recycled = this.emissions.length > PovSweep.MAX_EXPOSURE_FRAMES
+    const recycled = this.emissions.length >= this.historyFrames
       ? this.emissions.shift() : undefined;
     const pixels = recycled?.pixels ?? new Uint16Array(source.length);
     pixels.set(source);
@@ -76,11 +102,34 @@ export class PovSweep {
    * @returns {Uint16Array} Normalized linear RGB16 exposure, clipped to the display range.
    */
   cameraPixels(fraction, exposureFrames) {
-    this.exposurePixels ??= new Uint16Array(this.pixels.length);
     const duration = Math.max(Number.EPSILON,
       Math.min(PovSweep.MAX_EXPOSURE_FRAMES, exposureFrames));
     const end = Math.max(0, Math.min(1, fraction));
     const start = end - duration;
+    return this.weightedPixels((pulseStart, pulseEnd) => Math.max(0,
+      Math.min(end, pulseEnd) - Math.max(start, pulseStart)) / duration);
+  }
+
+  /**
+   * @param {number} fraction Response time within the current half-turn, in [0, 1].
+   * @param {number} [responseScale=1] Sustained-channel timescale multiplier, in [0.5, 2].
+   * @returns {Uint16Array} Approximate sustained visual response in linear RGB16.
+   */
+  visualPixels(fraction, responseScale = 1) {
+    const end = Math.max(0, Math.min(1, fraction));
+    const tau = PovSweep.RESPONSE_TAU_MS
+      * Math.max(0.5, Math.min(PovSweep.MAX_RESPONSE_SCALE, responseScale));
+    return this.weightedPixels((pulseStart, pulseEnd) => Math.max(0,
+      sustainedSurvival((end - pulseEnd) * this.frameMs / tau)
+      - sustainedSurvival((end - pulseStart) * this.frameMs / tau)));
+  }
+
+  /**
+   * @param {(start: number, end: number) => number} pulseWeight Response integral for dwell endpoints measured in half-turns.
+   * @returns {Uint16Array} Duty-compensated response, clipped to the display range.
+   */
+  weightedPixels(pulseWeight) {
+    this.exposurePixels ??= new Uint16Array(this.pixels.length);
     const half = this.width / 2;
     const count = this.emissions.length;
     for (let column = 0; column < half; column++) {
@@ -89,8 +138,8 @@ export class PovSweep {
         const pulseStart = epoch + column / half;
         const pulseEnd = epoch + (column + 1) / half;
         const recordedStart = epoch + this.emissions[frame].start;
-        this.exposureWeights[frame] = Math.max(0,
-          Math.min(end, pulseEnd) - Math.max(start, pulseStart, recordedStart)) * half / duration;
+        this.exposureWeights[frame] = pulseEnd <= recordedStart ? 0
+          : pulseWeight(Math.max(pulseStart, recordedStart), pulseEnd) * half;
       }
       for (let y = 0; y < this.height; y++) {
         for (let x = column; x < this.width; x += half) {

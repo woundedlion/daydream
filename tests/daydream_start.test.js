@@ -58,7 +58,7 @@ test('the global GUI carries the controls a deep link names', () => {
 
   assert.deepEqual(root.controllers.map((c) => c.property),
     ['resolution', 'testAll', 'labelAxes', 'cullBackSphere', 'showPip', 'povFidelity',
-      'povPresentation', 'povExposureMs', 'showSweepBoundary', 'sweepPosition',
+      'povPresentation', 'povExposureMs', 'povResponseScale', 'showSweepBoundary', 'sweepPosition',
       'columnFillOverlap', 'poleLod', 'topCap', 'bottomCap']);
   const segments = root.folders.find((f) => f.namespace === 'Segmented POV');
   assert.ok(segments, 'the segmented folder name is a deep-link key segment');
@@ -84,7 +84,7 @@ test('POV fidelity defaults off and toggling it requests a repaint', () => {
 test('camera presentation and exposure are persistent view controls', () => {
   const { guis, driver } = startApp();
   for (const [name, initial, selected] of [
-    ['povPresentation', 'raw', 'camera'], ['povExposureMs', 125, 250],
+    ['povPresentation', 'raw', 'camera'], ['povExposureMs', 125, 250], ['povResponseScale', 1, 2],
   ]) {
     driver.invalidated = false;
     const control = guis[0].controllers.find((c) => c.property === name);
@@ -123,18 +123,44 @@ test('exposure is enabled only for the active camera presentation and keeps its 
   assert.equal(exposure.disabled, true);
 });
 
-test('hydrated camera controls initialize exposure availability after all values load', () => {
+test('hydrated POV controls initialize response availability after all values load', () => {
   for (const povFidelity of [false, true]) {
-    for (const povPresentation of ['raw', 'camera']) {
+    for (const povPresentation of ['raw', 'camera', 'visual']) {
       const { guis } = startApp({
-        hydratedView: { povFidelity, povPresentation, povExposureMs: 187 },
+        hydratedView: { povFidelity, povPresentation, povExposureMs: 187, povResponseScale: 1.3 },
       });
       const exposure = guis[0].controllers.find((c) => c.property === 'povExposureMs');
       assert.equal(exposure.disabled, !(povFidelity && povPresentation === 'camera'));
       assert.equal(exposure.getValue(), 187);
       assert.ok(guis[0].collectUrlKeys().includes('view.povExposureMs'));
+      const response = guis[0].controllers.find((c) => c.property === 'povResponseScale');
+      assert.equal(response.disabled, !(povFidelity && povPresentation === 'visual'));
+      assert.equal(response.getValue(), 1.3);
+      assert.ok(guis[0].collectUrlKeys().includes('view.povResponseScale'));
     }
   }
+});
+
+test('visual response controls follow mode, fidelity, and sweep inspection', () => {
+  const { guis, driver } = startApp();
+  const control = (name) => guis[0].controllers.find((c) => c.property === name);
+  const response = control('povResponseScale');
+  assert.equal(response.disabled, true);
+  control('povPresentation').setValue('visual');
+  assert.equal(response.disabled, true);
+  Object.defineProperty(driver, 'sweepPosition',
+    Object.getOwnPropertyDescriptor(Daydream.prototype, 'sweepPosition'));
+  control('sweepPosition').setValue(25);
+  assert.equal(response.disabled, false);
+  assert.equal(control('povExposureMs').disabled, true);
+  response.setValue(1.5);
+  control('povPresentation').setValue('camera');
+  assert.equal(response.disabled, true);
+  assert.equal(response.getValue(), 1.5);
+  assert.equal(control('povExposureMs').disabled, false);
+  control('povPresentation').setValue('visual');
+  control('povFidelity').setValue(false);
+  assert.equal(response.disabled, true);
 });
 
 test('the sweep boundary defaults off and persists as a view control', () => {

@@ -109,10 +109,11 @@ When rendering falls behind, fidelity mode advances one engine frame and drops
 overdue whole intervals while keeping the fractional sweep time. The ordinary
 preview keeps its bounded frame backlog.
 
-With fidelity enabled, **POV presentation** selects **Raw sweep** (the default)
-or **Camera exposure**. **Exposure (ms)** sets a rectangular global shutter from
-1 to 250 ms, defaulting to 125 ms. The settings persist as `view.povPresentation`
-(`raw` or `camera`) and `view.povExposureMs` in shared URLs.
+With fidelity enabled, **POV presentation** selects **Raw sweep** (the default),
+**Camera exposure**, or **Visual response (approx.)**. **Exposure (ms)** sets a
+rectangular global shutter from 1 to 250 ms, defaulting to 125 ms. The settings
+persist as `view.povPresentation` (`raw`, `camera`, or `visual`) and
+`view.povExposureMs` in shared URLs.
 The exposure slider is disabled outside Camera exposure with fidelity enabled;
 its value is retained when switching presentations or disabling fidelity.
 
@@ -121,9 +122,9 @@ RGB16. Each opposing column pair emits for one column interval; the analytic
 integration includes every crossed column regardless of browser repaint rate.
 Brightness is normalized by the column duty cycle and shutter duration, so a
 static image retains its brightness over whole-sweep exposures. Short exposures
-can produce bright arcs clipped to the RGB16 display range. Five source frames
-bound the history; emissions before fidelity starts are black, so the camera
-view warms up over its shutter duration. Enabling fidelity midway through a
+can produce bright arcs clipped to the RGB16 display range. A camera exposure
+uses at most five retained source frames; emissions before fidelity starts are
+black, so the camera view warms up over its shutter duration. Enabling fidelity midway through a
 sweep records only the remaining portion.
 
 The camera clock follows simulated sweeps; dropped wall-clock backlog is not
@@ -149,6 +150,15 @@ do not accumulate in camera exposure.
 marker, and scrubs the same pair of source frames without advancing the engine.
 This diagnostic control is session-only; its position is not saved in URLs.
 
+**Visual response (approx.)** displays a causal sustained-channel response to
+the same captured column emissions. **Response timescale** multiplies its time
+constant from 0.5 to 2, defaulting to the published reference value at 1. Larger
+values slow the response. This control is enabled only for visual response with
+fidelity on; Exposure is enabled only for camera mode. The visual selection and
+scale persist as `view.povPresentation=visual` and `view.povResponseScale`.
+Pause, sweep inspection, and parameter changes follow the captured-history rules
+above. See [the model and research basis](#visual-response-model) for its scope.
+
 The global **Top cap (%)** and **Bottom cap (%)** controls adjust the missing
 north-to-south arc independently, from 0% to 25% each. Both default to 0% for full
 coverage; use 2% each to preview the provisional physical device calibration.
@@ -162,6 +172,93 @@ caches. Ordinary effects restart their animation and simulation history;
 parameters, typed runtime, palette state, clocks and seeds. Settings survive effect
 and resolution changes, and update the preview while paused. Firmware retains its
 compiled physical profile.
+
+## Visual response model
+
+This is a visualization of one sustained visual-channel signal under fixed
+viewing geometry. It is not a calibrated rendering of conscious appearance or a
+prediction that a seam or flicker will be invisible. The selected kernel starts
+at zero, rises gradually, and decays smoothly; it avoids the rectangular
+shutter's abrupt inclusion and removal of light samples.
+
+### Reference filter and integration
+
+The reference is the sustained channel from
+[Stigliani, Jeska and Grill-Spector (2017)](https://pmc.ncbi.nlm.nih.gov/articles/PMC5754759/),
+which adopts a gamma-cascade parameter set from Watson's temporal model:
+
+```text
+h(t) = (t/tau)^8 * exp(-t/tau) / (tau * 8!),  t >= 0
+h(t) = 0,                                   t < 0
+tau  = 4.94 ms * responseScale
+```
+
+At scale 1, the peak is 39.52 ms and the mean delay is 44.46 ms. These are derived
+properties of the reference kernel, not an asserted universal persistence time.
+The paper also models a separate biphasic transient channel and nonlinear
+processing; neither is combined into the RGB preview. The parameter set was
+used to predict neural responses, not validated as a complete appearance model
+for this device.
+
+For a column emitting constant linear RGB during `[a,b]`, its contribution at
+time `t` is its color multiplied by `G(t-a)-G(t-b)`, where `G` is the integral
+of `h`. The implementation evaluates the equivalent gamma survival-function
+difference analytically. It clips intervals at the beginning of captured
+history and excludes future emission. It integrates every column interval,
+independently of browser repaint cadence, and does not blend completed display
+frames. Paused preview edits do not rewrite captured emissions.
+
+The kernel has unit area. A fixed column-duty compensation matches the camera
+mode's brightness convention; weights are never normalized separately for each
+column or sweep phase. Such normalization would artificially suppress physical
+modulation. RGB output clips to the display range, so bright response peaks can
+saturate. Black prehistory makes startup fade in rather than inventing samples.
+
+History covers at least 40 time constants at the maximum scale, as well as the
+camera's maximum shutter. The omitted gamma-tail integral is below `8.6e-10`.
+At 16 half-turns per second this requires eight source snapshots. These bounds
+and the response to finite pulses are checked numerically.
+
+### Evidence and limits
+
+| Evidence | Consequence for this preview |
+| --- | --- |
+| [Stromeyer and Martini (2003)](https://pubmed.ncbi.nlm.nih.gov/12535987/) measured changes in temporal response with stimulus contrast, alongside the known dependence on mean luminance. [Stockman et al. (2006)](https://discovery.ucl.ac.uk/id/eprint/10216972/) measured human adaptation over a wide intensity range. | The timescale control explores model sensitivity. It is not an automatic brightness or adaptation calibration; relative engine RGB does not supply retinal illuminance. |
+| [Shinomori and Werner (2003)](https://pmc.ncbi.nlm.nih.gov/articles/PMC2774211/) found substantial observer variation in inferred temporal responses. | The reference does not describe every observer. A positive sustained filter omits inhibitory and transient responses. |
+| [Kang et al. (2023)](https://pmc.ncbi.nlm.nih.gov/articles/PMC10354087/) studied phantom-array visibility during saccades and its dependence on eye movement. | Sphere-coordinate histories assume fixed viewing geometry. Camera orbiting does not simulate a retinal gaze trajectory, smooth pursuit, or saccadic suppression. |
+| [castleCSF (2024)](https://pmc.ncbi.nlm.nih.gov/articles/PMC10996938/) models contrast sensitivity across spatial and temporal frequency, color, luminance, eccentricity, and area. [elaTCSF (2024)](https://arxiv.org/html/2503.16759v1) specifically addresses temporal sensitivity and low-persistence displays. | A threshold model needs viewing-condition inputs and is not interchangeable with a color appearance filter. No detection threshold is inferred from this preview. |
+| [ColorVideoVDP (2024)](https://achapiro.github.io/Man24/man24.pdf) predicts differences between reference and test videos using spatial and temporal processing. | A full-reference quality metric is a possible later validation tool, not a replacement image renderer. It also has explicit limits concerning eye motion. |
+
+Applying the same filter to R, G, and B is an engineering approximation that
+preserves preview color relationships. It is not a cone, opponent-color, rod,
+or mesopic model. The current column-dwell emission model also omits measured
+LED strobe duty, transport delays, angular emission footprint, and radiometric
+calibration.
+
+At 288 columns, the idealized two-arm device schedules 2304 column pairs per
+second, but revisits each spatial location only 16 times per second. Its narrow
+pulses contain that fundamental and higher harmonics. For this sustained filter,
+the derived sinusoidal gain at 16 Hz is about 0.371 at scale 1; remaining
+modulation is expected and is not a reason to widen the reference filter until
+an artifact disappears. A desktop monitor cannot reproduce the submillisecond
+emission pulses. Its display response and the viewer's visual system further
+filter the already processed visualization.
+
+### Validation and calibration
+
+Numerical checks cover independent pulse quadrature, causal onset, frequency
+response, full-cycle mean brightness below clipping, both arms, sweep endpoints,
+history truncation, repaint independence, and preservation of source samples.
+GridSpace checks exercise the installed engine's actual emitted colors, rather
+than only synthetic patterns. Smooth response at a moving front is distinct
+from either a flat spatial image or proof of perceptual invisibility.
+
+Device validation still requires measured pulse timing and duty, light output,
+viewing distance and angular size, background illumination, and fixed-gaze versus
+tracking observations. Known-shutter photographs can test camera mode; they
+cannot by themselves validate a human-perception model. Observer comparisons
+should include static patterns, moving bars and GridSpace at multiple speeds
+and brightnesses, with held-out effects to detect tuning to one example.
 
 ## Effect identities
 

@@ -1,9 +1,156 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PovSweep } from '../src/renderer/pov_sweep.js';
+import { PovSweep, sustainedSurvival } from '../src/renderer/pov_sweep.js';
 
 const frame = (value) => new Uint16Array(8 * 2 * 3).fill(value);
 const row = (pixels, y) => Array.from({ length: 8 }, (_, x) => pixels[(y * 8 + x) * 3]);
+
+test('visual response matches independent quadrature of the sustained gamma density', () => {
+  const frames = Array.from({ length: 10 }, (_, epoch) => new Uint16Array(
+    Array.from({ length: 48 }, (_, index) => 800 + epoch * 500 + index * 11)));
+  for (const frameMs of [62.5, 40]) {
+    const sweep = new PovSweep(8, 2, frames[0], 0.375, frameMs);
+    for (let epoch = 0; epoch < frames.length; epoch++) {
+      if (epoch) sweep.beginFrame(frames[epoch]);
+      for (const scale of [0.5, 1, 2]) {
+        for (const fraction of [0, 0.375, 0.8125]) {
+          const expected = new Float64Array(48);
+          const now = (epoch + fraction) * frameMs;
+          const tau = 4.94 * scale;
+          for (let past = 0; past <= epoch; past++) {
+            for (let column = 0; column < 4; column++) {
+              const start = Math.max(past + column / 4, 0.375) * frameMs;
+              const end = Math.min((past + (column + 1) / 4) * frameMs, now);
+              if (end <= start) continue;
+              const dt = (end - start) / 256;
+              let weight = 0;
+              for (let sample = 0; sample < 256; sample++) {
+                const age = (now - start - (sample + 0.5) * dt) / tau;
+                weight += age ** 8 * Math.exp(-age) / (tau * 40320) * dt * 4;
+              }
+              for (let y = 0; y < 2; y++) {
+                for (const x of [column, column + 4]) {
+                  for (let channel = 0; channel < 3; channel++) {
+                    const index = (y * 8 + x) * 3 + channel;
+                    expected[index] += frames[past][index] * weight;
+                  }
+                }
+              }
+            }
+          }
+          const actual = sweep.visualPixels(fraction, scale);
+          for (let i = 0; i < actual.length; i++)
+            assert.ok(Math.abs(actual[i] - Math.round(expected[i])) <= 1,
+              `${frameMs}ms frame ${epoch} phase ${fraction} scale ${scale} channel ${i}`);
+        }
+      }
+    }
+  }
+});
+
+test('visual response preserves periodic mean and the gamma frequency gain and phase', () => {
+  const sweep = new PovSweep(8, 2, frame(10000));
+  for (let i = 0; i < 10; i++) sweep.beginFrame(frame(10000));
+  for (const scale of [0.5, 1, 2]) {
+    const samples = 2048;
+    let mean = 0, real = 0, imaginary = 0;
+    let minimum = Infinity, maximum = 0;
+    for (let i = 0; i < samples; i++) {
+      const phase = i / samples;
+      const value = sweep.visualPixels(phase, scale)[0];
+      mean += value / samples;
+      real += value * Math.cos(2 * Math.PI * phase) * 2 / samples / 10000;
+      imaginary -= value * Math.sin(2 * Math.PI * phase) * 2 / samples / 10000;
+      minimum = Math.min(minimum, value);
+      maximum = Math.max(maximum, value);
+    }
+    const omegaTau = 2 * Math.PI * 16 * 0.00494 * scale;
+    const gain = (1 + omegaTau ** 2) ** -4.5;
+    const phase = -Math.PI / 4 - 9 * Math.atan(omegaTau);
+    const amplitude = 2 * Math.sin(Math.PI / 4) / (Math.PI / 4) * gain;
+    assert.ok(Math.abs(mean - 10000) < 0.1);
+    assert.ok(maximum - minimum > 1000, 'phase-dependent modulation remains');
+    assert.ok(Math.abs(real - amplitude * Math.cos(phase)) < 0.0001);
+    assert.ok(Math.abs(imaginary - amplitude * Math.sin(phase)) < 0.0001);
+  }
+});
+
+test('visual response has causal startup and continuous column and half-turn boundaries', () => {
+  const sweep = new PovSweep(8, 2, frame(10000), 0.5);
+  assert.deepEqual(sweep.visualPixels(0.5), frame(0));
+  assert.deepEqual(sweep.visualPixels(0.500001), frame(0));
+  assert.ok(sweep.visualPixels(0.9)[2 * 3] > 0);
+  assert.equal(sweep.visualPixels(0.9)[0], 0);
+  sweep.beginFrame(frame(20000));
+  for (const phase of [0.25, 0.5, 0.75]) {
+    const before = sweep.visualPixels(phase - 1e-8).slice();
+    assert.deepEqual(sweep.visualPixels(phase + 1e-8), before);
+  }
+  const before = sweep.visualPixels(1).slice();
+  sweep.beginFrame(frame(30000));
+  assert.deepEqual(sweep.visualPixels(0), before);
+});
+
+test('visual front differences converge with column spacing while held and boxcar jumps remain', () => {
+  const visualJumps = [];
+  for (const width of [288, 576, 1152, 2304]) {
+    const half = width / 2;
+    const ramp = (epoch) => Uint16Array.from({ length: width * 3 },
+      (_, index) => Math.round(2000 + 500 * (epoch + Math.floor(index / 3) % half / half)));
+    const sweep = new PovSweep(width, 1, ramp(0));
+    for (let epoch = 1; epoch <= 12; epoch++) sweep.beginFrame(ramp(epoch));
+    sweep.advance(0.5);
+    const frontJump = (pixels) => {
+      let maximum = 0;
+      for (let x = half / 2 - 2; x <= half / 2 + 1; x++)
+        maximum = Math.max(maximum, Math.abs(pixels[x * 3] - pixels[(x + 1) * 3]));
+      return maximum;
+    };
+    assert.ok(frontJump(sweep.pixels) >= 490);
+    assert.ok(frontJump(sweep.cameraPixels(0.5, 2)) >= 490);
+    visualJumps.push(frontJump(sweep.visualPixels(0.5)));
+  }
+  assert.ok(visualJumps[0] < 200);
+  for (let i = 1; i < visualJumps.length; i++)
+    assert.ok(Math.abs(visualJumps[i] * 2 - visualJumps[i - 1]) <= 8,
+      `doubling column density should halve adjacent differences: ${visualJumps}`);
+});
+
+test('visual history bounds cover the slowest response tail', () => {
+  let tail = 0;
+  for (let age = 40.005; age < 100; age += 0.01)
+    tail += age ** 8 * Math.exp(-age) / 40320 * 0.01;
+  assert.ok(Math.abs(sustainedSurvival(40) - tail) < 1e-14);
+  assert.ok(tail > 8.56e-10 && tail < 8.58e-10);
+  for (const frameMs of [62.5, 40, 100]) {
+    const sweep = new PovSweep(8, 2, frame(10000), 0, frameMs);
+    for (let i = 0; i < 30; i++) sweep.beginFrame(frame(10000));
+    assert.equal(sweep.emissions.length, Math.max(5, Math.ceil(40 * 4.94 * 2 / frameMs) + 1));
+    assert.ok((sweep.emissions.length - 1) * frameMs >= 40 * 4.94 * 2);
+    if (frameMs === 62.5) assert.equal(sweep.emissions.length, 8);
+  }
+});
+
+test('visual scale, seek, and paused replacement preserve source frames and camera output', () => {
+  const sweep = new PovSweep(8, 2, frame(10000));
+  sweep.beginFrame(frame(20000));
+  sweep.seek(0.5);
+  const history = sweep.emissions.map(({ pixels }) => pixels.slice());
+  const raw = sweep.pixels.slice();
+  const camera = sweep.cameraPixels(0.5, 2).slice();
+  const visual = sweep.visualPixels(0.5).slice();
+  assert.notDeepEqual(sweep.visualPixels(0.5, 2), visual);
+  sweep.seek(0);
+  sweep.visualPixels(0);
+  sweep.seek(0.5);
+  assert.deepEqual(sweep.visualPixels(0.5), visual);
+  sweep.displayPixels(true, sweep.visualPixels(0.5));
+  assert.deepEqual(sweep.pixels, raw);
+  assert.deepEqual(sweep.cameraPixels(0.5, 2), camera);
+  sweep.replaceFrame(frame(30000));
+  assert.deepEqual(sweep.visualPixels(0.5), visual);
+  assert.deepEqual(sweep.emissions.map(({ pixels }) => pixels), history);
+});
 
 test('camera exposure agrees with an independent time-sampled emission oracle', () => {
   const frames = Array.from({ length: 8 }, (_, epoch) => new Uint16Array(
@@ -34,7 +181,7 @@ test('camera exposure agrees with an independent time-sampled emission oracle', 
           `frame ${epoch}, phase ${fraction}, shutter ${duration}`);
       }
     }
-    assert.ok(sweep.emissions.length <= 5);
+    assert.ok(sweep.emissions.length <= 8);
   }
 });
 
