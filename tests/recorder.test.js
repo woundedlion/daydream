@@ -431,6 +431,26 @@ test('elapsed time follows the recording wall-clock lifecycle', (t) => {
   recorder.onstop();
 });
 
+/** A session waiting on the Save dialog reads 0:00, not the last duration. */
+test('a pending save dialog shows zero elapsed after a prior session', (t) => {
+  t.after(installRecorderEnv());
+  const warnings = installConsoleCapture('warn');
+  t.after(warnings.restore);
+  let nowMs = 0;
+  const rec = startRecorder(recordableCanvas(), 1 / 16, () => nowMs);
+  nowMs = 42_000;
+  const first = rec.mediaRecorder;
+  rec.stop();
+  first.onstop();
+  assert.equal(rec.elapsedFormatted, '0:42');
+
+  globalThis.showSaveFilePicker = () => new Promise(() => {});
+  rec.start('second');
+  assert.equal(rec.isRecording, true);
+  assert.equal(rec.elapsedFormatted, '0:00');
+  rec.stop();
+});
+
 /** abort() still finalizes the output; an idle recorder reports nothing. */
 test('abort stops a live session and tells the host', (t) => {
   const warnings = installConsoleCapture('warn');
