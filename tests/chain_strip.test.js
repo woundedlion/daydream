@@ -856,12 +856,16 @@ test('a strip whose first render throws binds nothing to the mount', async () =>
   assert.deepEqual(container.listeners, [],
     'the mount outlives the strip, so a failed build may leave nothing on it');
   assert.equal(doc.listenerCount('pointerdown'), 0);
+  assert.equal(doc.listenerCount('pointerup'), 0);
+  assert.equal(doc.listenerCount('pointercancel'), 0);
 
   failing = false;
   build();
   assert.deepEqual(container.listeners.map((listener) => listener.type), ['keydown'],
     'the next successful build owns the only history shortcut');
   assert.equal(doc.listenerCount('pointerdown'), 1);
+  assert.equal(doc.listenerCount('pointerup'), 1);
+  assert.equal(doc.listenerCount('pointercancel'), 1);
 });
 
 test('destroy detaches the strip listeners and empties the strip', async () => {
