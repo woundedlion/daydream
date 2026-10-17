@@ -580,6 +580,26 @@ test('the sweep boundary view setting roundtrips through its URL key', () => {
   }
 });
 
+test('camera presentation and exposure roundtrip through view URL keys', () => {
+  const url = installRecordingWindow('?view.povPresentation=camera&view.povExposureMs=250');
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const gui = new DeepLinkGUI({ autoPlace: false }, 'view');
+    const state = { povPresentation: 'raw', povExposureMs: 125 };
+    const presentation = gui.add(state, 'povPresentation', { 'Raw sweep': 'raw', 'Camera exposure': 'camera' });
+    const exposure = gui.add(state, 'povExposureMs', 1, 250, 1);
+    assert.deepEqual(state, { povPresentation: 'camera', povExposureMs: 250 });
+    presentation.setValue('raw');
+    exposure.setValue(62);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+    const written = new URL(url.written(), 'http://x').searchParams;
+    assert.equal(written.get('view.povPresentation'), 'raw');
+    assert.equal(written.get('view.povExposureMs'), '62');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 /**
  * Verifies a root namespace prefixes every deep-link key in that root's subtree,
  * so two independent GUI roots binding the same property name address different

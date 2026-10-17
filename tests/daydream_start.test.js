@@ -57,7 +57,8 @@ test('the global GUI carries the controls a deep link names', () => {
 
   assert.deepEqual(root.controllers.map((c) => c.property),
     ['resolution', 'testAll', 'labelAxes', 'cullBackSphere', 'showPip', 'povFidelity',
-      'showSweepBoundary', 'sweepPosition', 'columnFillOverlap', 'poleLod', 'topCap', 'bottomCap']);
+      'povPresentation', 'povExposureMs', 'showSweepBoundary', 'sweepPosition',
+      'columnFillOverlap', 'poleLod', 'topCap', 'bottomCap']);
   const segments = root.folders.find((f) => f.namespace === 'Segmented POV');
   assert.ok(segments, 'the segmented folder name is a deep-link key segment');
   assert.deepEqual(segments.controllers.map((c) => c.property),
@@ -79,9 +80,26 @@ test('POV fidelity defaults off and toggling it requests a repaint', () => {
   assert.equal(driver.invalidated, true);
 });
 
+test('camera presentation and exposure are persistent view controls', () => {
+  const { guis, driver } = startApp();
+  for (const [name, initial, selected] of [
+    ['povPresentation', 'raw', 'camera'], ['povExposureMs', 125, 250],
+  ]) {
+    driver.invalidated = false;
+    const control = guis[0].controllers.find((c) => c.property === name);
+    assert.equal(control.getValue(), initial);
+    assert.equal(control.session, undefined);
+    assert.ok(guis[0].collectUrlKeys().includes(`view.${name}`));
+    control.setValue(selected);
+    assert.equal(driver[name], selected);
+    assert.equal(driver.invalidated, true);
+  }
+});
+
 test('the sweep boundary defaults off and persists as a view control', () => {
   const { guis, driver } = startApp();
   const control = guis[0].controllers.find((c) => c.property === 'showSweepBoundary');
+  assert.equal(control.label, 'Show arm positions');
   assert.equal(control.getValue(), false);
   assert.equal(control.session, undefined);
   assert.ok(guis[0].collectUrlKeys().includes('view.showSweepBoundary'));

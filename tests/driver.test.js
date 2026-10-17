@@ -637,6 +637,75 @@ function renderCtx(colors, log) {
   };
 }
 
+test('camera presentation repaints within a column and freezes without advancing the engine', () => {
+  const colors = new Uint16Array(8 * 2 * 3).fill(10000);
+  const ctx = renderCtx(colors, []);
+  Object.assign(ctx, {
+    W: 8, H: 2, pixels: colors, povFidelity: true, povSweep: null,
+    povPresentation: 'camera', povExposureMs: 125, paused: false,
+    stepSimulation: Daydream.prototype.stepSimulation,
+    invalidate: Daydream.prototype.invalidate,
+  });
+  let painted;
+  let paints = 0;
+  let delta = 0;
+  ctx.clock.getDelta = () => delta;
+  ctx.renderMainView = () => {
+    painted = ctx.dotMesh.instanceColor.array.slice();
+    paints++;
+  };
+  const render = () => Daydream.prototype.render.call(ctx, {
+    drawFrame: () => assert.fail('presentation advanced the engine'),
+  });
+  render();
+  assert.ok(painted.every((value) => value === 0));
+  delta = ctx.frameInterval / 32;
+  render();
+  assert.equal(painted[0], 625);
+  render();
+  assert.equal(ctx.povSweep.column, 1);
+  assert.equal(painted[0], 1250);
+  assert.equal(paints, 3);
+  assert.equal(ctx.dotMesh.instanceColor.array, colors);
+
+  ctx.paused = true;
+  const captured = ctx.povSweep.emissions.map(({ pixels }) => pixels.slice());
+  render();
+  assert.equal(paints, 3);
+  ctx.povExposureMs = 62.5;
+  ctx.needsRender = true;
+  render();
+  assert.equal(painted[0], 2500);
+  colors.fill(20000);
+  ctx.needsRender = true;
+  render();
+  assert.equal(painted[0], 2500);
+  assert.deepEqual(ctx.povSweep.emissions.map(({ pixels }) => pixels), captured);
+
+  const position = Object.getOwnPropertyDescriptor(Daydream.prototype, 'sweepPosition');
+  position.set.call(ctx, 12.5);
+  ctx.showSweepBoundary = false;
+  render();
+  assert.equal(painted[0], 5000);
+  assert.deepEqual(ctx.povSweep.emissions.map(({ pixels }) => pixels), captured);
+  ctx.showSweepBoundary = true;
+  ctx.needsRender = true;
+  render();
+  assert.deepEqual(painted.slice(3, 6), new Uint16Array([65535, 0, 65535]));
+  assert.equal(painted[0], 5000);
+
+  ctx.povPresentation = 'raw';
+  ctx.showSweepBoundary = false;
+  ctx.needsRender = true;
+  render();
+  assert.deepEqual(painted, ctx.povSweep.pixels);
+  assert.equal(painted[0], 20000);
+  ctx.povPresentation = 'camera';
+  ctx.povFidelity = false;
+  render();
+  assert.deepEqual(painted, colors);
+});
+
 test('sweep inspection pauses and seeks without drawing another engine frame', () => {
   const colors = new Uint16Array(8 * 2 * 3).fill(10);
   const ctx = renderCtx(colors, []);

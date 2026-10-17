@@ -246,6 +246,8 @@ export class Daydream {
     this.frameInterval = 1 / Daydream.FPS; // seconds per simulation frame
     this.timeAccumulator = 0;
     this.povFidelity = false;
+    this.povPresentation = 'raw';
+    this.povExposureMs = 125;
     this.showSweepBoundary = false;
     this.povSweep = null;
 
@@ -550,7 +552,8 @@ export class Daydream {
     if (this.povFidelity && isViewLive(this.pixels)
         && (!this.povSweep || this.povSweep.width !== this.W
           || this.povSweep.height !== this.H)) {
-      this.povSweep = new PovSweep(this.W, this.H, this.pixels);
+      this.povSweep = new PovSweep(this.W, this.H, this.pixels,
+        (this.timeAccumulator % this.frameInterval) / this.frameInterval);
     } else if (!this.povFidelity && this.povSweep) {
       this.povSweep = null;
       if (this.dotMesh?.instanceColor) this.dotMesh.instanceColor.needsUpdate = true;
@@ -560,6 +563,7 @@ export class Daydream {
     // A pending single-step must fire immediately, even while paused and before
     // the fixed-timestep clock has accrued a full interval; the frame clock still
     // advances once per frame either way.
+    const previousSweepTime = this.timeAccumulator;
     const clockReady = this.advanceFrameClock();
     const advanced =
       (clockReady || this.stepFrames !== 0) && this.stepSimulation(adapter);
@@ -567,9 +571,12 @@ export class Daydream {
     if (this.povSweep && isViewLive(this.pixels)) {
       const pausedUpdate = this.paused && !advanced && this.needsRender
         && this.pixels.some((value, i) => value !== this.povSweep.source[i]);
-      if (advanced || pausedUpdate) this.povSweep.beginFrame(this.pixels);
+      if (advanced) this.povSweep.beginFrame(this.pixels);
+      else if (pausedUpdate) this.povSweep.replaceFrame(this.pixels);
       const fraction = (this.timeAccumulator % this.frameInterval) / this.frameInterval;
       if (this.povSweep.advance(fraction)) this.needsRender = true;
+      if (this.povPresentation === 'camera' && this.timeAccumulator !== previousSweepTime)
+        this.needsRender = true;
     }
     if (advanced || this.paused || this.needsRender) adapter?.sync?.(advanced);
 
@@ -600,7 +607,12 @@ export class Daydream {
     const colorAttribute = this.dotMesh?.instanceColor;
     const sourcePixels = colorAttribute?.array;
     if (this.povSweep && colorAttribute) {
-      colorAttribute.array = this.povSweep.displayPixels(this.showSweepBoundary);
+      const pixels = this.povPresentation === 'camera'
+        ? this.povSweep.cameraPixels(
+          (this.timeAccumulator % this.frameInterval) / this.frameInterval,
+          this.povExposureMs / (this.frameInterval * 1000))
+        : this.povSweep.pixels;
+      colorAttribute.array = this.povSweep.displayPixels(this.showSweepBoundary, pixels);
       colorAttribute.needsUpdate = true;
     }
     try {
