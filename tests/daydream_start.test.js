@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { installConsoleCapture } from './helpers/fake_console.js';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 import { fakeWasmModule, trackedStartApp } from './helpers/fake_app.js';
+import { Daydream } from '../src/renderer/driver.js';
 
 restoreDocumentAfterEach();
 const startApp = trackedStartApp();
@@ -93,6 +94,46 @@ test('camera presentation and exposure are persistent view controls', () => {
     control.setValue(selected);
     assert.equal(driver[name], selected);
     assert.equal(driver.invalidated, true);
+  }
+});
+
+test('exposure is enabled only for the active camera presentation and keeps its value', () => {
+  const { guis, driver } = startApp();
+  const control = (name) => guis[0].controllers.find((c) => c.property === name);
+  const exposure = control('povExposureMs');
+  assert.equal(exposure.disabled, true);
+  control('povFidelity').setValue(true);
+  assert.equal(exposure.disabled, true);
+  control('povPresentation').setValue('camera');
+  assert.equal(exposure.disabled, false);
+  exposure.setValue(187);
+  control('povPresentation').setValue('raw');
+  assert.equal(exposure.disabled, true);
+  assert.equal(exposure.getValue(), 187);
+  control('povFidelity').setValue(false);
+  control('povPresentation').setValue('camera');
+  assert.equal(exposure.disabled, true);
+  Object.defineProperty(driver, 'sweepPosition',
+    Object.getOwnPropertyDescriptor(Daydream.prototype, 'sweepPosition'));
+  control('sweepPosition').setValue(25);
+  assert.equal(driver.povFidelity, true);
+  assert.equal(exposure.disabled, false);
+  assert.equal(exposure.getValue(), 187);
+  control('povFidelity').setValue(false);
+  assert.equal(exposure.disabled, true);
+});
+
+test('hydrated camera controls initialize exposure availability after all values load', () => {
+  for (const povFidelity of [false, true]) {
+    for (const povPresentation of ['raw', 'camera']) {
+      const { guis } = startApp({
+        hydratedView: { povFidelity, povPresentation, povExposureMs: 187 },
+      });
+      const exposure = guis[0].controllers.find((c) => c.property === 'povExposureMs');
+      assert.equal(exposure.disabled, !(povFidelity && povPresentation === 'camera'));
+      assert.equal(exposure.getValue(), 187);
+      assert.ok(guis[0].collectUrlKeys().includes('view.povExposureMs'));
+    }
   }
 });
 

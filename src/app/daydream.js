@@ -552,12 +552,21 @@ export function start({
   guiInstance.add(daydream, 'labelAxes').name('Show Axes').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'showPip').name('Show PiP').onChange(() => daydream.invalidate());
-  guiInstance.add(daydream, 'povFidelity').name('POV fidelity (16 Hz)').listen().onChange(() => daydream.invalidate());
-  guiInstance.add(daydream, 'povPresentation', { 'Raw sweep': 'raw', 'Camera exposure': 'camera' })
-    .name('POV presentation').onChange(() => daydream.invalidate());
-  guiInstance.add(daydream, 'povExposureMs', 1, 250, 1).name('Exposure (ms)').onChange(() => daydream.invalidate());
+  const povFidelity = guiInstance.add(daydream, 'povFidelity').name('POV fidelity (16 Hz)').listen();
+  const povPresentation = guiInstance.add(daydream, 'povPresentation', { 'Raw sweep': 'raw', 'Camera exposure': 'camera' })
+    .name('POV presentation');
+  const povExposure = guiInstance.add(daydream, 'povExposureMs', 1, 250, 1).name('Exposure (ms)');
+  const syncPovControls = () => {
+    if (daydream.povFidelity && daydream.povPresentation === 'camera') povExposure.enable();
+    else povExposure.disable();
+    daydream.invalidate();
+  };
+  povFidelity.onChange(syncPovControls);
+  povPresentation.onChange(syncPovControls);
+  povExposure.onChange(() => daydream.invalidate());
+  syncPovControls();
   guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions').listen().onChange(() => daydream.invalidate());
-  guiInstance.addSession(daydream, 'sweepPosition', 0, 100, 0.1).name('Inspect sweep (%)').listen();
+  guiInstance.addSession(daydream, 'sweepPosition', 0, 100, 0.1).name('Inspect sweep (%)').listen().onChange(syncPovControls);
   guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill Overlap').onChange(() => daydream.invalidate());
 
   const poleLod = createPoleLodBinding({

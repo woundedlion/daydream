@@ -113,6 +113,8 @@ With fidelity enabled, **POV presentation** selects **Raw sweep** (the default)
 or **Camera exposure**. **Exposure (ms)** sets a rectangular global shutter from
 1 to 250 ms, defaulting to 125 ms. The settings persist as `view.povPresentation`
 (`raw` or `camera`) and `view.povExposureMs` in shared URLs.
+The exposure slider is disabled outside Camera exposure with fidelity enabled;
+its value is retained when switching presentations or disabling fidelity.
 
 Camera exposure integrates the frozen source frames' emitted columns in linear
 RGB16. Each opposing column pair emits for one column interval; the analytic
