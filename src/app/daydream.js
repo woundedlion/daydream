@@ -553,6 +553,7 @@ export function start({
   guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'showPip').name('Show PiP').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'povFidelity').name('POV fidelity (16 Hz)').onChange(() => daydream.invalidate());
+  guiInstance.add(daydream, 'showSweepBoundary').name('Show sweep boundary').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill Overlap').onChange(() => daydream.invalidate());
 
   const poleLod = createPoleLodBinding({

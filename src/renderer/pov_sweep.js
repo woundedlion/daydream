@@ -12,7 +12,30 @@ export class PovSweep {
     this.height = height;
     this.source = initial.slice();
     this.pixels = initial.slice();
+    /** @type {Uint16Array | null} */
+    this.boundaryPixels = null;
     this.column = 0;
+  }
+
+  /**
+   * @param {boolean} showBoundary Mark the next opposing columns in magenta.
+   * @returns {Uint16Array} Display pixels, with an optional boundary overlay.
+   */
+  displayPixels(showBoundary) {
+    if (!showBoundary) return this.pixels;
+    this.boundaryPixels ??= new Uint16Array(this.pixels.length);
+    this.boundaryPixels.set(this.pixels);
+    const half = this.width / 2;
+    const column = this.column % half;
+    for (let y = 0; y < this.height; y++) {
+      for (let x = column; x < this.width; x += half) {
+        const index = (y * this.width + x) * 3;
+        this.boundaryPixels[index] = 65535;
+        this.boundaryPixels[index + 1] = 0;
+        this.boundaryPixels[index + 2] = 65535;
+      }
+    }
+    return this.boundaryPixels;
   }
 
   /** @param {Uint16Array} source Next half-turn's image. */

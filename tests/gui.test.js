@@ -561,6 +561,25 @@ test('a ?param=value deep link reaches the engine through the replayed handler',
   }
 });
 
+test('the sweep boundary view setting roundtrips through its URL key', () => {
+  const url = installRecordingWindow('?view.showSweepBoundary=true');
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const gui = new DeepLinkGUI({ autoPlace: false }, 'view');
+    const state = { showSweepBoundary: false };
+    const control = gui.add(state, 'showSweepBoundary');
+    assert.equal(state.showSweepBoundary, true);
+    control.setValue(false);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+    assert.equal(new URL(url.written(), 'http://x').searchParams.get('view.showSweepBoundary'), 'false');
+    control.setValue(true);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+    assert.equal(new URL(url.written(), 'http://x').searchParams.get('view.showSweepBoundary'), 'true');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 /**
  * Verifies a root namespace prefixes every deep-link key in that root's subtree,
  * so two independent GUI roots binding the same property name address different

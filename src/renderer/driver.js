@@ -246,6 +246,7 @@ export class Daydream {
     this.frameInterval = 1 / Daydream.FPS; // seconds per simulation frame
     this.timeAccumulator = 0;
     this.povFidelity = false;
+    this.showSweepBoundary = false;
     this.povSweep = null;
 
     this.labelPool = new LabelPool(this.scene, Daydream.SPHERE_RADIUS, this.doc);
@@ -599,7 +600,7 @@ export class Daydream {
     const colorAttribute = this.dotMesh?.instanceColor;
     const sourcePixels = colorAttribute?.array;
     if (this.povSweep && colorAttribute) {
-      colorAttribute.array = this.povSweep.pixels;
+      colorAttribute.array = this.povSweep.displayPixels(this.showSweepBoundary);
       colorAttribute.needsUpdate = true;
     }
     try {

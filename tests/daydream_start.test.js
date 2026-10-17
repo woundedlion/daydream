@@ -57,7 +57,7 @@ test('the global GUI carries the controls a deep link names', () => {
 
   assert.deepEqual(root.controllers.map((c) => c.property),
     ['resolution', 'testAll', 'labelAxes', 'cullBackSphere', 'showPip', 'povFidelity',
-      'columnFillOverlap', 'poleLod', 'topCap', 'bottomCap']);
+      'showSweepBoundary', 'columnFillOverlap', 'poleLod', 'topCap', 'bottomCap']);
   const segments = root.folders.find((f) => f.namespace === 'Segmented POV');
   assert.ok(segments, 'the segmented folder name is a deep-link key segment');
   assert.deepEqual(segments.controllers.map((c) => c.property),
@@ -76,6 +76,17 @@ test('POV fidelity defaults off and toggling it requests a repaint', () => {
   assert.equal(control.getValue(), false);
   control.setValue(true);
   assert.equal(driver.povFidelity, true);
+  assert.equal(driver.invalidated, true);
+});
+
+test('the sweep boundary defaults off and persists as a view control', () => {
+  const { guis, driver } = startApp();
+  const control = guis[0].controllers.find((c) => c.property === 'showSweepBoundary');
+  assert.equal(control.getValue(), false);
+  assert.equal(control.session, undefined);
+  assert.ok(guis[0].collectUrlKeys().includes('view.showSweepBoundary'));
+  control.setValue(true);
+  assert.equal(driver.showSweepBoundary, true);
   assert.equal(driver.invalidated, true);
 });
 

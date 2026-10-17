@@ -637,6 +637,41 @@ function renderCtx(colors, log) {
   };
 }
 
+test('the sweep marker selects a separate display buffer only in fidelity mode', () => {
+  const colors = new Uint16Array(8 * 2 * 3).fill(10);
+  const ctx = renderCtx(colors, []);
+  Object.assign(ctx, {
+    W: 8, H: 2, pixels: colors, povFidelity: true, povSweep: null,
+    showSweepBoundary: true, timeAccumulator: 0.5 * ctx.frameInterval,
+  });
+  let painted;
+  ctx.renderMainView = () => { painted = ctx.dotMesh.instanceColor.array; };
+  const render = () => Daydream.prototype.render.call(ctx, {});
+  render();
+  assert.equal(painted, ctx.povSweep.boundaryPixels);
+  for (let y = 0; y < 2; y++) {
+    for (let x = 0; x < 8; x++) {
+      const index = (y * 8 + x) * 3;
+      assert.deepEqual(painted.slice(index, index + 3),
+        new Uint16Array(x % 4 === 3 ? [65535, 0, 65535] : [10, 10, 10]));
+    }
+  }
+  assert.equal(ctx.timeAccumulator, 0.5 * ctx.frameInterval);
+  assert.equal(ctx.povSweep.column, 3);
+  assert.ok(ctx.povSweep.pixels.every((value) => value === 10));
+  assert.ok(colors.every((value) => value === 10));
+  assert.equal(ctx.dotMesh.instanceColor.array, colors);
+
+  ctx.showSweepBoundary = false;
+  ctx.needsRender = true;
+  render();
+  assert.equal(painted, ctx.povSweep.pixels);
+  ctx.showSweepBoundary = true;
+  ctx.povFidelity = false;
+  render();
+  assert.equal(painted, colors);
+});
+
 test('POV fidelity sweeps between engine ticks and restores the engine aliases', () => {
   const colors = new Uint16Array(8 * 2 * 3);
   const ctx = renderCtx(colors, []);
