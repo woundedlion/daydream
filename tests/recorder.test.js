@@ -880,6 +880,7 @@ test('streams chunks to disk when the File System Access API is present', async 
   rec.start('stream');
   const sessionChunks = rec.chunks;
   const recorder = rec.mediaRecorder;
+  await drainSink();
   recorder.ondataavailable({ data: { size: 10 } });
   recorder.ondataavailable({ data: { size: 20 } });
   rec.stop();
@@ -915,6 +916,7 @@ test('a late file close failure reports its session without stopping a new recor
   rec.onError = (error) => captureFailures.push(error);
   rec.start('previous');
   const previous = rec.mediaRecorder;
+  await drainSink();
   previous.ondataavailable({ data: { size: 10 } });
   rec.stop();
   previous.onstop();
@@ -1023,6 +1025,7 @@ test('a mid-stream streaming write failure stops the session and reports truncat
 
   rec.start('stream');
   const recorder = rec.mediaRecorder;
+  await drainSink();
   recorder.ondataavailable({ data: { size: 10 } });
   recorder.ondataavailable({ data: { size: 20 } }); // this write throws
   recorder.ondataavailable({ data: { size: 30 } }); // dropped after the failure
@@ -1070,6 +1073,7 @@ test('a host hook that throws does not poison the streaming write chain', async 
 
   rec.start('stream');
   const recorder = rec.mediaRecorder;
+  await drainSink();
   recorder.ondataavailable({ data: { size: 10 } });
   recorder.ondataavailable({ data: { size: 20 } }); // this write throws
   await drainSink();
@@ -1088,20 +1092,18 @@ test('a host hook that throws does not poison the streaming write chain', async 
 });
 
 /**
- * A Save dialog nobody answers holds every chunk in the write chain. The sink
- * bounds that hold at 120 s of video: 15 MB at 1 Mbps, or 240 MB using the
- * 16 Mbps default when bitrate is zero. Queued chunks reach the eventual file
- * as a contiguous prefix after the session ends at that limit.
+ * A file that is slow to open holds every chunk in the write chain, bounded at
+ * PICKER_GRACE_SECONDS of video at the configured or default bitrate.
  */
 for (const bitrate of [1, 0]) {
-  test(`an unanswered save dialog bounds backlog with configured bitrate ${bitrate}`, async (t) => {
+  test(`a stalled file open bounds backlog with configured bitrate ${bitrate}`, async (t) => {
     t.after(installRecorderEnv());
     const writes = [];
     let closed = false;
     const writable = { write: async (d) => { writes.push(d); }, close: async () => { closed = true; } };
-    let answerPicker = () => {};
-    globalThis.showSaveFilePicker = () => new Promise((resolve) => {
-      answerPicker = () => resolve({ createWritable: async () => writable });
+    let open = () => {};
+    globalThis.showSaveFilePicker = async () => ({
+      createWritable: () => new Promise((resolve) => { open = () => resolve(writable); }),
     });
     const captured = installConsoleCapture('error');
     t.after(captured.restore);
@@ -1113,10 +1115,12 @@ for (const bitrate of [1, 0]) {
     const notified = [];
     rec.onError = (err) => notified.push(err);
 
-    rec.start('unanswered');
+    rec.start('slow-open');
     const recorder = rec.mediaRecorder;
     const expectedBitrate = (bitrate || 16) * 1_000_000;
     assert.equal(recorder.options.videoBitsPerSecond, expectedBitrate);
+    await drainSink();
+    assert.equal(recorder.state, 'recording', 'the encoder starts once the picker resolves');
     const sessionChunks = rec.chunks;
     const held = (expectedBitrate / 8) * PICKER_GRACE_SECONDS - 1_000_000;
     recorder.ondataavailable({ data: { size: held } });
@@ -1125,8 +1129,7 @@ for (const bitrate of [1, 0]) {
     recorder.ondataavailable({ data: { size: 2_000_000 } });
     assert.equal(rec.isRecording, false, 'the session stops when the backlog passes the bound');
     assert.equal(notified.length, 1, 'the host is told the session ended');
-    assert.match(captured.messages.join(' '), /Save dialog/,
-      'the stop is reported, not silent');
+    assert.match(notified[0].message, /streaming save could not keep up/);
     assert.doesNotMatch(captured.messages.join(' '), /recording stopped/i,
       'the notice prefix already says the session stopped');
 
@@ -1134,12 +1137,13 @@ for (const bitrate of [1, 0]) {
     recorder.onstop();
     assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
 
-    answerPicker();
+    await drainSink();
+    open();
     await sinkFinished();
 
     assert.deepEqual(writes, [{ size: held }],
       'the chunks held under the bound still reach the chosen file, in order');
-    assert.equal(closed, true, 'the file is closed once the late pick lands');
+    assert.equal(closed, true, 'the file is closed once it opens');
     assert.equal(downloaded, false, 'no in-memory blob download of the dropped tail');
     assert.deepEqual(sessionChunks, [], 'the dropped chunks are not retained in RAM');
   });
@@ -1437,37 +1441,25 @@ test('start does not blit; the timed fallback fills the offscreen on captureFram
   assert.equal(draws.length, 1, 'the render-task capture fills the offscreen');
 });
 
-/**
- * Save picker cancelled after chunks are already flowing: cancelling the picker
- * is a deliberate "don't save", so the buffered chunks are discarded and nothing
- * is written to the default Downloads folder — Cancel means cancel.
- */
-test('a cancelled save picker discards buffered chunks without downloading', async (t) => {
+/** A cancelled save picker never starts the encoder and saves nothing. */
+test('a cancelled save picker records and downloads nothing', async (t) => {
   t.after(installRecorderEnv());
   const abort = new Error('user cancelled');
   abort.name = 'AbortError';
   globalThis.showSaveFilePicker = async () => { throw abort; };
-  const captured = installConsoleCapture('warn');
+  const captured = installConsoleCapture('error');
   t.after(captured.restore);
   const rec = new VideoRecorder(recordableCanvas());
-  const sinkFinished = trackSinkFinish(rec);
   const downloads = [];
   rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
 
   rec.start('cancelled');
-  const sessionChunks = rec.chunks;
   const recorder = rec.mediaRecorder;
-  // Chunks arrive before the picker's rejection has settled the open promise.
-  recorder.ondataavailable({ data: { size: 10 } });
-  recorder.ondataavailable({ data: { size: 20 } });
-  recorder.ondataavailable({ data: { size: 30 } });
-  rec.stop();
-  recorder.onstop();
+  await drainSink();
 
-  await sinkFinished();
-
+  assert.equal(recorder.state, 'inactive', 'the encoder never starts');
+  assert.equal(rec.isRecording, false);
   assert.equal(downloads.length, 0, 'no download after the picker was cancelled');
-  assert.deepEqual(sessionChunks, []);
 });
 
 /**
@@ -1873,6 +1865,7 @@ test('a streaming write failure after Stop reaches the save-error UI', async (t)
   rec.onSaveError = (error) => errors.push(error);
   rec.start('stream');
   const recorder = rec.mediaRecorder;
+  await drainSink();
   recorder.ondataavailable({ data: { size: 10 } });
   rec.stop();
   recorder.onstop();
