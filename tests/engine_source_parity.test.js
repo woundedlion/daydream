@@ -444,10 +444,17 @@ test('DEFINED_SEED_CONSTANTS matches core/mesh/solids.h', { skip: engineSkip }, 
     + 'the paste redefine a constant the header already has');
 });
 
+/** @param {string} source @returns {string} Body of `namespace IslamicStarsDetail`. */
+function islamicStarsDetail(source) {
+  const block = /namespace IslamicStarsDetail\s*\{([\s\S]*?)^\} \/\/ namespace IslamicStarsDetail/m.exec(source);
+  assert.ok(block, 'namespace IslamicStarsDetail not found');
+  return block[1];
+}
+
 test('MAX_BUILD_STEPS matches the pinned shared build budget', { skip: engineSkip }, () => {
   const source = header(ISLAMIC_STARS_H);
   assert.match(source, /static constexpr size_t MAX_BUILD_STEPS\s*=\s*IslamicStarsDetail::MAX_BUILD_OPS;/);
-  const match = /namespace IslamicStarsDetail\s*\{[^}]*inline constexpr size_t MAX_BUILD_OPS\s*=\s*(\d+);/.exec(source);
+  const match = /inline constexpr size_t MAX_BUILD_OPS\s*=\s*(\d+);/.exec(islamicStarsDetail(source));
   assert.ok(match, 'IslamicStarsDetail::MAX_BUILD_OPS not found');
   assert.equal(MAX_BUILD_STEPS, Number(match[1]));
 });
@@ -490,7 +497,7 @@ test('engine struct reader ignores semicolons inside member comments', () => {
 test('MAX_BUILD_FACES matches the pinned shared build budget', { skip: engineSkip }, () => {
   const source = header(ISLAMIC_STARS_H);
   assert.match(source, /static constexpr size_t MAX_BUILD_FACES\s*=\s*IslamicStarsDetail::MAX_BUILD_FACES;/);
-  const match = /namespace IslamicStarsDetail\s*\{[^}]*inline constexpr size_t MAX_BUILD_FACES\s*=\s*(\d+);/.exec(source);
+  const match = /inline constexpr size_t MAX_BUILD_FACES\s*=\s*(\d+);/.exec(islamicStarsDetail(source));
   assert.ok(match, 'IslamicStarsDetail::MAX_BUILD_FACES not found');
   assert.equal(MAX_BUILD_FACES, Number(match[1]));
 });
@@ -564,7 +571,9 @@ test('composite sweep exemptions stay inside the engine primitive bands', { skip
 
 test('registry composite lowering matches expand_to_primitives', { skip: engineSkip }, () => {
   const recipe = header('core/mesh/recipe.h');
-  const body = recipe.slice(recipe.indexOf('inline size_t expand_to_primitives'));
+  const start = recipe.search(/\bsize_t\s+expand_to_primitives\(/);
+  assert.ok(start >= 0, 'expand_to_primitives not found');
+  const body = recipe.slice(start);
   for (const [name, lower] of Object.entries(LOWERING)) {
     const block = body.split(`case Op::${name.toUpperCase()}:`)[1]?.split('break;')[0];
     assert.ok(block, name);
