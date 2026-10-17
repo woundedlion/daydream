@@ -26,7 +26,7 @@ const RECORDER_TIMESLICE_MS = 1000;
 // or non-positive.
 const DEFAULT_BITRATE_MBPS = 16;
 
-// Seconds of video the streaming sink may hold pending picker, open, or writes.
+// Seconds of video the streaming sink may hold pending file open or writes.
 export const PICKER_GRACE_SECONDS = 120;
 
 // Bytes the in-memory fallback sink may accumulate before it ends the session.
@@ -321,13 +321,6 @@ export class VideoRecorder {
     // Alias of the live session buffer, for outside observation only.
     this.chunks = chunks;
 
-    recorder.ondataavailable = (e) => {
-      if (e.data.size === 0) return;
-      // Chunks received before sink setup are replayed through sink.write().
-      if (sink) sink.write(e.data);
-      else chunks.push(e.data);
-    };
-
     recorder.onstart = () => {
       if (notifyFallback && !ended && this.mediaRecorder === recorder)
         this.onFormatFallback?.(this.extension(recorder));
@@ -351,13 +344,16 @@ export class VideoRecorder {
     try {
       sink = this.openSink(recorder, effectName, chunks, bitrateMbps);
     } catch (err) {
-      recorder.ondataavailable = null;
       recorder.onstop = null;
       recorder.onerror = null;
       this.cleanup();
       this.reportFailure('output setup failed.', err);
       return;
     }
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) sink.write(e.data);
+    };
 
     const begin = () => {
       if (this.mediaRecorder !== recorder || sink.cancelled?.()) return;
@@ -367,8 +363,6 @@ export class VideoRecorder {
         this.elapsedSeconds = 0;
         this.recordingStartedAtMs = this.now();
         this.visibilityChanged();
-        const pending = chunks.splice(0);
-        for (const chunk of pending) sink.write(chunk);
       } catch (err) {
         recorder.ondataavailable = null;
         recorder.onstop = null;
@@ -558,8 +552,8 @@ export class VideoRecorder {
 
   /**
    * Builds the per-session data sink. With the File System Access API present,
-   * streams each chunk to a user-chosen file; chunks awaiting the picker, file
-   * opening, or writes are bounded at PICKER_GRACE_SECONDS of video at the
+   * streams each chunk to a user-chosen file; chunks awaiting file opening or
+   * writes are bounded at PICKER_GRACE_SECONDS of video at the
    * latched bitrate, past which the session stops and reports. Otherwise it
    * accumulates chunks for a single blob download at stop, bounded at
    * MEMORY_BUFFER_LIMIT_BYTES. The save dialog is raised here, under start()'s
@@ -600,7 +594,6 @@ export class VideoRecorder {
     let failed = false;
     let failureReported = false;
     let aborted = false;
-    let picked = false;
     let backlogBytes = 0;
     let overflowed = false;
     const maxBacklogBytes = (bitrateMbps * 1_000_000 / 8) * PICKER_GRACE_SECONDS;
@@ -622,8 +615,7 @@ export class VideoRecorder {
         } else {
           this.onSaveFallback?.(new Error('Streaming save unavailable; saving to Downloads instead.', { cause: err }));
         }
-      })
-      .finally(() => { picked = true; });
+      });
 
     // Serialize chunks; create the writable on the first chunk, preserving files for empty sessions.
     let chain = Promise.resolve();
@@ -632,17 +624,16 @@ export class VideoRecorder {
       ready: opened,
       write: (data) => {
         if (overflowed || aborted || failed) return;
-        if (picked && !handle && backlogBytes === 0) { hold(data); return; }
+        if (!handle && backlogBytes === 0) { hold(data); return; }
         if (backlogBytes + data.size > maxBacklogBytes) {
           overflowed = true;
           if (this.mediaRecorder === recorder) {
             this.stop();
             this.reportFailure(
-              `${picked ? 'the streaming save could not keep up' : 'the Save dialog was left unanswered'} `
+              'the streaming save could not keep up '
               + `while ${Math.round(maxBacklogBytes / 1_000_000)} MB of video `
               + `(${PICKER_GRACE_SECONDS}s at ${bitrateMbps} Mbps) piled up in memory. `
-              + (picked ? 'Queued video will be saved if writing completes.'
-                : 'Choose a file to save what was captured.'));
+              + 'Queued video will be saved if writing completes.');
           }
           return;
         }
