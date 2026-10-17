@@ -43,6 +43,7 @@ src/ui/gui.js
 src/segments/module_warmer.js
 src/effects/param_sync.js
 src/renderer/pixel_view.js
+src/renderer/pov_sweep.js
 src/recording/recorder.js
 src/segments/segment_controller.js
 src/segments/segment_compositor.js

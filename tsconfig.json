@@ -35,6 +35,7 @@
     "src/ui/global_stats_view.js",
     "src/effects/param_sync.js",
     "src/renderer/pixel_view.js",
+    "src/renderer/pov_sweep.js",
     "src/ui/sidebar_logic.js",
     "src/app/state.js",
     "src/app/app_lifecycle.js",

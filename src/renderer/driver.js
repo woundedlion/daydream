@@ -9,6 +9,7 @@ import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer
 import { pixelToSpherical } from "./geometry.js";
 import { isViewLive } from "./pixel_view.js";
 import { FPS } from "./frame_constants.js";
+import { PovSweep } from "./pov_sweep.js";
 import { MOBILE_BREAKPOINT_PX } from "../shared/layout.js";
 
 /**
@@ -244,6 +245,8 @@ export class Daydream {
     this.clock.connect(this.doc);
     this.frameInterval = 1 / Daydream.FPS; // seconds per simulation frame
     this.timeAccumulator = 0;
+    this.povFidelity = false;
+    this.povSweep = null;
 
     this.labelPool = new LabelPool(this.scene, Daydream.SPHERE_RADIUS, this.doc);
 
@@ -543,12 +546,31 @@ export class Daydream {
   render(adapter) {
     if (this.contextLost) return;
 
+    if (this.povFidelity && isViewLive(this.pixels)
+        && (!this.povSweep || this.povSweep.width !== this.W
+          || this.povSweep.height !== this.H)) {
+      this.povSweep = new PovSweep(this.W, this.H, this.pixels);
+    } else if (!this.povFidelity && this.povSweep) {
+      this.povSweep = null;
+      if (this.dotMesh?.instanceColor) this.dotMesh.instanceColor.needsUpdate = true;
+      this.needsRender = true;
+    }
+
     // A pending single-step must fire immediately, even while paused and before
     // the fixed-timestep clock has accrued a full interval; the frame clock still
     // advances once per frame either way.
     const clockReady = this.advanceFrameClock();
     const advanced =
       (clockReady || this.stepFrames !== 0) && this.stepSimulation(adapter);
+    if (this.povSweep && !isViewLive(this.pixels)) adapter?.refreshPixelView?.();
+    if (this.povSweep && isViewLive(this.pixels)) {
+      const pausedUpdate = this.paused && !advanced && this.needsRender
+        && this.pixels.some((value, i) => value !== this.povSweep.source[i]);
+      if (advanced || pausedUpdate) this.povSweep.beginFrame(this.pixels);
+      const fraction = this.paused && (advanced || pausedUpdate) ? 1
+        : this.timeAccumulator / this.frameInterval;
+      if (this.povSweep.advance(fraction)) this.needsRender = true;
+    }
     if (advanced || this.paused || this.needsRender) adapter?.sync?.(advanced);
 
     // Services live pointer interaction; emits 'change' (→ needsRender).
@@ -575,30 +597,40 @@ export class Daydream {
       return;
     }
 
-    this.xAxis.visible = this.labelAxes;
-    this.yAxis.visible = this.labelAxes;
-    this.zAxis.visible = this.labelAxes;
-
-    this.updateCullUniforms();
-
-    this.renderer.setScissorTest(true);
-    this.renderMainView();
-
-    // One requestFrame per repaint: several in a single task carry one timestamp,
-    // so the stream cannot emit them as separate video frames while the elapsed
-    // counter charges for each. A backlog drains one per repaint instead.
-    const owed = this.recorder ? (captureDue ? 1 : 0) + this.heldCaptures : 0;
-    this.heldCaptures = owed > 0 ? owed - 1 : 0;
-    if (owed > 0) this.recorder.captureFrame();
-    if (this.heldCaptures > 0) this.needsRender = true;
-
-    this.refreshLabels();
-    if (this.labelPool.activeCount > 0) {
-      this.labelRenderer.render(this.scene, this.camera);
+    const colorAttribute = this.dotMesh?.instanceColor;
+    const sourcePixels = colorAttribute?.array;
+    if (this.povSweep && colorAttribute) {
+      colorAttribute.array = this.povSweep.pixels;
+      colorAttribute.needsUpdate = true;
     }
+    try {
+      this.xAxis.visible = this.labelAxes;
+      this.yAxis.visible = this.labelAxes;
+      this.zAxis.visible = this.labelAxes;
 
-    this.renderPip();
-    this.renderer.setScissorTest(false);
+      this.updateCullUniforms();
+
+      this.renderer.setScissorTest(true);
+      this.renderMainView();
+
+      // One requestFrame per repaint: several in a single task carry one timestamp,
+      // so the stream cannot emit them as separate video frames while the elapsed
+      // counter charges for each. A backlog drains one per repaint instead.
+      const owed = this.recorder ? (captureDue ? 1 : 0) + this.heldCaptures : 0;
+      this.heldCaptures = owed > 0 ? owed - 1 : 0;
+      if (owed > 0) this.recorder.captureFrame();
+      if (this.heldCaptures > 0) this.needsRender = true;
+
+      this.refreshLabels();
+      if (this.labelPool.activeCount > 0) {
+        this.labelRenderer.render(this.scene, this.camera);
+      }
+
+      this.renderPip();
+      this.renderer.setScissorTest(false);
+    } finally {
+      if (this.povSweep && colorAttribute) colorAttribute.array = sourcePixels;
+    }
   }
 
   /**

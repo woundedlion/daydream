@@ -637,6 +637,76 @@ function renderCtx(colors, log) {
   };
 }
 
+test('POV fidelity sweeps between engine ticks and restores the engine aliases', () => {
+  const colors = new Uint16Array(8 * 2 * 3);
+  const ctx = renderCtx(colors, []);
+  Object.assign(ctx, {
+    W: 8, H: 2, pixels: colors, povFidelity: true, povSweep: null,
+    paused: false,
+    stepSimulation: Daydream.prototype.stepSimulation,
+    updateStats: () => {},
+  });
+  let delta = ctx.frameInterval;
+  let frames = 0;
+  let painted;
+  ctx.clock.getDelta = () => delta;
+  ctx.renderMainView = () => { painted = ctx.dotMesh.instanceColor.array.slice(); };
+  ctx.renderPip = () => assert.deepEqual(ctx.dotMesh.instanceColor.array, painted);
+  const adapter = { drawFrame: () => colors.fill(++frames * 10) };
+  const render = () => Daydream.prototype.render.call(ctx, adapter);
+  render();
+  assert.equal(frames, 1);
+  assert.ok(painted.every((v) => v === 0));
+  delta = ctx.frameInterval / 4;
+  render();
+  assert.equal(frames, 1);
+  assert.deepEqual(Array.from({ length: 8 }, (_, x) => painted[x * 3]),
+    [10, 0, 0, 0, 10, 0, 0, 0]);
+  assert.equal(ctx.pixels, colors);
+  assert.equal(ctx.dotMesh.instanceColor.array, colors);
+
+  ctx.paused = true;
+  const frozen = painted;
+  ctx.needsRender = true;
+  render();
+  assert.deepEqual(painted, frozen);
+  colors.fill(15);
+  ctx.needsRender = true;
+  render();
+  assert.ok(painted.every((v) => v === 15));
+  assert.equal(frames, 1);
+  ctx.stepFrames = 1;
+  render();
+  assert.equal(frames, 2);
+  assert.ok(painted.every((v) => v === 20));
+
+  ctx.povFidelity = false;
+  render();
+  assert.equal(ctx.povSweep, null);
+  assert.equal(ctx.dotMesh.instanceColor.array, colors);
+  assert.ok(painted.every((v) => v === 20));
+});
+
+test('POV fidelity reseeds after resize and restores aliases if drawing throws', () => {
+  const colors = new Uint16Array(8 * 2 * 3).fill(10);
+  const ctx = renderCtx(colors, []);
+  Object.assign(ctx, { W: 8, H: 2, pixels: colors, povFidelity: true, povSweep: null });
+  Daydream.prototype.render.call(ctx, {});
+  const resized = new Uint16Array(4 * 2 * 3).fill(20);
+  ctx.W = 4;
+  ctx.pixels = resized;
+  ctx.dotMesh.instanceColor = fakeColorAttribute(resized);
+  ctx.needsRender = true;
+  ctx.renderMainView = () => {
+    assert.deepEqual(ctx.dotMesh.instanceColor.array, resized);
+    throw new Error('GPU failed');
+  };
+  assert.throws(() => Daydream.prototype.render.call(ctx, {}), /GPU failed/);
+  assert.equal(ctx.povSweep.width, 4);
+  assert.equal(ctx.dotMesh.instanceColor.array, resized);
+  assert.equal(ctx.pixels, resized);
+});
+
 test('render repaints a pending frame while paused', () => {
   const log = [];
   const ctx = renderCtx(new Uint16Array(4), log);
