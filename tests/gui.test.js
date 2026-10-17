@@ -580,43 +580,18 @@ test('the sweep boundary view setting roundtrips through its URL key', () => {
   }
 });
 
-test('visual presentation and response scale roundtrip through view URL keys', () => {
-  const url = installRecordingWindow('?view.povPresentation=visual&view.povResponseScale=1.5');
+test('response scale roundtrips through its view URL key', () => {
+  const url = installRecordingWindow('?view.povResponseScale=1.5');
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const gui = new DeepLinkGUI({ autoPlace: false }, 'view');
-    const state = { povPresentation: 'raw', povResponseScale: 1 };
-    const presentation = gui.add(state, 'povPresentation', {
-      'Raw sweep': 'raw', 'Camera exposure': 'camera', 'Visual response (approx.)': 'visual',
-    });
+    const state = { povResponseScale: 1 };
     const response = gui.add(state, 'povResponseScale', 0.5, 2, 0.05);
-    assert.deepEqual(state, { povPresentation: 'visual', povResponseScale: 1.5 });
-    presentation.setValue('raw');
+    assert.equal(state.povResponseScale, 1.5);
     response.setValue(0.75);
     mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     const written = new URL(url.written(), 'http://x').searchParams;
-    assert.equal(written.get('view.povPresentation'), 'raw');
     assert.equal(written.get('view.povResponseScale'), '0.75');
-  } finally {
-    mock.timers.reset();
-  }
-});
-
-test('camera presentation and exposure roundtrip through view URL keys', () => {
-  const url = installRecordingWindow('?view.povPresentation=camera&view.povExposureMs=250');
-  mock.timers.enable({ apis: ['setTimeout'] });
-  try {
-    const gui = new DeepLinkGUI({ autoPlace: false }, 'view');
-    const state = { povPresentation: 'raw', povExposureMs: 125 };
-    const presentation = gui.add(state, 'povPresentation', { 'Raw sweep': 'raw', 'Camera exposure': 'camera' });
-    const exposure = gui.add(state, 'povExposureMs', 1, 250, 1);
-    assert.deepEqual(state, { povPresentation: 'camera', povExposureMs: 250 });
-    presentation.setValue('raw');
-    exposure.setValue(62);
-    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
-    const written = new URL(url.written(), 'http://x').searchParams;
-    assert.equal(written.get('view.povPresentation'), 'raw');
-    assert.equal(written.get('view.povExposureMs'), '62');
   } finally {
     mock.timers.reset();
   }

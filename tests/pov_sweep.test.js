@@ -91,7 +91,7 @@ test('visual response has causal startup and continuous column and half-turn bou
   assert.deepEqual(sweep.visualPixels(0), before);
 });
 
-test('visual front differences converge with column spacing while held and boxcar jumps remain', () => {
+test('visual front differences converge with column spacing while held jumps remain', () => {
   const visualJumps = [];
   for (const width of [288, 576, 1152, 2304]) {
     const half = width / 2;
@@ -107,7 +107,6 @@ test('visual front differences converge with column spacing while held and boxca
       return maximum;
     };
     assert.ok(frontJump(sweep.pixels) >= 490);
-    assert.ok(frontJump(sweep.cameraPixels(0.5, 2)) >= 490);
     visualJumps.push(frontJump(sweep.visualPixels(0.5)));
   }
   assert.ok(visualJumps[0] < 200);
@@ -125,19 +124,18 @@ test('visual history bounds cover the slowest response tail', () => {
   for (const frameMs of [62.5, 40, 100]) {
     const sweep = new PovSweep(8, 2, frame(10000), 0, frameMs);
     for (let i = 0; i < 30; i++) sweep.beginFrame(frame(10000));
-    assert.equal(sweep.emissions.length, Math.max(5, Math.ceil(40 * 4.94 * 2 / frameMs) + 1));
+    assert.equal(sweep.emissions.length, Math.ceil(40 * 4.94 * 2 / frameMs) + 1);
     assert.ok((sweep.emissions.length - 1) * frameMs >= 40 * 4.94 * 2);
     if (frameMs === 62.5) assert.equal(sweep.emissions.length, 8);
   }
 });
 
-test('visual scale, seek, and paused replacement preserve source frames and camera output', () => {
+test('visual scale, seek, and paused replacement preserve source frames', () => {
   const sweep = new PovSweep(8, 2, frame(10000));
   sweep.beginFrame(frame(20000));
   sweep.seek(0.5);
   const history = sweep.emissions.map(({ pixels }) => pixels.slice());
   const raw = sweep.pixels.slice();
-  const camera = sweep.cameraPixels(0.5, 2).slice();
   const visual = sweep.visualPixels(0.5).slice();
   assert.notDeepEqual(sweep.visualPixels(0.5, 2), visual);
   sweep.seek(0);
@@ -146,100 +144,9 @@ test('visual scale, seek, and paused replacement preserve source frames and came
   assert.deepEqual(sweep.visualPixels(0.5), visual);
   sweep.displayPixels(true, sweep.visualPixels(0.5));
   assert.deepEqual(sweep.pixels, raw);
-  assert.deepEqual(sweep.cameraPixels(0.5, 2), camera);
   sweep.replaceFrame(frame(30000));
   assert.deepEqual(sweep.visualPixels(0.5), visual);
   assert.deepEqual(sweep.emissions.map(({ pixels }) => pixels), history);
-});
-
-test('camera exposure agrees with an independent time-sampled emission oracle', () => {
-  const frames = Array.from({ length: 8 }, (_, epoch) => new Uint16Array(
-    Array.from({ length: 48 }, (_, index) => (epoch + 1) * 1000 + index * 7)));
-  const sweep = new PovSweep(8, 2, frames[0], 0.375);
-  for (let epoch = 0; epoch < frames.length; epoch++) {
-    if (epoch > 0) sweep.beginFrame(frames[epoch]);
-    for (const fraction of [0, 0.125, 0.375, 0.75, 1]) {
-      for (const duration of [0.125, 0.5, 1, 2.5, 4]) {
-        const expected = new Float64Array(48);
-        const endTick = (epoch + fraction) * 64;
-        const ticks = duration * 64;
-        for (let tick = endTick - ticks; tick < endTick; tick++) {
-          const time = (tick + 0.5) / 64;
-          if (time < 0.375) continue;
-          const source = frames[Math.floor(time)];
-          const column = Math.floor((time % 1) * 4);
-          for (let y = 0; y < 2; y++) {
-            for (const x of [column, column + 4]) {
-              const index = (y * 8 + x) * 3;
-              for (let channel = 0; channel < 3; channel++)
-                expected[index + channel] += source[index + channel] * 4 / ticks;
-            }
-          }
-        }
-        const rounded = Uint16Array.from(expected, (value) => Math.min(65535, Math.round(value)));
-        assert.deepEqual(sweep.cameraPixels(fraction, duration), rounded,
-          `frame ${epoch}, phase ${fraction}, shutter ${duration}`);
-      }
-    }
-    assert.ok(sweep.emissions.length <= 8);
-  }
-});
-
-test('camera startup is black and complete static exposures preserve linear brightness', () => {
-  const initial = frame(10000);
-  const sweep = new PovSweep(8, 2, initial, 0.5);
-  initial.fill(0);
-  assert.deepEqual(sweep.cameraPixels(0.5, 2), frame(0));
-  assert.deepEqual(row(sweep.cameraPixels(0.625, 2), 0), [0, 0, 2500, 0, 0, 0, 2500, 0]);
-  for (let i = 0; i < 5; i++) sweep.beginFrame(frame(10000));
-  for (const phase of [0, 0.125, 0.5, 0.875, 1]) {
-    for (const duration of [1, 2, 4])
-      assert.deepEqual(sweep.cameraPixels(phase, duration), frame(10000));
-  }
-  assert.deepEqual(row(sweep.cameraPixels(0.125, 0.125), 0),
-    [40000, 0, 0, 0, 40000, 0, 0, 0]);
-  sweep.beginFrame(frame(50000));
-  assert.deepEqual(row(sweep.cameraPixels(0.125, 0.125), 0),
-    [65535, 0, 0, 0, 65535, 0, 0, 0]);
-});
-
-test('camera seeks and marker overlays leave raw pixels and emission history unchanged', () => {
-  const source = frame(10000);
-  const sweep = new PovSweep(8, 2, source);
-  sweep.beginFrame(frame(20000));
-  source.fill(99);
-  sweep.seek(0.5);
-  const raw = sweep.pixels.slice();
-  const captured = sweep.emissions.map(({ pixels }) => pixels.slice());
-  const camera = sweep.cameraPixels(0.5, 1).slice();
-  const marked = sweep.displayPixels(true, sweep.cameraPixels(0.5, 1));
-  assert.equal(row(marked, 0).filter((value) => value === 65535).length, 2);
-  assert.deepEqual(sweep.cameraPixels(0.5, 1), camera);
-  assert.deepEqual(sweep.pixels, raw);
-  assert.equal(sweep.displayPixels(false), sweep.pixels);
-  sweep.seek(0);
-  sweep.cameraPixels(0, 4);
-  sweep.seek(0.5);
-  assert.deepEqual(sweep.cameraPixels(0.5, 1), camera);
-  assert.deepEqual(sweep.pixels, raw);
-  assert.deepEqual(sweep.emissions.map(({ pixels }) => pixels), captured);
-  sweep.replaceFrame(frame(30000));
-  assert.deepEqual(sweep.cameraPixels(0.5, 1), camera);
-  assert.deepEqual(sweep.emissions.map(({ pixels }) => pixels), captured);
-  sweep.beginFrame(frame(40000));
-  assert.deepEqual(sweep.emissions.at(-2).pixels, frame(20000));
-});
-
-test('camera exposure is continuous across column and half-turn boundaries', () => {
-  const sweep = new PovSweep(8, 2, frame(10000));
-  sweep.beginFrame(frame(20000));
-  for (const phase of [0.25, 0.5, 0.75]) {
-    const before = sweep.cameraPixels(phase - 1e-8, 1.5).slice();
-    assert.deepEqual(sweep.cameraPixels(phase + 1e-8, 1.5), before);
-  }
-  const before = sweep.cameraPixels(1, 1.5).slice();
-  sweep.beginFrame(frame(30000));
-  assert.deepEqual(sweep.cameraPixels(0, 1.5), before);
 });
 
 test('seeking backwards restores the same frame pair without accumulating markers', () => {

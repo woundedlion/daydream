@@ -21,8 +21,6 @@ export function sustainedSurvival(age) {
 
 /** Persistent two-arm display, sampled from one frozen image per half-turn. */
 export class PovSweep {
-  /** Maximum shutter duration, in half-turns. */
-  static MAX_EXPOSURE_FRAMES = 4;
   /** Sustained-channel gamma time constant in milliseconds. */
   static RESPONSE_TAU_MS = 4.94;
   /** Largest exploratory multiplier of the response time constant. */
@@ -41,24 +39,23 @@ export class PovSweep {
     this.width = width;
     this.height = height;
     this.frameMs = frameMs;
-    this.historyFrames = Math.max(PovSweep.MAX_EXPOSURE_FRAMES + 1,
-      Math.ceil(PovSweep.RESPONSE_TAIL_TAU * PovSweep.RESPONSE_TAU_MS
-        * PovSweep.MAX_RESPONSE_SCALE / frameMs) + 1);
+    this.historyFrames = Math.ceil(PovSweep.RESPONSE_TAIL_TAU * PovSweep.RESPONSE_TAU_MS
+        * PovSweep.MAX_RESPONSE_SCALE / frameMs) + 1;
     this.source = initial.slice();
     this.previous = initial.slice();
     this.pixels = initial.slice();
     /** @type {Uint16Array | null} */
     this.boundaryPixels = null;
     /** @type {Uint16Array | null} */
-    this.exposurePixels = null;
+    this.responsePixels = null;
     this.emissions = [{ pixels: initial.slice(), start: initialFraction }];
-    this.exposureWeights = new Float64Array(this.historyFrames);
+    this.responseWeights = new Float64Array(this.historyFrames);
     this.column = 0;
   }
 
   /**
    * @param {boolean} showBoundary Mark the next opposing columns in magenta.
-   * @param {Uint16Array} [pixels=this.pixels] Raw sweep or camera presentation.
+   * @param {Uint16Array} [pixels=this.pixels] Response pixels.
    * @returns {Uint16Array} Display pixels, with an optional boundary overlay.
    */
   displayPixels(showBoundary, pixels = this.pixels) {
@@ -97,20 +94,6 @@ export class PovSweep {
   }
 
   /**
-   * @param {number} fraction Camera time within the current half-turn, in [0, 1].
-   * @param {number} exposureFrames Rectangular shutter duration in half-turns, in (0, 4].
-   * @returns {Uint16Array} Normalized linear RGB16 exposure, clipped to the display range.
-   */
-  cameraPixels(fraction, exposureFrames) {
-    const duration = Math.max(Number.EPSILON,
-      Math.min(PovSweep.MAX_EXPOSURE_FRAMES, exposureFrames));
-    const end = Math.max(0, Math.min(1, fraction));
-    const start = end - duration;
-    return this.weightedPixels((pulseStart, pulseEnd) => Math.max(0,
-      Math.min(end, pulseEnd) - Math.max(start, pulseStart)) / duration);
-  }
-
-  /**
    * @param {number} fraction Response time within the current half-turn, in [0, 1].
    * @param {number} [responseScale=1] Sustained-channel timescale multiplier, in [0.5, 2].
    * @returns {Uint16Array} Approximate sustained visual response in linear RGB16.
@@ -129,7 +112,7 @@ export class PovSweep {
    * @returns {Uint16Array} Duty-compensated response, clipped to the display range.
    */
   weightedPixels(pulseWeight) {
-    this.exposurePixels ??= new Uint16Array(this.pixels.length);
+    this.responsePixels ??= new Uint16Array(this.pixels.length);
     const half = this.width / 2;
     const count = this.emissions.length;
     for (let column = 0; column < half; column++) {
@@ -138,7 +121,7 @@ export class PovSweep {
         const pulseStart = epoch + column / half;
         const pulseEnd = epoch + (column + 1) / half;
         const recordedStart = epoch + this.emissions[frame].start;
-        this.exposureWeights[frame] = pulseEnd <= recordedStart ? 0
+        this.responseWeights[frame] = pulseEnd <= recordedStart ? 0
           : pulseWeight(Math.max(pulseStart, recordedStart), pulseEnd) * half;
       }
       for (let y = 0; y < this.height; y++) {
@@ -147,13 +130,13 @@ export class PovSweep {
           for (let channel = 0; channel < 3; channel++) {
             let value = 0;
             for (let frame = 0; frame < count; frame++)
-              value += this.emissions[frame].pixels[index + channel] * this.exposureWeights[frame];
-            this.exposurePixels[index + channel] = Math.min(65535, Math.round(value));
+              value += this.emissions[frame].pixels[index + channel] * this.responseWeights[frame];
+            this.responsePixels[index + channel] = Math.min(65535, Math.round(value));
           }
         }
       }
     }
-    return this.exposurePixels;
+    return this.responsePixels;
   }
 
   /** @param {number} fraction Position within the current half-turn, in [0, 1]. */

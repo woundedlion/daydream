@@ -101,63 +101,37 @@ helpers that can perform that action themselves.
 
 ## Display geometry
 
-The **POV fidelity (16 Hz)** control reveals opposing columns at their sweep
-times and retains the previous image ahead of the arms. Column zero appears at
-the start of each half-turn. Pausing freezes the sweep position; single-step and
-parameter updates replace the source frame while preserving that position.
+The **POV fidelity (16 Hz)** control displays an approximate visual response to
+opposing columns emitted at their sweep times. Each opposing column pair emits
+for one column interval. The causal response integrates captured emissions in
+linear RGB16, independently of browser repaint rate. Emissions before fidelity
+starts are black; enabling it midway through a sweep records only the remaining
+portion. Fidelity off displays the ordinary full-frame preview.
+
 When rendering falls behind, fidelity mode advances one engine frame and drops
 overdue whole intervals while keeping the fractional sweep time. The ordinary
-preview keeps its bounded frame backlog.
+preview keeps its bounded frame backlog. The response clock follows simulated
+sweeps; dropped wall-clock backlog is not integrated. Pausing freezes response
+time. Changing the response scale reintegrates captured samples; paused parameter
+changes do not rewrite those emissions. Source colors enter the history when
+simulation advances.
 
-With fidelity enabled, **POV presentation** selects **Raw sweep** (the default),
-**Camera exposure**, or **Visual response (approx.)**. **Exposure (ms)** sets a
-rectangular global shutter from 1 to 250 ms, defaulting to 125 ms. The settings
-persist as `view.povPresentation` (`raw`, `camera`, or `visual`) and
-`view.povExposureMs` in shared URLs.
-The exposure slider is disabled outside Camera exposure with fidelity enabled;
-its value is retained when switching presentations or disabling fidelity.
-
-Camera exposure integrates the frozen source frames' emitted columns in linear
-RGB16. Each opposing column pair emits for one column interval; the analytic
-integration includes every crossed column regardless of browser repaint rate.
-Brightness is normalized by the column duty cycle and shutter duration, so a
-static image retains its brightness over whole-sweep exposures. Short exposures
-can produce bright arcs clipped to the RGB16 display range. A camera exposure
-uses at most five retained source frames; emissions before fidelity starts are
-black, so the camera view warms up over its shutter duration. Enabling fidelity midway through a
-sweep records only the remaining portion.
-
-The camera clock follows simulated sweeps; dropped wall-clock backlog is not
-integrated. Pausing freezes exposure time. Scrubbing and changing exposure only
-reintegrate captured samples; paused parameter changes or asynchronous segmented
-refreshes update the raw preview while the camera retains captured colors until
-simulation advances. The boundary marker is applied after exposure integration.
-This is an idealized nonstrobed column-dwell model with a global shutter, not a
-calibrated human-eye, LED strobe, transport-delay, or rolling-shutter model. It
-changes simulator presentation only; firmware and emitted source colors are
-unchanged. Longer shutters blur motion and do not guarantee seam-free output.
+**Response timescale** multiplies the sustained response's time constant from
+0.5 to 2, defaulting to the published reference value at 1. Larger values slow
+the response. The control is enabled when fidelity is on and persists as
+`view.povResponseScale`. Fidelity always uses visual response; obsolete
+`view.povPresentation` and `view.povExposureMs` parameters are removed from old
+links. See [the model and research basis](#visual-response-model) for its scope.
 
 **Show arm positions** marks the next opposing columns in magenta when POV
 fidelity is enabled. It defaults off and persists as `view.showSweepBoundary`
-in shared URLs. The marker changes only the displayed image. Column time
-compensation joins consecutive sweep endpoints at the fixed wrap, but the held
-image still has a one-sweep age jump at the moving refresh boundary. Pausing
-leaves that boundary stationary. These markers rotate with the arms; they do
-not identify a fixed longitude seam. Only the current pair is shown; the markers
-do not accumulate in camera exposure.
+in shared URLs. Only the current opposing pair is shown, applied after response
+integration. These markers rotate with the arms and do not identify a fixed
+longitude seam. The marker changes only the displayed image.
 
-**Inspect sweep (%)** pauses the simulator, enables fidelity and its boundary
-marker, and scrubs the same pair of source frames without advancing the engine.
-This diagnostic control is session-only; its position is not saved in URLs.
-
-**Visual response (approx.)** displays a causal sustained-channel response to
-the same captured column emissions. **Response timescale** multiplies its time
-constant from 0.5 to 2, defaulting to the published reference value at 1. Larger
-values slow the response. This control is enabled only for visual response with
-fidelity on; Exposure is enabled only for camera mode. The visual selection and
-scale persist as `view.povPresentation=visual` and `view.povResponseScale`.
-Pause, sweep inspection, and parameter changes follow the captured-history rules
-above. See [the model and research basis](#visual-response-model) for its scope.
+This changes simulator presentation only; firmware and emitted source colors are
+unchanged. It is an idealized nonstrobed column-dwell model with an approximate
+sustained visual response, not a calibrated human appearance model.
 
 The global **Top cap (%)** and **Bottom cap (%)** controls adjust the missing
 north-to-south arc independently, from 0% to 25% each. Both default to 0% for full
@@ -208,14 +182,13 @@ history and excludes future emission. It integrates every column interval,
 independently of browser repaint cadence, and does not blend completed display
 frames. Paused preview edits do not rewrite captured emissions.
 
-The kernel has unit area. A fixed column-duty compensation matches the camera
-mode's brightness convention; weights are never normalized separately for each
+The kernel has unit area. A fixed column-duty compensation preserves mean
+brightness; weights are never normalized separately for each
 column or sweep phase. Such normalization would artificially suppress physical
 modulation. RGB output clips to the display range, so bright response peaks can
 saturate. Black prehistory makes startup fade in rather than inventing samples.
 
-History covers at least 40 time constants at the maximum scale, as well as the
-camera's maximum shutter. The omitted gamma-tail integral is below `8.6e-10`.
+History covers at least 40 time constants at the maximum scale. The omitted gamma-tail integral is below `8.6e-10`.
 At 16 half-turns per second this requires eight source snapshots. These bounds
 and the response to finite pulses are checked numerically.
 
@@ -255,8 +228,8 @@ from either a flat spatial image or proof of perceptual invisibility.
 
 Device validation still requires measured pulse timing and duty, light output,
 viewing distance and angular size, background illumination, and fixed-gaze versus
-tracking observations. Known-shutter photographs can test camera mode; they
-cannot by themselves validate a human-perception model. Observer comparisons
+tracking observations. Known-shutter photographs alone cannot validate a
+human-perception model. Observer comparisons
 should include static patterns, moving bars and GridSpace at multiple speeds
 and brightnesses, with held-out effects to detect tuning to one example.
 

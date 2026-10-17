@@ -260,8 +260,6 @@ export function fakeDriver() {
     cullBackSphere: false,
     showPip: false,
     povFidelity: false,
-    povPresentation: 'raw',
-    povExposureMs: 125,
     povResponseScale: 1,
     showSweepBoundary: false,
     sweepPosition: 0,
