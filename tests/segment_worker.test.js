@@ -129,6 +129,10 @@ class FakeEngine {
     return this.selectPreset(
       (this.presetIndex + this.presetCount - 1) % this.presetCount);
   }
+  setTemporalSampling(enabled) {
+    this.calls.push(['setTemporalSampling', enabled]);
+    this.temporalSampling = enabled;
+  }
   setPoleLod(v) {
     this.calls.push(['setPoleLod', v]);
     this.poleLod = v;
@@ -326,6 +330,7 @@ test('state-changing messages before init explicitly reject instead of disappear
     { type: 'setAnimationsPaused', paused: true },
     { type: 'selectPreset', index: 1 },
     { type: 'setPoleLod', value: 0.5 },
+    { type: 'setTemporalSampling', enabled: false },
     { type: 'setDisplayCaps', topCap: 0, bottomCap: 0 },
   ];
   for (const message of messages) {
@@ -421,7 +426,7 @@ test('init applies the segment clip and posts ready', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
 
   assert.ok(engineInstance, 'engine constructed');
-  assert.deepEqual(engineInstance.calls[1], ['setResolution', 8, 4]);
+  assert.deepEqual(engineInstance.calls[2], ['setResolution', 8, 4]);
   assert.equal(engineInstance.effect, 'Plasma');
   // segId 3 of 4 over 8x4 → arm B (x0=4), bottom band (y0=2): clip {2,4,4,8}.
   assert.deepEqual(engineInstance.clip, { y0: 2, y1: 4, x0: 4, x1: 8 });
@@ -435,7 +440,7 @@ test('init with a rejected resolution posts engineRejected, not ready', async ()
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
 
   assert.ok(engineInstance, 'engine constructed');
-  assert.deepEqual(engineInstance.calls[1], ['setResolution', 8, 4], 'setResolution attempted');
+  assert.deepEqual(engineInstance.calls[2], ['setResolution', 8, 4], 'setResolution attempted');
   assert.ok(!posted.some((p) => p.msg.type === 'ready'), 'no ready for a rejected resolution');
   const failed = posted.find((p) => p.msg.type === 'engineRejected');
   assert.ok(failed, 'engineRejected posted');
@@ -896,7 +901,7 @@ test('init selects the carried preset before applying tuned params', async () =>
     presetIndex: 2, params: [{ name: 'Speed', value: 0.5 }],
   });
   assert.equal(engineInstance.presetIndex, 2);
-  assert.deepEqual(engineInstance.calls.slice(2, 4),
+  assert.deepEqual(engineInstance.calls.slice(3, 5),
     [['setEffect', 'Plasma'], ['synchronizePreset', 2]]);
   assert.deepEqual(engineInstance.params, [['Speed', 0.5]]);
 });
@@ -1341,8 +1346,8 @@ function typedefShapes(source) {
 // The typedefs are erased at runtime; this pin ties their shapes to
 // PROTOCOL_VERSION, which makes a reshaped message fault.
 const PROTOCOL_SHAPE_PIN = {
-  version: 13,
-  sha256: '16bba16acbe62dda1dbb1fd0ccfac1b6f5acf9fed8afadabbaea001fc0fcf31f',
+  version: 14,
+  sha256: '4db13e98c75ed6863d370e5ca6e5f60d7e91ad541caeff0bd62be8e2563b0572',
 };
 
 test('protocol typedef scanning includes single-line aliases', () => {
@@ -1352,7 +1357,7 @@ test('protocol typedef scanning includes single-line aliases', () => {
 
 test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {
   const shapes = typedefShapes(readFileSync(join(REPO, 'src/segments/worker_protocol.js'), 'utf8'));
-  assert.equal(shapes.length, 19, 'every protocol typedef is included');
+  assert.equal(shapes.length, 20, 'every protocol typedef is included');
   const digest = createHash('sha256').update(shapes.join('\n')).digest('hex');
   assert.equal(digest, PROTOCOL_SHAPE_PIN.sha256,
     'a protocol message shape changed: bump PROTOCOL_VERSION so a stale cached '
@@ -1370,4 +1375,19 @@ test('render after rejected init faults on the missing segment range', async () 
   assert.equal(posted.length, 0);
   assert.equal(captured.length, 1);
   assert.throws(() => captured[0](), /render without a configured segment range/);
+});
+
+
+test('worker sampling follows init and live changes before rendering', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
+    effectName: 'Plasma', temporalSampling: true });
+  assert.equal(engineInstance.temporalSampling, true);
+  assert.ok(engineInstance.calls.findIndex(([name]) => name === 'setTemporalSampling')
+    < engineInstance.calls.findIndex(([name]) => name === 'setEffect'));
+  await dispatch({ type: 'setTemporalSampling', enabled: false });
+  assert.equal(engineInstance.temporalSampling, false);
+  await dispatch({ type: 'render' });
+  const sampling = engineInstance.calls.findLastIndex(([name]) => name === 'setTemporalSampling');
+  const draw = engineInstance.calls.findLastIndex(([name]) => name === 'drawFrame');
+  assert.ok(sampling < draw);
 });

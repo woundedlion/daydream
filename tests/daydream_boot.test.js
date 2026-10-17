@@ -779,6 +779,7 @@ test('a trapped resolution query stops the startup instead of booting on', async
       }
       setPoleLod() {}
       setDisplayCaps() { return true; }
+      setTemporalSampling() {}
       getDisplayNorthPhi() { return 0; }
       getDisplaySouthPhi() { return Math.PI; }
       delete() {}
@@ -1119,4 +1120,29 @@ test('segment resize failure destroys the pool and clears Enabled while boundari
   assert.equal(segments.showBoundaries, true);
   boundaries.setValue(false);
   assert.equal(segments.showBoundaries, false);
+});
+
+
+test('fidelity selects engine sampling before first draw and refreshes paused toggles once', async () => {
+  for (const povFidelity of [false, true]) {
+    const module = fakeWasmModule();
+    const draws = [];
+    module.HolosphereEngine.prototype.drawFrame = function () { draws.push(this.temporalSampling); };
+    const app = startApp({ loadModule: () => Promise.resolve(module), hydratedView: { povFidelity } });
+    await app.teardown.ready;
+    assert.equal(module.engine.temporalSampling, povFidelity);
+    app.driver.renderer.frame();
+    assert.ok(draws.length > 0);
+    assert.ok(draws.every((sampling) => sampling === povFidelity));
+    const control = app.guis[0].controllers.find((c) => c.property === 'povFidelity');
+    app.driver.paused = true;
+    const before = draws.length;
+    control.setValue(!povFidelity);
+    assert.equal(module.engine.temporalSampling, !povFidelity);
+    assert.deepEqual(draws.slice(before), [!povFidelity]);
+    assert.equal(app.driver.paused, true);
+    control.setValue(!povFidelity);
+    assert.equal(draws.length, before + 1);
+    app.teardown.dispose();
+  }
 });

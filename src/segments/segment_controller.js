@@ -19,7 +19,7 @@ import { FAULT_POOL, FAULT_RENDER, PROTOCOL_VERSION } from "./worker_protocol.js
 import { errorDetail } from "../shared/banner.js";
 import { SEGMENT_COUNT_MAX } from "./segment_policy.js";
 
-export const SEGMENT_CONTROLLER_API_VERSION = 3;
+export const SEGMENT_CONTROLLER_API_VERSION = 4;
 
 // Deadline for all workers to report 'ready'; a non-throwing WASM load failure
 // fires no onerror and never sends 'ready'.
@@ -196,6 +196,7 @@ export class SegmentController {
     // Near-pole azimuthal decimation; per engine instance, so re-seeded into
     // every rebuilt pool.
     this.poleLod = 0;
+    this.temporalSampling = false;
     this.topCap = 0;
     this.bottomCap = 0;
 
@@ -508,6 +509,7 @@ export class SegmentController {
           paused: this.animationsPaused,
           presetIndex: this.presetIndex ?? undefined,
           poleLod: this.poleLod,
+          temporalSampling: this.temporalSampling,
           topCap: this.topCap,
           bottomCap: this.bottomCap,
           paramRevision: this.paramRevision,
@@ -950,6 +952,16 @@ export class SegmentController {
     this.poleLod = value;
     if (this.faulted) return;
     this.broadcast({ type: 'setPoleLod', value });
+  }
+
+  /** @param {boolean} enabled Whether columns sample their individual sweep times. */
+  setTemporalSampling(enabled) {
+    if (this.temporalSampling === enabled) return;
+    this.temporalSampling = enabled;
+    if (this.faulted) return;
+    this.#fencePublished();
+    this.broadcast({ type: 'setTemporalSampling', enabled });
+    if (this.driver.paused) this.tick();
   }
 
   /**

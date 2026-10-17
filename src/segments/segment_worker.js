@@ -269,6 +269,7 @@ export function installSegmentWorker() {
         post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
         return;
       }
+      engine.setTemporalSampling(msg.temporalSampling ?? false);
       // The latch tracks the live engine; a fresh one starts unlatched.
       awaitingEffect = false;
       // A rejected resolution leaves no usable geometry.
@@ -309,7 +310,7 @@ export function installSegmentWorker() {
           + `segRange=${segRange ? 'set' : 'null'})`);
       }
       if (!['setEffect', 'setResolution', 'setParameter', 'setAnimationsPaused',
-        'selectPreset', 'setDisplayCaps', 'setPoleLod'].includes(msg.type))
+        'selectPreset', 'setDisplayCaps', 'setPoleLod', 'setTemporalSampling'].includes(msg.type))
         throw new Error(`segment_worker: unknown message type ${msg.type}`);
       rejectBeforeInit(msg.type);
       return;
@@ -390,6 +391,11 @@ export function installSegmentWorker() {
 
       case 'setPoleLod': {
         engine.setPoleLod(msg.value);
+        break;
+      }
+
+      case 'setTemporalSampling': {
+        engine.setTemporalSampling(msg.enabled);
         break;
       }
 

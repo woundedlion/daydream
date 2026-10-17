@@ -16,7 +16,7 @@
  * bumps PROTOCOL_VERSION.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 13;
+export const PROTOCOL_VERSION = 14;
 
 // Sentinel segIds for pool-wide faults with no single worker to blame:
 // FAULT_POOL for pool-creation faults, FAULT_RENDER for render-path faults.
@@ -60,7 +60,7 @@ export const FAULT_RENDER = -2;
  *   effectName: string, params?: SegParam[],
  *   chainSnapshot?: ChainSnapshot, paused?: boolean,
  *   presetIndex?: number|undefined,
- *   poleLod?: number, paramRevision: number,
+ *   poleLod?: number, temporalSampling?: boolean, paramRevision: number,
  *   topCap?: number, bottomCap?: number,
  *   wasmModule?: WebAssembly.Module|undefined,
  * }} InitMsg
@@ -94,6 +94,9 @@ export const FAULT_RENDER = -2;
  * per-module-instance global).
  * @typedef {{ type: 'setPoleLod', value: number }} SetPoleLodMsg */
 
+/** Set whether columns sample individual sweep times on the worker's engine.
+ * @typedef {{ type: 'setTemporalSampling', enabled: boolean }} SetTemporalSamplingMsg */
+
 /** Set missing arc percentages on the worker's engine.
  * @typedef {{ type: 'setDisplayCaps', topCap: number, bottomCap: number }} SetDisplayCapsMsg */
 
@@ -106,7 +109,7 @@ export const FAULT_RENDER = -2;
  * Every message the controller sends to a worker.
  * @typedef {InitMsg | SetEffectMsg | SetResolutionMsg
  *   | SetParameterMsg | SetAnimationsPausedMsg | SelectPresetMsg | SetPoleLodMsg
- *   | SetDisplayCapsMsg | RenderMsg} WorkerInboundMsg
+ *   | SetDisplayCapsMsg | SetTemporalSamplingMsg | RenderMsg} WorkerInboundMsg
  */
 
 // --- Worker -> Controller (received by the controller) ---------------------

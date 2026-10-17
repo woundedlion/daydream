@@ -361,6 +361,7 @@ export function fakeWasmModule({
         return ParamSetResult.APPLIED;
       }
       setPoleLod(v) { poleLod.push(v); }
+      setTemporalSampling(enabled) { this.temporalSampling = enabled; }
       setDisplayCaps(top, bottom) { caps.push([top, bottom]); return true; }
       getDisplayNorthPhi() { return (caps.at(-1)?.[0] ?? 0) * Math.PI / 100; }
       getDisplaySouthPhi() { return (1 - (caps.at(-1)?.[1] ?? 0) / 100) * Math.PI; }
