@@ -109,6 +109,13 @@ When rendering falls behind, fidelity mode advances one engine frame and drops
 overdue whole intervals while keeping the fractional sweep time. The ordinary
 preview keeps its bounded frame backlog.
 
+**Show sweep boundary** marks the next opposing columns in magenta when POV
+fidelity is enabled. It defaults off and persists as `view.showSweepBoundary`
+in shared URLs. The marker changes only the displayed image. Column time
+compensation joins consecutive sweep endpoints at the fixed wrap, but the held
+image still has a one-sweep age jump at the moving refresh boundary. Pausing
+leaves that boundary stationary.
+
 The global **Top cap (%)** and **Bottom cap (%)** controls adjust the missing
 north-to-south arc independently, from 0% to 25% each. Both default to 0% for full
 coverage; use 2% each to preview the provisional physical device calibration.

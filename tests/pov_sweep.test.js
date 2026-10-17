@@ -5,6 +5,36 @@ import { PovSweep } from '../src/renderer/pov_sweep.js';
 const frame = (value) => new Uint16Array(8 * 2 * 3).fill(value);
 const row = (pixels, y) => Array.from({ length: 8 }, (_, x) => pixels[(y * 8 + x) * 3]);
 
+test('the optional boundary marks only the next opposing columns without changing samples', () => {
+  const initial = frame(10);
+  const source = frame(20);
+  const sweep = new PovSweep(8, 2, initial);
+  sweep.beginFrame(source);
+  assert.equal(sweep.displayPixels(false), sweep.pixels);
+  assert.equal(sweep.boundaryPixels, null);
+  let overlay;
+  for (const [phase, boundary] of [[0, 1], [0.5, 3], [1, 0]]) {
+    sweep.advance(phase);
+    const held = sweep.pixels.slice();
+    const displayed = sweep.displayPixels(true);
+    if (overlay) assert.equal(displayed, overlay);
+    overlay = displayed;
+    for (let y = 0; y < 2; y++) {
+      for (let x = 0; x < 8; x++) {
+        const index = (y * 8 + x) * 3;
+        assert.deepEqual(displayed.slice(index, index + 3),
+          x % 4 === boundary ? new Uint16Array([65535, 0, 65535])
+            : held.slice(index, index + 3));
+      }
+    }
+    assert.deepEqual(sweep.pixels, held);
+    assert.deepEqual(sweep.source, source);
+    assert.deepEqual(source, frame(20));
+    assert.deepEqual(initial, frame(10));
+    assert.equal(sweep.displayPixels(false), sweep.pixels);
+  }
+});
+
 test('sweep replaces opposing columns and retains the previous image ahead of both arms', () => {
   const sweep = new PovSweep(8, 2, frame(10));
   const source = frame(20);
