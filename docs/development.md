@@ -109,12 +109,39 @@ When rendering falls behind, fidelity mode advances one engine frame and drops
 overdue whole intervals while keeping the fractional sweep time. The ordinary
 preview keeps its bounded frame backlog.
 
-**Show sweep boundary** marks the next opposing columns in magenta when POV
+With fidelity enabled, **POV presentation** selects **Raw sweep** (the default)
+or **Camera exposure**. **Exposure (ms)** sets a rectangular global shutter from
+1 to 250 ms, defaulting to 125 ms. The settings persist as `view.povPresentation`
+(`raw` or `camera`) and `view.povExposureMs` in shared URLs.
+
+Camera exposure integrates the frozen source frames' emitted columns in linear
+RGB16. Each opposing column pair emits for one column interval; the analytic
+integration includes every crossed column regardless of browser repaint rate.
+Brightness is normalized by the column duty cycle and shutter duration, so a
+static image retains its brightness over whole-sweep exposures. Short exposures
+can produce bright arcs clipped to the RGB16 display range. Five source frames
+bound the history; emissions before fidelity starts are black, so the camera
+view warms up over its shutter duration. Enabling fidelity midway through a
+sweep records only the remaining portion.
+
+The camera clock follows simulated sweeps; dropped wall-clock backlog is not
+integrated. Pausing freezes exposure time. Scrubbing and changing exposure only
+reintegrate captured samples; paused parameter changes or asynchronous segmented
+refreshes update the raw preview while the camera retains captured colors until
+simulation advances. The boundary marker is applied after exposure integration.
+This is an idealized nonstrobed column-dwell model with a global shutter, not a
+calibrated human-eye, LED strobe, transport-delay, or rolling-shutter model. It
+changes simulator presentation only; firmware and emitted source colors are
+unchanged. Longer shutters blur motion and do not guarantee seam-free output.
+
+**Show arm positions** marks the next opposing columns in magenta when POV
 fidelity is enabled. It defaults off and persists as `view.showSweepBoundary`
 in shared URLs. The marker changes only the displayed image. Column time
 compensation joins consecutive sweep endpoints at the fixed wrap, but the held
 image still has a one-sweep age jump at the moving refresh boundary. Pausing
-leaves that boundary stationary.
+leaves that boundary stationary. These markers rotate with the arms; they do
+not identify a fixed longitude seam. Only the current pair is shown; the markers
+do not accumulate in camera exposure.
 
 **Inspect sweep (%)** pauses the simulator, enables fidelity and its boundary
 marker, and scrubs the same pair of source frames without advancing the engine.

@@ -553,7 +553,10 @@ export function start({
   guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'showPip').name('Show PiP').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'povFidelity').name('POV fidelity (16 Hz)').listen().onChange(() => daydream.invalidate());
-  guiInstance.add(daydream, 'showSweepBoundary').name('Show sweep boundary').listen().onChange(() => daydream.invalidate());
+  guiInstance.add(daydream, 'povPresentation', { 'Raw sweep': 'raw', 'Camera exposure': 'camera' })
+    .name('POV presentation').onChange(() => daydream.invalidate());
+  guiInstance.add(daydream, 'povExposureMs', 1, 250, 1).name('Exposure (ms)').onChange(() => daydream.invalidate());
+  guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions').listen().onChange(() => daydream.invalidate());
   guiInstance.addSession(daydream, 'sweepPosition', 0, 100, 0.1).name('Inspect sweep (%)').listen();
   guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill Overlap').onChange(() => daydream.invalidate());
 
