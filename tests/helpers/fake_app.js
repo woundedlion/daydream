@@ -111,12 +111,12 @@ function rejectUnsupported(target, property, choices) {
 
 /**
  * @param {string} [namespace=''] - Root namespace.
- * @param {{optionsReplaces?: boolean}} [options={}] - Controller replacement behavior.
+ * @param {{optionsReplaces?: boolean, hydrated?: Object}} [options={}] - Controller behavior and saved values.
  * @returns {Object} Deep-link GUI double.
  */
-export function fakeGui(namespace = '', { optionsReplaces = false } = {}) {
+export function fakeGui(namespace = '', { optionsReplaces = false, hydrated = {} } = {}) {
   if (typeof namespace !== 'string') throw new TypeError('GUI namespace must be a string');
-  return buildGui(namespace, optionsReplaces, false, {}, {});
+  return buildGui(namespace, optionsReplaces, false, hydrated, {});
 }
 
 /**
@@ -407,7 +407,7 @@ export function fakeWasmModule({
 /**
  * Builds the app against fakes.
  * @param {{loadModule?: () => Promise<Object>, nav?: Object,
- *   daydreamMode?: string, search?: string, optionsReplaces?: boolean}}
+ *   daydreamMode?: string, search?: string, optionsReplaces?: boolean, hydratedView?: Object}}
  *   [options] - Seam overrides. daydreamMode stamps documentElement, the
  *   attribute start() reads to route the workbench page; search is the query
  *   string URLSync hydrates from and the redirect builds its target against;
@@ -421,6 +421,7 @@ export function startApp({
   daydreamMode = undefined,
   search = '',
   optionsReplaces = false,
+  hydratedView = {},
 } = {}) {
   const savedGlobals = new Map([
     'document', 'window', 'ResizeObserver', 'requestAnimationFrame',
@@ -480,7 +481,9 @@ export function startApp({
     nav,
     createDriver: () => driver,
     createGui: (options, namespace) => {
-      const gui = fakeGui(namespace, { optionsReplaces });
+      const gui = fakeGui(namespace, {
+        optionsReplaces, hydrated: namespace === 'view' ? hydratedView : {},
+      });
       guis.push(gui);
       return gui;
     },
