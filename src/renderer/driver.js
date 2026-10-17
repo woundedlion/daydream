@@ -567,8 +567,7 @@ export class Daydream {
       const pausedUpdate = this.paused && !advanced && this.needsRender
         && this.pixels.some((value, i) => value !== this.povSweep.source[i]);
       if (advanced || pausedUpdate) this.povSweep.beginFrame(this.pixels);
-      const fraction = this.paused && (advanced || pausedUpdate) ? 1
-        : this.timeAccumulator / this.frameInterval;
+      const fraction = (this.timeAccumulator % this.frameInterval) / this.frameInterval;
       if (this.povSweep.advance(fraction)) this.needsRender = true;
     }
     if (advanced || this.paused || this.needsRender) adapter?.sync?.(advanced);
@@ -637,7 +636,8 @@ export class Daydream {
    * Fixed-timestep gate. Accumulates real elapsed time (clamped to avoid a
    * spiral-of-death after a stall) and consumes one frame interval only when
    * enough has accrued to advance a frame. Backlog beyond the clamp is dropped,
-   * not replayed: at most one frame advances per call.
+   * not replayed: at most one frame advances per call. POV fidelity drops overdue
+   * whole intervals and retains the current sweep phase.
    * @returns {boolean} True when a frame interval was consumed and the sim should advance.
    */
   advanceFrameClock() {
@@ -647,6 +647,11 @@ export class Daydream {
     // stalls on an emptied accumulator nor replays the paused span as backlog.
     if (this.paused) return false;
     this.timeAccumulator += delta;
+    if (this.povFidelity) {
+      if (this.timeAccumulator < this.frameInterval) return false;
+      this.timeAccumulator %= this.frameInterval;
+      return true;
+    }
     if (this.timeAccumulator > Daydream.MAX_FRAME_BACKLOG_SECONDS)
       this.timeAccumulator = Daydream.MAX_FRAME_BACKLOG_SECONDS;
     if (this.timeAccumulator < this.frameInterval) return false;

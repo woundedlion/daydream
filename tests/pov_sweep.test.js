@@ -10,10 +10,11 @@ test('sweep replaces opposing columns and retains the previous image ahead of bo
   const source = frame(20);
   sweep.beginFrame(source);
   source.fill(99);
-  assert.equal(sweep.advance(0), false);
+  assert.equal(sweep.advance(0), true);
+  assert.deepEqual(row(sweep.pixels, 0), [20, 10, 10, 10, 20, 10, 10, 10]);
   assert.equal(sweep.advance(0.5), true);
   for (const y of [0, 1]) {
-    assert.deepEqual(row(sweep.pixels, y), [20, 20, 10, 10, 20, 20, 10, 10]);
+    assert.deepEqual(row(sweep.pixels, y), [20, 20, 20, 10, 20, 20, 20, 10]);
   }
   assert.equal(sweep.advance(0.5), false);
   assert.equal(sweep.advance(1), true);
@@ -27,14 +28,31 @@ test('a new half-turn finishes the previous image before revealing the next', ()
   sweep.beginFrame(frame(30));
   assert.deepEqual(sweep.pixels, frame(20));
   sweep.advance(0.25);
-  assert.deepEqual(row(sweep.pixels, 0), [30, 20, 20, 20, 30, 20, 20, 20]);
+  assert.deepEqual(row(sweep.pixels, 0), [30, 30, 20, 20, 30, 30, 20, 20]);
 });
 
 test('a stalled clock clamps at a full sweep and cannot rewind displayed columns', () => {
   const sweep = new PovSweep(8, 2, frame(10));
   sweep.beginFrame(frame(20));
   assert.equal(sweep.advance(-1), false);
+  assert.equal(sweep.advance(-0.01), false);
+  assert.deepEqual(sweep.pixels, frame(10));
   assert.equal(sweep.advance(10), true);
   assert.equal(sweep.advance(0.25), false);
   assert.deepEqual(sweep.pixels, frame(20));
+});
+
+test('the first column joins the preceding sweep at both fixed meridians', () => {
+  const timestampFrame = (start) => new Uint16Array(
+    Array.from({ length: 8 * 3 }, (_, i) => start + Math.floor(i / 3) % 4));
+  const sweep = new PovSweep(8, 1, timestampFrame(0));
+  sweep.beginFrame(timestampFrame(4));
+  sweep.advance(0);
+  assert.deepEqual(row(sweep.pixels, 0), [4, 1, 2, 3, 4, 1, 2, 3]);
+  assert.equal(sweep.pixels[0] - sweep.pixels[7 * 3], 1);
+  assert.equal(sweep.pixels[4 * 3] - sweep.pixels[3 * 3], 1);
+  sweep.advance(0.25 - Number.EPSILON);
+  assert.equal(sweep.column, 1);
+  sweep.advance(0.25);
+  assert.deepEqual(row(sweep.pixels, 0), [4, 5, 2, 3, 4, 5, 2, 3]);
 });

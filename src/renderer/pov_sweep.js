@@ -27,8 +27,9 @@ export class PovSweep {
    * @returns {boolean} Whether any columns were refreshed.
    */
   advance(fraction) {
+    if (fraction < 0) return false;
     const half = this.width / 2;
-    const end = Math.min(half, Math.max(0, Math.floor(fraction * half)));
+    const end = Math.min(half, Math.floor(fraction * half) + 1);
     if (end <= this.column) return false;
     for (let y = 0; y < this.height; y++) {
       for (let arm = 0; arm < this.width; arm += half) {

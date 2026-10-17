@@ -101,6 +101,14 @@ helpers that can perform that action themselves.
 
 ## Display geometry
 
+The **POV fidelity (16 Hz)** control reveals opposing columns at their sweep
+times and retains the previous image ahead of the arms. Column zero appears at
+the start of each half-turn. Pausing freezes the sweep position; single-step and
+parameter updates replace the source frame while preserving that position.
+When rendering falls behind, fidelity mode advances one engine frame and drops
+overdue whole intervals while keeping the fractional sweep time. The ordinary
+preview keeps its bounded frame backlog.
+
 The global **Top cap (%)** and **Bottom cap (%)** controls adjust the missing
 north-to-south arc independently, from 0% to 25% each. Both default to 0% for full
 coverage; use 2% each to preview the provisional physical device calibration.

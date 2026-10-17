@@ -656,12 +656,13 @@ test('POV fidelity sweeps between engine ticks and restores the engine aliases',
   const render = () => Daydream.prototype.render.call(ctx, adapter);
   render();
   assert.equal(frames, 1);
-  assert.ok(painted.every((v) => v === 0));
+  assert.deepEqual(Array.from({ length: 8 }, (_, x) => painted[x * 3]),
+    [10, 0, 0, 0, 10, 0, 0, 0]);
   delta = ctx.frameInterval / 4;
   render();
   assert.equal(frames, 1);
   assert.deepEqual(Array.from({ length: 8 }, (_, x) => painted[x * 3]),
-    [10, 0, 0, 0, 10, 0, 0, 0]);
+    [10, 10, 0, 0, 10, 10, 0, 0]);
   assert.equal(ctx.pixels, colors);
   assert.equal(ctx.dotMesh.instanceColor.array, colors);
 
@@ -673,18 +674,65 @@ test('POV fidelity sweeps between engine ticks and restores the engine aliases',
   colors.fill(15);
   ctx.needsRender = true;
   render();
-  assert.ok(painted.every((v) => v === 15));
+  assert.deepEqual(Array.from({ length: 8 }, (_, x) => painted[x * 3]),
+    [15, 15, 10, 10, 15, 15, 10, 10]);
   assert.equal(frames, 1);
   ctx.stepFrames = 1;
   render();
   assert.equal(frames, 2);
-  assert.ok(painted.every((v) => v === 20));
+  assert.deepEqual(Array.from({ length: 8 }, (_, x) => painted[x * 3]),
+    [20, 20, 15, 15, 20, 20, 15, 15]);
 
   ctx.povFidelity = false;
   render();
   assert.equal(ctx.povSweep, null);
   assert.equal(ctx.dotMesh.instanceColor.array, colors);
   assert.ok(painted.every((v) => v === 20));
+});
+
+test('POV fidelity keeps fixed meridians continuous through lag and paused frame steps', () => {
+  const timestampFrame = (start) => new Uint16Array(
+    Array.from({ length: 8 * 3 }, (_, i) => start + Math.floor(i / 3) % 4));
+  const colors = timestampFrame(0);
+  const ctx = renderCtx(colors, []);
+  Object.assign(ctx, {
+    W: 8, H: 1, pixels: colors, povFidelity: true, povSweep: null,
+    paused: false,
+    stepSimulation: Daydream.prototype.stepSimulation,
+    updateStats: () => {},
+  });
+  ctx.clock.getDelta = () => ctx.frameInterval * 2.25;
+  let frame = 0;
+  let painted;
+  ctx.renderMainView = () => { painted = ctx.dotMesh.instanceColor.array.slice(); };
+  const adapter = { drawFrame: () => colors.set(timestampFrame(++frame * 4)) };
+  const render = () => Daydream.prototype.render.call(ctx, adapter);
+  render();
+  assert.equal(frame, 1);
+  assert.equal(ctx.timeAccumulator, ctx.frameInterval / 4);
+  assert.deepEqual(Array.from({ length: 8 }, (_, x) => painted[x * 3]),
+    [4, 5, 2, 3, 4, 5, 2, 3]);
+  assert.equal(painted[0] - painted[7 * 3], 1);
+  assert.equal(painted[4 * 3] - painted[3 * 3], 1);
+
+  ctx.paused = true;
+  ctx.stepFrames = 1;
+  render();
+  assert.equal(frame, 2);
+  assert.equal(ctx.timeAccumulator, ctx.frameInterval / 4);
+  assert.deepEqual(Array.from({ length: 8 }, (_, x) => painted[x * 3]),
+    [8, 9, 6, 7, 8, 9, 6, 7]);
+  assert.equal(painted[0] - painted[7 * 3], 1);
+  assert.equal(painted[4 * 3] - painted[3 * 3], 1);
+
+  colors.set(timestampFrame(12));
+  ctx.needsRender = true;
+  render();
+  assert.equal(frame, 2);
+  assert.deepEqual(Array.from({ length: 8 }, (_, x) => painted[x * 3]),
+    [12, 13, 10, 11, 12, 13, 10, 11]);
+  assert.equal(painted[0] - painted[7 * 3], 1);
+  assert.equal(painted[4 * 3] - painted[3 * 3], 1);
 });
 
 test('POV fidelity reseeds after resize and restores aliases if drawing throws', () => {
@@ -705,6 +753,28 @@ test('POV fidelity reseeds after resize and restores aliases if drawing throws',
   assert.equal(ctx.povSweep.width, 4);
   assert.equal(ctx.dotMesh.instanceColor.array, resized);
   assert.equal(ctx.pixels, resized);
+});
+
+test('enabling POV fidelity while paused normalizes an existing frame backlog', () => {
+  const colors = new Uint16Array(
+    Array.from({ length: 8 * 3 }, (_, i) => Math.floor(i / 3) % 4));
+  const ctx = renderCtx(colors, []);
+  Object.assign(ctx, {
+    W: 8, H: 1, pixels: colors, povFidelity: true, povSweep: null,
+    stepFrames: 1, timeAccumulator: ctx.frameInterval * 2.25,
+    stepSimulation: Daydream.prototype.stepSimulation,
+    updateStats: () => {},
+  });
+  let painted;
+  ctx.renderMainView = () => { painted = ctx.dotMesh.instanceColor.array.slice(); };
+  Daydream.prototype.render.call(ctx, {
+    drawFrame: () => colors.forEach((value, i) => { colors[i] = 4 + Math.floor(i / 3) % 4; }),
+  });
+  assert.equal(ctx.stepFrames, 0);
+  assert.deepEqual(Array.from({ length: 8 }, (_, x) => painted[x * 3]),
+    [4, 5, 2, 3, 4, 5, 2, 3]);
+  assert.equal(painted[0] - painted[7 * 3], 1);
+  assert.equal(painted[4 * 3] - painted[3 * 3], 1);
 });
 
 test('render repaints a pending frame while paused', () => {
