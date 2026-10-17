@@ -246,8 +246,6 @@ export class Daydream {
     this.frameInterval = 1 / Daydream.FPS; // seconds per simulation frame
     this.timeAccumulator = 0;
     this.povFidelity = false;
-    this.povPresentation = 'raw';
-    this.povExposureMs = 125;
     this.povResponseScale = 1;
     this.showSweepBoundary = false;
     this.povSweep = null;
@@ -577,8 +575,7 @@ export class Daydream {
       else if (pausedUpdate) this.povSweep.replaceFrame(this.pixels);
       const fraction = (this.timeAccumulator % this.frameInterval) / this.frameInterval;
       if (this.povSweep.advance(fraction)) this.needsRender = true;
-      if ((this.povPresentation === 'camera' || this.povPresentation === 'visual')
-          && this.timeAccumulator !== previousSweepTime)
+      if (this.timeAccumulator !== previousSweepTime)
         this.needsRender = true;
     }
     if (advanced || this.paused || this.needsRender) adapter?.sync?.(advanced);
@@ -611,11 +608,7 @@ export class Daydream {
     const sourcePixels = colorAttribute?.array;
     if (this.povSweep && colorAttribute) {
       const fraction = (this.timeAccumulator % this.frameInterval) / this.frameInterval;
-      let pixels = this.povSweep.pixels;
-      if (this.povPresentation === 'camera')
-        pixels = this.povSweep.cameraPixels(fraction, this.povExposureMs / (this.frameInterval * 1000));
-      else if (this.povPresentation === 'visual')
-        pixels = this.povSweep.visualPixels(fraction, this.povResponseScale);
+      const pixels = this.povSweep.visualPixels(fraction, this.povResponseScale);
       colorAttribute.array = this.povSweep.displayPixels(this.showSweepBoundary, pixels);
       colorAttribute.needsUpdate = true;
     }

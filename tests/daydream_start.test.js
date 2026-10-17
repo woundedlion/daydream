@@ -9,7 +9,6 @@ import { readFileSync } from 'node:fs';
 import { installConsoleCapture } from './helpers/fake_console.js';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 import { fakeWasmModule, trackedStartApp } from './helpers/fake_app.js';
-import { Daydream } from '../src/renderer/driver.js';
 
 restoreDocumentAfterEach();
 const startApp = trackedStartApp();
@@ -58,7 +57,7 @@ test('the global GUI carries the controls a deep link names', () => {
 
   assert.deepEqual(root.controllers.map((c) => c.property),
     ['resolution', 'testAll', 'labelAxes', 'cullBackSphere', 'showPip', 'povFidelity',
-      'povPresentation', 'povExposureMs', 'povResponseScale', 'showSweepBoundary', 'sweepPosition',
+      'povResponseScale', 'showSweepBoundary',
       'columnFillOverlap', 'poleLod', 'topCap', 'bottomCap']);
   const segments = root.folders.find((f) => f.namespace === 'Segmented POV');
   assert.ok(segments, 'the segmented folder name is a deep-link key segment');
@@ -81,86 +80,50 @@ test('POV fidelity defaults off and toggling it requests a repaint', () => {
   assert.equal(driver.invalidated, true);
 });
 
-test('camera presentation and exposure are persistent view controls', () => {
+test('response timescale is a persistent view control', () => {
   const { guis, driver } = startApp();
-  for (const [name, initial, selected] of [
-    ['povPresentation', 'raw', 'camera'], ['povExposureMs', 125, 250], ['povResponseScale', 1, 2],
-  ]) {
-    driver.invalidated = false;
-    const control = guis[0].controllers.find((c) => c.property === name);
-    assert.equal(control.getValue(), initial);
-    assert.equal(control.session, undefined);
-    assert.ok(guis[0].collectUrlKeys().includes(`view.${name}`));
-    control.setValue(selected);
-    assert.equal(driver[name], selected);
-    assert.equal(driver.invalidated, true);
-  }
+  const control = guis[0].controllers.find((c) => c.property === 'povResponseScale');
+  assert.equal(control.getValue(), 1);
+  assert.equal(control.session, undefined);
+  assert.ok(guis[0].collectUrlKeys().includes('view.povResponseScale'));
+  driver.invalidated = false;
+  control.setValue(2);
+  assert.equal(driver.povResponseScale, 2);
+  assert.equal(driver.invalidated, true);
 });
 
-test('exposure is enabled only for the active camera presentation and keeps its value', () => {
-  const { guis, driver } = startApp();
-  const control = (name) => guis[0].controllers.find((c) => c.property === name);
-  const exposure = control('povExposureMs');
-  assert.equal(exposure.disabled, true);
-  control('povFidelity').setValue(true);
-  assert.equal(exposure.disabled, true);
-  control('povPresentation').setValue('camera');
-  assert.equal(exposure.disabled, false);
-  exposure.setValue(187);
-  control('povPresentation').setValue('raw');
-  assert.equal(exposure.disabled, true);
-  assert.equal(exposure.getValue(), 187);
-  control('povFidelity').setValue(false);
-  control('povPresentation').setValue('camera');
-  assert.equal(exposure.disabled, true);
-  Object.defineProperty(driver, 'sweepPosition',
-    Object.getOwnPropertyDescriptor(Daydream.prototype, 'sweepPosition'));
-  control('sweepPosition').setValue(25);
-  assert.equal(driver.povFidelity, true);
-  assert.equal(exposure.disabled, false);
-  assert.equal(exposure.getValue(), 187);
-  control('povFidelity').setValue(false);
-  assert.equal(exposure.disabled, true);
-});
-
-test('hydrated POV controls initialize response availability after all values load', () => {
+test('legacy presentation settings cannot change hydrated fidelity response controls', () => {
   for (const povFidelity of [false, true]) {
     for (const povPresentation of ['raw', 'camera', 'visual']) {
-      const { guis } = startApp({
+      const { guis, driver } = startApp({
         hydratedView: { povFidelity, povPresentation, povExposureMs: 187, povResponseScale: 1.3 },
       });
-      const exposure = guis[0].controllers.find((c) => c.property === 'povExposureMs');
-      assert.equal(exposure.disabled, !(povFidelity && povPresentation === 'camera'));
-      assert.equal(exposure.getValue(), 187);
-      assert.ok(guis[0].collectUrlKeys().includes('view.povExposureMs'));
       const response = guis[0].controllers.find((c) => c.property === 'povResponseScale');
-      assert.equal(response.disabled, !(povFidelity && povPresentation === 'visual'));
+      assert.equal(response.disabled, !povFidelity);
       assert.equal(response.getValue(), 1.3);
       assert.ok(guis[0].collectUrlKeys().includes('view.povResponseScale'));
+      for (const key of ['povPresentation', 'povExposureMs']) {
+        assert.ok(!guis[0].collectUrlKeys().includes(`view.${key}`));
+        assert.equal(driver[key], undefined);
+      }
     }
   }
 });
 
-test('visual response controls follow mode, fidelity, and sweep inspection', () => {
-  const { guis, driver } = startApp();
+test('response availability follows fidelity without resetting its value', () => {
+  const { guis } = startApp();
   const control = (name) => guis[0].controllers.find((c) => c.property === name);
   const response = control('povResponseScale');
   assert.equal(response.disabled, true);
-  control('povPresentation').setValue('visual');
-  assert.equal(response.disabled, true);
-  Object.defineProperty(driver, 'sweepPosition',
-    Object.getOwnPropertyDescriptor(Daydream.prototype, 'sweepPosition'));
-  control('sweepPosition').setValue(25);
+  control('povFidelity').setValue(true);
   assert.equal(response.disabled, false);
-  assert.equal(control('povExposureMs').disabled, true);
   response.setValue(1.5);
-  control('povPresentation').setValue('camera');
-  assert.equal(response.disabled, true);
-  assert.equal(response.getValue(), 1.5);
-  assert.equal(control('povExposureMs').disabled, false);
-  control('povPresentation').setValue('visual');
   control('povFidelity').setValue(false);
   assert.equal(response.disabled, true);
+  assert.equal(response.getValue(), 1.5);
+  control('povFidelity').setValue(true);
+  assert.equal(response.disabled, false);
+  assert.equal(response.getValue(), 1.5);
 });
 
 test('the sweep boundary defaults off and persists as a view control', () => {
@@ -173,14 +136,6 @@ test('the sweep boundary defaults off and persists as a view control', () => {
   control.setValue(true);
   assert.equal(driver.showSweepBoundary, true);
   assert.equal(driver.invalidated, true);
-});
-
-test('sweep inspection stays out of shared URLs', () => {
-  const { guis } = startApp({ search: '?view.sweepPosition=75' });
-  const control = guis[0].controllers.find((c) => c.property === 'sweepPosition');
-  assert.equal(control.session, true);
-  assert.equal(control.getValue(), 0);
-  assert.ok(!guis[0].collectUrlKeys().includes('view.sweepPosition'));
 });
 
 test('a workbench-only effect deep link is handed to the workbench page', () => {
