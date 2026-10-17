@@ -381,6 +381,7 @@ export class VideoRecorder {
 
     if (sink.ready) {
       this.starting = true;
+      this.elapsedSeconds = 0;
       sink.ready.then(begin);
     } else {
       begin();
