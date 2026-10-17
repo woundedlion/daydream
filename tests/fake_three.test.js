@@ -66,7 +66,7 @@ test('needsUpdate only ever raises the version', () => {
   assert.equal(attribute.needsUpdate, undefined, 'the flag is write-only');
 });
 
-test('only the dispose paths append to the shared teardown log', () => {
+test('construction is silent; clear() and the dispose paths append to the teardown log', () => {
   const before = log.length;
   const scene = new Scene();
   const geometry = new SphereGeometry();
