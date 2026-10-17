@@ -57,7 +57,7 @@ test('the global GUI carries the controls a deep link names', () => {
 
   assert.deepEqual(root.controllers.map((c) => c.property),
     ['resolution', 'testAll', 'labelAxes', 'cullBackSphere', 'showPip', 'povFidelity',
-      'showSweepBoundary', 'columnFillOverlap', 'poleLod', 'topCap', 'bottomCap']);
+      'showSweepBoundary', 'sweepPosition', 'columnFillOverlap', 'poleLod', 'topCap', 'bottomCap']);
   const segments = root.folders.find((f) => f.namespace === 'Segmented POV');
   assert.ok(segments, 'the segmented folder name is a deep-link key segment');
   assert.deepEqual(segments.controllers.map((c) => c.property),
@@ -88,6 +88,14 @@ test('the sweep boundary defaults off and persists as a view control', () => {
   control.setValue(true);
   assert.equal(driver.showSweepBoundary, true);
   assert.equal(driver.invalidated, true);
+});
+
+test('sweep inspection stays out of shared URLs', () => {
+  const { guis } = startApp({ search: '?view.sweepPosition=75' });
+  const control = guis[0].controllers.find((c) => c.property === 'sweepPosition');
+  assert.equal(control.session, true);
+  assert.equal(control.getValue(), 0);
+  assert.ok(!guis[0].collectUrlKeys().includes('view.sweepPosition'));
 });
 
 test('a workbench-only effect deep link is handed to the workbench page', () => {

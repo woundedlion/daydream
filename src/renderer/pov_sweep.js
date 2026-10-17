@@ -11,6 +11,7 @@ export class PovSweep {
     this.width = width;
     this.height = height;
     this.source = initial.slice();
+    this.previous = initial.slice();
     this.pixels = initial.slice();
     /** @type {Uint16Array | null} */
     this.boundaryPixels = null;
@@ -41,8 +42,16 @@ export class PovSweep {
   /** @param {Uint16Array} source Next half-turn's image. */
   beginFrame(source) {
     this.advance(1);
+    this.previous.set(this.source);
     this.source.set(source);
     this.column = 0;
+  }
+
+  /** @param {number} fraction Position within the current half-turn, in [0, 1]. */
+  seek(fraction) {
+    this.pixels.set(this.previous);
+    this.column = 0;
+    this.advance(Math.max(0, Math.min(1, fraction)));
   }
 
   /**

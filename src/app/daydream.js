@@ -552,8 +552,9 @@ export function start({
   guiInstance.add(daydream, 'labelAxes').name('Show Axes').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'showPip').name('Show PiP').onChange(() => daydream.invalidate());
-  guiInstance.add(daydream, 'povFidelity').name('POV fidelity (16 Hz)').onChange(() => daydream.invalidate());
-  guiInstance.add(daydream, 'showSweepBoundary').name('Show sweep boundary').onChange(() => daydream.invalidate());
+  guiInstance.add(daydream, 'povFidelity').name('POV fidelity (16 Hz)').listen().onChange(() => daydream.invalidate());
+  guiInstance.add(daydream, 'showSweepBoundary').name('Show sweep boundary').listen().onChange(() => daydream.invalidate());
+  guiInstance.addSession(daydream, 'sweepPosition', 0, 100, 0.1).name('Inspect sweep (%)').listen();
   guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill Overlap').onChange(() => daydream.invalidate());
 
   const poleLod = createPoleLodBinding({

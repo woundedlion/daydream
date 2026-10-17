@@ -116,6 +116,10 @@ compensation joins consecutive sweep endpoints at the fixed wrap, but the held
 image still has a one-sweep age jump at the moving refresh boundary. Pausing
 leaves that boundary stationary.
 
+**Inspect sweep (%)** pauses the simulator, enables fidelity and its boundary
+marker, and scrubs the same pair of source frames without advancing the engine.
+This diagnostic control is session-only; its position is not saved in URLs.
+
 The global **Top cap (%)** and **Bottom cap (%)** controls adjust the missing
 north-to-south arc independently, from 0% to 25% each. Both default to 0% for full
 coverage; use 2% each to preview the provisional physical device calibration.

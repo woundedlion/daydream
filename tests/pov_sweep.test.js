@@ -5,6 +5,34 @@ import { PovSweep } from '../src/renderer/pov_sweep.js';
 const frame = (value) => new Uint16Array(8 * 2 * 3).fill(value);
 const row = (pixels, y) => Array.from({ length: 8 }, (_, x) => pixels[(y * 8 + x) * 3]);
 
+test('seeking backwards restores the same frame pair without accumulating markers', () => {
+  const sweep = new PovSweep(8, 2, frame(10));
+  const source = frame(20);
+  sweep.beginFrame(source);
+  for (const [phase, expected, boundary] of [
+    [0.5, [20, 20, 20, 10, 20, 20, 20, 10], 3],
+    [0, [20, 10, 10, 10, 20, 10, 10, 10], 1],
+    [1, [20, 20, 20, 20, 20, 20, 20, 20], 0],
+    [0.25, [20, 20, 10, 10, 20, 20, 10, 10], 2],
+    [0, [20, 10, 10, 10, 20, 10, 10, 10], 1],
+  ]) {
+    sweep.seek(phase);
+    for (const y of [0, 1]) {
+      assert.deepEqual(row(sweep.pixels, y), expected);
+      const overlay = row(sweep.displayPixels(true), y);
+      assert.equal(overlay.filter((value) => value === 65535).length, 2);
+      assert.equal(overlay[boundary], 65535);
+      assert.equal(overlay[boundary + 4], 65535);
+    }
+    assert.deepEqual(sweep.source, frame(20));
+    assert.deepEqual(sweep.previous, frame(10));
+    assert.deepEqual(source, frame(20));
+  }
+  sweep.beginFrame(frame(30));
+  sweep.seek(0);
+  assert.deepEqual(row(sweep.pixels, 0), [30, 20, 20, 20, 30, 20, 20, 20]);
+});
+
 test('the optional boundary marks only the next opposing columns without changing samples', () => {
   const initial = frame(10);
   const source = frame(20);
