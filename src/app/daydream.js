@@ -553,17 +553,23 @@ export function start({
   guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'showPip').name('Show PiP').onChange(() => daydream.invalidate());
   const povFidelity = guiInstance.add(daydream, 'povFidelity').name('POV fidelity (16 Hz)').listen();
-  const povPresentation = guiInstance.add(daydream, 'povPresentation', { 'Raw sweep': 'raw', 'Camera exposure': 'camera' })
+  const povPresentation = guiInstance.add(daydream, 'povPresentation', {
+    'Raw sweep': 'raw', 'Camera exposure': 'camera', 'Visual response (approx.)': 'visual',
+  })
     .name('POV presentation');
   const povExposure = guiInstance.add(daydream, 'povExposureMs', 1, 250, 1).name('Exposure (ms)');
+  const povResponse = guiInstance.add(daydream, 'povResponseScale', 0.5, 2, 0.05).name('Response timescale');
   const syncPovControls = () => {
     if (daydream.povFidelity && daydream.povPresentation === 'camera') povExposure.enable();
     else povExposure.disable();
+    if (daydream.povFidelity && daydream.povPresentation === 'visual') povResponse.enable();
+    else povResponse.disable();
     daydream.invalidate();
   };
   povFidelity.onChange(syncPovControls);
   povPresentation.onChange(syncPovControls);
   povExposure.onChange(() => daydream.invalidate());
+  povResponse.onChange(() => daydream.invalidate());
   syncPovControls();
   guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions').listen().onChange(() => daydream.invalidate());
   guiInstance.addSession(daydream, 'sweepPosition', 0, 100, 0.1).name('Inspect sweep (%)').listen().onChange(syncPovControls);

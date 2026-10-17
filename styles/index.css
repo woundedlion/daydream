@@ -817,6 +817,11 @@
     display: contents;
   }
 
+  .gui-container .lil-gui .lil-controller.lil-disabled > .lil-name,
+  .gui-container .lil-gui .lil-controller.lil-disabled > .lil-widget {
+    opacity: 0.5;
+  }
+
   .gui-container .lil-gui .lil-controller > .lil-name {
     padding-right: 10px;
     line-height: var(--widget-height);
