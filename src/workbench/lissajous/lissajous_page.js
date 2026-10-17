@@ -119,11 +119,13 @@ const snapFrequencies = (activeId, rawNewValue, direction = 0) => {
   sliderHandles[activeId].setValue(snappedActiveC);
   sliderHandles[activeId].setReadout(snappedActiveC);
 
-  sliderHandles.Duration.setValue(newDomain);
-  state.Duration = newDomain;
-  // The readout shows the closing domain, which the thumb's step grid may miss
-  // by up to half a step.
-  sliderHandles.Duration.setReadout(state.Duration);
+  if (newDomain !== null) {
+    sliderHandles.Duration.setValue(newDomain);
+    state.Duration = newDomain;
+    // The readout shows the closing domain, which the thumb's step grid may miss
+    // by up to half a step.
+    sliderHandles.Duration.setReadout(state.Duration);
+  }
 
   scheduleUpdate();
 };

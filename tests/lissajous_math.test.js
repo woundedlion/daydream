@@ -355,6 +355,24 @@ test('directed rational snap advances from an existing closing ratio', () => {
 
 test('directed rational snap stays within bounds when no next ratio exists', () => {
   const range = { min: 1, max: 12 };
-  assert.equal(snapToRationalRatio(12, 5, 8, range, 1).snappedActiveC, 12);
-  assert.equal(snapToRationalRatio(1, 5, 8, range, -1).snappedActiveC, 1);
+  const atMax = snapToRationalRatio(12, 5, 8, range, 1);
+  const atMin = snapToRationalRatio(1, 5, 8, range, -1);
+  assert.equal(atMax.snappedActiveC, 12);
+  assert.equal(atMax.closingPeriod, TWO_PI);
+  assert.equal(atMin.snappedActiveC, 1);
+  assert.equal(atMin.closingPeriod, TWO_PI);
+});
+
+test('directed rational snap held at a bound reports its own closing period', () => {
+  const held = snapToRationalRatio(1, 12, 8, { min: 1, max: 100 }, -1);
+  assert.equal(held.snappedActiveC, 1);
+  assert.equal(held.m, 1);
+  assert.equal(held.n, 12);
+  assert.ok(Math.abs(held.closingPeriod - TWO_PI) < 1e-12);
+});
+
+test('directed rational snap held at a bound on a non-closing pair reports no period', () => {
+  const held = snapToRationalRatio(Math.SQRT2, 1, 8, { min: 1, max: Math.SQRT2 }, 1);
+  assert.equal(held.snappedActiveC, Math.SQRT2);
+  assert.equal(held.closingPeriod, null);
 });
