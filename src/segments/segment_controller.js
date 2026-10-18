@@ -802,7 +802,6 @@ export class SegmentController {
 
   #fencePublished() {
     this.#renderGen++;
-    this.#results.fill(null);
     this.#pendingFrame = false;
     this.#frameComposited = false;
   }
@@ -883,7 +882,7 @@ export class SegmentController {
       this.create(this.count);
       return;
     }
-    // Fence in-flight old-effect frames and drop settled ones.
+    // Fence unpublished old-effect frames.
     this.#fencePublished();
     this.broadcast({
       type: 'setEffect',
@@ -966,7 +965,7 @@ export class SegmentController {
   }
 
   /**
-   * Update worker geometry and discard frames rendered for the previous caps.
+   * Update worker geometry, holding the published frame until its replacement.
    * @param {number} topCap
    * @param {number} bottomCap
    * @returns {void}
@@ -996,6 +995,7 @@ export class SegmentController {
     this.paramValues = null;
     this.paramRevision++;
     this.#fencePublished();
+    this.#results.fill(null);
     // The outstanding render retains the latch until frameResolve or its watchdog.
     this.broadcast({ type: 'setResolution', w, h });
   }

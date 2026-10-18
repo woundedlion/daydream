@@ -590,12 +590,50 @@ test('effect selection fences the unconsumed capture of a paused outgoing frame'
     assert.equal(c.frameComposited, true);
     c.setEffect('Replacement');
     assert.equal(c.consumeCapture(), false);
-    assert.equal(c.hasPublishedFrame(), false);
+    assert.equal(c.hasPublishedFrame(), true);
   } finally {
     driver.paused = false;
     c.destroy();
   }
 });
+
+for (const [name, fence] of [
+  ['effect', (c) => c.setEffect('Replacement')],
+  ['temporal sampling', (c) => c.setTemporalSampling(!c.temporalSampling)],
+  ['display caps', (c) => c.setDisplayCaps(0.1, 0.2)],
+]) {
+  test(`${name} changes hold the published frame during running ticks`, async () => {
+    setDisplayGrid(4, 2);
+    const c = readyController(2);
+    c.active = true;
+    driver.paused = false;
+    try {
+      c.tick();
+      await deliverGeneration(c, gridHalves(1000));
+      c.tick();
+      const outgoing = driver.pixels.slice();
+      assert.ok(outgoing.some((value) => value !== 0));
+      assert.equal(c.consumeCapture(), true);
+      fence(c);
+      driver.pixels.fill(0);
+      c.tick();
+      assert.deepEqual(driver.pixels, outgoing);
+      assert.equal(c.consumeCapture(), false);
+      await deliverGeneration(c, gridHalves(2000));
+      driver.pixels.fill(0);
+      c.tick();
+      assert.deepEqual(driver.pixels, outgoing);
+      assert.equal(c.consumeCapture(), false);
+      await deliverGeneration(c, gridHalves(3000));
+      driver.pixels.fill(0);
+      c.tick();
+      assert.notDeepEqual(driver.pixels, outgoing);
+      assert.equal(c.consumeCapture(), true);
+    } finally {
+      c.destroy();
+    }
+  });
+}
 
 test('setEffect broadcasts the name plus the tuned param snapshot to every worker', () => {
   const c = readyController(2);
@@ -669,7 +707,7 @@ test('setEffect fences out an old-effect frame still in flight', async () => {
   assert.ok(!driver.pixels.includes(111), 'no old-effect pixel reached the display');
 });
 
-test('setEffect drops an old-effect generation that settled but never composited', async () => {
+test('setEffect holds a published outgoing generation without capturing it', async () => {
   setDisplayGrid(4, 2);
   const c = readyController(2);
   c.showBoundaries = false;
@@ -680,8 +718,8 @@ test('setEffect drops an old-effect generation that settled but never composited
   c.setEffect('NewEffect');
   c.tick();
 
-  assert.equal(c.frameComposited, false, 'the dropped generation composited nothing');
-  assert.ok(!driver.pixels.includes(111), 'no old-effect pixel reached the display');
+  assert.equal(c.frameComposited, false, 'the held generation is not a new capture');
+  assert.ok(driver.pixels.includes(111), 'the published outgoing image is held');
 });
 
 // A resize drops the worker's effect and its clip; rendering faults until the
