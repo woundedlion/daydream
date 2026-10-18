@@ -711,44 +711,6 @@ test('effect history waits for complete worker publication and swaps while pause
   assert.equal(ctx.paused, true);
 });
 
-test('sweep inspection pauses and seeks without drawing another engine frame', () => {
-  const colors = new Uint16Array(8 * 2 * 3).fill(10);
-  const ctx = renderCtx(colors, []);
-  Object.assign(ctx, {
-    W: 8, H: 2, pixels: colors, povFidelity: false, povSweep: null,
-    paused: false, stepFrames: 2, invalidate: Daydream.prototype.invalidate,
-    stepSimulation: Daydream.prototype.stepSimulation,
-  });
-  const position = Object.getOwnPropertyDescriptor(Daydream.prototype, 'sweepPosition');
-  const render = () => Daydream.prototype.render.call(ctx, {
-    drawFrame: () => assert.fail('inspection advanced the engine'),
-  });
-  position.set.call(ctx, 50);
-  assert.equal(ctx.paused, true);
-  assert.equal(ctx.stepFrames, 0);
-  assert.equal(ctx.povFidelity, true);
-  assert.equal(ctx.showSweepBoundary, true);
-  assert.equal(position.get.call(ctx), 50);
-  render();
-  assert.equal(ctx.povSweep.column, 3);
-
-  colors.fill(20);
-  ctx.needsRender = true;
-  render();
-  for (const [percent, expected] of [
-    [0, [20, 10, 10, 10, 20, 10, 10, 10]],
-    [100, [20, 20, 20, 20, 20, 20, 20, 20]],
-    [25, [20, 20, 10, 10, 20, 20, 10, 10]],
-  ]) {
-    position.set.call(ctx, percent);
-    render();
-    assert.deepEqual(Array.from({ length: 8 }, (_, x) => ctx.povSweep.pixels[x * 3]), expected);
-    assert.ok(Math.abs(position.get.call(ctx) - percent) < 1e-10);
-    assert.ok(ctx.povSweep.previous.every((value) => value === 10));
-    assert.ok(ctx.povSweep.source.every((value) => value === 20));
-  }
-});
-
 test('the sweep marker selects a separate display buffer only in fidelity mode', () => {
   const colors = new Uint16Array(8 * 2 * 3).fill(10);
   const ctx = renderCtx(colors, []);

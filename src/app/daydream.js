@@ -557,7 +557,7 @@ export function start({
   guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'showPip').name('Show PiP').onChange(() => daydream.invalidate());
   let temporalSampling = daydream.povFidelity;
-  const povFidelity = guiInstance.add(daydream, 'povFidelity').name('POV fidelity (16 Hz)').listen();
+  const povFidelity = guiInstance.add(daydream, 'povFidelity').name('POV fidelity (16 Hz)');
   const povResponse = guiInstance.add(daydream, 'povResponseScale', 0.5, 2, 0.05).name('Response timescale');
   const syncPovControls = () => {
     if (daydream.povFidelity) povResponse.enable();
@@ -575,7 +575,7 @@ export function start({
   });
   povResponse.onChange(() => daydream.invalidate());
   syncPovControls();
-  guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions').listen().onChange(() => daydream.invalidate());
+  guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill Overlap').onChange(() => daydream.invalidate());
 
   const poleLod = createPoleLodBinding({

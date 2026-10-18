@@ -650,23 +650,6 @@ export class Daydream {
     }
   }
 
-  /** @returns {number} Current sweep position as a percentage. */
-  get sweepPosition() {
-    return (this.timeAccumulator % this.frameInterval) / this.frameInterval * 100;
-  }
-
-  /** @param {number} percentage Pause and inspect the current sweep at this position. */
-  set sweepPosition(percentage) {
-    const fraction = Math.max(0, Math.min(1 - Number.EPSILON, percentage / 100));
-    this.paused = true;
-    this.stepFrames = 0;
-    this.povFidelity = true;
-    this.showSweepBoundary = true;
-    this.timeAccumulator = fraction * this.frameInterval;
-    this.povSweep?.seek(fraction);
-    this.invalidate();
-  }
-
   /**
    * Fixed-timestep gate. Accumulates real elapsed time (clamped to avoid a
    * spiral-of-death after a stall) and consumes one frame interval only when

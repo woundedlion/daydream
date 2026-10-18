@@ -152,17 +152,15 @@ test('visual history bounds cover the slowest response tail', () => {
   }
 });
 
-test('visual scale, seek, and paused replacement preserve source frames', () => {
+test('visual scale and paused replacement preserve source frames', () => {
   const sweep = new PovSweep(8, 2, frame(10000));
   sweep.beginFrame(frame(20000));
-  sweep.seek(0.5);
+  sweep.advance(0.5);
   const history = sweep.emissions.map(({ pixels }) => pixels.slice());
   const raw = sweep.pixels.slice();
   const visual = sweep.visualPixels(0.5).slice();
   assert.notDeepEqual(sweep.visualPixels(0.5, 2), visual);
-  sweep.seek(0);
   sweep.visualPixels(0);
-  sweep.seek(0.5);
   assert.deepEqual(sweep.visualPixels(0.5), visual);
   sweep.displayPixels(true, sweep.visualPixels(0.5));
   assert.deepEqual(sweep.pixels, raw);
@@ -171,10 +169,8 @@ test('visual scale, seek, and paused replacement preserve source frames', () => 
   assert.deepEqual(sweep.emissions.map(({ pixels }) => pixels), history);
 });
 
-test('seeking backwards restores the same frame pair without accumulating markers', () => {
-  const sweep = new PovSweep(8, 2, frame(10));
+test('advancing fresh frame pairs preserves samples without accumulating markers', () => {
   const source = frame(20);
-  sweep.beginFrame(source);
   for (const [phase, expected, boundary] of [
     [0.5, [20, 20, 20, 10, 20, 20, 20, 10], 3],
     [0, [20, 10, 10, 10, 20, 10, 10, 10], 1],
@@ -182,7 +178,9 @@ test('seeking backwards restores the same frame pair without accumulating marker
     [0.25, [20, 20, 10, 10, 20, 20, 10, 10], 2],
     [0, [20, 10, 10, 10, 20, 10, 10, 10], 1],
   ]) {
-    sweep.seek(phase);
+    const sweep = new PovSweep(8, 2, frame(10));
+    sweep.beginFrame(source);
+    sweep.advance(phase);
     for (const y of [0, 1]) {
       assert.deepEqual(row(sweep.pixels, y), expected);
       const overlay = row(sweep.displayPixels(true), y);
@@ -194,8 +192,9 @@ test('seeking backwards restores the same frame pair without accumulating marker
     assert.deepEqual(sweep.previous, frame(10));
     assert.deepEqual(source, frame(20));
   }
+  const sweep = new PovSweep(8, 2, source);
   sweep.beginFrame(frame(30));
-  sweep.seek(0);
+  sweep.advance(0);
   assert.deepEqual(row(sweep.pixels, 0), [30, 20, 20, 20, 30, 20, 20, 20]);
 });
 

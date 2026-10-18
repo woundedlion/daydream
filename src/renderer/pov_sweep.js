@@ -152,13 +152,6 @@ export class PovSweep {
     return this.responsePixels;
   }
 
-  /** @param {number} fraction Position within the current half-turn, in [0, 1]. */
-  seek(fraction) {
-    this.pixels.set(this.previous);
-    this.column = 0;
-    this.advance(Math.max(0, Math.min(1, fraction)));
-  }
-
   /**
    * @param {number} fraction Elapsed fraction of the half-turn, in [0, 1].
    * @returns {boolean} Whether any columns were refreshed.
