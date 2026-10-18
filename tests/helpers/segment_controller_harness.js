@@ -2,7 +2,7 @@
 // worker message drivers, and the console/global guards each suite installs.
 import { mock, beforeEach, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { installDocument } from './fake_dom.js';
+import { installDocument, stashGlobals } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 import { FakeWorker } from './fake_worker.js';
 import { displayAliasesDiverged, repointDisplayAliases } from '../../src/engine/display_aliases.js';
@@ -99,17 +99,10 @@ export function installSegmentControllerHarness() {
       .map(({method, args}) => [method, String(args[0])]);
     assert.deepEqual(diagnostics, expectedDiagnostics, 'per-test segment diagnostics');
   });
-  const savedGlobals = { Worker: globalThis.Worker, document: globalThis.document };
-  const restoreGlobal = (key, val) => {
-    if (val === undefined) delete globalThis[key];
-    else globalThis[key] = val;
-  };
+  const restore = stashGlobals('Worker', 'document');
   after(() => {
     for (const stub of consoleMocks) stub.mock.restore();
-    restoreGlobal('Worker', savedGlobals.Worker);
-    restoreGlobal('document', savedGlobals.document);
-
-
+    restore();
   });
 
   globalThis.Worker = FakeWorker;

@@ -1,7 +1,7 @@
 // Builds daydream.js's composition root against injected seams (document, page
 // target, navigator, driver, GUI factory, module loader).
 import { afterEach } from 'node:test';
-import { fakeElement, installDocument } from './fake_dom.js';
+import { fakeElement, installDocument, stashGlobals } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 import { EffectSetResult, ParamSetResult, ResolutionSetResult } from './fake_engine.js';
 import { Daydream } from '../../src/renderer/driver.js';
@@ -423,10 +423,8 @@ export function startApp({
   optionsReplaces = false,
   hydratedView = {},
 } = {}) {
-  const savedGlobals = new Map([
-    'document', 'window', 'ResizeObserver', 'requestAnimationFrame',
-    'cancelAnimationFrame',
-  ].map((key) => [key, globalThis[key]]));
+  const restore = stashGlobals('document', 'window', 'ResizeObserver',
+    'requestAnimationFrame', 'cancelAnimationFrame');
   const ids = ['gui-container', 'effect-sidebar', 'apply-notice-dismiss',
     'apply-notice-body', 'apply-notice-text', 'canvas-container',
     'loading-overlay', 'apply-notice', 'segment-stats'];
@@ -489,12 +487,6 @@ export function startApp({
     },
     loadModule,
   });
-  const restore = () => {
-    for (const [key, value] of savedGlobals) {
-      if (value === undefined) delete globalThis[key];
-      else globalThis[key] = value;
-    }
-  };
   return {
     teardown, driver, guis, listeners, docListeners, elements, queried, win,
     replaced, urlWrites, restore,
