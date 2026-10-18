@@ -1779,7 +1779,7 @@ function cullCtx() {
     camera: { position: new THREE.Vector3(3, -4, 12) },
     cullBackSphere: false,
     strobeColumns: true,
-    columnFillOverlap: 1.15,
+    noBlackColumns: false,
     cullUniforms: {
       uCameraPos: { value: new THREE.Vector3() },
       uCullThreshold: { value: NaN },
@@ -1819,7 +1819,7 @@ test('updateCullUniforms culls nothing until back-face culling is on', () => {
   assert.ok(threshold < 0, 'culling ate the visible hemisphere');
 });
 
-test('updateCullUniforms gap-fills columns only for a persisting effect', () => {
+test('updateCullUniforms gap-fills columns for a persisting effect', () => {
   const ctx = cullCtx();
   Daydream.prototype.updateCullUniforms.call(ctx);
   assert.equal(ctx.cullUniforms.uColumnFillArc.value, 0, 'strobed dots were smeared');
@@ -1834,11 +1834,22 @@ test('updateCullUniforms gap-fills columns only for a persisting effect', () => 
   Daydream.prototype.updateCullUniforms.call(ctx);
   assert.ok(Math.abs(ctx.cullUniforms.uColumnFillArc.value - arc / 2) < 1e-9);
 
-  // Overlap scales it linearly.
-  ctx.W = 96;
-  ctx.columnFillOverlap *= 2;
+
+});
+
+test('no black columns overrides strobing and restores the effect mode when disabled', () => {
+  const ctx = cullCtx();
+  ctx.noBlackColumns = true;
   Daydream.prototype.updateCullUniforms.call(ctx);
-  assert.ok(Math.abs(ctx.cullUniforms.uColumnFillArc.value - arc * 2) < 1e-9);
+  assert.ok(ctx.cullUniforms.uColumnFillArc.value > 0);
+
+  ctx.noBlackColumns = false;
+  Daydream.prototype.updateCullUniforms.call(ctx);
+  assert.equal(ctx.cullUniforms.uColumnFillArc.value, 0);
+
+  ctx.strobeColumns = false;
+  Daydream.prototype.updateCullUniforms.call(ctx);
+  assert.ok(ctx.cullUniforms.uColumnFillArc.value > 0);
 });
 
 test('updateCullUniforms is a no-op before setupDots builds the dot material', () => {

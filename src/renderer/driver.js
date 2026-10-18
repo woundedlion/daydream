@@ -302,9 +302,7 @@ export class Daydream {
     this.labelAxes = false;
     this.cullBackSphere = true;
     this.showPip = true;
-    // Persist column gap-fill overlap (see updateCullUniforms): 1.0 = pills meet
-    // exactly; higher closes any hairline seam at the cost of longer terminal caps.
-    this.columnFillOverlap = 1.15;
+    this.noBlackColumns = false;
 
     // Round dots until an effect binds and sets its mode (see updateCullUniforms).
     this.strobeColumns = true;
@@ -748,10 +746,8 @@ export class Daydream {
       this.cullUniforms.uCullThreshold.value = this.cullBackSphere
         ? -this.DOT_SIZE / Daydream.SPHERE_RADIUS
         : -2.0;
-      // Persist effects pass the equator half-arc (PI*R/W) so the shader fills the
-      // inter-column gaps; strobe and the pre-effect default pass 0 (round dots).
-      this.cullUniforms.uColumnFillArc.value = this.strobeColumns === false
-        ? this.columnFillOverlap * Math.PI * Daydream.SPHERE_RADIUS / this.W
+      this.cullUniforms.uColumnFillArc.value = this.noBlackColumns || this.strobeColumns === false
+        ? 1.15 * Math.PI * Daydream.SPHERE_RADIUS / this.W
         : 0;
     }
   }
@@ -869,7 +865,7 @@ export class Daydream {
                  transformed *= 0.0;
              }
              vec3 instPos = (instanceMatrix[3]).xyz;
-             // Column gap-fill (persist effects, uColumnFillArc > 0): extend each
+             // Column gap-fill (uColumnFillArc > 0): extend each
              // dot east-west into a PILL whose STRAIGHT (full-radius) middle
              // reaches the column-cell boundary, so a run of lit columns tiles
              // flush — flat seams, no scalloping — and only the run's terminal
@@ -883,7 +879,7 @@ export class Daydream {
              // to nothing) the cap shows as the rounded terminal. ext = the cell
              // half-arc = uColumnFillArc * sinPhi; sinPhi (latitude
              // foreshortening from instPos) shrinks the cell toward the poles.
-             // Strobe effects pass uColumnFillArc == 0 -> round dots.
+             // uColumnFillArc == 0 leaves round dots.
              float sinPhi = length(instPos.xz) / max(length(instPos), 1e-6);
              float ext = uColumnFillArc * sinPhi;
              transformed.x += sign(transformed.x) * ext;

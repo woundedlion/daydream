@@ -576,7 +576,7 @@ export function start({
   povResponse.onChange(() => daydream.invalidate());
   syncPovControls();
   guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions').onChange(() => daydream.invalidate());
-  guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill Overlap').onChange(() => daydream.invalidate());
+  guiInstance.add(daydream, 'noBlackColumns').name('No black columns').onChange(() => daydream.invalidate());
 
   const poleLod = createPoleLodBinding({
     getEngine: () => host.engine,
