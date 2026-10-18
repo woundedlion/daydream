@@ -338,6 +338,7 @@ export function createSwitchCoordinator({
  * @param {{active: boolean, setEffect: (effect: string) => void,
  *   setResolution: (w: number, h: number) => void}} deps.segments - The SegmentController.
  * @param {{setStrobeColumns: (strobe: boolean) => void, invalidate: () => void, stepOnce: () => void,
+ *   resetPovOnNextFrame: () => void,
  *   updateResolution: (w: number, h: number, dotSize: number) => void}} deps.driver -
  *   The Daydream driver.
  * @param {{setActive: (effect: string) => void,
@@ -424,6 +425,7 @@ export function createApplyPipeline({
     effectGui.applyAnimationPause();
 
     sidebar.setActive(appState.get('effect'));
+    driver.resetPovOnNextFrame();
     driver.stepOnce();
     return ApplyResult.APPLIED;
   }

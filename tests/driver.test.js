@@ -685,6 +685,32 @@ test('visual presentation repaints within columns and preserves paused samples a
   assert.deepEqual(painted, colors);
 });
 
+test('effect history waits for complete worker publication and swaps while paused', () => {
+  const pixels = new Uint16Array(48).fill(1000);
+  const ctx = renderCtx(pixels, []);
+  Object.assign(ctx, { W: 8, H: 2, pixels, povFidelity: true,
+    povResponseScale: 1, paused: true, needsRender: true });
+  let ready = false, calls = 0;
+  const adapter = { captureReady() { calls++; return ready; } };
+  const render = () => Daydream.prototype.render.call(ctx, adapter);
+  render();
+  Daydream.prototype.resetPovOnNextFrame.call(ctx);
+  pixels.fill(0);
+  ctx.needsRender = true;
+  render();
+  assert.equal(ctx.povResetPending, true);
+  assert.ok(ctx.povSweep.source.every(value => value === 1000));
+  pixels.fill(2000);
+  ready = true;
+  ctx.needsRender = true;
+  render();
+  assert.equal(ctx.povResetPending, false);
+  assert.ok(ctx.povSweep.emissions.every(frame => frame.pixels.every(value => value === 2000)));
+  assert.equal(ctx.dotMesh.instanceColor.array, pixels);
+  assert.equal(calls, 3, 'capture readiness is consumed once per repaint');
+  assert.equal(ctx.paused, true);
+});
+
 test('sweep inspection pauses and seeks without drawing another engine frame', () => {
   const colors = new Uint16Array(8 * 2 * 3).fill(10);
   const ctx = renderCtx(colors, []);

@@ -287,6 +287,7 @@ export function fakeDriver() {
     advanceFrameClock() { return true; },
     invalidate() { this.invalidated = true; this.needsRender = true; },
     stepOnce() { this.invalidate(); this.stepFrames = Math.max(1, this.stepFrames); },
+    resetPovOnNextFrame: Daydream.prototype.resetPovOnNextFrame,
     keydown(e) { this.keys.push(e); },
     setStrobeColumns(strobe) { this.strobe = strobe; },
     setDisplayGeometry(geometry) { Object.assign(this, geometry); },

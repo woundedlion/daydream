@@ -249,6 +249,7 @@ export class Daydream {
     this.povResponseScale = 1;
     this.showSweepBoundary = false;
     this.povSweep = null;
+    this.povResetPending = false;
 
     this.labelPool = new LabelPool(this.scene, Daydream.SPHERE_RADIUS, this.doc);
 
@@ -567,12 +568,21 @@ export class Daydream {
     const clockReady = this.advanceFrameClock();
     const advanced =
       (clockReady || this.stepFrames !== 0) && this.stepSimulation(adapter);
+    const captureReady = typeof adapter?.captureReady === 'function'
+      ? adapter.captureReady(advanced) : advanced;
     if (this.povSweep && !isViewLive(this.pixels)) adapter?.refreshPixelView?.();
+    if (this.povResetPending && captureReady && isViewLive(this.pixels)) {
+      this.povSweep?.reset(this.pixels);
+      this.povResetPending = false;
+      this.needsRender = true;
+    }
     if (this.povSweep && isViewLive(this.pixels)) {
       const pausedUpdate = this.paused && !advanced && this.needsRender
         && this.pixels.some((value, i) => value !== this.povSweep.source[i]);
-      if (advanced) this.povSweep.beginFrame(this.pixels);
-      else if (pausedUpdate) this.povSweep.replaceFrame(this.pixels);
+      if (!this.povResetPending) {
+        if (advanced) this.povSweep.beginFrame(this.pixels);
+        else if (pausedUpdate) this.povSweep.replaceFrame(this.pixels);
+      }
       const fraction = (this.timeAccumulator % this.frameInterval) / this.frameInterval;
       if (this.povSweep.advance(fraction)) this.needsRender = true;
       if (this.timeAccumulator !== previousSweepTime)
@@ -586,8 +596,6 @@ export class Daydream {
     if (!advanced && !this.needsRender) return;
     this.needsRender = false;
 
-    const captureReady = typeof adapter?.captureReady === 'function'
-      ? adapter.captureReady(advanced) : advanced;
     const captureDue = this.recorder?.isRecording === true && captureReady;
 
     // Three throws if an attribute's array byteLength differs from the size it gave
@@ -718,6 +726,11 @@ export class Daydream {
       instanceColor.needsUpdate = true;
 
     return true;
+  }
+
+  /** Replace POV history when the next complete effect frame is displayed. */
+  resetPovOnNextFrame() {
+    this.povResetPending = true;
   }
 
   /**

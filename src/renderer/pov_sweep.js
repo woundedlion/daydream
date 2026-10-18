@@ -85,6 +85,19 @@ export class PovSweep {
     this.emissions.push({ pixels, start: 0 });
   }
 
+  /** @param {Uint16Array} source Complete replacement effect image. */
+  reset(source) {
+    this.source.set(source);
+    this.previous.set(source);
+    this.pixels.set(source);
+    for (const frame of this.emissions) {
+      frame.pixels.set(source);
+      frame.start = 0;
+    }
+    while (this.emissions.length < this.historyFrames)
+      this.emissions.push({ pixels: source.slice(), start: 0 });
+  }
+
   /** @param {Uint16Array} source Paused raw preview; recorded emissions stay unchanged. */
   replaceFrame(source) {
     this.advance(1);

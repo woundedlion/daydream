@@ -485,6 +485,7 @@ function makeApp({
         log.push(`driver.updateResolution ${w}x${h}@${dot}`),
       invalidate: () => log.push('driver.invalidate'),
       stepOnce: () => log.push('driver.stepOnce'),
+      resetPovOnNextFrame: () => log.push('driver.resetPovOnNextFrame'),
     },
     sidebar: {
       setActive: (name) => log.push(`sidebar.setActive ${name}`),
@@ -531,7 +532,7 @@ test('applying an effect points the engine at it and rebuilds the panel', () => 
     'effectGui.mount',
     'effectGui.applyAnimationPause',
     'sidebar.setActive Alpha',
-    'driver.stepOnce',
+    'driver.resetPovOnNextFrame', 'driver.stepOnce',
   ]);
 });
 
@@ -670,7 +671,7 @@ test('an off-list effect is corrected and applied exactly once', () => {
   assert.equal(app.state.effect, 'Alpha');
   assert.deepEqual(app.log.filter((entry) => entry === 'effectGui.build'),
     ['effectGui.build'], 'the correction applied the effect exactly once');
-  assert.deepEqual(app.log.slice(-2), ['sidebar.setActive Alpha', 'driver.stepOnce']);
+  assert.deepEqual(app.log.slice(-3), ['sidebar.setActive Alpha', 'driver.resetPovOnNextFrame', 'driver.stepOnce']);
 });
 
 /**

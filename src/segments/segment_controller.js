@@ -804,6 +804,7 @@ export class SegmentController {
     this.#renderGen++;
     this.#results.fill(null);
     this.#pendingFrame = false;
+    this.#frameComposited = false;
   }
 
   #settleInflight() {

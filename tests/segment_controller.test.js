@@ -579,6 +579,24 @@ test('an engine without the chain-bindings accessor rebuilds from params', () =>
   });
 });
 
+test('effect selection fences the unconsumed capture of a paused outgoing frame', async () => {
+  setDisplayGrid(4, 2);
+  const c = readyController(2);
+  c.active = true;
+  driver.paused = true;
+  try {
+    c.tick();
+    await deliverGeneration(c, gridHalves(1000));
+    assert.equal(c.frameComposited, true);
+    c.setEffect('Replacement');
+    assert.equal(c.consumeCapture(), false);
+    assert.equal(c.hasPublishedFrame(), false);
+  } finally {
+    driver.paused = false;
+    c.destroy();
+  }
+});
+
 test('setEffect broadcasts the name plus the tuned param snapshot to every worker', () => {
   const c = readyController(2);
   c.getWasmEngine = () => fakeEngine([

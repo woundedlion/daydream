@@ -5,6 +5,28 @@ import { PovSweep, sustainedSurvival } from '../src/renderer/pov_sweep.js';
 const frame = (value) => new Uint16Array(8 * 2 * 3).fill(value);
 const row = (pixels, y) => Array.from({ length: 8 }, (_, x) => pixels[(y * 8 + x) * 3]);
 
+test('effect replacement removes outgoing light from every hemisphere and history epoch', () => {
+  const old = frame(0), incoming = frame(0);
+  for (let i = 0; i < old.length; i += 3) {
+    old[i] = 20000;
+    incoming[i + 1] = 18000;
+  }
+  const sweep = new PovSweep(8, 2, old, 0.8);
+  sweep.reset(incoming);
+  assert.deepEqual(sweep.source, incoming);
+  assert.deepEqual(sweep.previous, incoming);
+  assert.deepEqual(sweep.pixels, incoming);
+  for (const fraction of [0, 0.2, 0.9]) {
+    const visible = sweep.visualPixels(fraction);
+    for (let i = 0; i < visible.length; i += 3) {
+      assert.equal(visible[i], 0);
+      assert.ok(visible[i + 1] > 0, 'replacement is visible across the full sphere');
+    }
+  }
+  sweep.beginFrame(incoming);
+  assert.ok(sweep.emissions.every(entry => entry.pixels.every((v, i) => v === incoming[i])));
+});
+
 test('visual response matches independent quadrature of the sustained gamma density', () => {
   const frames = Array.from({ length: 10 }, (_, epoch) => new Uint16Array(
     Array.from({ length: 48 }, (_, index) => 800 + epoch * 500 + index * 11)));

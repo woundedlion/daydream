@@ -101,6 +101,11 @@ helpers that can perform that action themselves.
 
 ## Display geometry
 
+Effect changes hard-swap the entire sphere once a complete replacement frame is
+available. The POV sweep and visual-response history are reseeded from that frame,
+so outgoing and incoming effects never occupy different hemispheres. Segmented
+rendering holds the outgoing image until all replacement segments are composited.
+
 The **POV fidelity (16 Hz)** control displays an approximate visual response to
 opposing columns emitted at their sweep times. Each opposing column pair emits
 for one column interval. The causal response integrates captured emissions in
