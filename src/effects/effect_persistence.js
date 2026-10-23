@@ -92,24 +92,42 @@ export function createEffectPersistence({
     }
   }
 
-  /** @param {*} gui @returns {void} */
+  /**
+   * Replay stored accepted values, rereading the schema after every write and
+   * retrying refused writes while some retry applies.
+   * @param {*} gui
+   * @returns {void}
+   */
   function restoreAcceptedParams(gui) {
     const probed = new Set();
+    /** @type {Map<string, number>} */
+    const refused = new Map();
+    /** @param {string} name @param {number} value @returns {boolean} */
+    const apply = (name, value) => {
+      if (setEngineParam(name, value) === false) return false;
+      refused.delete(name);
+      restoredKeys.add(name);
+      return true;
+    };
     for (;;) {
+      const writable = getParameterDefinitions().filter((candidate) => !candidate.readonly);
       let parameter;
       let value;
-      for (const candidate of getParameterDefinitions()) {
-        if (candidate.readonly || probed.has(candidate.name)) continue;
+      for (const candidate of writable) {
+        if (probed.has(candidate.name)) continue;
         probed.add(candidate.name);
         const stored = gui.readStoredNumber(acceptedStorageKey(candidate.name));
         if (stored === undefined) continue;
-        restoredKeys.add(candidate.name);
         parameter = candidate;
         value = stored;
         break;
       }
-      if (!parameter) return;
-      setEngineParam(parameter.name, value);
+      if (parameter) {
+        if (!apply(parameter.name, value)) refused.set(parameter.name, value);
+        continue;
+      }
+      const names = new Set(writable.map((candidate) => candidate.name));
+      if (![...refused].some(([name, retried]) => names.has(name) && apply(name, retried))) return;
     }
   }
 
