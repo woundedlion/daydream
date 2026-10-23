@@ -9,8 +9,14 @@ const capture = () => callWorkbenchBinding(engine, 'getSnapshot', []);
 const restore = (snapshot) => callWorkbenchBinding(engine, 'restoreSnapshot', [snapshot]);
 after(() => engine.delete());
 
-test('typed snapshots preserve evolving walk, noise, source and palette state across effect replacement', () => {
+/**
+ * Evolves a wandering ShaderChain, snapshots it, and records the frames that follow uninterrupted.
+ * @param {boolean} temporal Column-time sampling for every draw.
+ * @returns {{snapshot: object, frames: Uint16Array[]}} The snapshot and the next five frames.
+ */
+function evolve(temporal) {
   engine.setResolution(96, 20);
+  engine.setTemporalSampling(temporal);
   const install = () => {
     engine.setEffect('ShaderChain');
     assert.equal(callWorkbenchBinding(engine, 'setShaderChainParameters', [[
@@ -31,9 +37,35 @@ test('typed snapshots preserve evolving walk, noise, source and palette state ac
   engine.drawFrame();
   assert.notDeepEqual(Uint16Array.from(engine.getPixels()), frames[0],
     'a fresh chain with the same parameters renders differently, so parity needs the restored state');
+  return {snapshot, frames};
+}
+
+/** Replaces the current effect and restores `snapshot` into a fresh ShaderChain. */
+function restoreFresh(snapshot) {
   engine.setEffect('ShaderChain');
   assert.equal(restore(snapshot), module.ChainSnapshotRestoreResult.APPLIED);
+}
+
+test('typed snapshots continue flat-sampled rendering exactly across effect replacement', (t) => {
+  t.after(() => engine.setTemporalSampling(true));
+  const {snapshot, frames} = evolve(false);
+  restoreFresh(snapshot);
   for (const expected of frames) { engine.drawFrame(); assert.deepEqual(engine.getPixels(), expected); }
+});
+
+test('a restored snapshot draws its first temporal frame at the current endpoint, then continues exactly', (t) => {
+  t.after(() => engine.setTemporalSampling(true));
+  const {snapshot, frames} = evolve(true);
+  engine.setTemporalSampling(false);
+  restoreFresh(snapshot);
+  engine.drawFrame();
+  const endpoint = Uint16Array.from(engine.getPixels());
+  assert.notDeepEqual(endpoint, frames[0], 'column history changes the uninterrupted first frame');
+  engine.setTemporalSampling(true);
+  restoreFresh(snapshot);
+  engine.drawFrame();
+  assert.deepEqual(engine.getPixels(), endpoint);
+  for (const expected of frames.slice(1)) { engine.drawFrame(); assert.deepEqual(engine.getPixels(), expected); }
 });
 
 test('snapshot validation refuses malformed state transactionally', () => {
