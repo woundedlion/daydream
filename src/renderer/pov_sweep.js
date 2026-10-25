@@ -42,7 +42,6 @@ export class PovSweep {
     this.historyFrames = Math.ceil(PovSweep.RESPONSE_TAIL_TAU * PovSweep.RESPONSE_TAU_MS
         * PovSweep.MAX_RESPONSE_SCALE / frameMs) + 1;
     this.source = initial.slice();
-    this.previous = initial.slice();
     this.pixels = initial.slice();
     /** @type {Uint16Array | null} */
     this.boundaryPixels = null;
@@ -92,7 +91,6 @@ export class PovSweep {
   reset(source) {
     this.responseFraction = NaN;
     this.source.set(source);
-    this.previous.set(source);
     this.pixels.set(source);
     for (const frame of this.emissions) {
       frame.pixels.set(source);
@@ -105,7 +103,6 @@ export class PovSweep {
   /** @param {Uint16Array} source Paused raw preview; recorded emissions stay unchanged. */
   replaceFrame(source) {
     this.advance(1);
-    this.previous.set(this.source);
     this.source.set(source);
     this.column = 0;
   }

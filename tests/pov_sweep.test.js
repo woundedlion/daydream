@@ -14,7 +14,6 @@ test('effect replacement removes outgoing light from every hemisphere and histor
   const sweep = new PovSweep(8, 2, old, 0.8);
   sweep.reset(incoming);
   assert.deepEqual(sweep.source, incoming);
-  assert.deepEqual(sweep.previous, incoming);
   assert.deepEqual(sweep.pixels, incoming);
   for (const fraction of [0, 0.2, 0.9]) {
     const visible = sweep.visualPixels(fraction);
@@ -189,7 +188,6 @@ test('advancing fresh frame pairs preserves samples without accumulating markers
       assert.equal(overlay[boundary + 4], 65535);
     }
     assert.deepEqual(sweep.source, frame(20));
-    assert.deepEqual(sweep.previous, frame(10));
     assert.deepEqual(source, frame(20));
   }
   const sweep = new PovSweep(8, 2, source);
