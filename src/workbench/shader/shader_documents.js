@@ -47,8 +47,8 @@ export function engineParameterName(parameterId) {
 
 /**
  * Performs one resolved write.
- * @param {*} engine
- * @param {*} module - The loaded WASM module, for its ParamSetResult enum.
+ * @param {import('../../../generated/holosphere_wasm.js').HolosphereEngine} engine
+ * @param {import('../../../generated/holosphere_wasm.js').HolosphereModule} module - The loaded WASM module, for its ParamSetResult enum.
  *   Every enum value is a truthy object; compare against APPLIED.
  * @param {{name: string, stored: *}} write
  * @returns {string|null} Refusal reason, or null once written.
@@ -61,8 +61,8 @@ function performEngineWrite(engine, module, { name, stored }) {
 
 /**
  * Writes one engine parameter.
- * @param {*} engine
- * @param {*} module
+ * @param {import('../../../generated/holosphere_wasm.js').HolosphereEngine} engine
+ * @param {import('../../../generated/holosphere_wasm.js').HolosphereModule} module
  * @param {ParameterDefinition[]} definitions
  * @param {string} name
  * @param {*} value
@@ -90,7 +90,7 @@ function compiledControlFor(parameterId, definitions, baked) {
 }
 
 /**
- * @param {*} engine @param {*} module @param {CompiledDocument} compiled
+ * @param {import('../../../generated/holosphere_wasm.js').HolosphereEngine} engine @param {import('../../../generated/holosphere_wasm.js').HolosphereModule} module @param {CompiledDocument} compiled
  * @param {string} presetId
  * @param {Set<string>} baked - The topology fields the effect bakes in.
  * @param {Set<string>} derived - Validated fields computed by the fixed effect.
@@ -122,8 +122,8 @@ function applyDocumentValues(engine, module, compiled, presetId, baked, derived)
 
 /**
  * Applies one authored preset to a matching concrete fixed-pipeline effect.
- * @param {*} engine
- * @param {*} module
+ * @param {import('../../../generated/holosphere_wasm.js').HolosphereEngine} engine
+ * @param {import('../../../generated/holosphere_wasm.js').HolosphereModule} module
  * @param {CompiledDocument} compiled
  * @param {string} presetId
  * @param {string[]} referencePresetIds

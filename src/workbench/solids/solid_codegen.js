@@ -32,12 +32,12 @@ import { NUMERIC_ENUMS } from '../../../generated/engine_contract.mjs';
 
 /**
  * A live WASM MeshOps mesh wrapper.
- * @typedef {Object<string, any>} MeshWrapper
+ * @typedef {import('../../../generated/holosphere_wasm.js').MeshHandle} MeshWrapper
  */
 
 /**
  * A spawned WASM module instance, reached by binding name.
- * @typedef {Object<string, any>} WasmModule
+ * @typedef {import('../../../generated/holosphere_wasm.js').HolosphereModule} WasmModule
  */
 
 /**
@@ -345,7 +345,8 @@ function dispatchOp(mesh, o, opName) {
   if (opName === 'snub') return mesh.snub(params.t, params.twist);
   if (opName === 'hankin') return mesh.hankin(Math.fround(params.angle * D2R_F32));
   if (opName === 'relax') return mesh.relax(params.iter);
-  if (mesh[opName]) return mesh[opName]();
+  const operation = Reflect.get(mesh, opName);
+  if (typeof operation === 'function') return operation.call(mesh);
   throw new Error(`unknown op "${opName}" — not bound by the WASM MeshOps module`);
 }
 
@@ -380,7 +381,7 @@ export function meshOpFailure(Mod, what) {
   const recorded = Mod?.MeshOps?.getLastResult?.();
   let reason = 'UNKNOWN';
   if (codes && recorded !== undefined) {
-    reason = MESH_OP_RESULT_NAMES.find((name) => codes[name] === recorded) ?? 'UNKNOWN';
+    reason = Object.entries(codes).find(([name, value]) => MESH_OP_RESULT_NAMES.includes(name) && value === recorded)?.[0] ?? 'UNKNOWN';
   }
   return {
     reason,
@@ -393,14 +394,15 @@ export function meshOpFailure(Mod, what) {
 /**
  * Passes a mesh-producing MeshOps result through, or reports and remedies the
  * failure a null stands for.
- * @param {MeshWrapper?} result - What the bridge returned.
+ * @template T
+ * @param {T|null} result - What the bridge returned.
  * @param {string} what - What the caller was building, used in the message.
  * @param {Object} ctx - The live wiring, read per call because an engine halt nulls it.
  * @param {WasmModule} ctx.Mod - The WASM module instance that produced the result.
  * @param {{clearToolingMemory: () => void}} ctx.meshOps - Its MeshOps binding.
  * @param {(message: string) => void} ctx.onError - Surfaces the failure message to the user.
  * @param {(message: string) => void} [ctx.onFatal] - Stands the tool down for a failure nothing can recover from.
- * @returns {MeshWrapper?} The result, or null when it was a failure.
+ * @returns {T|null} The result, or null when it was a failure.
  * @details Flushes the tooling arenas only for ARENA_EXHAUSTED. ARENA_UNAVAILABLE
  * is unrecoverable and goes to onFatal.
  */
