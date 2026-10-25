@@ -235,6 +235,8 @@ export function createShaderDocumentController({
     doc.getElementById('shader-document-file'));
   const status = /** @type {HTMLOutputElement|null} */ (
     doc.getElementById('shader-document-status'));
+  const notice = doc.getElementById('shader-document-notice');
+  const errorNotice = doc.getElementById('shader-document-error');
   const digestButton = /** @type {HTMLButtonElement|null} */ (
     doc.getElementById('shader-document-digest'));
   const parityToggle = /** @type {HTMLButtonElement|null} */ (
@@ -278,8 +280,8 @@ export function createShaderDocumentController({
 
   /** @param {string} message @param {boolean} error */
   const writeStatus = (message, error) => {
-    status.setAttribute('role', error ? 'alert' : 'status');
-    status.setAttribute('aria-live', error ? 'assertive' : 'polite');
+    if (notice) notice.textContent = error ? '' : message;
+    if (errorNotice) errorNotice.textContent = error ? message : '';
     status.dataset.status = error ? 'error' : 'ok';
     status.textContent = message;
   };
@@ -288,7 +290,7 @@ export function createShaderDocumentController({
   /** @param {string} message */
   const showError = (message) => writeStatus(message, true);
 
-  // The shared live region; an empty message clears it.
+  // An empty message clears both announcements.
   /** @param {string} message */
   const announce = (message) => writeStatus(message, message !== '');
 

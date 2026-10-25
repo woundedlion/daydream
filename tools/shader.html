@@ -44,7 +44,9 @@
       <button id="shader-animation-toggle" type="button" disabled aria-pressed="false">Pause Presets</button>
       <button id="shader-document-digest" class="shader-document-digest" type="button" disabled aria-label="Copy the descriptor digest —">—</button>
       <input id="shader-document-file" type="file" accept=".json,.shader.json,application/json" hidden>
-      <output id="shader-document-status" class="shader-document-status" role="status" aria-live="polite">Loading source documents…</output>
+      <output id="shader-document-status" class="shader-document-status" role="none" aria-live="off">Loading source documents…</output>
+      <div id="shader-document-notice" class="sr-only" role="status" aria-live="polite"></div>
+      <div id="shader-document-error" class="sr-only" role="alert" aria-live="assertive"></div>
       <div id="global-stats-desktop">
         <table class="global-stats global-stats--desktop">
           <caption class="visually-hidden">Engine memory and compute</caption>

@@ -578,7 +578,8 @@ function workbenchEngine() {
 function workbenchMounts() {
   const elements = new Map(['shader-document-select', 'shader-preset-select',
     'shader-document-open', 'shader-document-save', 'shader-document-file',
-    'shader-document-status', 'shader-document-digest', 'shader-parity-toggle',
+    'shader-document-status', 'shader-document-notice', 'shader-document-error',
+    'shader-document-digest', 'shader-parity-toggle',
     'shader-animation-toggle', 'shader-document-save-as',
   ].map((id) => [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
   const scratch = fakeElement('option');
@@ -709,6 +710,8 @@ test('a catalog document that fails to compile reports its diagnostic', async ()
   assert.equal(await controller.init(), false);
   const status = elements.get('shader-document-status');
   assert.equal(status.dataset.status, 'error');
+  assert.equal(elements.get('shader-document-error').textContent, status.textContent);
+  assert.equal(elements.get('shader-document-notice').textContent, '');
   assert.match(status.textContent, /E_ROLE at \/descriptor: unknown role/);
   assert.equal(elements.get('shader-document-select').options.length, 1);
 });
