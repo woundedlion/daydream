@@ -4,6 +4,7 @@
 // harness's problem collector.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 
 import { BROWSER_ARGS, BROWSER_CANDIDATES, resolveBrowser } from '../scripts/browser.mjs';
 import { collectProblems } from '../scripts/probe_harness.mjs';
@@ -63,6 +64,20 @@ test('the launch flags put external asset CDNs beyond every probe', () => {
     'the probes are served three.js and lil-gui from their own origin; a page '
       + 'that reached jsdelivr instead would hand a CDN incident the power to '
       + 'red the required gate');
+});
+
+test('CDN smoke permits external assets without a per-user browser directory', () => {
+  const env = { ...process.env, HS_CDN_SMOKE: '1' };
+  delete env.LOCALAPPDATA;
+  const source = new URL('../scripts/browser.mjs', import.meta.url).href;
+  const browser = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e',
+    `import { BROWSER_ARGS, BROWSER_CANDIDATES } from ${JSON.stringify(source)};
+     console.log(JSON.stringify({ BROWSER_ARGS, BROWSER_CANDIDATES }));`,
+  ], { env, encoding: 'utf8' }));
+  assert.equal(browser.BROWSER_ARGS.some(flag => flag.startsWith('--host-resolver-rules=')), false);
+  assert.ok(browser.BROWSER_ARGS.includes('--use-angle=swiftshader'));
+  assert.equal(browser.BROWSER_CANDIDATES.some(path => path.includes('/AppData/')), false);
+  assert.ok(browser.BROWSER_CANDIDATES.includes('/usr/bin/google-chrome'));
 });
 
 test('font fallback failures are expected but other request failures are not', () => {

@@ -6,6 +6,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs, { existsSync, readFileSync, rmSync } from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
+import { Server } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
@@ -124,4 +125,40 @@ test('staging reports a missing dependency and removes its partial tree', (t) =>
   assert.ok(partial);
   assert.equal(exists(partial), false);
   assert.equal(exists(dependency), true);
+});
+
+test('CDN smoke stages an external import map without changing the committed map', (t) => {
+  const previous = process.env.HS_CDN_SMOKE;
+  t.after(() => {
+    if (previous === undefined) delete process.env.HS_CDN_SMOKE;
+    else process.env.HS_CDN_SMOKE = previous;
+  });
+  process.env.HS_CDN_SMOKE = '1';
+  const site = stageProbeSite();
+  t.after(() => rmSync(site.root, { recursive: true, force: true }));
+  const map = readFileSync(join(site.root, 'vendor-importmap.js'), 'utf8');
+  assert.match(map, /const VENDOR = \{ three: 'cdn', lilGui: 'cdn' \};/);
+  assert.match(map, /https:\/\/cdn\.jsdelivr\.net/);
+  assert.equal(existsSync(join(site.root, 'index.html')), true);
+  assert.match(readFileSync(new URL('../vendor-importmap.js', import.meta.url), 'utf8'),
+    /const VENDOR = \{ three: 'cdn', lilGui: 'cdn' \};/);
+});
+
+test('a server bind failure removes its staged tree and preserves other sites', async (t) => {
+  const makeTemp = fs.mkdtempSync;
+  let partial;
+  t.mock.method(fs, 'mkdtempSync', (...args) => {
+    partial = makeTemp(...args);
+    return partial;
+  });
+  t.mock.method(Server.prototype, 'listen', function () {
+    this.emit('error', new Error('fixture bind refused'));
+    return this;
+  });
+  t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
+  syncBuiltinESMExports();
+  await assert.rejects(serveStagedSite(), /fixture bind refused/);
+  assert.ok(partial);
+  assert.equal(existsSync(partial), false);
+  assert.equal(existsSync(staged.root), true);
 });

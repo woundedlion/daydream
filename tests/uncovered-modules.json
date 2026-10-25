@@ -28,10 +28,6 @@
     "reason": "Remaining branches include focus restoration, pointer capture and viewport geometry fallbacks, optional controls, and teardown after DOM removal. The fake DOM covers editing; browser probes cover native focus and pointer behavior.",
     "branches": 84.59
   },
-  "scripts/browser.mjs": {
-    "reason": "The import-time LOCALAPPDATA branch depends on the host environment. Resolver fixtures cover explicit paths, candidate selection and missing executables; they do not reload the module under both Windows environment states.",
-    "branches": 88.89
-  },
   "src/ui/effect_panel_view.js": {
     "reason": "Browser probes exercise focused controller DOM paths.",
     "branches": 81.82
