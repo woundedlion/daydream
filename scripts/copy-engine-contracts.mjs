@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, realpathSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ENGINE_CONTRACT_PATHS } from './install-engine-bundle.mjs';
@@ -23,7 +23,7 @@ export function copyEngineContracts(source, destination) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const [source, destination] = process.argv.slice(2);
   if (!source || !destination)
     throw new Error('Usage: copy-engine-contracts.mjs <installed-checkout> <source-checkout>');
