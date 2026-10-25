@@ -51,6 +51,8 @@ export class PovSweep {
     this.emissions = [{ pixels: initial.slice(), start: initialFraction }];
     this.responseWeights = new Float64Array(this.historyFrames);
     this.column = 0;
+    this.responseFraction = NaN;
+    this.responseTau = NaN;
   }
 
   /**
@@ -77,6 +79,7 @@ export class PovSweep {
 
   /** @param {Uint16Array} source Next half-turn's image. */
   beginFrame(source) {
+    this.responseFraction = NaN;
     this.replaceFrame(source);
     const recycled = this.emissions.length >= this.historyFrames
       ? this.emissions.shift() : undefined;
@@ -87,6 +90,7 @@ export class PovSweep {
 
   /** @param {Uint16Array} source Complete replacement effect image. */
   reset(source) {
+    this.responseFraction = NaN;
     this.source.set(source);
     this.previous.set(source);
     this.pixels.set(source);
@@ -115,9 +119,14 @@ export class PovSweep {
     const end = Math.max(0, Math.min(1, fraction));
     const tau = PovSweep.RESPONSE_TAU_MS
       * Math.max(0.5, Math.min(PovSweep.MAX_RESPONSE_SCALE, responseScale));
-    return this.weightedPixels((pulseStart, pulseEnd) => Math.max(0,
+    if (this.responsePixels && this.responseFraction === end && this.responseTau === tau)
+      return this.responsePixels;
+    const pixels = this.weightedPixels((pulseStart, pulseEnd) => Math.max(0,
       sustainedSurvival((end - pulseEnd) * this.frameMs / tau)
       - sustainedSurvival((end - pulseStart) * this.frameMs / tau)));
+    this.responseFraction = end;
+    this.responseTau = tau;
+    return pixels;
   }
 
   /**
@@ -125,7 +134,9 @@ export class PovSweep {
    * @returns {Uint16Array} Duty-compensated response, clipped to the display range.
    */
   weightedPixels(pulseWeight) {
+    this.responseFraction = NaN;
     this.responsePixels ??= new Uint16Array(this.pixels.length);
+    const sources = this.emissions.map((frame) => frame.pixels);
     const half = this.width / 2;
     const count = this.emissions.length;
     for (let column = 0; column < half; column++) {
@@ -143,7 +154,7 @@ export class PovSweep {
           for (let channel = 0; channel < 3; channel++) {
             let value = 0;
             for (let frame = 0; frame < count; frame++)
-              value += this.emissions[frame].pixels[index + channel] * this.responseWeights[frame];
+              value += sources[frame][index + channel] * this.responseWeights[frame];
             this.responsePixels[index + channel] = Math.min(65535, Math.round(value));
           }
         }
