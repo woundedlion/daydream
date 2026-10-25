@@ -533,10 +533,13 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
           if [ "$FIRST_FAIL" = transient ] && [ "$n" = 1 ]; then return 1; fi
           if [ "$n" = 1 ]; then return 0; fi
           if [ "$n" = 2 ]; then return 1; fi
-          printf '12\\tcompleted\\tsuccess\\t%s\\n' "$PIN" ;;
+          printf '13\\tcompleted\\tfailure\\t%s\\n12\\tcompleted\\tsuccess\\t%s\\n' "$PIN" "$PIN" ;;
         artifact)
           if [ "$n" -lt 3 ]; then return 1; fi
-          printf '42\\tfalse\\t2030-01-01\\n' ;;
+          case "$4" in
+            *length) printf '1\\n' ;;
+            *) printf '42\\tfalse\\t2030-01-01\\n' ;;
+          esac ;;
         zip)
           if [ "$n" -lt 3 ]; then printf 'partial'; return 1; fi
           printf 'bundle' ;;
@@ -555,7 +558,7 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
     assert.equal(result.status, exhausted ? 1 : 0, result.stderr + result.stdout);
     assert.equal(readFileSync(join(fixture, 'query'), 'utf8'), exhausted ? '4' : '3');
     if (!exhausted) {
-      assert.equal(readFileSync(join(fixture, 'artifact'), 'utf8'), '3');
+      assert.equal(readFileSync(join(fixture, 'artifact'), 'utf8'), '4');
       assert.equal(readFileSync(join(fixture, 'zip'), 'utf8'), '3');
     }
   }
