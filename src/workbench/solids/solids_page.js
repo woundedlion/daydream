@@ -294,6 +294,7 @@ function handleBaseSolidKeyDown(event) {
   const next = choices[(choices.indexOf(event.currentTarget) + delta + choices.length) % choices.length];
   choices.forEach(choice => { choice.tabIndex = choice === next ? 0 : -1; });
   next.focus();
+  next.click();
 }
 
 async function generateThumbnails(signal) {

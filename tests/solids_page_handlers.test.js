@@ -764,21 +764,24 @@ test('a star pattern without a recipe leaves the chain alone', async () => {
   assert.match(calls.at(-1)[1], /no authored chain/);
 });
 
-test('base-solid arrows move focus without replacing the authored chain', () => {
+test('base-solid arrows focus and select the next radio', () => {
   const choices = ['cube', 'tetrahedron', 'star'].map(solid => ({
     dataset: { solid }, tabIndex: solid === 'cube' ? 0 : -1,
-    focus() { focused = solid; }, click: () => assert.fail('arrow activated a solid'),
+    focus() { focused = solid; }, click() { selected = solid; },
   }));
   let focused;
+  let selected;
   let prevented = 0;
   const keydown = handler('handleBaseSolidKeyDown', {
     document: { querySelectorAll: () => choices },
   });
   keydown({ key: 'ArrowLeft', currentTarget: choices[0], preventDefault() { prevented++; } });
   assert.equal(focused, 'star');
+  assert.equal(selected, 'star');
   assert.deepEqual(choices.map(choice => choice.tabIndex), [-1, -1, 0]);
   keydown({ key: 'ArrowRight', currentTarget: choices[2], preventDefault() { prevented++; } });
   assert.equal(focused, 'cube');
+  assert.equal(selected, 'cube');
   assert.deepEqual(choices.map(choice => choice.tabIndex), [0, -1, -1]);
   keydown({ key: 'Enter', currentTarget: choices[0], preventDefault: assert.fail });
   assert.equal(prevented, 2);
