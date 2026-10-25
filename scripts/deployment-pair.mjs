@@ -38,13 +38,32 @@ export async function snapshotPair(api, repo) {
   return validatePair({ daydream: daydream.sha, holosphere: holosphere.sha });
 }
 
+/** @param {GitHubApi} api @param {string} repo @param {number} id @param {*} status */
+async function settleAttempt(api, repo, id, status) {
+  if (status?.state !== 'pending') return status;
+  const runId = status.log_url?.match(/\/actions\/runs\/(\d+)\/?$/)?.[1];
+  if (!runId) return status;
+  const run = await api(`repos/${repo}/actions/runs/${runId}`);
+  if (!run.conclusion) return status;
+  const completed = { ...status,
+    state: run.conclusion === 'failure' ? 'failure' : 'inactive',
+    description: `Attempt workflow: ${run.conclusion}`,
+  };
+  await api(`repos/${repo}/deployments/${id}/statuses`, {
+    state: completed.state, description: completed.description,
+    log_url: status.log_url, auto_inactive: false,
+  });
+  return completed;
+}
+
 /** @param {GitHubApi} api @param {string} repo */
 export async function latestSuccessfulPair(api, repo) {
   for (let page = 1; ; page++) {
     const deployments = await api(`repos/${repo}/deployments?environment=${PAIR_ENVIRONMENT}&per_page=100&page=${page}`);
     for (const deployment of deployments) {
       const statuses = await api(`repos/${repo}/deployments/${deployment.id}/statuses?per_page=1`);
-      if (statuses[0]?.state === 'success') return validatePair(deployment.payload);
+      const status = await settleAttempt(api, repo, deployment.id, statuses[0]);
+      if (status?.state === 'success') return validatePair(deployment.payload);
     }
     if (deployments.length < 100) return null;
   }
@@ -60,12 +79,9 @@ export async function pairWasAttempted(api, repo, pair) {
     for (const deployment of deployments) {
       if (!samePair(pair, deployment.payload)) continue;
       const statuses = await api(`repos/${repo}/deployments/${deployment.id}/statuses?per_page=1`);
-      if (statuses[0]?.state === 'success') return true;
-      const runId = statuses[0]?.log_url?.match(/\/actions\/runs\/(\d+)\/?$/)?.[1];
-      if (runId) {
-        const run = await api(`repos/${repo}/actions/runs/${runId}`);
-        if (run.conclusion === 'cancelled') continue;
-      }
+      const status = await settleAttempt(api, repo, deployment.id, statuses[0]);
+      if (status?.state === 'inactive' && status.description === 'Attempt workflow: cancelled')
+        continue;
       return true;
     }
     if (deployments.length < 100) return false;

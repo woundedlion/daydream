@@ -142,3 +142,27 @@ test('resolve skips an already deployed pair and final checks reject either adva
   await assert.rejects(run('bad', env, api), /Unknown deployment/);
   await assert.rejects(run('resolve', {}, api), /Missing repository/);
 });
+
+test('completed pending attempts close their own deployment and terminal attempts avoid run reads', async () => {
+  const calls = [];
+  const api = async (path, body) => {
+    calls.push({ path, body });
+    if (body) return {};
+    if (path.includes('/actions/runs/')) return { conclusion: 'failure' };
+    if (path.includes('/statuses')) return [{ state: 'pending',
+      log_url: 'https://github.com/example/daydream/actions/runs/42' }];
+    return [{ id: 9, payload: pair }];
+  };
+  assert.equal(await pairWasAttempted(api, repo, pair), true);
+  const writes = calls.filter(call => call.body);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].path, `repos/${repo}/deployments/9/statuses`);
+  assert.equal(writes[0].body.state, 'failure');
+  calls.length = 0;
+  assert.equal(await pairWasAttempted(async (path) => {
+    calls.push({ path });
+    if (path.includes('/statuses')) return [{ state: 'failure' }];
+    return [{ id: 9, payload: pair }];
+  }, repo, pair), true);
+  assert.equal(calls.some(call => call.path.includes('/actions/runs/')), false);
+});
