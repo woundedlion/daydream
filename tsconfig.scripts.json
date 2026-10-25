@@ -17,6 +17,7 @@
     "scripts/install-engine-bundle.mjs",
     "scripts/verify-ci-green.mjs",
     "scripts/site-pages.mjs",
-    "scripts/vendor-stage.mjs"
+    "scripts/vendor-stage.mjs",
+    "scripts/serve-manifest.mjs"
   ]
 }
