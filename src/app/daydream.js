@@ -473,7 +473,8 @@ export function start({
       createGui: () => createGui({ autoPlace: false, title: 'Effect' }, 'fx'),
       container: () => shaderWorkbench ? null : doc.getElementById('gui-container'),
       isMobile: () => win.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false,
-      canPausePresets: () => canonicalEffectId(appState.get('effect')) !== canonicalEffectId('GSReactionDiffusion'),
+      canPausePresets: () => host.engine.getPresetCount() > 1
+        || host.engine.getParameterDefinitions().some((parameter) => parameter.animated),
       copyText: copyToClipboard,
       applyEffect: () => {
         const rejected = apply.applyEffect() !== ApplyResult.APPLIED;

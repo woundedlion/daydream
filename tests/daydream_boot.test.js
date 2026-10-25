@@ -1015,6 +1015,7 @@ test('a pooled effect switch sizes the preset row from the incoming effect', asy
     app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
       .find((entry) => entry.dataset.effect === canonicalEffectId(name)).onclick();
     assert.equal(presetChoices(), presetCounts[name], name);
+    assert.equal(Boolean(app.guis.at(-1).ctrl('pause')), presetCounts[name] > 1, name);
   }
 });
 
