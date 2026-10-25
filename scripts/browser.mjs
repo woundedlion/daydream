@@ -39,8 +39,8 @@ export const BROWSER_ARGS = [
   '--use-gl=angle',
   '--use-angle=swiftshader',
   '--enable-unsafe-swiftshader',
-  '--host-resolver-rules=MAP cdn.jsdelivr.net ~NOTFOUND, '
-    + 'MAP fonts.googleapis.com ~NOTFOUND, MAP fonts.gstatic.com ~NOTFOUND',
+  ...(process.env.HS_CDN_SMOKE === '1' ? [] : ['--host-resolver-rules=MAP cdn.jsdelivr.net ~NOTFOUND, '
+    + 'MAP fonts.googleapis.com ~NOTFOUND, MAP fonts.gstatic.com ~NOTFOUND']),
 ];
 
 /**

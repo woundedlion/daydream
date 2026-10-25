@@ -87,7 +87,8 @@ export function stageProbeSite() {
     }
     execFileSync(
       process.execPath,
-      [GENERATOR, '--local', '--vendor-root', root, '--out', join(root, IMPORTMAP)],
+      [GENERATOR, ...(process.env.HS_CDN_SMOKE === '1' ? [] : ['--local']),
+        '--vendor-root', root, '--out', join(root, IMPORTMAP)],
       { stdio: ['ignore', 'ignore', 'inherit'] },
     );
   } catch (error) {
