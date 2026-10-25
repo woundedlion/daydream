@@ -599,7 +599,7 @@ test('saved-solid imports reject bare seeds while accepting an exportable recipe
 });
 
 
-test('stale saved cards are reported and backed up before the live list is overwritten', () => {
+test('stale card backup failure cannot block the primary save', () => {
   const valid = {base: 'cube', ops: [{op: 'dual', params: {}}]};
   const stale = {base: 'cube', ops: [{op: 'truncate', params: {t: 50}}]};
   const storage = new Map([['saved', JSON.stringify([valid, stale])], ['rejected', '[{"older":true}]']]);
@@ -619,13 +619,13 @@ test('stale saved cards are reported and backed up before the live list is overw
     localStorage, SAVED_SOLIDS_KEY: 'saved', REJECTED_SOLIDS_KEY: 'rejected',
     document: {getElementById: () => status}, console: {warn() {}}});
   persist();
-  assert.deepEqual(JSON.parse(storage.get('saved')), [valid, stale]);
-  assert.deepEqual(writes, ['rejected']);
-  assert.match(status.textContent, /Changes apply to this session only/);
+  assert.deepEqual(JSON.parse(storage.get('saved')), [valid]);
+  assert.deepEqual(writes, ['saved', 'rejected']);
+  assert.equal(status.textContent, savedStorage.notice);
   assert.equal(savedStorage.rejected.length, 1);
   refusingBackup = false;
   persist();
-  assert.deepEqual(writes, ['rejected', 'rejected', 'saved']);
+  assert.deepEqual(writes, ['saved', 'rejected', 'saved', 'rejected']);
   assert.deepEqual(JSON.parse(storage.get('saved')), [valid]);
   assert.deepEqual(JSON.parse(storage.get('rejected')), [{older: true}, stale]);
   assert.equal(savedStorage.rejected.length, 0);

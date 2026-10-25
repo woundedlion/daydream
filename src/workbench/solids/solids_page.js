@@ -552,13 +552,23 @@ if (savedStorageStatus) savedStorageStatus.textContent = savedStorage.notice;
 function persistSavedSolids() {
   const status = document.getElementById('savedStorageStatus');
   try {
-    if (savedStorage.rejected.length) {
-      const previous = JSON.parse(localStorage.getItem(REJECTED_SOLIDS_KEY) || '[]');
-      if (!Array.isArray(previous)) throw new Error('Rejected-solid backup is not an array');
-      localStorage.setItem(REJECTED_SOLIDS_KEY, JSON.stringify([...previous, ...savedStorage.rejected]));
-      savedStorage.rejected.length = 0;
-    }
     localStorage.setItem(SAVED_SOLIDS_KEY, JSON.stringify(savedSolids));
+    if (savedStorage.rejected.length) {
+      try {
+        const previous = JSON.parse(localStorage.getItem(REJECTED_SOLIDS_KEY) || '[]');
+        const backup = [...(Array.isArray(previous) ? previous : []), ...savedStorage.rejected]
+          .slice(-20).map((entry) => {
+            if (!entry || typeof entry !== 'object') return String(entry).slice(0, 4096);
+            const data = { ...entry };
+            delete data.thumb;
+            return JSON.stringify(data).length <= 4096 ? data : { truncated: true };
+          });
+        localStorage.setItem(REJECTED_SOLIDS_KEY, JSON.stringify(backup));
+        savedStorage.rejected.length = 0;
+      } catch (error) {
+        console.warn('Could not back up rejected solids:', error);
+      }
+    }
     if (status) status.textContent = savedStorage.notice;
   } catch (error) {
     console.warn('Could not persist saved solids:', error);
