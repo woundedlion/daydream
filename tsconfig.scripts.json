@@ -14,6 +14,9 @@
     "scripts/deployment-pair.mjs",
     "scripts/copy-engine-contracts.mjs",
     "scripts/stage-site.mjs",
-    "scripts/install-engine-bundle.mjs"
+    "scripts/install-engine-bundle.mjs",
+    "scripts/verify-ci-green.mjs",
+    "scripts/site-pages.mjs",
+    "scripts/vendor-stage.mjs"
   ]
 }

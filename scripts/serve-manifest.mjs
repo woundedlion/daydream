@@ -13,6 +13,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 // A .wasm served as anything else drops Emscripten to the ArrayBuffer path, and
 // a module served as text/plain is refused outright.
+/** @type {Record<string, string>} */
 export const MIME = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -35,7 +36,7 @@ export const MIME = {
  * @returns {Promise<{origin: string, close: () => Promise<void>}>} The listening origin and its shutdown.
  */
 export async function serveManifest(entries, root = ROOT) {
-  const served = (path) =>
+  const served = (/** @type {string} */ path) =>
     entries.includes(path);
 
   const server = createServer((req, res) => {
