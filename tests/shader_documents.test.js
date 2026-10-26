@@ -1534,51 +1534,30 @@ test('ending a slider drag flushes its final link without waiting', async () => 
   }
 });
 
-test('save flushes the last slider input before its animation frame', async () => {
-  const harness = await editorWorkbench({ source: null });
-  mock.timers.enable({ apis: ['setTimeout'] });
-  try {
-    harness.urls.length = 0;
-    const slider = sampleFrequencySlider(harness);
-    slider.value = '7.5';
-    slider.dispatch('input');
+for (const [action, title] of [['save', 'save'], ['saveAs', 'save as']]) {
+  test(`${title} flushes the last slider input before its animation frame`, async () => {
+    const harness = await editorWorkbench({ source: null });
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      harness.urls.length = 0;
+      const slider = sampleFrequencySlider(harness);
+      slider.value = '7.5';
+      slider.dispatch('input');
 
-    assert.equal(harness.controller.save(), true);
-    assert.equal(JSON.parse(harness.downloads.at(-1)[1]).preset_bank.presets[0]
-      .values['sample.pattern-freq'], 7.5);
-    await harness.controller.flushDeepLink();
+      assert.equal(harness.controller[action](), true);
+      assert.equal(JSON.parse(harness.downloads.at(-1)[1]).preset_bank.presets[0]
+        .values['sample.pattern-freq'], 7.5);
+      await harness.controller.flushDeepLink();
 
-    assert.equal(harness.urls.length, 1);
-    const state = await decodeShaderStateHash(harness.win.location.hash);
-    assert.equal(state.document.preset_bank.presets[0]
-      .values['sample.pattern-freq'], 7.5);
-  } finally {
-    mock.timers.reset();
-  }
-});
-
-test('save as flushes the last slider input before its animation frame', async () => {
-  const harness = await editorWorkbench({ source: null });
-  mock.timers.enable({ apis: ['setTimeout'] });
-  try {
-    harness.urls.length = 0;
-    const slider = sampleFrequencySlider(harness);
-    slider.value = '7.5';
-    slider.dispatch('input');
-
-    assert.equal(harness.controller.saveAs(), true);
-    assert.equal(JSON.parse(harness.downloads.at(-1)[1]).preset_bank.presets[0]
-      .values['sample.pattern-freq'], 7.5);
-    await harness.controller.flushDeepLink();
-
-    assert.equal(harness.urls.length, 1);
-    const state = await decodeShaderStateHash(harness.win.location.hash);
-    assert.equal(state.document.preset_bank.presets[0]
-      .values['sample.pattern-freq'], 7.5);
-  } finally {
-    mock.timers.reset();
-  }
-});
+      assert.equal(harness.urls.length, 1);
+      const state = await decodeShaderStateHash(harness.win.location.hash);
+      assert.equal(state.document.preset_bank.presets[0]
+        .values['sample.pattern-freq'], 7.5);
+    } finally {
+      mock.timers.reset();
+    }
+  });
+}
 
 test('a malformed shader state link falls back to an editable scratch chain', async () => {
   const harness = await editorWorkbench({
