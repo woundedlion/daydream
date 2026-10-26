@@ -59,19 +59,19 @@
         </table>
       </div>
     </div>
+    <div id="stats-bar" class="stats-bar">
+      <table class="global-stats global-stats--mobile">
+        <caption class="visually-hidden">Engine memory and compute</caption>
+        <thead>
+          <tr class="stats-head"><th scope="col">Scratch A</th><th scope="col">Scratch B</th><th scope="col">Persistent</th><th scope="col">Stack</th><th scope="col">Compute</th></tr>
+        </thead>
+        <tbody>
+          <tr><td id="stat-scratch-a-m"></td><td id="stat-scratch-b-m"></td><td id="stat-persistent-m"></td><td id="stat-stack-m"></td><td id="perf-stats-mobile" class="perf-time"></td></tr>
+        </tbody>
+      </table>
+    </div>
     <main class="main-area">
       <section id="chain-strip" class="chain-strip-region" aria-label="Shader chain"></section>
-      <div id="stats-bar" class="stats-bar">
-        <table class="global-stats global-stats--mobile">
-          <caption class="visually-hidden">Engine memory and compute</caption>
-          <thead>
-            <tr class="stats-head"><th scope="col">Scratch A</th><th scope="col">Scratch B</th><th scope="col">Persistent</th><th scope="col">Stack</th><th scope="col">Compute</th></tr>
-          </thead>
-          <tbody>
-            <tr><td id="stat-scratch-a-m"></td><td id="stat-scratch-b-m"></td><td id="stat-persistent-m"></td><td id="stat-stack-m"></td><td id="perf-stats-mobile" class="perf-time"></td></tr>
-          </tbody>
-        </table>
-      </div>
       <div id="canvas-container" class="canvas-container">
         <div id="loading-overlay" class="loading-overlay" role="status"><div class="spinner"></div><span>Loading Shader workbench…</span></div>
         <div id="apply-notice" class="apply-notice" role="alert">

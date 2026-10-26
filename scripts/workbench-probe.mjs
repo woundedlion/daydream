@@ -58,7 +58,7 @@ export async function probeStrip(tab) {
   const regions = await tab.$$eval('.main-area > *',
     (nodes) => nodes.map((node) => node.id).join());
   const draggable = await tab.$('#chain-strip [draggable="true"]');
-  check(regions === 'chain-strip,stats-bar,canvas-container,gui-container'
+  check(regions === 'chain-strip,canvas-container,gui-container'
       && draggable === null,
   `the main area mounts ${regions} beside no stage library or draggable chip`);
 

@@ -602,10 +602,6 @@ select.chain-param-control {
 }
 
 @media only screen and (width <= 900px) {
-  #stats-bar {
-    display: none;
-  }
-
   .chain-chip-params {
     grid-template-columns: minmax(0, 1fr) 3rem;
   }
