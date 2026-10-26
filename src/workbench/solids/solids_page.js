@@ -542,7 +542,7 @@ function loadSavedSolids() {
     reason = 'invalid saved-solid JSON';
   }
   return { entries, rejected, notice: rejected.length
-    ? `${rejected.length} saved solids could not be loaded: ${reason}. Rejected data is retained in browser storage.` : '' };
+    ? `${rejected.length} saved solids could not be loaded: ${reason}. Saving attempts a backup of up to 20 rejected entries without thumbnails; oversized data may be truncated or omitted.` : '' };
 }
 
 const savedStorage = loadSavedSolids();
@@ -552,6 +552,7 @@ if (savedStorageStatus) savedStorageStatus.textContent = savedStorage.notice;
 
 function persistSavedSolids() {
   const status = document.getElementById('savedStorageStatus');
+  let notice = savedStorage.notice;
   try {
     localStorage.setItem(SAVED_SOLIDS_KEY, JSON.stringify(savedSolids));
     if (savedStorage.rejected.length) {
@@ -568,9 +569,10 @@ function persistSavedSolids() {
         savedStorage.rejected.length = 0;
       } catch (error) {
         console.warn('Could not back up rejected solids:', error);
+        notice = `${savedStorage.notice} Rejected cards could not be backed up.`;
       }
     }
-    if (status) status.textContent = savedStorage.notice;
+    if (status) status.textContent = notice;
   } catch (error) {
     console.warn('Could not persist saved solids:', error);
     if (status) status.textContent = [savedStorage.notice,
