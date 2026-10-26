@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { RUNTIME_PATHS } from '../scripts/install-engine-bundle.mjs';
+import { manifestEntries } from './helpers/site_pages.js';
 import { findBash, scratchDir } from './helpers/fixture_repo.js';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -583,4 +585,13 @@ test('deployment pair recovery uses retained resolve outputs and engine packages
   assert.deepEqual(JSON.parse(readFileSync(join(root, 'deployment-pair.json'), 'utf8')), pair);
   assert.match(workflowText('engine-bundle.yml'),
     /name: verified-engine-bundle\s+path: engine-bundle\/\s+retention-days: 30\b/);
+});
+
+
+test('deployment MIME and presence checks cover every published engine module', () => {
+  const assets = workflowText('deploy.yml').match(/^\s+ENGINE_ASSETS: (.+)$/m);
+  assert.ok(assets, 'deploy declares its engine module checks');
+  const published = new Set(manifestEntries());
+  const expected = [...RUNTIME_PATHS].filter((path) => /\.(m?js|wasm)$/.test(path) && published.has(path));
+  assert.deepEqual([...new Set(assets[1].trim().split(/\s+/))].sort(), expected.sort());
 });
