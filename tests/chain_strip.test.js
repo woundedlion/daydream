@@ -1374,7 +1374,7 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
   assert.deepEqual([...deactivatedParameterIds(
     [{ id: 'sample.edge-width', storage: 'binary32' }],
     { 'sample.edge-width': 0.1 }, chain, CATALOG)],
-  [], 'no gate, no deactivation');
+  [], 'an unset gate field deactivates nothing');
 });
 
 test('parameter gate predicates match every catalog live value', () => {
