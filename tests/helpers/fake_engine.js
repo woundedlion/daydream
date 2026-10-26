@@ -127,7 +127,7 @@ export class FakeChainEngine {
       } else if (operator === 'sphere.displace.ripple.v2') {
         kind = 'ripple-clock-v1';
         state = { phase: 0 };
-      } else if (operator === 'sample.spherical-rings.v2') {
+      } else if (operator === 'sample.spherical-rings.v3') {
         kind = 'spherical-rings-v2';
         state = { walk: { noiseSeed: 1337, walkTime: 0, position: [0, 1, 0], direction: [1, 0, 0],
           wander: [1, 0, 0, 0], angularVelocity: 0, spinPhase: 0 }, phase: 0 };

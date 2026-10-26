@@ -443,6 +443,28 @@ test('chain snapshots match fake key sets, decode refusals and runtime round tri
   assert.deepEqual(chainCall(fake, 'getSnapshot').paletteBank, saved.paletteBank);
 });
 
+test('every catalog operator matches fake snapshot runtime kinds and state keys', () => {
+  const fake = new FakeChainEngine();
+  fake.setEffect('ShaderChain');
+  engine.setEffect('ShaderChain');
+  for (const operator of fake.catalog.operators) {
+    const chain = [];
+    if (operator.input !== 'sphere') chain.push(DEFAULT_CHAIN[1]);
+    if (operator.input === 'field') chain.push(DEFAULT_CHAIN[2]);
+    chain.push({ instance: 'target', operator: operator.id });
+    if (operator.output === 'sphere') chain.push(DEFAULT_CHAIN[1]);
+    if (operator.output === 'sphere' || operator.output === 'plane') chain.push(DEFAULT_CHAIN[2]);
+    if (operator.output !== 'color') chain.push(DEFAULT_CHAIN[3]);
+    for (const target of [engine, fake])
+      assert.equal(chainCall(target, 'setShaderChain', chain).code, 'APPLIED', operator.id);
+    const shape = (target) => {
+      const entry = chainCall(target, 'getSnapshot').runtime.find(({ instance }) => instance === 'target');
+      return { kind: entry?.kind ?? 'none', keys: Object.keys(entry?.state ?? {}).sort() };
+    };
+    assert.deepEqual(shape(fake), shape(engine), operator.id);
+  }
+});
+
 test('chain preset batches restore cross-field values and refuse singular edits without storing them', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)));
   assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
