@@ -1144,7 +1144,7 @@ test('fidelity selects engine sampling before first draw and refreshes paused to
     assert.equal(module.engine.temporalSampling, !povFidelity);
     assert.deepEqual(draws.slice(before), [!povFidelity]);
     assert.equal(app.driver.paused, true);
-    control.setValue(!povFidelity);
+    control.changed(!povFidelity);
     assert.equal(draws.length, before + 1);
     app.teardown.dispose();
   }
