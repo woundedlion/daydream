@@ -14,12 +14,9 @@ export const EffectSetResult = enumeration('EffectSetResult');
 export const ChainStatus = enumeration('ChainStatus');
 export const ChainSnapshotRestoreResult = enumeration('ChainSnapshotRestoreResult');
 
-// The engine catalog exactly as the module's getShaderChainCatalog static
-// exports it: the installed file carries the export plus a POSIX trailing
-// newline, which the export itself does not.
 const CHAIN_CATALOG_TEXT = readFileSync(
   new URL('../../generated/shader/engine_catalog.json', import.meta.url), 'utf8',
-).replace(/\n$/, '');
+);
 
 /**
  * Stand-in for the chain-capable engine surface: setShaderChain with the
