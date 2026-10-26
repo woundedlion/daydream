@@ -24,6 +24,7 @@ import {
   generateFuncAndRecipe,
   opParams,
   requireParams,
+  snakeIdentifier,
 } from './solid_codegen.js';
 import { engineHalted } from '../../shared/engine_halt.js';
 import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns } from '../../shared/cpp_format.js';
@@ -140,7 +141,7 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
  * @returns {string} The UPPER_SNAKE form.
  */
 export function upperSnake(name) {
-  return name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toUpperCase();
+  return snakeIdentifier(name).toUpperCase();
 }
 
 /**
@@ -374,7 +375,7 @@ function seedConstantCpp(seedName) {
  * @returns {string} The engine registry display name.
  */
 export function registryDisplayName(item, funcName) {
-  return item.base + funcName.slice(item.base.replace(/([a-z0-9])([A-Z])/g, '$1_$2').length);
+  return item.base + funcName.slice(snakeIdentifier(item.base).length);
 }
 
 /**

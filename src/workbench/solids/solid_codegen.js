@@ -488,6 +488,14 @@ export function pctSuffix(val) {
 }
 
 /**
+ * @param {string} name - A C++ identifier.
+ * @returns {string} Its lowercase snake_case spelling.
+ */
+export function snakeIdentifier(name) {
+  return name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+}
+
+/**
  * Derives the C++ funcName and SolidBuilder recipe expression for a solid spec.
  * The funcName is the base plus one suffix per op: `t`-valued params in
  * hundredths (`_bevel20`, `_snub50_tw00`), hankin in whole degrees (`_hk58`),
@@ -515,7 +523,7 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
     throw new Error(`generateFuncAndRecipe: op chain is empty; the emitted function would redefine the seed "${item.base}" and recurse into itself`);
   }
 
-  const baseIdentifier = item.base.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+  const baseIdentifier = snakeIdentifier(item.base);
   let nameParts = [baseIdentifier];
   let chain = '';
 
