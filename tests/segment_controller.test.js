@@ -874,26 +874,31 @@ test('cap changes reach current workers and survive pool recreation', () => {
   }
 });
 
-test('paused cap edits fence old frames and dispatch a replacement after they settle', async () => {
-  setDisplayGrid(4, 2);
-  const c = readyController(2);
-  c.active = true;
-  c.tick();
-  driver.paused = true;
-  try {
-    c.setDisplayCaps(2, 3);
-    assert.notEqual(c.frameState.inflightGen, c.frameState.renderGen);
-    await deliverGeneration(c);
-    assert.equal(c.frameState.renderInFlight, true);
-    assert.equal(c.frameState.inflightGen, c.frameState.renderGen);
-    assert.ok(c.frameState.results.every((frame) => frame === null));
-    await deliverGeneration(c, gridHalves());
-    assert.equal(c.frameState.renderInFlight, false);
-    assert.ok(driver.invalidations > 0);
-  } finally {
-    driver.paused = false;
-  }
-});
+for (const [name, fence] of [
+  ['cap', (c) => c.setDisplayCaps(2, 3)],
+  ['sampling', (c) => c.setTemporalSampling(true)],
+]) {
+  test(`paused ${name} changes fence old frames and dispatch a replacement after they settle`, async () => {
+    setDisplayGrid(4, 2);
+    const c = readyController(2);
+    c.active = true;
+    c.tick();
+    driver.paused = true;
+    try {
+      fence(c);
+      assert.notEqual(c.frameState.inflightGen, c.frameState.renderGen);
+      await deliverGeneration(c);
+      assert.equal(c.frameState.renderInFlight, true);
+      assert.equal(c.frameState.inflightGen, c.frameState.renderGen);
+      assert.ok(c.frameState.results.every((frame) => frame === null));
+      await deliverGeneration(c, gridHalves());
+      assert.equal(c.frameState.renderInFlight, false);
+      assert.ok(driver.invalidations > 0);
+    } finally {
+      driver.paused = false;
+    }
+  });
+}
 
 test('create with an unknown resolution latches a pool fault', () => {
   const c = makeController({ resolution: 'nope' });
@@ -1081,25 +1086,4 @@ test('temporal sampling reaches workers and survives pool recreation', () => {
   c.create(2);
   for (const w of c.workers)
     assert.equal(w.posted.find((m) => m.type === 'init').temporalSampling, true);
-});
-
-test('paused sampling changes fence old results and dispatch a replacement', async () => {
-  setDisplayGrid(4, 2);
-  const c = readyController(2);
-  c.active = true;
-  c.tick();
-  driver.paused = true;
-  try {
-    c.setTemporalSampling(true);
-    assert.notEqual(c.frameState.inflightGen, c.frameState.renderGen);
-    await deliverGeneration(c);
-    assert.equal(c.frameState.renderInFlight, true);
-    assert.equal(c.frameState.inflightGen, c.frameState.renderGen);
-    assert.ok(c.frameState.results.every((frame) => frame === null));
-    await deliverGeneration(c, gridHalves());
-    assert.equal(c.frameState.renderInFlight, false);
-    assert.ok(driver.invalidations > 0);
-  } finally {
-    driver.paused = false;
-  }
 });
