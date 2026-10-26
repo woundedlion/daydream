@@ -24,7 +24,8 @@ Holosphere master once in their engine gate.
 
 Generated WASM glue, binary, provenance files and engine catalog are ignored
 local build outputs. A fresh checkout needs an engine install before running
-the simulator or the full test suite. Build Holosphere's `wasm-release-install`
+the simulator, pushing (the push hook typechecks against installed contracts),
+or running the full test suite. Build Holosphere's `wasm-release-install`
 preset from its sibling checkout, or install a verified package with
 `node scripts/install-engine-bundle.mjs <bundle> .`.
 Neither a push nor deployment requires committing generated outputs. The local
