@@ -84,6 +84,8 @@ test('catalog effects are offered at both simulator resolutions', async () => {
     assert.ok(loRes.includes(canonicalEffectId(effect)),
       `the sidebar must offer ${effect} at the low-res preset`);
   }
+  assert.equal(hiRes.includes(canonicalEffectId('Dynamo')), false);
+  assert.equal(loRes.includes(canonicalEffectId('Dynamo')), true);
 });
 
 test('a booted render reconciles live panel values', async () => {
