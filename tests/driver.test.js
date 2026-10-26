@@ -698,7 +698,6 @@ test('POV fidelity records a frame whose pixel view detaches during the tick', (
     drawFrame() { structuredClone(pixels.buffer, { transfer: [pixels.buffer] }); },
     refreshPixelView() { repointDisplayAliases(ctx, sentinel); },
   });
-  assert.deepEqual(ctx.povSweep.source, sentinel);
   assert.deepEqual(ctx.povSweep.emissions.at(-1).pixels, sentinel);
 });
 
@@ -716,7 +715,7 @@ test('effect history waits for complete worker publication and swaps while pause
   ctx.needsRender = true;
   render();
   assert.equal(ctx.povResetPending, true);
-  assert.ok(ctx.povSweep.source.every(value => value === 1000));
+  assert.ok(ctx.povSweep.emissions.every(({ pixels }) => pixels.every(value => value === 1000)));
   pixels.fill(2000);
   ready = true;
   ctx.needsRender = true;
@@ -749,7 +748,7 @@ test('the sweep marker selects a separate display buffer only in fidelity mode',
   }
   assert.equal(ctx.timeAccumulator, 0.5 * ctx.frameInterval);
   assert.equal(ctx.povSweep.column, 3);
-  assert.ok(ctx.povSweep.pixels.every((value) => value === 10));
+  assert.ok(ctx.povSweep.emissions.at(-1).pixels.every((value) => value === 10));
   assert.ok(colors.every((value) => value === 10));
   assert.equal(ctx.dotMesh.instanceColor.array, colors);
 
@@ -782,13 +781,14 @@ test('POV fidelity sweeps between engine ticks and restores the engine aliases',
   const render = () => Daydream.prototype.render.call(ctx, adapter);
   render();
   assert.equal(frames, 1);
-  assert.deepEqual(Array.from({ length: 8 }, (_, x) => ctx.povSweep.pixels[x * 3]),
-    [10, 0, 0, 0, 10, 0, 0, 0]);
+  assert.equal(ctx.povSweep.column, 1);
+  assert.deepEqual(ctx.povSweep.emissions.at(-1).pixels, colors);
+  const history = ctx.povSweep.emissions.map(({ pixels }) => pixels.slice());
   delta = ctx.frameInterval / 4;
   render();
   assert.equal(frames, 1);
-  assert.deepEqual(Array.from({ length: 8 }, (_, x) => ctx.povSweep.pixels[x * 3]),
-    [10, 10, 0, 0, 10, 10, 0, 0]);
+  assert.equal(ctx.povSweep.column, 2);
+  assert.deepEqual(ctx.povSweep.emissions.map(({ pixels }) => pixels), history);
   assert.equal(ctx.pixels, colors);
   assert.equal(ctx.dotMesh.instanceColor.array, colors);
 
@@ -800,15 +800,14 @@ test('POV fidelity sweeps between engine ticks and restores the engine aliases',
   colors.fill(15);
   ctx.needsRender = true;
   render();
-  assert.deepEqual(Array.from({ length: 8 }, (_, x) => ctx.povSweep.pixels[x * 3]),
-    [15, 15, 10, 10, 15, 15, 10, 10]);
+  assert.deepEqual(ctx.povSweep.emissions.map(({ pixels }) => pixels), history);
   assert.deepEqual(painted, frozen);
   assert.equal(frames, 1);
   ctx.stepFrames = 1;
   render();
   assert.equal(frames, 2);
-  assert.deepEqual(Array.from({ length: 8 }, (_, x) => ctx.povSweep.pixels[x * 3]),
-    [20, 20, 15, 15, 20, 20, 15, 15]);
+  assert.deepEqual(ctx.povSweep.emissions.at(-1).pixels, colors);
+  assert.deepEqual(ctx.povSweep.emissions.at(-2).pixels, history.at(-1));
 
   ctx.povFidelity = false;
   render();
@@ -817,7 +816,7 @@ test('POV fidelity sweeps between engine ticks and restores the engine aliases',
   assert.ok(painted.every((v) => v === 20));
 });
 
-test('POV fidelity retains adjacent sweep timestamps through lag and paused frame steps', () => {
+test('POV fidelity records only advanced frames through lag and paused frame steps', () => {
   const timestampFrame = (start) => new Uint16Array(
     Array.from({ length: 8 * 3 }, (_, i) => start + Math.floor(i / 3) % 4));
   const colors = timestampFrame(0);
@@ -835,29 +834,27 @@ test('POV fidelity retains adjacent sweep timestamps through lag and paused fram
   render();
   assert.equal(frame, 1);
   assert.equal(ctx.timeAccumulator, ctx.frameInterval / 4);
-  assert.deepEqual(Array.from({ length: 8 }, (_, x) => ctx.povSweep.pixels[x * 3]),
-    [4, 5, 2, 3, 4, 5, 2, 3]);
-  assert.equal(ctx.povSweep.pixels[0] - ctx.povSweep.pixels[7 * 3], 1);
-  assert.equal(ctx.povSweep.pixels[4 * 3] - ctx.povSweep.pixels[3 * 3], 1);
+  assert.equal(ctx.povSweep.column, 2);
+  assert.deepEqual(ctx.povSweep.emissions.at(-2).pixels, timestampFrame(0));
+  assert.deepEqual(ctx.povSweep.emissions.at(-1).pixels, timestampFrame(4));
 
   ctx.paused = true;
   ctx.stepFrames = 1;
   render();
   assert.equal(frame, 2);
   assert.equal(ctx.timeAccumulator, ctx.frameInterval / 4);
-  assert.deepEqual(Array.from({ length: 8 }, (_, x) => ctx.povSweep.pixels[x * 3]),
-    [8, 9, 6, 7, 8, 9, 6, 7]);
-  assert.equal(ctx.povSweep.pixels[0] - ctx.povSweep.pixels[7 * 3], 1);
-  assert.equal(ctx.povSweep.pixels[4 * 3] - ctx.povSweep.pixels[3 * 3], 1);
+  assert.equal(ctx.povSweep.column, 2);
+  assert.deepEqual(ctx.povSweep.emissions.at(-2).pixels, timestampFrame(4));
+  assert.deepEqual(ctx.povSweep.emissions.at(-1).pixels, timestampFrame(8));
+  const history = ctx.povSweep.emissions.map(({ pixels }) => pixels.slice());
+  const visual = ctx.povSweep.visualPixels(0.25).slice();
 
   colors.set(timestampFrame(12));
   ctx.needsRender = true;
   render();
   assert.equal(frame, 2);
-  assert.deepEqual(Array.from({ length: 8 }, (_, x) => ctx.povSweep.pixels[x * 3]),
-    [12, 13, 10, 11, 12, 13, 10, 11]);
-  assert.equal(ctx.povSweep.pixels[0] - ctx.povSweep.pixels[7 * 3], 1);
-  assert.equal(ctx.povSweep.pixels[4 * 3] - ctx.povSweep.pixels[3 * 3], 1);
+  assert.deepEqual(ctx.povSweep.emissions.map(({ pixels }) => pixels), history);
+  assert.deepEqual(ctx.povSweep.visualPixels(0.25), visual);
 });
 
 test('POV fidelity reseeds after resize and restores aliases if drawing throws', () => {
@@ -895,10 +892,11 @@ test('enabling POV fidelity while paused normalizes an existing frame backlog', 
     drawFrame: () => colors.forEach((value, i) => { colors[i] = 4 + Math.floor(i / 3) % 4; }),
   });
   assert.equal(ctx.stepFrames, 0);
-  assert.deepEqual(Array.from({ length: 8 }, (_, x) => ctx.povSweep.pixels[x * 3]),
-    [4, 5, 2, 3, 4, 5, 2, 3]);
-  assert.equal(ctx.povSweep.pixels[0] - ctx.povSweep.pixels[7 * 3], 1);
-  assert.equal(ctx.povSweep.pixels[4 * 3] - ctx.povSweep.pixels[3 * 3], 1);
+  assert.equal(ctx.povSweep.column, 2);
+  assert.deepEqual(Array.from({ length: 8 }, (_, x) => ctx.povSweep.emissions.at(-1).pixels[x * 3]),
+    [4, 5, 6, 7, 4, 5, 6, 7]);
+  assert.deepEqual(Array.from({ length: 8 }, (_, x) => ctx.povSweep.emissions.at(-2).pixels[x * 3]),
+    [0, 1, 2, 3, 0, 1, 2, 3]);
 });
 
 test('render repaints a pending frame while paused', () => {

@@ -13,8 +13,7 @@ test('effect replacement removes outgoing light from every hemisphere and histor
   }
   const sweep = new PovSweep(8, 2, old, 0.8);
   sweep.reset(incoming);
-  assert.deepEqual(sweep.source, incoming);
-  assert.deepEqual(sweep.pixels, incoming);
+  assert.ok(sweep.emissions.every(({ pixels }) => pixels.every((v, i) => v === incoming[i])));
   for (const fraction of [0, 0.2, 0.9]) {
     const visible = sweep.visualPixels(fraction);
     for (let i = 0; i < visible.length; i += 3) {
@@ -112,7 +111,7 @@ test('visual response has causal startup and continuous column and half-turn bou
   assert.deepEqual(sweep.visualPixels(0), before);
 });
 
-test('visual front differences converge with column spacing while held jumps remain', () => {
+test('visual front differences converge with column spacing', () => {
   const visualJumps = [];
   for (const width of [288, 576, 1152, 2304]) {
     const half = width / 2;
@@ -127,7 +126,6 @@ test('visual front differences converge with column spacing while held jumps rem
         maximum = Math.max(maximum, Math.abs(pixels[x * 3] - pixels[(x + 1) * 3]));
       return maximum;
     };
-    assert.ok(frontJump(sweep.pixels) >= 490);
     visualJumps.push(frontJump(sweep.visualPixels(0.5)));
   }
   assert.ok(visualJumps[0] < 200);
@@ -151,49 +149,37 @@ test('visual history bounds cover the slowest response tail', () => {
   }
 });
 
-test('visual scale and paused replacement preserve source frames', () => {
+test('visual scale and boundary overlays preserve recorded emissions', () => {
   const sweep = new PovSweep(8, 2, frame(10000));
   sweep.beginFrame(frame(20000));
   sweep.advance(0.5);
   const history = sweep.emissions.map(({ pixels }) => pixels.slice());
-  const raw = sweep.pixels.slice();
   const visual = sweep.visualPixels(0.5).slice();
   assert.notDeepEqual(sweep.visualPixels(0.5, 2), visual);
   sweep.visualPixels(0);
   assert.deepEqual(sweep.visualPixels(0.5), visual);
   sweep.displayPixels(true, sweep.visualPixels(0.5));
-  assert.deepEqual(sweep.pixels, raw);
-  sweep.replaceFrame(frame(30000));
   assert.deepEqual(sweep.visualPixels(0.5), visual);
   assert.deepEqual(sweep.emissions.map(({ pixels }) => pixels), history);
 });
 
-test('advancing fresh frame pairs preserves samples without accumulating markers', () => {
+test('advancing fresh frames moves the boundary without changing recorded emissions', () => {
   const source = frame(20);
-  for (const [phase, expected, boundary] of [
-    [0.5, [20, 20, 20, 10, 20, 20, 20, 10], 3],
-    [0, [20, 10, 10, 10, 20, 10, 10, 10], 1],
-    [1, [20, 20, 20, 20, 20, 20, 20, 20], 0],
-    [0.25, [20, 20, 10, 10, 20, 20, 10, 10], 2],
-    [0, [20, 10, 10, 10, 20, 10, 10, 10], 1],
+  for (const [phase, boundary] of [
+    [0.5, 3], [0, 1], [1, 0], [0.25, 2], [0, 1],
   ]) {
     const sweep = new PovSweep(8, 2, frame(10));
     sweep.beginFrame(source);
     sweep.advance(phase);
     for (const y of [0, 1]) {
-      assert.deepEqual(row(sweep.pixels, y), expected);
-      const overlay = row(sweep.displayPixels(true), y);
+      const overlay = row(sweep.displayPixels(true, sweep.visualPixels(phase)), y);
       assert.equal(overlay.filter((value) => value === 65535).length, 2);
       assert.equal(overlay[boundary], 65535);
       assert.equal(overlay[boundary + 4], 65535);
     }
-    assert.deepEqual(sweep.source, frame(20));
+    assert.deepEqual(sweep.emissions.at(-1).pixels, frame(20));
     assert.deepEqual(source, frame(20));
   }
-  const sweep = new PovSweep(8, 2, source);
-  sweep.beginFrame(frame(30));
-  sweep.advance(0);
-  assert.deepEqual(row(sweep.pixels, 0), [30, 20, 20, 20, 30, 20, 20, 20]);
 });
 
 test('the optional boundary marks only the next opposing columns without changing samples', () => {
@@ -201,13 +187,15 @@ test('the optional boundary marks only the next opposing columns without changin
   const source = frame(20);
   const sweep = new PovSweep(8, 2, initial);
   sweep.beginFrame(source);
-  assert.equal(sweep.displayPixels(false), sweep.pixels);
+  const response = sweep.visualPixels(0);
+  assert.equal(sweep.displayPixels(false, response), response);
   assert.equal(sweep.boundaryPixels, null);
   let overlay;
   for (const [phase, boundary] of [[0, 1], [0.5, 3], [1, 0]]) {
     sweep.advance(phase);
-    const held = sweep.pixels.slice();
-    const displayed = sweep.displayPixels(true);
+    const response = sweep.visualPixels(phase);
+    const held = response.slice();
+    const displayed = sweep.displayPixels(true, response);
     if (overlay) assert.equal(displayed, overlay);
     overlay = displayed;
     for (let y = 0; y < 2; y++) {
@@ -218,62 +206,61 @@ test('the optional boundary marks only the next opposing columns without changin
             : held.slice(index, index + 3));
       }
     }
-    assert.deepEqual(sweep.pixels, held);
-    assert.deepEqual(sweep.source, source);
+    assert.deepEqual(response, held);
+    assert.deepEqual(sweep.emissions.at(-1).pixels, source);
     assert.deepEqual(source, frame(20));
     assert.deepEqual(initial, frame(10));
-    assert.equal(sweep.displayPixels(false), sweep.pixels);
+    assert.equal(sweep.displayPixels(false, response), response);
   }
 });
 
-test('sweep replaces opposing columns and retains the previous image ahead of both arms', () => {
+test('a half-turn snapshots its image independently of the live buffer', () => {
   const sweep = new PovSweep(8, 2, frame(10));
   const source = frame(20);
   sweep.beginFrame(source);
   source.fill(99);
   assert.equal(sweep.advance(0), true);
-  assert.deepEqual(row(sweep.pixels, 0), [20, 10, 10, 10, 20, 10, 10, 10]);
+  assert.equal(sweep.column, 1);
   assert.equal(sweep.advance(0.5), true);
-  for (const y of [0, 1]) {
-    assert.deepEqual(row(sweep.pixels, y), [20, 20, 20, 10, 20, 20, 20, 10]);
-  }
+  assert.equal(sweep.column, 3);
   assert.equal(sweep.advance(0.5), false);
   assert.equal(sweep.advance(1), true);
-  assert.deepEqual(sweep.pixels, frame(20));
+  assert.equal(sweep.column, 4);
+  assert.deepEqual(sweep.emissions.at(-1).pixels, frame(20));
 });
 
-test('a new half-turn finishes the previous image before revealing the next', () => {
+test('a new half-turn resets the column while retaining the previous emission', () => {
   const sweep = new PovSweep(8, 2, frame(10));
   sweep.beginFrame(frame(20));
   sweep.advance(0.25);
   sweep.beginFrame(frame(30));
-  assert.deepEqual(sweep.pixels, frame(20));
+  assert.equal(sweep.column, 0);
+  assert.deepEqual(sweep.emissions.at(-2).pixels, frame(20));
+  assert.deepEqual(sweep.emissions.at(-1).pixels, frame(30));
   sweep.advance(0.25);
-  assert.deepEqual(row(sweep.pixels, 0), [30, 30, 20, 20, 30, 30, 20, 20]);
+  assert.equal(sweep.column, 2);
 });
 
-test('a stalled clock clamps at a full sweep and cannot rewind displayed columns', () => {
+test('a stalled clock clamps at a full sweep and cannot rewind the boundary', () => {
   const sweep = new PovSweep(8, 2, frame(10));
   sweep.beginFrame(frame(20));
   assert.equal(sweep.advance(-1), false);
   assert.equal(sweep.advance(-0.01), false);
-  assert.deepEqual(sweep.pixels, frame(10));
+  assert.equal(sweep.column, 0);
   assert.equal(sweep.advance(10), true);
   assert.equal(sweep.advance(0.25), false);
-  assert.deepEqual(sweep.pixels, frame(20));
+  assert.equal(sweep.column, 4);
 });
 
-test('the first column joins the preceding sweep at both fixed meridians', () => {
+test('the boundary advances at exact column intervals', () => {
   const timestampFrame = (start) => new Uint16Array(
     Array.from({ length: 8 * 3 }, (_, i) => start + Math.floor(i / 3) % 4));
   const sweep = new PovSweep(8, 1, timestampFrame(0));
   sweep.beginFrame(timestampFrame(4));
   sweep.advance(0);
-  assert.deepEqual(row(sweep.pixels, 0), [4, 1, 2, 3, 4, 1, 2, 3]);
-  assert.equal(sweep.pixels[0] - sweep.pixels[7 * 3], 1);
-  assert.equal(sweep.pixels[4 * 3] - sweep.pixels[3 * 3], 1);
+  assert.equal(sweep.column, 1);
   sweep.advance(0.25 - Number.EPSILON);
   assert.equal(sweep.column, 1);
   sweep.advance(0.25);
-  assert.deepEqual(row(sweep.pixels, 0), [4, 5, 2, 3, 4, 5, 2, 3]);
+  assert.equal(sweep.column, 2);
 });

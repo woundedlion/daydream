@@ -41,8 +41,6 @@ export class PovSweep {
     this.frameMs = frameMs;
     this.historyFrames = Math.ceil(PovSweep.RESPONSE_TAIL_TAU * PovSweep.RESPONSE_TAU_MS
         * PovSweep.MAX_RESPONSE_SCALE / frameMs) + 1;
-    this.source = initial.slice();
-    this.pixels = initial.slice();
     /** @type {Uint16Array | null} */
     this.boundaryPixels = null;
     /** @type {Uint16Array | null} */
@@ -56,12 +54,12 @@ export class PovSweep {
 
   /**
    * @param {boolean} showBoundary Mark the next opposing columns in magenta.
-   * @param {Uint16Array} [pixels=this.pixels] Response pixels.
+   * @param {Uint16Array} pixels Response pixels.
    * @returns {Uint16Array} Display pixels, with an optional boundary overlay.
    */
-  displayPixels(showBoundary, pixels = this.pixels) {
+  displayPixels(showBoundary, pixels) {
     if (!showBoundary) return pixels;
-    this.boundaryPixels ??= new Uint16Array(this.pixels.length);
+    this.boundaryPixels ??= new Uint16Array(pixels.length);
     this.boundaryPixels.set(pixels);
     const half = this.width / 2;
     const column = this.column % half;
@@ -79,7 +77,7 @@ export class PovSweep {
   /** @param {Uint16Array} source Next half-turn's image. */
   beginFrame(source) {
     this.responseFraction = NaN;
-    this.replaceFrame(source);
+    this.column = 0;
     const recycled = this.emissions.length >= this.historyFrames
       ? this.emissions.shift() : undefined;
     const pixels = recycled?.pixels ?? new Uint16Array(source.length);
@@ -90,21 +88,12 @@ export class PovSweep {
   /** @param {Uint16Array} source Complete replacement effect image. */
   reset(source) {
     this.responseFraction = NaN;
-    this.source.set(source);
-    this.pixels.set(source);
     for (const frame of this.emissions) {
       frame.pixels.set(source);
       frame.start = 0;
     }
     while (this.emissions.length < this.historyFrames)
       this.emissions.push({ pixels: source.slice(), start: 0 });
-  }
-
-  /** @param {Uint16Array} source Paused raw preview; recorded emissions stay unchanged. */
-  replaceFrame(source) {
-    this.advance(1);
-    this.source.set(source);
-    this.column = 0;
   }
 
   /**
@@ -132,7 +121,7 @@ export class PovSweep {
    */
   weightedPixels(pulseWeight) {
     this.responseFraction = NaN;
-    this.responsePixels ??= new Uint16Array(this.pixels.length);
+    this.responsePixels ??= new Uint16Array(this.width * this.height * 3);
     const sources = this.emissions.map((frame) => frame.pixels);
     const half = this.width / 2;
     const count = this.emissions.length;
@@ -162,20 +151,13 @@ export class PovSweep {
 
   /**
    * @param {number} fraction Elapsed fraction of the half-turn, in [0, 1].
-   * @returns {boolean} Whether any columns were refreshed.
+   * @returns {boolean} Whether the sweep reached another column.
    */
   advance(fraction) {
     if (fraction < 0) return false;
     const half = this.width / 2;
     const end = Math.min(half, Math.floor(fraction * half) + 1);
     if (end <= this.column) return false;
-    for (let y = 0; y < this.height; y++) {
-      for (let arm = 0; arm < this.width; arm += half) {
-        const start = (y * this.width + arm + this.column) * 3;
-        const stop = (y * this.width + arm + end) * 3;
-        this.pixels.set(this.source.subarray(start, stop), start);
-      }
-    }
     this.column = end;
     return true;
   }

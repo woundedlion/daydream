@@ -572,12 +572,7 @@ export class Daydream {
       this.needsRender = true;
     }
     if (this.povSweep && isViewLive(this.pixels)) {
-      const pausedUpdate = this.paused && !advanced && this.needsRender
-        && this.pixels.some((value, i) => value !== this.povSweep.source[i]);
-      if (!this.povResetPending) {
-        if (advanced) this.povSweep.beginFrame(this.pixels);
-        else if (pausedUpdate) this.povSweep.replaceFrame(this.pixels);
-      }
+      if (!this.povResetPending && advanced) this.povSweep.beginFrame(this.pixels);
       const fraction = (this.timeAccumulator % this.frameInterval) / this.frameInterval;
       if (this.povSweep.advance(fraction)) this.needsRender = true;
       if (this.timeAccumulator !== previousSweepTime)
