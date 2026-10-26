@@ -1778,7 +1778,6 @@ function cullCtx() {
     DOT_SIZE: Daydream.DEFAULT_DOT_SIZE,
     camera: { position: new THREE.Vector3(3, -4, 12) },
     cullBackSphere: false,
-    strobeColumns: true,
     noBlackColumns: false,
     cullUniforms: {
       uCameraPos: { value: new THREE.Vector3() },
@@ -1824,7 +1823,9 @@ test('updateCullUniforms gap-fills columns for a persisting effect', () => {
   Daydream.prototype.updateCullUniforms.call(ctx);
   assert.equal(ctx.cullUniforms.uColumnFillArc.value, 0, 'strobed dots were smeared');
 
-  ctx.strobeColumns = false;
+  ctx.invalidate = () => {};
+  Daydream.prototype.setStrobeColumns.call(ctx, false);
+  assert.equal(ctx.noBlackColumns, true);
   Daydream.prototype.updateCullUniforms.call(ctx);
   const arc = ctx.cullUniforms.uColumnFillArc.value;
   assert.ok(arc > 0);
@@ -1837,19 +1838,29 @@ test('updateCullUniforms gap-fills columns for a persisting effect', () => {
 
 });
 
-test('no black columns overrides strobing and restores the effect mode when disabled', () => {
+test('the view toggle overrides both persisting and strobed effect defaults', () => {
   const ctx = cullCtx();
-  ctx.noBlackColumns = true;
+  let invalidations = 0;
+  ctx.invalidate = () => { invalidations += 1; };
+  Daydream.prototype.setStrobeColumns.call(ctx, false);
+  assert.equal(ctx.noBlackColumns, true);
   Daydream.prototype.updateCullUniforms.call(ctx);
   assert.ok(ctx.cullUniforms.uColumnFillArc.value > 0);
 
   ctx.noBlackColumns = false;
   Daydream.prototype.updateCullUniforms.call(ctx);
   assert.equal(ctx.cullUniforms.uColumnFillArc.value, 0);
+  Daydream.prototype.updateCullUniforms.call(ctx);
+  assert.equal(ctx.cullUniforms.uColumnFillArc.value, 0);
 
-  ctx.strobeColumns = false;
+  Daydream.prototype.setStrobeColumns.call(ctx, true);
+  assert.equal(ctx.noBlackColumns, false);
+  Daydream.prototype.updateCullUniforms.call(ctx);
+  assert.equal(ctx.cullUniforms.uColumnFillArc.value, 0);
+  ctx.noBlackColumns = true;
   Daydream.prototype.updateCullUniforms.call(ctx);
   assert.ok(ctx.cullUniforms.uColumnFillArc.value > 0);
+  assert.equal(invalidations, 2);
 });
 
 test('updateCullUniforms is a no-op before setupDots builds the dot material', () => {

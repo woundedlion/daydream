@@ -98,7 +98,7 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
     enable() { controller.enabled = true; controller.disabled = false; return controller; },
     disable() { controller.enabled = false; controller.disabled = true; return controller; },
     max(value) { controller.args[1] = value; return controller; },
-    listen() { return controller; },
+    listen() { controller.listening = true; return controller; },
   };
   return controller;
 }
@@ -288,7 +288,7 @@ export function fakeDriver() {
     stepOnce() { this.invalidate(); this.stepFrames = Math.max(1, this.stepFrames); },
     resetPovOnNextFrame: Daydream.prototype.resetPovOnNextFrame,
     keydown(e) { this.keys.push(e); },
-    setStrobeColumns(strobe) { this.strobe = strobe; },
+    setStrobeColumns: Daydream.prototype.setStrobeColumns,
     setDisplayGeometry(geometry) { Object.assign(this, geometry); },
     updateResolution(w, h, dotSize) {
       this.resolution = [w, h, dotSize];

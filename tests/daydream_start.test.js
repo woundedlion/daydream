@@ -80,6 +80,36 @@ test('POV fidelity defaults off and toggling it requests a repaint', () => {
   assert.equal(driver.invalidated, true);
 });
 
+test('the column toggle follows the loaded effect default and accepts manual changes', async () => {
+  const app = startApp({ loadModule: async () => fakeWasmModule() });
+  const control = app.guis[0].controllers.find((c) => c.property === 'noBlackColumns');
+  assert.equal(control.listening, true);
+  assert.equal(control.getValue(), false);
+  await app.teardown.ready;
+  assert.equal(control.getValue(), true);
+  app.driver.invalidated = false;
+  control.setValue(false);
+  assert.equal(app.driver.noBlackColumns, false);
+  assert.equal(app.driver.invalidated, true);
+});
+
+test('explicit column-layout choices survive the initial effect default', async () => {
+  for (const strobe of [false, true]) {
+    for (const noBlackColumns of [false, true]) {
+      const module = fakeWasmModule();
+      module.HolosphereEngine.prototype.strobeColumns = () => strobe;
+      const app = startApp({
+        hydratedView: { noBlackColumns },
+        loadModule: async () => module,
+      });
+      await app.teardown.ready;
+      const control = app.guis[0].controllers.find((c) => c.property === 'noBlackColumns');
+      assert.equal(control.getValue(), noBlackColumns);
+      assert.equal(app.driver.noBlackColumns, noBlackColumns);
+    }
+  }
+});
+
 test('response timescale is a persistent view control', () => {
   const { guis, driver } = startApp();
   const control = guis[0].controllers.find((c) => c.property === 'povResponseScale');

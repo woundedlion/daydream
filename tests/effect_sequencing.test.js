@@ -536,6 +536,17 @@ test('applying an effect points the engine at it and rebuilds the panel', () => 
   ]);
 });
 
+test('column defaults change on effect switches and preserve overrides on repeated applies', () => {
+  const app = makeApp();
+  app.pipeline.applyEffect();
+  app.pipeline.applyEffect();
+  assert.equal(app.log.filter((entry) => entry.startsWith('driver.setStrobeColumns')).length, 1);
+
+  app.state.effect = 'Beta';
+  app.pipeline.applyEffect();
+  assert.equal(app.log.filter((entry) => entry.startsWith('driver.setStrobeColumns')).length, 2);
+});
+
 test('a preserved apply keeps the effect param deep links', () => {
   const app = makeApp();
 
@@ -549,7 +560,7 @@ test('an engine rejection leaves the panel and the workers untouched', () => {
 
   assert.equal(app.pipeline.applyEffect(), ApplyResult.REJECTED);
 
-  assert.deepEqual(app.log, ['engine.setEffect Alpha', 'driver.setStrobeColumns true']);
+  assert.deepEqual(app.log, ['engine.setEffect Alpha']);
   assert.match(app.errors[0], /setEffect\("Alpha"\) failed/);
 });
 

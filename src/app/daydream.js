@@ -577,7 +577,11 @@ export function start({
   povResponse.onChange(() => daydream.invalidate());
   syncPovControls();
   guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions').onChange(() => daydream.invalidate());
-  guiInstance.add(daydream, 'noBlackColumns').name('No black columns').onChange(() => daydream.invalidate());
+  let initialColumnOverride = null;
+  guiInstance.add(daydream, 'noBlackColumns').name('No black columns').listen().onChange((value) => {
+    if (!host.engine) initialColumnOverride = value;
+    daydream.invalidate();
+  });
 
   const poleLod = createPoleLodBinding({
     getEngine: () => host.engine,
@@ -679,7 +683,13 @@ export function start({
   });
 
   const ready = loadWithDeadline(loadModule)
-    .then(moduleLoad.onModuleReady).catch(moduleLoad.onModuleFailed);
+    .then(moduleLoad.onModuleReady)
+    .then(() => {
+      if (initialColumnOverride !== null && host.engine) {
+        daydream.noBlackColumns = initialColumnOverride;
+        daydream.invalidate();
+      }
+    }).catch(moduleLoad.onModuleFailed);
 
   return Object.assign(appTeardown, { ready });
 }

@@ -304,9 +304,6 @@ export class Daydream {
     this.showPip = true;
     this.noBlackColumns = false;
 
-    // Round dots until an effect binds and sets its mode (see updateCullUniforms).
-    this.strobeColumns = true;
-
     this.statsView = statsView;
   }
 
@@ -746,19 +743,18 @@ export class Daydream {
       this.cullUniforms.uCullThreshold.value = this.cullBackSphere
         ? -this.DOT_SIZE / Daydream.SPHERE_RADIUS
         : -2.0;
-      this.cullUniforms.uColumnFillArc.value = this.noBlackColumns || this.strobeColumns === false
+      this.cullUniforms.uColumnFillArc.value = this.noBlackColumns
         ? 1.15 * Math.PI * Daydream.SPHERE_RADIUS / this.W
         : 0;
     }
   }
 
   /**
-   * Set POV column-strobe mode: true = discrete dots, false = gap-filled band
-   * (applied via uColumnFillArc in updateCullUniforms()).
+   * Apply an effect's default column layout; the view control may override it.
    * @param {boolean} strobe - true to strobe columns, false to persist/smear.
    */
   setStrobeColumns(strobe) {
-    this.strobeColumns = strobe;
+    this.noBlackColumns = !strobe;
     this.invalidate();
   }
 

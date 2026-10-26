@@ -372,6 +372,11 @@ export function createApplyPipeline({
   logWarn = (...args) => console.warn(...args),
   moduleDead = () => false,
 }) {
+  /** @type {HolosphereEngine|null} */
+  let strobeEngine = null;
+  /** @type {string|null} */
+  let strobeEffect = null;
+
   /**
    * Point the engine at the state's effect and mirror its strobe layout onto the
    * driver.
@@ -385,7 +390,11 @@ export function createApplyPipeline({
     // Module.EffectSetResult value is a truthy object).
     const applied =
       engine.setEffect(effect) === getModule().EffectSetResult.INSTALLED;
-    driver.setStrobeColumns(engine.strobeColumns());
+    if (applied && (engine !== strobeEngine || effect !== strobeEffect)) {
+      driver.setStrobeColumns(engine.strobeColumns());
+      strobeEngine = engine;
+      strobeEffect = effect;
+    }
     if (!applied) {
       logError(`setEffect("${effect}") failed; effect unavailable.`);
     }
