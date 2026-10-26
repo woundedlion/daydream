@@ -856,8 +856,12 @@ test('a recipe zoom reads the same in either drag direction and stays in range',
     zoomRecipeWindow({ offset: 0, span: 1 }, 0.4, 0.6));
   assert.deepEqual(zoomRecipeWindow({ offset: 0, span: 1 }, -0.5, 1.5),
     { offset: 0, span: 1 }, 'a drag off either end still names the whole palette');
-  assert.equal(zoomRecipeWindow({ offset: 0, span: 0.02 }, 0.5, 0.5).span, 0.01,
-    'a zoom onto nothing keeps the narrowest window the controls hold');
+  assert.deepEqual(zoomRecipeWindow({ offset: 0.4, span: 0.02 }, 0.5, 0.5),
+    { offset: 0.4, span: 0.02 }, 'an empty drag leaves the window alone');
+  assert.deepEqual(zoomRecipeWindow({ offset: 0.4, span: 0.02 }, 0.25, 0.5),
+    { offset: 0.4, span: 0.02 }, 'a span below the minimum leaves the window alone');
+  assert.deepEqual(zoomRecipeWindow({ offset: 0.4, span: 0.02 }, 0.25, 0.75),
+    { offset: 0.405, span: 0.01 }, 'the minimum span remains editable');
 });
 
 test('a short strip drag copies a color and a long one zooms', () => {

@@ -248,7 +248,7 @@ export function tablistKeyTarget(key, current, count) {
  * @property {(position: number) => number} map - Takes a 0..1 strip position to its palette phase.
  * @property {(firstPosition: number, secondPosition: number) => {start: number, end: number}} zoom
  *   Narrows the window to the span between two strip positions, in either drag
- *   direction, and returns it; an empty drag leaves the window alone.
+ *   direction, and returns it; a span below 0.01 leaves the window alone.
  * @property {() => void} reset - Restores the full 0..1 range.
  */
 
@@ -323,7 +323,7 @@ export function clampRecipeWindow(offset, span) {
 
 /**
  * Narrows a recipe's phase window to the span between two strip positions, in
- * either drag direction.
+ * either drag direction; a span below 0.01 leaves the window alone.
  * @param {{offset: number, span: number}} window - The window now shown.
  * @param {number} firstPosition - One end of the drag, as a 0..1 strip position.
  * @param {number} secondPosition - The other end.
@@ -332,8 +332,10 @@ export function clampRecipeWindow(offset, span) {
 export function zoomRecipeWindow(window, firstPosition, secondPosition) {
   const low = Math.min(clampUnit(firstPosition), clampUnit(secondPosition));
   const high = Math.max(clampUnit(firstPosition), clampUnit(secondPosition));
+  const span = (high - low) * window.span;
+  if (span < 0.01) return { ...window };
   return clampRecipeWindow(
-    window.offset + low * window.span, (high - low) * window.span);
+    window.offset + low * window.span, span);
 }
 
 /** Shortest drag the strip reads as a zoom rather than as a click. */
