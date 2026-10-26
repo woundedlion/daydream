@@ -642,8 +642,8 @@ export class SegmentController {
     }
     // Count and stage only the first message from each segment.
     if (this.#frameSeen[msg.segId]) return;
-    // Generation fence: keep only results from the current resolution; still
-    // settle the frame either way.
+    // Stage only results dispatched under the current generation; settle
+    // the frame either way.
     if (this.#inflightGen === this.#renderGen) {
       // Mirror segment 0's live params for GUI sync; fenced, since a stale
       // frame's params index the old descriptor list.
