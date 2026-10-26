@@ -587,7 +587,7 @@ test('registry composite lowering matches expand_to_primitives', { skip: engineS
       }
       const emitted = [...chosen.matchAll(/emit\(\{Op::([A-Z]+)([^}]*)\}\)/g)].map((match) => {
         const op = match[1].toLowerCase();
-        if (op === 'truncate') { assert.match(match[2], /step\.param/); return { op, params: { t } }; }
+        if (op === 'truncate') { assert.match(match[2], /^,\s*step\.param\s*$/); return { op, params: { t } }; }
         if (op === 'snub') assert.match(match[2], /MeshOps::SNUB_DEFAULT_T, MeshOps::SNUB_DEFAULT_TWIST/);
         return op;
       });
