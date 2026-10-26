@@ -563,3 +563,24 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
     }
   }
 });
+
+
+test('deployment pair recovery uses retained resolve outputs and engine packages last through reruns', (t) => {
+  const deploy = workflowText('deploy.yml');
+  assert.doesNotMatch(deploy, /name: deployment-pair/);
+  assert.match(deploy, /DAYDREAM_SHA: \$\{\{ needs.resolve.outputs.daydream \}\}/);
+  assert.match(deploy, /HOLOSPHERE_SHA: \$\{\{ needs.resolve.outputs.holosphere \}\}/);
+  const code = deploy.match(/node --input-type=module <<'NODE'\n([\s\S]*?)\n {10}NODE/)[1]
+    .replace(/^ {10}/gm, '');
+  const root = scratchDir(t, 'deployment-pair-recovery-');
+  mkdirSync(join(root, 'scripts'));
+  writeFileSync(join(root, 'scripts/deployment-pair.mjs'),
+    readFileSync(resolve(REPO, 'scripts/deployment-pair.mjs')));
+  const pair = { daydream: 'a'.repeat(40), holosphere: 'b'.repeat(40) };
+  execFileSync(process.execPath, ['--input-type=module', '-e', code], {
+    cwd: root, env: { ...process.env, DAYDREAM_SHA: pair.daydream, HOLOSPHERE_SHA: pair.holosphere },
+  });
+  assert.deepEqual(JSON.parse(readFileSync(join(root, 'deployment-pair.json'), 'utf8')), pair);
+  assert.match(workflowText('engine-bundle.yml'),
+    /name: verified-engine-bundle\s+path: engine-bundle\/\s+retention-days: 30\b/);
+});
