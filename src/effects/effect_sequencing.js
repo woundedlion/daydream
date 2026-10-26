@@ -352,6 +352,7 @@ export function createSwitchCoordinator({
  * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
  * @param {(error?: *) => boolean} [deps.moduleDead] - Reads whether the engine module
  *   trapped; a sidebar query that trapped is re-thrown.
+ * @param {() => void} [deps.onColumnDefault] - Called after applying the effect's column layout.
  * @returns {{applyEffect: (options?: {preserveParams?: boolean, broadcast?: boolean, chainSnapshot?: *}) => string,
  *   applyResolution: (options?: {preserveParams?: boolean}) => string}}
  */
@@ -371,6 +372,7 @@ export function createApplyPipeline({
   logError = (...args) => console.error(...args),
   logWarn = (...args) => console.warn(...args),
   moduleDead = () => false,
+  onColumnDefault = () => {},
 }) {
   /** @type {HolosphereEngine|null} */
   let strobeEngine = null;
@@ -392,6 +394,7 @@ export function createApplyPipeline({
       engine.setEffect(effect) === getModule().EffectSetResult.INSTALLED;
     if (applied && (engine !== strobeEngine || effect !== strobeEffect)) {
       driver.setStrobeColumns(engine.strobeColumns());
+      onColumnDefault();
       strobeEngine = engine;
       strobeEffect = effect;
     }

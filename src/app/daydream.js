@@ -489,6 +489,7 @@ export function start({
     },
   });
 
+  let columnDefaultsReady = false;
   const apply = createApplyPipeline({
     appState,
     getEngine: () => host.engine,
@@ -503,6 +504,9 @@ export function start({
     sidebar,
     muteSubscription: (write) => switches.mute(write),
     moduleDead: (error) => host.moduleDead(error),
+    onColumnDefault: () => {
+      if (columnDefaultsReady) urlSync.setParam('view.noBlackColumns', null);
+    },
   });
 
   const switches = createSwitchCoordinator({
@@ -689,6 +693,7 @@ export function start({
         daydream.noBlackColumns = initialColumnOverride;
         daydream.invalidate();
       }
+      columnDefaultsReady = true;
     }).catch(moduleLoad.onModuleFailed);
 
   return Object.assign(appTeardown, { ready });

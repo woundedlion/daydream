@@ -139,6 +139,41 @@ test('an effect switch preserves view deep-link parameters', async (t) => {
   assert.equal(query.has('fx.stale'), false);
 });
 
+for (const change of ['effect', 'resolution']) {
+  test(`a ${change} switch keeps the column-layout URL consistent with the display`, async (t) => {
+    t.mock.timers.enable({apis: ['setTimeout']});
+    for (const strobe of [false, true]) {
+      const module = fakeWasmModule();
+      module.HolosphereEngine.prototype.strobeColumns = () => strobe;
+      const app = await bootedApp({
+        search: `?view.noBlackColumns=${strobe}`,
+        hydratedView: {noBlackColumns: strobe},
+        loadModule: async () => module,
+      });
+      assert.equal(app.driver.noBlackColumns, strobe);
+      getActiveURLSync().schedule();
+      t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+      const initial = new URL(app.urlWrites.at(-1), 'https://example.test').searchParams;
+      assert.equal(initial.get('view.noBlackColumns'), String(strobe));
+      if (change === 'effect') {
+        app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
+          .find((entry) => entry.dataset.effect === canonicalEffectId('Raymarch')).onclick();
+      } else {
+        resolutionControl(app).setValue('Holosphere (96x20)');
+      }
+      t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+      const query = new URL(app.urlWrites.at(-1), 'https://example.test').searchParams;
+      if (change === 'effect') {
+        assert.equal(app.driver.noBlackColumns, !strobe);
+        assert.equal(query.has('view.noBlackColumns'), false);
+      } else {
+        assert.equal(app.driver.noBlackColumns, strobe);
+        assert.equal(query.get('view.noBlackColumns'), String(strobe));
+      }
+    }
+  });
+}
+
 /**
  * A controller in the Recording folder of a booted app.
  * @param {Object} app - A startApp() result.
