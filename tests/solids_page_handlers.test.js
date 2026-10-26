@@ -333,8 +333,11 @@ test('clearing saved solids requires confirmation and preserves cancelled cards'
   clear();
   assert.equal(savedSolids.length, 2);
   assert.equal(calls.length, 1);
+  assert.equal(calls[0], 'Delete 2 saved solids? This cannot be undone.');
+  savedSolids.pop();
   confirmed = true;
   clear();
+  assert.equal(calls[1], 'Delete 1 saved solid? This cannot be undone.');
   assert.equal(savedSolids.length, 0);
   assert.deepEqual(calls.slice(-2), ['persist', 'render']);
   clear();
@@ -613,7 +616,7 @@ test('stale card backup failure cannot block the primary save', () => {
   const savedStorage = handler('loadSavedSolids', {localStorage, SAVED_SOLIDS_KEY: 'saved', savedSolidExportError})();
   assert.equal(savedStorage.entries.length, 1);
   assert.equal(savedStorage.rejected.length, 1);
-  assert.match(savedStorage.notice, /1 saved solids.*out-of-range/);
+  assert.match(savedStorage.notice, /1 saved solid could not be loaded.*out-of-range/);
   assert.match(savedStorage.notice, /up to 20 rejected entries without thumbnails; oversized data may be truncated or omitted/);
   const status = {textContent: savedStorage.notice};
   const persist = handler('persistSavedSolids', {savedStorage, savedSolids: savedStorage.entries,

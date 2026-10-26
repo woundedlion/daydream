@@ -542,7 +542,7 @@ function loadSavedSolids() {
     reason = 'invalid saved-solid JSON';
   }
   return { entries, rejected, notice: rejected.length
-    ? `${rejected.length} saved solids could not be loaded: ${reason}. Saving attempts a backup of up to 20 rejected entries without thumbnails; oversized data may be truncated or omitted.` : '' };
+    ? `${rejected.length} saved solid${rejected.length === 1 ? '' : 's'} could not be loaded: ${reason}. Saving attempts a backup of up to 20 rejected entries without thumbnails; oversized data may be truncated or omitted.` : '' };
 }
 
 const savedStorage = loadSavedSolids();
@@ -1344,7 +1344,7 @@ function resetOps() {
 
 function clearSavedSolids() {
   if (savedSolids.length === 0 || !window.confirm(
-    `Delete all ${savedSolids.length} saved solids? This cannot be undone.`)) return;
+    `Delete ${savedSolids.length} saved solid${savedSolids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
   savedSolids.length = 0;
   persistSavedSolids();
   renderSavedList();
