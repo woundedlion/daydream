@@ -614,8 +614,13 @@ export async function probeStrip(tab) {
 
   // A source that reads the sphere directly collapses the plane crossing, so
   // that carrier holds no gap, chip or socket and is drawn no band at all.
-  await (await tab.waitForSelector(
-    '.chain-band[data-carrier="plane"] .chain-chip .chain-chip-remove')).click();
+  const removePlaneStage = await tab.waitForSelector(
+    '.chain-band[data-carrier="plane"] .chain-chip .chain-chip-remove');
+  await removePlaneStage.hover();
+  await tab.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
+  await removePlaneStage.click();
   await tab.waitForFunction(() => document.querySelector(
     '.chain-band[data-carrier="plane"] .chain-chip') === null);
   await tab.select(source, 'sample.spherical-rings.v3');
