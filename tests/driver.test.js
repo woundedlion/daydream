@@ -685,6 +685,23 @@ test('visual presentation repaints within columns and preserves paused samples a
   assert.deepEqual(painted, colors);
 });
 
+test('POV fidelity records a frame whose pixel view detaches during the tick', () => {
+  const pixels = new Uint16Array(48).fill(1000);
+  const sentinel = new Uint16Array(48).fill(23000);
+  const ctx = renderCtx(pixels, []);
+  Object.assign(ctx, {
+    W: 8, H: 2, pixels, povFidelity: true, paused: false,
+    stepSimulation: Daydream.prototype.stepSimulation, updateStats() {},
+  });
+  ctx.clock.getDelta = () => ctx.frameInterval;
+  Daydream.prototype.render.call(ctx, {
+    drawFrame() { structuredClone(pixels.buffer, { transfer: [pixels.buffer] }); },
+    refreshPixelView() { repointDisplayAliases(ctx, sentinel); },
+  });
+  assert.deepEqual(ctx.povSweep.source, sentinel);
+  assert.deepEqual(ctx.povSweep.emissions.at(-1).pixels, sentinel);
+});
+
 test('effect history waits for complete worker publication and swaps while paused', () => {
   const pixels = new Uint16Array(48).fill(1000);
   const ctx = renderCtx(pixels, []);
