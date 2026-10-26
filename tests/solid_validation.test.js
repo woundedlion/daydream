@@ -119,18 +119,20 @@ test('solids validator resolves the module factory after async initialization', 
 });
 
 
-/**
- * Verifies every page gate binds the verdict instead of negating the call. The verdict
- * is an object and therefore always truthy, so a gate left testing the call's
- * result directly would pass every chain.
- */
-test('the solids page binds every chainIsValid verdict instead of testing it', () => {
+/** Verifies page gates test the verdict's ok field. */
+test('the solids page gates on each chainIsValid verdict field', () => {
   const calls = [...SOLIDS_PAGE.matchAll(/\bchainIsValid\(/g)].length;
   assert.ok(calls >= 7, `expected the page's gates to call chainIsValid, found ${calls}`);
   assert.equal([...SOLIDS_PAGE.matchAll(/const \w+ = await chainIsValid\(/g)].length, calls,
     'every call must bind its verdict; an unbound one is truthy and gates nothing');
   assert.doesNotMatch(SOLIDS_PAGE, /!\s*\(?await chainIsValid\(/,
     'a negated call tests the verdict object, not its ok field');
+  const verdicts = new Set([...SOLIDS_PAGE.matchAll(/const (\w+) = await chainIsValid\(/g)]
+    .map((match) => match[1]));
+  for (const verdict of verdicts) {
+    assert.doesNotMatch(SOLIDS_PAGE, new RegExp(`if\\s*\\(\\s*!?\\s*${verdict}\\s*\\)`),
+      `${verdict} must be tested through its ok field`);
+  }
 });
 
 
