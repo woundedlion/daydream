@@ -7,7 +7,7 @@
  * runs its own WASM engine and renders one segment rectangle; results are
  * composited one frame deep (frame N-1 displays while frame N renders).
  */
-import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
+import { getChainSnapshot } from '../engine/workbench_bindings.js';
 import { acceptedParamValue, engineParamValue } from '../effects/param_sync.js';
 import {
   isValidSegmentCount,
@@ -851,7 +851,7 @@ export class SegmentController {
    */
   snapshotEffectState() {
     const engine = this.getWasmEngine();
-    const snapshot = callWorkbenchBinding(engine, 'getSnapshot', []);
+    const snapshot = getChainSnapshot(engine);
     if (snapshot) return { chainSnapshot: snapshot };
     return { params: this.snapshotParams() };
   }
