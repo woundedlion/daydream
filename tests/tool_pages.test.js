@@ -408,10 +408,32 @@ test('tailwind.css keeps its upstream license banner', () => {
 const AA_CONTRAST = 4.5;
 
 // Sheet -> text rule -> the rule painting the surface under it, front to back
-// where the nearer fill is translucent. Every rule a tools/ stylesheet declares
-// `color` on is listed here or in CONTRAST_EXEMPT. tailwind.css is generated
+// where the nearer fill is translucent. Swept color rules are listed here
+// or in CONTRAST_EXEMPT. tailwind.css is generated
 // from the page and source classes: its rules stay in the cascade but out of the sweep.
 const CONTRAST_SURFACES = {
+  'index.css': {
+    '.nav-label': '.nav-tabs',
+    '.tab': ['.tab', '.nav-tabs'],
+    '.global-stats': '.nav-tabs',
+    '.global-stats .stats-head': '.nav-tabs',
+    '.global-stats .perf-time': '.nav-tabs',
+    '.global-stats .perf-time.slow': '.nav-tabs',
+    '.loading-overlay': '.loading-overlay',
+    '.loading-overlay.error': '.loading-overlay',
+    '.load-error-detail': '.loading-overlay',
+    '.load-error-remedy': '.loading-overlay',
+    '.apply-notice-body': '.apply-notice-body',
+    '.apply-notice-dismiss': '.apply-notice-body',
+    '.context-lost-reload': '.context-lost-reload',
+    '.effect-sidebar-heading': ['.effect-sidebar', '.layout-container'],
+    '.effect-button': ['.effect-sidebar', '.layout-container'],
+    '.effect-size': ['.effect-sidebar', '.layout-container'],
+    '.sort-btn': ['.sort-btn', '.effect-sidebar', '.layout-container'],
+    '.sort-btn:hover': ['.sort-btn:hover', '.effect-sidebar', '.layout-container'],
+    '.sort-btn.active': ['.sort-btn', '.effect-sidebar', '.layout-container'],
+    '.effect-button:hover': ['.effect-button:hover', '.effect-sidebar', '.layout-container'],
+  },
   'tools.css': {
     'body': 'body',
     '.slider-label': '.param-group',
@@ -491,6 +513,32 @@ const CONTRAST_SURFACES = {
 // Sheet -> text rule -> why no pair measures it. An empty reason is no
 // exemption: the sweep falls back to demanding a surface for it.
 const CONTRAST_EXEMPT = {
+  'index.css': {
+    '.license-link': 'translucent text over the live canvas',
+    '.license-link:hover': 'text over the live canvas',
+    '.rec-duration': 'text over the live canvas',
+    '.effect-button.active': 'text over a gradient fill',
+    '.effect-button.active .effect-size': 'text over a gradient fill',
+    '.scroll-arrow': 'translucent text over a gradient fill',
+    '.gui-container .effect-gui .lil-controller.param-readonly > .lil-name':
+      'lil-gui supplies its own background in its vendored stylesheet',
+    '.gui-container .effect-gui .lil-controller.param-readonly > .lil-widget':
+      'lil-gui supplies its own background in its vendored stylesheet',
+    '.gui-container .effect-gui .lil-controller.param-warning > .lil-name::after':
+      'lil-gui supplies its own background in its vendored stylesheet',
+    '.gui-container .effect-gui .param-warning-note':
+      'lil-gui supplies its own background in its vendored stylesheet',
+    'div.label': 'text over the live canvas',
+    '.segment-stats': 'translucent readout over the live canvas',
+    '.segment-stats th': 'translucent readout over the live canvas',
+    '.segment-stats .seg-label': 'translucent readout over the live canvas',
+    '.segment-stats .seg-label.seg-diverged': 'translucent readout over the live canvas',
+    '.segment-stats .seg-time': 'translucent readout over the live canvas',
+    '.segment-stats .seg-time.slow': 'translucent readout over the live canvas',
+    '.segment-stats .seg-status': 'translucent readout over the live canvas',
+    '.segment-stats .seg-status.seg-fault': 'translucent readout over the live canvas',
+    '.segment-stats .seg-detail': 'translucent readout over the live canvas',
+  },
   'shader.css': {
     '.shader-toolbar button:disabled':
       'inactive control, which SC 1.4.3 exempts from the contrast floor',
@@ -674,15 +722,16 @@ test('CSS readers ignore comments and honor later declarations', () => {
 });
 
 /**
- * Sweeps every colour the tools/ stylesheets declare against the WCAG AA floor,
+ * Sweeps simulator and tool text colours against the WCAG AA floor,
  * each in the cascade its page builds.
  */
-test('every colour a tools/ stylesheet declares clears the WCAG AA floor or says why not', () => {
+test('every simulator and tool stylesheet colour clears the WCAG AA floor or says why not', () => {
   const sweptNames = new Set();
   let measured = 0;
   for (const { page, sheets } of SERVED_PAGES) {
     const cascade = sheets.map((sheet) => read(...sheet)).join('\n');
-    const swept = sheets.filter(([dir, name]) => dir === 'tools' && name !== 'tailwind.css');
+    const swept = sheets.filter(([dir, name]) => (dir === 'tools' && name !== 'tailwind.css')
+      || (dir === 'styles' && name === 'index.css'));
     for (const sheet of swept) {
       const name = sheet.at(-1);
       sweptNames.add(name);
