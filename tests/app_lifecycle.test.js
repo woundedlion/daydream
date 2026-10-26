@@ -1016,12 +1016,15 @@ test('an anchor without href does not own the key', () => {
 
 test('render adapters tolerate a missing pixel view', () => {
   const h = makeAdapter();
+  h.driver.pixels = h.view;
+  h.driver.dotMesh.instanceColor.array = h.view;
   h.host.view = () => null;
   h.host.refresh = () => {};
   h.adapter.refreshPixelView();
   h.adapter.drawFrame();
-  assert.equal(h.driver.pixels, null);
-  assert.equal(h.driver.dotMesh.instanceColor.array, null);
+  assert.equal(h.driver.pixels, h.view);
+  assert.equal(h.driver.dotMesh.instanceColor.array, h.view);
+  assert.equal(h.driver.dotMesh.instanceColor.version, 0);
   assert.deepEqual(h.errors, []);
 });
 
