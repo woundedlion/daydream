@@ -4,6 +4,8 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { float32Decimal } from '../../shared/cpp_format.js';
+
 /** @typedef {{id: string, topology?: boolean, values?: string[], gated_by?: {field: string, values: string[]}}} CatalogParameter */
 /** @typedef {{id: string, name: string|null, input: string, output: string, params: CatalogParameter[]}} CatalogOperator */
 /** @typedef {{carriers: string[], operators: CatalogOperator[]}} OperatorCatalog */
@@ -24,21 +26,11 @@
 
 const READOUT_STEPS = 1000;
 
-// Nine significant digits round-trip every binary32.
-const READOUT_DIGITS = 9;
-
 /**
  * @param {number} value - A stored parameter value.
  * @returns {string} The shortest decimal that reads back as the same binary32.
  */
-export const formatNumericValue = (value) => {
-  const stored = Math.fround(Number(value));
-  for (let digits = 1; digits < READOUT_DIGITS; digits += 1) {
-    const text = String(Number(Number(value).toPrecision(digits)));
-    if (Math.fround(Number(text)) === stored) return text;
-  }
-  return String(Number(Number(value).toPrecision(READOUT_DIGITS)));
-};
+export const formatNumericValue = (value) => String(float32Decimal(Number(value)));
 
 /**
  * @param {ParameterDeclaration} declaration - A binary32 declaration.

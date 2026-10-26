@@ -6,7 +6,7 @@
 /** Solids op dispatch, C++ generation, drag-slot math, and saved-card capacity. */
 
 import {
-  COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns, formatFloatCpp,
+  COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns, formatFloatCpp, float32Decimal,
 } from '../../shared/cpp_format.js';
 import { NUMERIC_ENUMS } from '../../../generated/engine_contract.mjs';
 
@@ -772,19 +772,6 @@ export function seedOpParams(opName, mesh) {
     params[key] = val;
   }
   return params;
-}
-
-/**
- * The shortest decimal that rounds to the same float32 as `value`.
- * @param {number} value - A float32 value read across the WASM boundary.
- * @returns {number} That decimal.
- */
-function float32Decimal(value) {
-  for (let digits = 1; digits < 17; digits++) {
-    const decimal = Number(value.toPrecision(digits));
-    if (Math.fround(decimal) === Math.fround(value)) return decimal;
-  }
-  return value;
 }
 
 /**

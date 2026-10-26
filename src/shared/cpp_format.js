@@ -17,6 +17,18 @@ export const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const COLUMN_LIMIT = 80;
 
 /**
+ * @param {number} value - A stored numeric value.
+ * @returns {number} The shortest decimal that reads back as the same float32.
+ */
+export function float32Decimal(value) {
+  for (let digits = 1; digits < 17; digits++) {
+    const decimal = Number(value.toPrecision(digits));
+    if (Math.fround(decimal) === Math.fround(value)) return decimal;
+  }
+  return value;
+}
+
+/**
  * Greedy fill of `words` at the column limit. Initializer lists match
  * clang-format packing; comment bodies remain as emitted with the engine
  * setting `ReflowComments: false`.
