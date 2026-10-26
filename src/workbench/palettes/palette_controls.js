@@ -276,7 +276,7 @@ export function createPaletteViewport() {
     },
 
     get zoomed() {
-      return start !== 0 || end !== 1;
+      return isZoomed(start, end);
     },
 
     map,
@@ -287,14 +287,10 @@ export function createPaletteViewport() {
      * @returns {{start: number, end: number}} The window now shown.
      */
     zoom(firstPosition, secondPosition) {
-      const low = Math.min(clampUnit(firstPosition), clampUnit(secondPosition));
-      const high = Math.max(clampUnit(firstPosition), clampUnit(secondPosition));
-      if (low === high) return { start, end };
-      const nextStart = map(low);
-      const nextEnd = map(high);
-      if (nextEnd - nextStart < 0.01) return { start, end };
-      start = nextStart;
-      end = nextEnd;
+      const window = zoomRecipeWindow({ offset: start, span: end - start },
+        firstPosition, secondPosition);
+      start = window.offset;
+      end = window.offset + window.span;
       return { start, end };
     },
 
@@ -364,7 +360,7 @@ export function stripDragIntent(startPosition, endPosition,
  *   name that say so.
  */
 export function paletteStripView({ start, end }) {
-  const zoomed = start !== 0 || end !== 1;
+  const zoomed = isZoomed(start, end);
   return {
     zoomed,
     heading: zoomed
@@ -373,6 +369,15 @@ export function paletteStripView({ start, end }) {
     ariaLabel: `Palette strip, t ${start.toFixed(3)} to ${end.toFixed(3)}. `
       + 'Press Enter to copy the center color. Drag to zoom.',
   };
+}
+
+/**
+ * @param {number} start - First visible palette phase.
+ * @param {number} end - Last visible palette phase.
+ * @returns {boolean} Whether the full palette is outside the window.
+ */
+function isZoomed(start, end) {
+  return start !== 0 || end !== 1;
 }
 
 /**
