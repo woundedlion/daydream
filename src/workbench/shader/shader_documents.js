@@ -39,12 +39,6 @@ export const SHADER_LINK_MAX_WAIT_MS = 1000;
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[], optionValues?: number[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string, diagnostics?: *, status?: string}} CompiledDocument */
 
-/** @param {string} parameterId @returns {string} The primary engine control name. */
-export function engineParameterName(parameterId) {
-  return engineControlNames(parameterId)[0];
-}
-
-
 /**
  * Performs one resolved write.
  * @param {import('../../../generated/holosphere_wasm.js').HolosphereEngine} engine

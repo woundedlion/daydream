@@ -1,5 +1,5 @@
 import { canonicalEffectId } from '../src/effects/effect_identity.js';
-import { fixedDerivedBinding, compileShaderDocument, DEFAULT_LIMITS, exportShaderDocumentJson, validateShaderDocument } from '../generated/shader/shader_workbench.mjs';
+import { fixedDerivedBinding, engineControlNames, compileShaderDocument, DEFAULT_LIMITS, exportShaderDocumentJson, validateShaderDocument } from '../generated/shader/shader_workbench.mjs';
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -17,7 +17,6 @@ import {
   BAKED_CONSTANT_IDS,
   bakedTopologyFields,
   createShaderDocumentController,
-  engineParameterName,
   SHADER_LINK_DEBOUNCE_MS,
   SHADER_LINK_MAX_WAIT_MS,
 } from '../src/workbench/shader/shader_documents.js';
@@ -28,6 +27,8 @@ import {
   documentEvents, fakeElement, installAnimationFrames, installDocument,
   restoreDocumentAfterEach,
 } from './helpers/fake_dom.js';
+
+const primaryName = (id) => engineControlNames(id)[0];
 
 const ownedEditors = new Set();
 afterEach(async () => {
@@ -163,14 +164,14 @@ test('simulator exposes Shader as a standalone tool', () => {
 // parameter id is <label>.<field>, and the label picks the family whose
 // registered control names the field maps onto.
 test('v2 document parameter IDs map to pre-spec promoted controls', () => {
-  assert.equal(engineParameterName('sample.pattern-freq'), 'Pattern Freq');
-  assert.equal(engineParameterName('sample.angle-speed'), 'Source Angle Speed');
-  assert.equal(engineParameterName('warp1.cell-x'), 'Planar Warp 1 Cell X');
-  assert.equal(engineParameterName('warp2.speed'), 'Planar Warp 2 Speed');
-  assert.equal(engineParameterName('camera.wander'), 'Camera Wander');
-  assert.equal(engineParameterName('surface.scale'), 'Surface Noise Scale');
-  assert.equal(engineParameterName('colorize.value-opacity-low'), 'Opacity at Value 0');
-  assert.equal(engineParameterName('colorize.value-opacity-high'), 'Opacity at Value 1');
+  assert.equal(primaryName('sample.pattern-freq'), 'Pattern Freq');
+  assert.equal(primaryName('sample.angle-speed'), 'Source Angle Speed');
+  assert.equal(primaryName('warp1.cell-x'), 'Planar Warp 1 Cell X');
+  assert.equal(primaryName('warp2.speed'), 'Planar Warp 2 Speed');
+  assert.equal(primaryName('camera.wander'), 'Camera Wander');
+  assert.equal(primaryName('surface.scale'), 'Surface Noise Scale');
+  assert.equal(primaryName('colorize.value-opacity-low'), 'Opacity at Value 0');
+  assert.equal(primaryName('colorize.value-opacity-high'), 'Opacity at Value 1');
 });
 
 /** @param {string} field The plain Title Case control name an alias-free label yields. */
@@ -180,12 +181,12 @@ const plainName = (field) => field.split('-').map((part) => part.length === 0
 // A label outside the alias set maps to the plain Title Case of its field, so
 // a newly promoted document needs no table entry to land on its controls.
 test('labels outside the alias table need no entry', () => {
-  assert.equal(engineParameterName('project.pole-fade'), 'Pole Fade');
-  assert.equal(engineParameterName('lens.mobius-a-re'), 'Mobius A Re');
-  assert.equal(engineParameterName('transfer.iso-level'), 'Iso Level');
-  assert.equal(engineParameterName('colorize.palette-mapping'), 'Palette Mapping');
-  assert.equal(engineParameterName('halo.glow-strength'), 'Glow Strength');
-  assert.equal(engineParameterName('no-dot-id'), 'No Dot Id');
+  assert.equal(primaryName('project.pole-fade'), 'Pole Fade');
+  assert.equal(primaryName('lens.mobius-a-re'), 'Mobius A Re');
+  assert.equal(primaryName('transfer.iso-level'), 'Iso Level');
+  assert.equal(primaryName('colorize.palette-mapping'), 'Palette Mapping');
+  assert.equal(primaryName('halo.glow-strength'), 'Glow Strength');
+  assert.equal(primaryName('no-dot-id'), 'No Dot Id');
 });
 
 // Across every shipped pattern document, the labels whose mapping differs from
@@ -200,7 +201,7 @@ test('the alias table keys stay frozen to the pre-spec promoted labels', () => {
     for (const preset of doc.preset_bank.presets) {
       for (const id of Object.keys(preset.values ?? {})) {
         const dot = id.indexOf('.');
-        if (engineParameterName(id) !== plainName(id.slice(dot + 1)))
+        if (primaryName(id) !== plainName(id.slice(dot + 1)))
           aliased.add(id.slice(0, dot));
       }
     }
@@ -407,7 +408,7 @@ test('the fixed apply skips the Ash Cloud baked topology and constant ids and wr
     .filter((id) => !BAKED.has(id.slice(id.indexOf('.') + 1)))
     .map((id) => {
       const value = ashCloud.preset_bank.presets[0].values[id];
-      return {name: engineParameterName(id), ...(typeof value === 'string'
+      return {name: primaryName(id), ...(typeof value === 'string'
         ? {options: [value], optionValues: [0]} : {})};
     })
     .filter((definition) => definition.name !== 'Camera Spin Speed');
@@ -419,7 +420,7 @@ test('the fixed apply skips the Ash Cloud baked topology and constant ids and wr
     engine, MODULE, { document: ashCloud }, 'ash-cloud', ['ash-cloud'], BAKED, fixedDerivedBinding), null);
   assert.equal(engine.writes.some(([name]) => name === 'Camera Spin Speed'), false);
   const expectedWrites = Object.entries(ashCloud.preset_bank.presets[0].values)
-    .map(([id, value]) => [engineParameterName(id), typeof value === 'string' ? 0 : value])
+    .map(([id, value]) => [primaryName(id), typeof value === 'string' ? 0 : value])
     .filter(([name]) => definitions.some((definition) => definition.name === name));
   assert.deepEqual(engine.writes, expectedWrites);
 });
@@ -1029,7 +1030,7 @@ const HEX_PATTERN_CATALOG = JSON.stringify({
  */
 function compiledBuildEngine(source = KALEIDOSCOPE_HEX_BRIGHT) {
   const definitions = JSON.parse(source).descriptor.parameters.map((parameter) => ({
-    name: engineParameterName(parameter.id),
+    name: primaryName(parameter.id),
     ...(parameter.storage === 'enum8' ? { options: [...parameter.domain.values] } : {}),
   }));
   const selected = [];
