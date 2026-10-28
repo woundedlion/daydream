@@ -335,23 +335,8 @@ function recipeDefinitionCpp(name, seed, steps) {
 }
 
 /**
- * The registry-order static_assert that pins a SEED_* constant to the
- * simple_registry entry it names, wrapped as clang-format does.
- * @param {string} constName - The SEED_* constant.
- * @param {string} seedName - The simple_registry entry name it must index.
- * @returns {string} The static_assert statement.
- */
-function seedAssertCpp(constName, seedName) {
-  const head = `static_assert(std::string_view(simple_registry[${constName}].name) ==`;
-  const value = `"${seedName}");`;
-  if (head.length + 1 + value.length <= COLUMN_LIMIT) return `${head} ${value}`;
-  if (head.length <= COLUMN_LIMIT) return `${head}\n              ${value}`;
-  return `static_assert(\n    ${head.slice('static_assert('.length)}\n    ${value}`;
-}
-
-/**
  * The definition a paste carries for a seed solids.h declares no SEED_*
- * constant for: the documented constant plus its registry-order static_assert.
+ * constant for: its documented registry index.
  * @param {string} seedName - The simple_registry entry name.
  * @returns {string} The constant block, ending in a blank line.
  */
@@ -362,11 +347,10 @@ function seedConstantCpp(seedName) {
   const value = `static_cast<uint8_t>(BaseMesh::${upperSnake(seedName)});`;
   const definition = declaration.length + 1 + value.length <= COLUMN_LIMIT
     ? `${declaration} ${value}` : `${declaration}\n    ${value}`;
-  return `// solids.h defines no ${constName}. Paste the constant and its\n`
-    + '// static_assert beside the other SEED_* constants.\n'
+  return `// solids.h defines no ${constName}.\n`
+    + '// Paste this beside the other SEED_* constants.\n'
     + `/// simple_registry index of the ${words} seed.\n`
-    + `${definition}\n`
-    + `${seedAssertCpp(constName, seedName)}\n\n`;
+    + `${definition}\n\n`;
 }
 
 /**

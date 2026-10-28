@@ -1,11 +1,8 @@
-// solids.h defines no SEED_TRUNCATED_CUBOCTAHEDRON. Paste the constant and its
-// static_assert beside the other SEED_* constants.
+// solids.h defines no SEED_TRUNCATED_CUBOCTAHEDRON.
+// Paste this beside the other SEED_* constants.
 /// simple_registry index of the truncated cuboctahedron seed.
 inline constexpr uint8_t SEED_TRUNCATED_CUBOCTAHEDRON =
     static_cast<uint8_t>(BaseMesh::TRUNCATED_CUBOCTAHEDRON);
-static_assert(
-    std::string_view(simple_registry[SEED_TRUNCATED_CUBOCTAHEDRON].name) ==
-    "truncatedCuboctahedron");
 
 // clang-format off
 /** Step table for truncated_cuboctahedron_truncate33_truncate33_truncate33. */

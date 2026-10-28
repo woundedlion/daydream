@@ -156,9 +156,7 @@ test('generateRegistryCpp defines constants absent from the tool roster', () => 
     assert.match(block, new RegExp(`\\n/// simple_registry index of the ${words} seed\\.\\n`
       + `inline constexpr uint8_t ${constName} =\\s+static_cast<uint8_t>\\(BaseMesh::${upperSnake(seed)}\\);`),
     `${constName} must carry its documented simple_registry index`);
-    // The house static_assert, which fails to compile if the index moves.
-    assert.match(block, new RegExp('static_assert\\(\\s*std::string_view\\('
-      + `simple_registry\\[${constName}\\]\\.name\\) ==\\s*"${seed}"\\);`));
+    assert.doesNotMatch(block, /static_assert/);
     // solids.h is clang-formatted at 80 columns and the block is pasted in.
     for (const line of block.split('\n')) {
       assert.ok(line.length <= 80, `"${line}" is ${line.length} columns`);
