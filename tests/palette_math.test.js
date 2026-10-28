@@ -30,12 +30,9 @@ function mockPaletteOps(overrides = {}) {
     status: { code: paletteEnums.PaletteCompileCode.OK, field: paletteEnums.PaletteRecipeField.NONE, wrappedFields: 0, clampedFields: 0, canonicalizedFields: 0 },
     canonicalRecipe: structuredClone(recipe),
     lut: mockBakeLut(),
-    diagnostics: new Float32Array(256 * 6),
-    fallback: new Uint8Array(256),
   });
   return {
     compileAndBakeV4: compile,
-    inspectV4: compile,
     ...overrides,
   };
 }
@@ -327,42 +324,30 @@ test('generativePaletteCpp rejects unknown enum values', () => {
   assert.throws(() => generativePaletteCpp(recipe), /Unknown domain value: 99/);
 });
 
-test('compilePaletteRecipe selects the requested bridge operation and owns its buffers', () => {
+test('compilePaletteRecipe bakes the LUT and owns its buffers', () => {
   const recipe = defaultPaletteRecipe();
   const lut = mockBakeLut();
-  const diagnostics = new Float32Array(256 * 6).fill(0.25);
-  const fallback = new Uint8Array(256).fill(1);
+  const status = { code: paletteEnums.PaletteCompileCode.OK, field: paletteEnums.PaletteRecipeField.NONE };
   const calls = [];
-  const compile = (kind) => (input) => {
-    calls.push([kind, input]);
-    return {
-      status: { code: paletteEnums.PaletteCompileCode.OK, field: paletteEnums.PaletteRecipeField.NONE },
-      canonicalRecipe: input,
-      lut,
-      diagnostics,
-      fallback,
-    };
+  const ops = {
+    compileAndBakeV4: (input) => {
+      calls.push(input);
+      return { status, canonicalRecipe: input, lut };
+    },
   };
-  const ops = { compileAndBakeV4: compile('compile'), inspectV4: compile('inspect') };
   withPaletteOps(ops, () => {
-    const inspected = compilePaletteRecipe(recipe);
-    const compiled = compilePaletteRecipe(recipe, { inspect: false });
-    assert.deepEqual(calls.map(([kind]) => kind), ['inspect', 'compile']);
-    assert.notEqual(inspected.lut, lut);
-    assert.notEqual(inspected.diagnostics, diagnostics);
-    assert.notEqual(inspected.fallback, fallback);
-    assert.notEqual(inspected.canonicalRecipe, recipe);
+    const compiled = compilePaletteRecipe(recipe);
+    assert.deepEqual(calls, [recipe]);
+    assert.notEqual(compiled.status, status);
+    assert.notEqual(compiled.lut, lut);
+    assert.notEqual(compiled.canonicalRecipe, recipe);
     assert.deepEqual(compiled.lut, lut);
-    const savedLut = Uint8Array.from(inspected.lut);
-    const savedDiagnostics = Float32Array.from(inspected.diagnostics);
-    const savedFallback = Uint8Array.from(inspected.fallback);
+    const savedLut = Uint8Array.from(compiled.lut);
+    const savedRecipe = structuredClone(recipe);
     lut.fill(0);
-    diagnostics.fill(0);
-    fallback.fill(0);
-    assert.deepEqual(inspected.lut, savedLut);
-    assert.deepEqual(inspected.diagnostics, savedDiagnostics);
-    assert.deepEqual(inspected.fallback, savedFallback);
+    recipe.falloffStart = 0.75;
     assert.deepEqual(compiled.lut, savedLut);
+    assert.deepEqual(compiled.canonicalRecipe, savedRecipe);
   });
 });
 
@@ -409,10 +394,9 @@ test('paletteAdjustmentSummary names every adjusted field', () => {
     'wrapped unnamed 40');
 });
 
-test('GenerativePalette uses the canonical recipe without inspecting diagnostics', () => {
+test('GenerativePalette uses the canonical recipe', () => {
   const recipe = defaultPaletteRecipe();
   const ops = mockPaletteOps({
-    inspectV4: () => assert.fail('the palette does not need per-sample diagnostics'),
     compileAndBakeV4: (input) => ({
       status: { code: paletteEnums.PaletteCompileCode.OK, field: paletteEnums.PaletteRecipeField.NONE },
       canonicalRecipe: { ...structuredClone(input), falloffStart: 0.8 },

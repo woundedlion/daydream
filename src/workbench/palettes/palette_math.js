@@ -29,21 +29,18 @@ import { paletteEnumName } from './palette_controls.js';
  */
 
 /**
- * A compile result detached from WASM memory. The buffers are absent when the
- * recipe did not compile, and `diagnostics` also when the bake skipped them.
+ * A compile result detached from WASM memory. The LUT is absent when the
+ * recipe did not compile.
  * @typedef {object} PaletteCompileResult
  * @property {PaletteCompileStatus} status - How the compile went.
  * @property {PaletteRecipe} [canonicalRecipe] - The recipe as the compiler normalized it.
  * @property {Uint8Array} [lut] - 256 sRGB triples.
- * @property {Float32Array} [diagnostics] - Six per-entry values: L, C, q, Cmax, hPath and hFinal.
- * @property {Uint8Array} [fallback] - Per entry, non-zero where the color was mapped back into gamut.
  */
 
 /**
  * The engine bridge every generative-palette call compiles through.
  * @typedef {object} PaletteOps
  * @property {(recipe: PaletteRecipe) => PaletteCompileResult} compileAndBakeV4
- * @property {(recipe: PaletteRecipe) => PaletteCompileResult} inspectV4
  */
 
 const TWO_PI = 2 * Math.PI;
@@ -312,29 +309,21 @@ export function paletteAdjustmentSummary(status) {
  * bridge returns views onto WASM memory, which the next call reuses, so the
  * results are copied out before they can be overwritten.
  * @param {PaletteRecipe} recipe - A V4 palette recipe.
- * @param {Object} [options]
- * @param {boolean} [options.inspect=true] - Whether to bake per-sample diagnostics with the LUT.
  * @returns {PaletteCompileResult} The detached compile result; `status.code` is PaletteCompileCode.OK on success.
  * @throws {Error} When no PaletteOps bridge has been installed.
  */
-export function compilePaletteRecipe(recipe, { inspect = true } = {}) {
+export function compilePaletteRecipe(recipe) {
   if (!paletteOps) {
     throw new Error('PaletteOps bridge is not initialized');
   }
-  const result = inspect
-    ? paletteOps.inspectV4(recipe)
-    : paletteOps.compileAndBakeV4(recipe);
-  for (const view of [result.lut, result.diagnostics, result.fallback]) {
-    if (ArrayBuffer.isView(view) && view.buffer.byteLength === 0)
-      throw new Error('PaletteOps returned a detached buffer');
-  }
+  const result = paletteOps.compileAndBakeV4(recipe);
+  if (ArrayBuffer.isView(result.lut) && result.lut.buffer.byteLength === 0)
+    throw new Error('PaletteOps returned a detached buffer');
   /** @type {PaletteCompileResult} */
   const copied = { status: { ...result.status } };
   if (result.canonicalRecipe)
     copied.canonicalRecipe = structuredClone(result.canonicalRecipe);
   if (result.lut) copied.lut = Uint8Array.from(result.lut);
-  if (result.diagnostics) copied.diagnostics = Float32Array.from(result.diagnostics);
-  if (result.fallback) copied.fallback = Uint8Array.from(result.fallback);
   return copied;
 }
 
@@ -349,7 +338,7 @@ export class GenerativePalette {
    * @throws {Error} When the recipe does not compile, carrying the status code and field.
    */
   constructor(recipe) {
-    const result = compilePaletteRecipe(recipe, { inspect: false });
+    const result = compilePaletteRecipe(recipe);
     if (result.status.code !== compileCodes.OK) throw new Error(paletteCompileError(result.status));
     this.canonicalRecipe = result.canonicalRecipe;
     this.status = result.status;
