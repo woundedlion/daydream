@@ -367,7 +367,7 @@ test('compilePaletteRecipe selects the requested bridge operation and owns its b
 });
 
 test('GenerativePalette reports compiler failures', () => {
-  const ops = mockPaletteOps({ inspectV4: () => ({ status: { code: paletteEnums.PaletteCompileCode.NON_FINITE, field: paletteEnums.PaletteRecipeField.BASE_TURNS } }) });
+  const ops = mockPaletteOps({ compileAndBakeV4: () => ({ status: { code: paletteEnums.PaletteCompileCode.NON_FINITE, field: paletteEnums.PaletteRecipeField.BASE_TURNS } }) });
   withPaletteOps(ops, () => {
     assert.throws(() => new GenerativePalette(defaultPaletteRecipe()),
       /Palette recipe error NON_FINITE \(2\) at field BASE_TURNS \(7\)/);
@@ -409,38 +409,19 @@ test('paletteAdjustmentSummary names every adjusted field', () => {
     'wrapped unnamed 40');
 });
 
-test('GenerativePalette uses the canonical recipe and exposes diagnostics', () => {
+test('GenerativePalette uses the canonical recipe without inspecting diagnostics', () => {
   const recipe = defaultPaletteRecipe();
-  const diagnostics = new Float32Array(256 * 6);
-  diagnostics.set([0.6, 0.2, 0.75, 0.25, 0.1, 0.12], 6 * 128);
-  const fallback = new Uint8Array(256);
-  fallback[128] = 1;
   const ops = mockPaletteOps({
-    inspectV4: (input) => ({
+    inspectV4: () => assert.fail('the palette does not need per-sample diagnostics'),
+    compileAndBakeV4: (input) => ({
       status: { code: paletteEnums.PaletteCompileCode.OK, field: paletteEnums.PaletteRecipeField.NONE },
       canonicalRecipe: { ...structuredClone(input), falloffStart: 0.8 },
       lut: mockBakeLut(),
-      diagnostics,
-      fallback,
     }),
   });
   withPaletteOps(ops, () => {
     const palette = new GenerativePalette(recipe);
     assert.equal(palette.canonicalRecipe.falloffStart, 0.8);
-    assert.deepEqual(palette.diagnosticAt(128 / 255), {
-      t: 128 / 255,
-      rgb: [128, 127, 128],
-      L: diagnostics[768],
-      C: diagnostics[769],
-      q: diagnostics[770],
-      Cmax: diagnostics[771],
-      hPath: diagnostics[772],
-      hFinal: diagnostics[773],
-      fallbackMapped: true,
-    });
-    // Without the guard NaN indexes the buffers out of range, and the absent
-    // fallback byte reads as a gamut map.
-    assert.deepEqual(palette.diagnosticAt(Number.NaN), palette.diagnosticAt(1));
   });
 });
 
@@ -448,12 +429,10 @@ test('GenerativePalette.get blends adjacent entries in linear light', () => {
   const lut = new Uint8Array(256 * 3);
   lut.fill(128, 3);
   const ops = mockPaletteOps({
-    inspectV4: (recipe) => ({
+    compileAndBakeV4: (recipe) => ({
       status: { code: paletteEnums.PaletteCompileCode.OK, field: paletteEnums.PaletteRecipeField.NONE },
       canonicalRecipe: recipe,
       lut,
-      diagnostics: new Float32Array(256 * 6),
-      fallback: new Uint8Array(256),
     }),
   });
   withPaletteOps(ops, () => {

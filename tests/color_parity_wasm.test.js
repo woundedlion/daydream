@@ -567,12 +567,10 @@ test('browser GenerativePalette owns the real bridge result', () => {
   try {
     const recipe = defaultPaletteRecipe();
     recipe.hue.baseTurns = 0.37;
-    const direct = ops.inspectV4(recipe);
+    const direct = ops.compileAndBakeV4(recipe);
     const palette = new P.GenerativePalette(recipe);
     assert.deepEqual(palette.lut, Uint8Array.from(direct.lut));
     assert.deepEqual(palette.canonicalRecipe, direct.canonicalRecipe);
-    assert.equal(palette.diagnostics.length, 256 * 6);
-    assert.equal(palette.fallback.length, 256);
   } finally {
     P.setPaletteOps(null);
     ops.delete();

@@ -35,7 +35,7 @@ import { paletteEnumName } from './palette_controls.js';
  * @property {PaletteCompileStatus} status - How the compile went.
  * @property {PaletteRecipe} [canonicalRecipe] - The recipe as the compiler normalized it.
  * @property {Uint8Array} [lut] - 256 sRGB triples.
- * @property {Float32Array} [diagnostics] - Six per-entry values, in diagnosticAt's order.
+ * @property {Float32Array} [diagnostics] - Six per-entry values: L, C, q, Cmax, hPath and hFinal.
  * @property {Uint8Array} [fallback] - Per entry, non-zero where the color was mapped back into gamut.
  */
 
@@ -313,7 +313,7 @@ export function paletteAdjustmentSummary(status) {
  * results are copied out before they can be overwritten.
  * @param {PaletteRecipe} recipe - A V4 palette recipe.
  * @param {Object} [options]
- * @param {boolean} [options.inspect=true] - Whether to also bake the per-sample diagnostics the tool plots; false bakes the LUT alone.
+ * @param {boolean} [options.inspect=true] - Whether to bake per-sample diagnostics with the LUT.
  * @returns {PaletteCompileResult} The detached compile result; `status.code` is PaletteCompileCode.OK on success.
  * @throws {Error} When no PaletteOps bridge has been installed.
  */
@@ -344,20 +344,16 @@ export function compilePaletteRecipe(recipe, { inspect = true } = {}) {
  */
 export class GenerativePalette {
   /**
-   * Compiles the recipe and keeps the baked LUT, diagnostics and the
-   * compile status, which names the normalizations the compiler applied.
+   * Compiles the recipe and keeps its baked LUT and compile status.
    * @param {PaletteRecipe} recipe - A V4 palette recipe.
    * @throws {Error} When the recipe does not compile, carrying the status code and field.
    */
   constructor(recipe) {
-    const result = compilePaletteRecipe(recipe);
+    const result = compilePaletteRecipe(recipe, { inspect: false });
     if (result.status.code !== compileCodes.OK) throw new Error(paletteCompileError(result.status));
     this.canonicalRecipe = result.canonicalRecipe;
     this.status = result.status;
-    // A successful inspect bake always carries all three buffers.
     this.lut = /** @type {Uint8Array} */ (result.lut);
-    this.diagnostics = /** @type {Float32Array} */ (result.diagnostics);
-    this.fallback = /** @type {Uint8Array} */ (result.fallback);
   }
 
   /**
@@ -388,32 +384,6 @@ export class GenerativePalette {
     return this.get(t).map(linearToSrgbFloat);
   }
 
-
-  /**
-   * The compiler's own account of the nearest LUT entry to a phase.
-   * @param {number} t - Phase in [0, 1]; the nearest of the 256 entries answers, and NaN reads the last.
-   * @returns {{t:number, rgb:number[], L:number, C:number, q:number, Cmax:number, hPath:number, hFinal:number, fallbackMapped:boolean}}
-   *   The entry's phase and 8-bit sRGB triple, the OKLCH lightness and chroma it
-   *   resolved to, the chroma control `q` as a fraction of the boundary, the
-   *   gamut's chroma ceiling `Cmax` at that lightness and hue, the hue the color
-   *   path asked for and the hue torsion left it at, and whether the color fell
-   *   out of gamut and was mapped back in.
-   */
-  diagnosticAt(t) {
-    const index = Math.max(0, Math.min(255, Number.isNaN(t) ? 255 : Math.round(t * 255)));
-    const offset = index * 6;
-    return {
-      t: index / 255,
-      rgb: Array.from(this.lut.slice(index * 3, index * 3 + 3)),
-      L: this.diagnostics[offset],
-      C: this.diagnostics[offset + 1],
-      q: this.diagnostics[offset + 2],
-      Cmax: this.diagnostics[offset + 3],
-      hPath: this.diagnostics[offset + 4],
-      hFinal: this.diagnostics[offset + 5],
-      fallbackMapped: this.fallback[index] !== 0,
-    };
-  }
 }
 
 /**
