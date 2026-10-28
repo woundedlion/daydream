@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GUI } from '../src/ui/gui.js';
+import { Daydream } from '../src/renderer/driver.js';
 import { AppState, URLSync } from '../src/app/state.js';
-import { fakeGui, fakePanelGui } from './helpers/fake_app.js';
+import { fakeDriver, fakeGui, fakePanelGui } from './helpers/fake_app.js';
 
 for (const factory of [fakeGui, fakePanelGui]) {
   test(`${factory.name} clears stored companions and rejects nonnumeric values`, () => {
@@ -45,3 +46,25 @@ test('stored companion writes match DeepLinkGUI pending and flushed URLs', () =>
     real.destroy();
   }
 });
+
+
+test('fake driver matches the real driver method and data surface', () => {
+  const fields = new Set([...Daydream.toString().matchAll(/\bthis\.([A-Za-z_$][\w$]*)\s*=(?!=)/g)]
+    .map((match) => match[1]));
+  for (const [name, value] of Object.entries(fakeDriver())) {
+    if (typeof value === 'function') {
+      assert.equal(typeof Daydream.prototype[name], 'function', name);
+    } else {
+      assert.ok(name === 'keys' || name === 'frames' || fields.has(name), name);
+    }
+  }
+});
+
+for (const factory of [fakeGui, fakePanelGui]) {
+  test(`${factory.name} methods match the real GUI surface`, () => {
+    for (const [name, value] of Object.entries(factory())) {
+      if (typeof value === 'function' && name !== 'ctrl')
+        assert.equal(typeof GUI.prototype[name], 'function', name);
+    }
+  });
+}
