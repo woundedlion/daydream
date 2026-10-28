@@ -771,6 +771,10 @@
 
 /* --- Desktop Styles --- */
 @media only screen and (width > 900px) {
+  .canvas-container .segment-stats {
+    bottom: 44px;
+  }
+
   .gui-container {
     position: absolute;
     display: flex;
@@ -929,11 +933,6 @@ div.label {
   display: block;
 }
 
-@media only screen and (width > 900px) {
-  .segment-stats {
-    bottom: 44px;
-  }
-}
 
 /* The fault message takes hits (and so selection); the rest of the overlay
    stays click-through. */
