@@ -28,6 +28,15 @@ export function linearToSrgbFloat(l) {
 }
 
 /**
+ * Encodes a linear channel as a clamped, rounded 8-bit sRGB value.
+ * @param {number} c - Linear channel value.
+ * @returns {number} Rounded sRGB byte value.
+ */
+export function linearToSrgbByte(c) {
+  return Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, c))) * 255);
+}
+
+/**
  * Converts a linear RGB color to a "#rrggbb" hex string, applying the linear -> sRGB
  * transfer function and clamping each channel before encoding.
  * @param {number} r - Linear red channel in [0, 1].
@@ -42,7 +51,7 @@ export function linearRgbToHex(r, g, b) {
    * @returns {string} Two-character lowercase hex byte.
    */
   const toHex = (c) => {
-    const i = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, c))) * 255);
+    const i = linearToSrgbByte(c);
     const hex = i.toString(16);
     return hex.length === 1 ? "0" + hex : hex;
   };

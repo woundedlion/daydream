@@ -8,7 +8,7 @@
  * drag-selection overlay, and the RGB wave graph.
  */
 
-import { linearToSrgbFloat } from '../../shared/color.js';
+import { linearToSrgbByte } from '../../shared/color.js';
 import { waveGraphBand } from './palette_math.js';
 
 /**
@@ -103,9 +103,9 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
       const [r, g, b] = palette.get(phase);
 
       // Encode the preview as rounded 8-bit sRGB without dithering.
-      const rInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, r))) * 255);
-      const gInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, g))) * 255);
-      const bInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, b))) * 255);
+      const rInt = linearToSrgbByte(r);
+      const gInt = linearToSrgbByte(g);
+      const bInt = linearToSrgbByte(b);
 
       const index = x * 4;
       data[index] = rInt;

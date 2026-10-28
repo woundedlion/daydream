@@ -8,7 +8,7 @@
  * labels, and the pointer and keyboard arithmetic that moves a key.
  */
 
-import { linearToSrgbFloat } from '../../shared/color.js';
+import { linearToSrgbByte } from '../../shared/color.js';
 import { linearRgbInGamut, maxSrgbGamutChroma, oklchLinearRgb, wrapTurns } from './palette_controls.js';
 
 /**
@@ -79,8 +79,7 @@ export function paintHueWheelRaster(data, width, height, lightness) {
       }
       for (let channel = 0; channel < 3; channel++) {
         data[offset + channel] = inGamut
-          ? Math.round(
-            Math.max(0, Math.min(1, linearToSrgbFloat(rgb[channel]))) * 255)
+          ? linearToSrgbByte(rgb[channel])
           : BACKDROP[channel];
       }
       data[offset + 3] = 255;
