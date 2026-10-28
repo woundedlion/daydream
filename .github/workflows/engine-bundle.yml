@@ -84,7 +84,7 @@ jobs:
             run="$(printf '%s\n' "$runs" | head -n 1)"
             while IFS=$'\t' read -r candidate_id candidate_status candidate_conclusion candidate_sha; do
               if [ "$candidate_status" != completed ] || [ "$candidate_conclusion" != success ]; then continue; fi
-              valid="$(retry_api "repos/woundedlion/pov/actions/runs/$candidate_id/artifacts" --jq ".artifacts | map(select(.name == \"holosphere-engine-$PIN\" and .expired == false)) | length")" || continue
+              valid="$(retry_api "repos/woundedlion/pov/actions/runs/$candidate_id/artifacts?name=holosphere-engine-$PIN&per_page=100" --jq ".artifacts | map(select(.name == \"holosphere-engine-$PIN\" and .expired == false)) | length")" || continue
               if [ "$valid" -gt 0 ]; then
                 run="$candidate_id"$'\t'"$candidate_status"$'\t'"$candidate_conclusion"$'\t'"$candidate_sha"
                 break
@@ -101,7 +101,7 @@ jobs:
                   echo "::error::POV CI for $PIN concluded $run_conclusion"
                   exit 1
                 fi
-                artifact="$(retry_api "repos/woundedlion/pov/actions/runs/$run_id/artifacts" --jq ".artifacts | map(select(.name == \"holosphere-engine-$PIN\")) | .[0] // empty | [.id, .expired, .expires_at] | @tsv")"
+                artifact="$(retry_api "repos/woundedlion/pov/actions/runs/$run_id/artifacts?name=holosphere-engine-$PIN&per_page=100" --jq ".artifacts | map(select(.name == \"holosphere-engine-$PIN\")) | .[0] // empty | [.id, .expired, .expires_at] | @tsv")"
                 if [ -z "$artifact" ]; then
                   echo "::error::successful POV CI for $PIN published no verified engine bundle, or it expired. While $PIN is master head, dispatch a fresh run: gh workflow run ci.yml --repo woundedlion/pov --ref master. If master has advanced, select the current verified engine SHA. Unless DAYDREAM_DISPATCH_TOKEN is set, run daydream Deploy to GitHub Pages manually (workflow_dispatch) or use Re-run failed jobs; a full scheduled rerun skips an attempted pair."
                   exit 1

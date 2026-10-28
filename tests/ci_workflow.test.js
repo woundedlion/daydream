@@ -520,7 +520,7 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
     gh() {
       case "$2" in
         *workflows*) kind=query ;;
-        *runs/*/artifacts) kind=artifact ;;
+        *runs/*/artifacts\\?*) kind=artifact ;;
         *artifacts/*/zip) kind=zip ;;
         *) return 9 ;;
       esac
