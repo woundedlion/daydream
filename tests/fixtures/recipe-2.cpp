@@ -5,7 +5,7 @@
  * @param b Second arena; the result may borrow storage from either arena.
  * @return The resulting star-pattern mesh.
  */
-FLASHMEM static PolyMesh
+HS_FLASH_INLINE inline PolyMesh
 truncated_icosidodecahedron_hankin62_chamfer50_dual(Arena &a, Arena &b) {
   return SolidBuilder(IslamicStarPatterns::
                           truncated_icosidodecahedron_hankin62_chamfer50(a, b),

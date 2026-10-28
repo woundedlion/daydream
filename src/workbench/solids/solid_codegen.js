@@ -623,8 +623,8 @@ function doxygenCpp(tags) {
 function signatureCpp(funcName) {
   const tail = 'Arena &b) {';
   for (const [lead, head] of [
-    ['', `FLASHMEM static PolyMesh ${funcName}`],
-    ['FLASHMEM static PolyMesh\n', funcName],
+    ['', `HS_FLASH_INLINE inline PolyMesh ${funcName}`],
+    ['HS_FLASH_INLINE inline PolyMesh\n', funcName],
   ]) {
     const open = `${head}(Arena &a,`;
     if (`${open} ${tail}`.length <= COLUMN_LIMIT) return `${lead}${open} ${tail}`;
@@ -633,7 +633,7 @@ function signatureCpp(funcName) {
       return `${lead}${open}\n${align}${tail}`;
     }
   }
-  return `FLASHMEM static PolyMesh\n${funcName}(\n    Arena &a, ${tail}`;
+  return `HS_FLASH_INLINE inline PolyMesh\n${funcName}(\n    Arena &a, ${tail}`;
 }
 
 // A builder call to break the chain before. A float literal's '.' is followed
@@ -681,7 +681,7 @@ function returnRecipeCpp(recipe) {
 }
 
 /**
- * Emits the full FLASHMEM C++ function for a solid, led by a doxygen block whose
+ * Emits the full HS_FLASH_INLINE C++ function for a solid, led by a doxygen block whose
  * brief records the solid's vertex/face/index counts. Output is pasted verbatim
  * into the engine and must clear its clang-format gate.
  * @param {SolidSpec} item - The solid spec (see generateFuncAndRecipe), optionally with vCount, fCount, and iCount counts.

@@ -280,8 +280,8 @@ test('a parameterized op with empty params is rejected, not defaulted', () => {
     /relax param "iter" must be a positive integer/);
 });
 
-/** Pins the tool's full FLASHMEM function format, including its V/F/I metadata. */
-test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comment', () => {
+/** Pins the tool's full HS_FLASH_INLINE function format, including its V/F/I metadata. */
+test('generateRecipeCpp wraps the recipe in an HS_FLASH_INLINE function with V/F/I comment', () => {
   const item = {
     base: 'tetrahedron',
     ops: [{ op: 'kis', params: {} }],
@@ -297,7 +297,7 @@ test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comme
     ' * @param b Second arena; the result may borrow storage from either arena.\n' +
     ' * @return The resulting star-pattern mesh.\n' +
     ' */\n' +
-    'FLASHMEM static PolyMesh tetrahedron_kis(Arena &a, Arena &b) {\n' +
+    'HS_FLASH_INLINE inline PolyMesh tetrahedron_kis(Arena &a, Arena &b) {\n' +
     '  return SolidBuilder(Archimedean::tetrahedron(a, b), a, b).kis().build();\n' +
     '}';
   assert.equal(cpp, expected);
@@ -326,7 +326,7 @@ test('generateRecipeCpp breaks after the return type when the name fills the lin
     base: 'truncatedIcosidodecahedron',
     ops: [{ op: 'truncate', params: { t: 0.5 } }, 'ambo', 'dual'],
   }, 'Archimedean');
-  assert.match(cpp, /\nFLASHMEM static PolyMesh\ntruncated_icosidodecahedron_truncate50_ambo_dual\(Arena &a, Arena &b\) \{\n/);
+  assert.match(cpp, /\nHS_FLASH_INLINE inline PolyMesh\ntruncated_icosidodecahedron_truncate50_ambo_dual\(Arena &a, Arena &b\) \{\n/);
 });
 
 /**
@@ -372,9 +372,9 @@ test('generateRecipeCpp keeps every breakable line within the column limit', () 
 /** Verifies a line that exactly fills the column limit stays whole and one past it wraps. */
 test('generateRecipeCpp wraps at the column limit, not one column early or late', () => {
   const signature = generateRecipeCpp({
-    base: 'a'.repeat(26), ops: [{ op: 'relax', params: { iter: 9 } }],
-  }, 'Archimedean').split('\n').find((line) => line.startsWith('FLASHMEM'));
-  assert.equal(signature, `FLASHMEM static PolyMesh ${'a'.repeat(26)}_relax9(Arena &a, Arena &b) {`);
+    base: 'a'.repeat(19), ops: [{ op: 'relax', params: { iter: 9 } }],
+  }, 'Archimedean').split('\n').find((line) => line.startsWith('HS_FLASH_INLINE'));
+  assert.equal(signature, `HS_FLASH_INLINE inline PolyMesh ${'a'.repeat(19)}_relax9(Arena &a, Arena &b) {`);
   assert.equal(signature.length, 80);
 
   const seedLines = (base) => {
