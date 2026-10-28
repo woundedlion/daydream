@@ -160,8 +160,9 @@ export class VideoRecorder {
   }
 
   /**
-   * Whether a recording session is actively capturing.
-   * @returns {boolean} True while recording or paused in a background tab.
+   * Whether a session exists: starting (Save dialog open), recording, or
+   * paused in a background tab.
+   * @returns {boolean} True while starting, recording, or paused.
    */
   get isRecording() {
     return this.starting || (this.mediaRecorder !== null && this.mediaRecorder.state !== 'inactive');
@@ -384,6 +385,8 @@ export class VideoRecorder {
 
   /**
    * Stops the active session; download and cleanup happen in the onstop handler.
+   * A session still waiting on the Save dialog is cancelled synchronously;
+   * nothing is saved.
    * @returns {void}
    */
   stop() {
