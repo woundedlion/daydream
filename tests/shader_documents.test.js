@@ -1,5 +1,5 @@
 import { canonicalEffectId } from '../src/effects/effect_identity.js';
-import { fixedDerivedBinding, engineControlNames, compileShaderDocument, DEFAULT_LIMITS, exportShaderDocumentJson, validateShaderDocument } from '../generated/shader/shader_workbench.mjs';
+import { BAKED_CONSTANT_IDS, bakedTopologyFields, fixedDerivedBinding, engineControlNames, compileShaderDocument, DEFAULT_LIMITS, exportShaderDocumentJson, validateShaderDocument } from '../generated/shader/shader_workbench.mjs';
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -14,8 +14,6 @@ import {
 } from '../src/workbench/shader/shader_deeplink.js';
 import {
   applyFixedShaderDocument,
-  BAKED_CONSTANT_IDS,
-  bakedTopologyFields,
   createShaderDocumentController,
   SHADER_LINK_DEBOUNCE_MS,
   SHADER_LINK_MAX_WAIT_MS,
