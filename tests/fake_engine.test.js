@@ -103,6 +103,49 @@ test('an injected APPLIED cannot report success without applying the chain', () 
   assert.equal(engine.definitions, definitions);
 });
 
+test('fake snapshots refuse invalid modulation recipes without changing state', () => {
+  const engine = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
+  const bindings = engine.getShaderChainBindings();
+  const before = bindings.getSnapshot();
+  for (const change of [
+    (value) => { value.modulation[0].recipe = {}; },
+    (value) => { value.modulation[0].recipe.mechanic.amount = 10; },
+    (value) => { value.modulation[0].recipe.sine.offset = 1000; },
+    (value) => { value.modulation[0].recipe.noise.variant = 7; },
+    (value) => { value.modulation[0].recipe.sine.axis = [0, 1]; },
+    (value) => { value.modulation[0].recipe.noise.basis = 1; },
+    (value) => { value.modulation[0].recipe.mechanic = {kind: 2, amount: -0.1}; },
+    (value) => { value.modulation[0].recipe.version = 2; },
+    (value) => { value.modulation[0].recipe.seed = -1; },
+    (value) => { value.parameters.push({name: 'colorize.pattern-speed', value: 0}); },
+    (value) => { value.runtime.find((entry) => entry.kind === 'color-clock-v2').state.modulation.source = 1; },
+  ]) {
+    const candidate = structuredClone(before);
+    change(candidate);
+    assert.equal(bindings.restoreSnapshot(candidate), ChainSnapshotRestoreResult.INVALID_VALUE);
+    assert.deepEqual(bindings.getSnapshot(), before);
+  }
+  const valid = structuredClone(before);
+  valid.modulation[0].recipe.mechanic.amount = 3;
+  assert.equal(bindings.restoreSnapshot(valid), ChainSnapshotRestoreResult.APPLIED);
+  assert.deepEqual(bindings.getSnapshot(), valid);
+});
+
+test('fake source writes synchronize the snapshot clock with the selected recipe', () => {
+  const engine = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
+  assert.equal(engine.setParameter('colorize.modulation-evaluation', 0), ParamSetResult.APPLIED);
+  assert.equal(engine.setParameter('colorize.modulation-source', 1), ParamSetResult.APPLIED);
+  const bindings = engine.getShaderChainBindings();
+  const snapshot = bindings.getSnapshot();
+  assert.equal(snapshot.modulation[0].recipe.source, 1);
+  const clock = snapshot.runtime.find((entry) => entry.kind === 'color-clock-v2').state.modulation;
+  assert.equal(clock.source, 1);
+  assert.equal(clock.phaseTurns, 0);
+  assert.equal(bindings.restoreSnapshot(snapshot), ChainSnapshotRestoreResult.APPLIED);
+});
+
 test('the fake chain engine advances generations after repeated application', () => {
   const engine = new FakeChainEngine();
   engine.setEffect('ShaderChain');

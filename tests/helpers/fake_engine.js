@@ -45,6 +45,42 @@ for (const source of ['sine', 'interference', 'grid']) {
   }
 }
 
+function validModulationRecipe(recipe, definitions, instance) {
+  const unsigned = (value) => Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
+  if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)
+      || typeof recipe.enabled !== 'boolean' || recipe.version !== 1 || !unsigned(recipe.seed)) return false;
+  for (const source of ['sine', 'interference', 'grid']) {
+    if (!Array.isArray(recipe[source]?.axis) || recipe[source].axis.length !== 3
+        || (source !== 'sine' && (!Array.isArray(recipe[source]?.axisB)
+          || recipe[source].axisB.length !== 3))) return false;
+  }
+  for (const [field, path] of Object.entries(MODULATION_PATHS)) {
+    const value = path.reduce((value, key) => value?.[key], recipe);
+    const definition = definitions.find((entry) => entry.name === `${instance}.${field}`);
+    const numeric = field === 'modulation-enabled' ? Number(value) : value;
+    if (!definition || typeof numeric !== 'number' || !Number.isFinite(numeric)
+        || Math.fround(numeric) < definition.min || Math.fround(numeric) > definition.max
+        || (definition.options && !Number.isInteger(numeric))) return false;
+  }
+  if (recipe.mechanic.kind !== 0 && (recipe.mechanic.amount < 0 || recipe.mechanic.amount > 1)) return false;
+  if (recipe.evaluation === 1 && (recipe.source !== 0 || recipe.noise.scale > 8)) return false;
+  if (recipe.source === 0) {
+    if (recipe.evaluation === 0 && recipe.noise.variant !== 0) return false;
+    if (recipe.noise.variant === 0 && (recipe.noise.basis !== 0 || recipe.noise.contrast !== 0)) return false;
+    return !(recipe.noise.variant === 1 && recipe.mechanic.kind === 1);
+  }
+  const source = [null, recipe.sine, recipe.interference, recipe.grid][recipe.source];
+  const squaredLength = (axis) => axis.reduce((sum, value) => sum + value * value, 0);
+  const axisValid = (axis) => Array.isArray(axis) && axis.length === 3
+    && axis.every(Number.isFinite) && squaredLength(axis) >= 1e-12;
+  if (!source || !axisValid(source.axis)) return false;
+  if (recipe.source === 1) return true;
+  if (!axisValid(source.axisB)) return false;
+  if (recipe.source === 2) return true;
+  const dot = source.axis.reduce((sum, value, index) => sum + value * source.axisB[index], 0);
+  return Math.abs(dot / Math.sqrt(squaredLength(source.axis) * squaredLength(source.axisB))) <= 1e-5;
+}
+
 /**
  * Stand-in for the chain-capable engine surface: setShaderChain with the
  * module's payload-shape checks, parameter definitions rebuilt from the pinned
@@ -256,7 +292,8 @@ export class FakeChainEngine {
           return ChainSnapshotRestoreResult.INVALID_CHAIN;
         const modulationInstances = new Set(candidate.modulation.map(({instance}) => instance));
         for (const entry of snapshot.modulation) {
-          if (!modulationInstances.delete(entry?.instance) || !entry.recipe)
+          if (!modulationInstances.delete(entry?.instance)
+              || !validModulationRecipe(entry.recipe, candidate.definitions, entry.instance))
             return ChainSnapshotRestoreResult.INVALID_VALUE;
         }
         if (modulationInstances.size) return ChainSnapshotRestoreResult.INVALID_VALUE;
@@ -264,6 +301,8 @@ export class FakeChainEngine {
         for (const write of snapshot.parameters) {
           const definition = candidate.definitions.find((d) => d.name === write?.name);
           if (!definition || names.has(write.name) || !Number.isFinite(write.value)
+              || candidate.modulation.some((entry) => write.name.startsWith(`${entry.instance}.`)
+                && MODULATION_PATHS[write.name.split('.')[1]])
               || write.value < definition.min || write.value > definition.max
               || (definition.options && !Number.isInteger(write.value)))
             return ChainSnapshotRestoreResult.INVALID_VALUE;
@@ -274,6 +313,12 @@ export class FakeChainEngine {
           for (const entry of snapshot.runtime) {
             if (remaining.get(entry.instance) !== entry.kind)
               return ChainSnapshotRestoreResult.INVALID_VALUE;
+            if (entry.kind === 'color-clock-v2') {
+              const recipe = snapshot.modulation.find((value) => value.instance === entry.instance)?.recipe;
+              if (!recipe || entry.state.modulation.source !== recipe.source
+                  || entry.state.modulation.version !== recipe.version)
+                return ChainSnapshotRestoreResult.INVALID_VALUE;
+            }
             remaining.delete(entry.instance);
           }
           if (remaining.size) return ChainSnapshotRestoreResult.INVALID_VALUE;
@@ -326,6 +371,10 @@ export class FakeChainEngine {
     if (recipe && path) {
       const target = path.slice(0, -1).reduce((value, key) => value[key], recipe);
       target[path.at(-1)] = field === 'modulation-enabled' ? Boolean(accepted) : accepted;
+      if (field === 'modulation-source') {
+        const clock = this.runtime.find((entry) => entry.instance === instance)?.state.modulation;
+        if (clock) Object.assign(clock, {source: accepted, version: recipe.version, phaseTurns: 0, initialized: true});
+      }
     }
     this.paused = true;
     this.writes.push([name, value]);
