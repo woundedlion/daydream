@@ -378,7 +378,7 @@ export function start({
           applyNotice.show(
             `The shader workbench could not be initialized: ${errorDetail(err)}`,
             WORKBENCH_NOTICE);
-        });
+        }).finally(finishColumnDefaults);
       } catch (err) {
         console.error('Initial resolution/effect could not be applied:', err);
         if (abandonOnModuleDeath(err)) return;
@@ -582,8 +582,17 @@ export function start({
   syncPovControls();
   guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions').onChange(() => daydream.invalidate());
   let initialColumnOverride = null;
+  let columnOverrideChanged = false;
+  const finishColumnDefaults = () => {
+    if (initialColumnOverride !== null && host.engine && !columnOverrideChanged) {
+      daydream.noBlackColumns = initialColumnOverride;
+      daydream.invalidate();
+    }
+    columnDefaultsReady = true;
+  };
   guiInstance.add(daydream, 'noBlackColumns').name('No black columns').listen().onChange((value) => {
     if (!host.engine) initialColumnOverride = value;
+    else columnOverrideChanged = true;
     daydream.invalidate();
   });
 
@@ -689,11 +698,7 @@ export function start({
   const ready = loadWithDeadline(loadModule)
     .then(moduleLoad.onModuleReady)
     .then(() => {
-      if (initialColumnOverride !== null && host.engine) {
-        daydream.noBlackColumns = initialColumnOverride;
-        daydream.invalidate();
-      }
-      columnDefaultsReady = true;
+      if (!shaderDocuments) finishColumnDefaults();
     }).catch(moduleLoad.onModuleFailed);
 
   return Object.assign(appTeardown, { ready });

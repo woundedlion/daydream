@@ -407,7 +407,8 @@ export function fakeWasmModule({
 /**
  * Builds the app against fakes.
  * @param {{loadModule?: () => Promise<Object>, nav?: Object,
- *   daydreamMode?: string, search?: string, optionsReplaces?: boolean, hydratedView?: Object}}
+ *   daydreamMode?: string, search?: string, optionsReplaces?: boolean, hydratedView?: Object,
+ *   documentIds?: string[]}}
  *   [options] - Seam overrides. daydreamMode stamps documentElement, the
  *   attribute start() reads to route the workbench page; search is the query
  *   string URLSync hydrates from and the redirect builds its target against;
@@ -422,13 +423,14 @@ export function startApp({
   search = '',
   optionsReplaces = false,
   hydratedView = {},
+  documentIds = [],
 } = {}) {
   const restore = stashGlobals('document', 'window', 'ResizeObserver',
     'requestAnimationFrame', 'cancelAnimationFrame');
   const ids = ['gui-container', 'effect-sidebar', 'apply-notice-dismiss',
     'apply-notice-body', 'apply-notice-text', 'canvas-container',
-    'loading-overlay', 'apply-notice', 'segment-stats'];
-  const elements = new Map(ids.map((id) => [id, fakeElement('div')]));
+    'loading-overlay', 'apply-notice', 'segment-stats', ...documentIds];
+  const elements = new Map(ids.map((id) => [id, fakeElement(id.endsWith('-select') ? 'select' : 'div')]));
   const docTarget = fakeElement('document');
   const docListeners = docTarget.listeners;
   // Every id the app asks the document for, in order.

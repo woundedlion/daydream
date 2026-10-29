@@ -96,6 +96,27 @@ test('a resolved workbench init releases pending URL writes', async () => {
   assert.equal(app.urlWrites.length, 1);
 });
 
+test('a column edit during workbench initialization supersedes the initial override', async () => {
+  mock.timers.enable({apis: ['setTimeout']});
+  let resolve;
+  initResult = new Promise((done) => { resolve = done; });
+  const module = fakeWasmModule();
+  module.HolosphereEngine.prototype.strobeColumns = () => true;
+  const app = startApp({daydreamMode: 'shader-workbench',
+    search: '?effect=AlienBrain&view.noBlackColumns=true', hydratedView: {noBlackColumns: true},
+    loadModule: async () => module});
+  await app.teardown.ready;
+  assert.equal(callbacks.selectEffect('ShaderChain'), true);
+  const control = app.guis[0].controllers.find((entry) => entry.property === 'noBlackColumns');
+  control.setValue(true);
+  control.setValue(false);
+  resolve(true);
+  await new Promise((done) => setImmediate(done));
+  assert.equal(app.driver.noBlackColumns, false);
+  getActiveURLSync().flush();
+  assert.equal(new URL(app.urlWrites.at(-1), 'https://example.test').searchParams.get('view.noBlackColumns'), 'false');
+});
+
 test('release of the original link resumes URL writes once', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   preserveLink = true;
