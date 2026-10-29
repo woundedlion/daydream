@@ -2301,11 +2301,16 @@ test('query snapshot import rejects retired archive versions without adopting th
 });
 
 test('shader links refuse null snapshot entries before initializing a candidate', async () => {
-  for (const [chain, parameters] of [[[], [null]], [[null], []], [[], [{name: 42}]]]) {
+  for (const [chain, parameters, modulation = []] of [
+    [[], [null]], [[null], []], [[], [{name: 42}]],
+    [[], [], [null]], [[], [], [[]]], [[], [], [3]],
+  ]) {
     const compact = {d: {descriptor: {chain: []}}, p: 'night', b: [], a: true,
-      s: {schemaVersion: 3, chain, parameters, modulation: []}};
+      s: {schemaVersion: 3, chain, parameters, modulation}};
     const payload = gzipSync(JSON.stringify(compact)).toString('base64url');
     await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`), /invalid shader link snapshot/);
+    await assert.rejects(encodeShaderStateHash({document: compact.d, preset: compact.p,
+      bypassed: compact.b, paused: compact.a, chainSnapshot: compact.s}), /invalid shader link snapshot/);
   }
 });
 
