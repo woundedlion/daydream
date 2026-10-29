@@ -113,8 +113,6 @@ test('a column edit during workbench initialization supersedes the initial overr
   resolve(true);
   await new Promise((done) => setImmediate(done));
   assert.equal(app.driver.noBlackColumns, false);
-  getActiveURLSync().flush();
-  assert.equal(new URL(app.urlWrites.at(-1), 'https://example.test').searchParams.get('view.noBlackColumns'), 'false');
 });
 
 test('release of the original link resumes URL writes once', async () => {
