@@ -18,6 +18,33 @@ const CHAIN_CATALOG_TEXT = readFileSync(
   new URL('../../generated/shader/engine_catalog.json', import.meta.url), 'utf8',
 );
 
+export function modulationRecipe() {
+  const sine = () => ({axis: [0, 1, 0], frequency: 1, offset: 0, speed: 0});
+  const interference = () => ({...sine(), axisB: [1, 0, 0], frequencyB: 1, offsetB: 0});
+  return {enabled: true, source: 0, version: 1, evaluation: 1, seed: 6047,
+    noise: {scale: 1, speed: 0, contrast: 0, basis: 0, variant: 0},
+    sine: sine(), interference: interference(), grid: interference(), mechanic: {kind: 0, amount: 0}};
+}
+
+const MODULATION_PATHS = {
+  'modulation-enabled': ['enabled'], 'modulation-source': ['source'],
+  'modulation-evaluation': ['evaluation'], 'modulation-mechanic': ['mechanic', 'kind'],
+  'modulation-amount': ['mechanic', 'amount'], 'pattern-noise-basis': ['noise', 'basis'],
+  'pattern-noise-variant': ['noise', 'variant'],
+};
+for (const field of ['scale', 'speed', 'contrast']) MODULATION_PATHS[`pattern-${field}`] = ['noise', field];
+for (const source of ['sine', 'interference', 'grid']) {
+  for (const [index, axis] of ['x', 'y', 'z'].entries()) {
+    MODULATION_PATHS[`${source}-axis-${axis}`] = [source, 'axis', index];
+    if (source !== 'sine') MODULATION_PATHS[`${source}-axis-b-${axis}`] = [source, 'axisB', index];
+  }
+  for (const field of ['frequency', 'offset', 'speed']) MODULATION_PATHS[`${source}-${field}`] = [source, field];
+  if (source !== 'sine') {
+    MODULATION_PATHS[`${source}-frequency-b`] = [source, 'frequencyB'];
+    MODULATION_PATHS[`${source}-offset-b`] = [source, 'offsetB'];
+  }
+}
+
 /**
  * Stand-in for the chain-capable engine surface: setShaderChain with the
  * module's payload-shape checks, parameter definitions rebuilt from the pinned
@@ -116,8 +143,9 @@ export class FakeChainEngine {
         state = { noiseSeed: 1337, walkTime: 0, position: [0, 1, 0], direction: [1, 0, 0],
           wander: [1, 0, 0, 0], angularVelocity: 0, spinPhase: 0 };
       } else if (operator.startsWith('colorize.')) {
-        kind = 'color-clock-v1';
-        state = { oscillationPhase: 0, hueNoisePhase: 0, hueNoiseSeed: 6047 };
+        kind = 'color-clock-v2';
+        state = { oscillationPhase: 0,
+          modulation: {source: 0, version: 1, phaseTurns: 0, initialized: true} };
       } else if (operator.startsWith('warp.affine.')) {
         kind = 'affine-clock-v1';
         state = { phase: 0, rotation: 0 };
@@ -142,6 +170,8 @@ export class FakeChainEngine {
     });
     this.paletteBank = { chroma: 0.15, hues: [0, 1, 2], cycles: Array.from({ length: 3 },
       () => ({ frame: 0, nextSequence: 0, fadeActive: false, displayDirty: true })) };
+    this.modulation = entries.filter(({operator}) => operator.startsWith('colorize.'))
+      .map(({instance}) => ({instance, recipe: modulationRecipe()}));
     this.generation += 1;
     return { status: ChainStatus.OK, code: 'APPLIED', entryIndex: -1 };
   }
@@ -155,8 +185,11 @@ export class FakeChainEngine {
       isValid,
       getProgram: () => isValid() ? structuredClone(this.program) : null,
       getSnapshot: () => isValid() ? {
-        schemaVersion: 2, chain: structuredClone(this.program),
-        parameters: this.definitions.map((d) => ({name: d.name, value: d.acceptedValue})),
+        schemaVersion: 3, chain: structuredClone(this.program),
+        parameters: this.definitions.filter((d) => !this.modulation.some((entry) =>
+          d.name.startsWith(`${entry.instance}.`) && MODULATION_PATHS[d.name.split('.')[1]]))
+          .map((d) => ({name: d.name, value: d.acceptedValue})),
+        modulation: structuredClone(this.modulation),
         animationsPaused: this.paused,
         runtime: structuredClone(this.runtime),
         paletteBank: structuredClone(this.paletteBank),
@@ -166,12 +199,13 @@ export class FakeChainEngine {
         if (snapshot === null || typeof snapshot !== 'object' || Array.isArray(snapshot)
             || !Number.isInteger(snapshot.schemaVersion) || snapshot.schemaVersion < 0
             || snapshot.schemaVersion > 0xffffffff) return ChainSnapshotRestoreResult.INVALID_VALUE;
-        if (snapshot.schemaVersion !== 2) return ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
+        if (snapshot.schemaVersion !== 3) return ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
         if (typeof snapshot.animationsPaused !== 'boolean') return ChainSnapshotRestoreResult.INVALID_VALUE;
-        if (!Array.isArray(snapshot.chain) || !Array.isArray(snapshot.parameters))
+        if (!Array.isArray(snapshot.chain) || !Array.isArray(snapshot.parameters) || !Array.isArray(snapshot.modulation))
           return ChainSnapshotRestoreResult.INVALID_VALUE;
         if (snapshot.chain.length > this.catalog.budgets.max_chain_ops
-            || snapshot.parameters.length > this.catalog.budgets.max_params)
+            || snapshot.parameters.length > this.catalog.budgets.max_params
+            || snapshot.modulation.length > this.catalog.budgets.max_chain_ops)
           return ChainSnapshotRestoreResult.INVALID_LENGTH;
         if (snapshot.runtime !== undefined && !Array.isArray(snapshot.runtime))
           return ChainSnapshotRestoreResult.INVALID_VALUE;
@@ -185,7 +219,7 @@ export class FakeChainEngine {
         const runtimeFields = {
           'source-clock-v1': ['primary', 'secondary', 'angle'],
           'noise-clock-v1': ['phase'], 'affine-clock-v1': ['phase', 'rotation'],
-          'color-clock-v1': ['oscillationPhase', 'hueNoisePhase'],
+          'color-clock-v2': ['oscillationPhase'],
           'phase-clock-v1': ['phase'], 'ripple-clock-v1': ['phase'],
         };
         if (snapshot.runtime?.some((entry) => {
@@ -197,7 +231,11 @@ export class FakeChainEngine {
           const fields = runtimeFields[entry.kind];
           return !fields || fields.some((key) => !Number.isFinite(entry.state[key]))
             || (entry.kind === 'noise-clock-v1' && !unsigned(entry.state.noiseSeed))
-            || (entry.kind === 'color-clock-v1' && !unsigned(entry.state.hueNoiseSeed));
+            || (entry.kind === 'color-clock-v2' && (!entry.state.modulation
+              || !unsigned(entry.state.modulation.source) || entry.state.modulation.source > 3
+              || entry.state.modulation.version !== 1 || typeof entry.state.modulation.initialized !== 'boolean'
+              || !Number.isFinite(entry.state.modulation.phaseTurns)
+              || entry.state.modulation.phaseTurns < 0 || entry.state.modulation.phaseTurns >= 1));
         })) return ChainSnapshotRestoreResult.INVALID_VALUE;
         const palette = snapshot.paletteBank;
         if (palette !== undefined && (palette === null || typeof palette !== 'object'
@@ -216,6 +254,12 @@ export class FakeChainEngine {
         candidate.effect = 'ShaderChain';
         if (candidate.#setShaderChain(snapshot.chain).code !== 'APPLIED')
           return ChainSnapshotRestoreResult.INVALID_CHAIN;
+        const modulationInstances = new Set(candidate.modulation.map(({instance}) => instance));
+        for (const entry of snapshot.modulation) {
+          if (!modulationInstances.delete(entry?.instance) || !entry.recipe)
+            return ChainSnapshotRestoreResult.INVALID_VALUE;
+        }
+        if (modulationInstances.size) return ChainSnapshotRestoreResult.INVALID_VALUE;
         const names = new Set();
         for (const write of snapshot.parameters) {
           const definition = candidate.definitions.find((d) => d.name === write?.name);
@@ -237,6 +281,15 @@ export class FakeChainEngine {
         const outcome = this.#setShaderChain(snapshot.chain);
         if (outcome.code !== 'APPLIED') return ChainSnapshotRestoreResult.INVALID_CHAIN;
         this.#setShaderChainParameters(snapshot.parameters);
+        this.modulation = structuredClone(snapshot.modulation);
+        for (const {instance, recipe} of this.modulation) {
+          for (const [field, path] of Object.entries(MODULATION_PATHS)) {
+            const definition = this.definitions.find((d) => d.name === `${instance}.${field}`);
+            if (!definition) continue;
+            const value = Number(path.reduce((value, key) => value[key], recipe));
+            Object.assign(definition, {value, requestedValue: value, acceptedValue: value});
+          }
+        }
         this.paused = snapshot.animationsPaused;
         if (snapshot.runtime !== undefined) this.runtime = structuredClone(snapshot.runtime);
         if (palette !== undefined) this.paletteBank = structuredClone(palette);
@@ -267,6 +320,13 @@ export class FakeChainEngine {
     definition.value = accepted;
     definition.requestedValue = accepted;
     definition.acceptedValue = accepted;
+    const [instance, field] = name.split('.');
+    const recipe = this.modulation?.find((entry) => entry.instance === instance)?.recipe;
+    const path = MODULATION_PATHS[field];
+    if (recipe && path) {
+      const target = path.slice(0, -1).reduce((value, key) => value[key], recipe);
+      target[path.at(-1)] = field === 'modulation-enabled' ? Boolean(accepted) : accepted;
+    }
     this.paused = true;
     this.writes.push([name, value]);
     return ParamSetResult.APPLIED;

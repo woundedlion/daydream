@@ -1341,8 +1341,8 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     { id: 'camera.wander', storage: 'binary32' },
     { id: 'colorize.hue-shift-mode', storage: 'enum8' },
     { id: 'colorize.hue-shift-amount', storage: 'binary32' },
-    { id: 'colorize.hue-noise-scale', storage: 'binary32' },
-    { id: 'colorize.hue-noise-speed', storage: 'binary32' },
+    { id: 'colorize.pattern-scale', storage: 'binary32' },
+    { id: 'colorize.pattern-speed', storage: 'binary32' },
     { id: 'colorize.brightness-envelope', storage: 'enum8' },
     { id: 'colorize.brightness-bottom', storage: 'binary32' },
     { id: 'colorize.brightness-top', storage: 'binary32' },
@@ -1355,8 +1355,8 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     'camera.wander': 0,
     'colorize.hue-shift-mode': 'path-length',
     'colorize.hue-shift-amount': 1,
-    'colorize.hue-noise-scale': 1,
-    'colorize.hue-noise-speed': 0,
+    'colorize.pattern-scale': 1,
+    'colorize.pattern-speed': 0,
     'colorize.brightness-envelope': 'none',
     'colorize.brightness-bottom': 0,
     'colorize.brightness-top': 1,
@@ -1368,8 +1368,7 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     { label: 'colorize', operator: 'colorize.generated-palette.v3' },
   ];
   assert.deepEqual([...deactivatedParameterIds(parameters, values, chain, CATALOG)],
-    ['sample.edge-width', 'colorize.hue-noise-scale',
-      'colorize.hue-noise-speed', 'colorize.brightness-bottom',
+    ['sample.edge-width', 'colorize.brightness-bottom',
       'colorize.brightness-top']);
   assert.deepEqual([...deactivatedParameterIds(
     [{ id: 'sample.edge-width', storage: 'binary32' }],

@@ -14,7 +14,7 @@ const MAX_PAYLOAD_CHARS = 65536;
 const MAX_STATE_BYTES = 524288;
 
 /** Chain snapshot schema the engine's ChainSnapshot encodes and accepts. */
-export const CHAIN_SNAPSHOT_SCHEMA_VERSION = 2;
+export const CHAIN_SNAPSHOT_SCHEMA_VERSION = 3;
 
 /** @param {*} value @returns {*} */
 function normalizedState(value) {
@@ -32,6 +32,7 @@ function normalizedState(value) {
       && (!value.chainSnapshot || typeof value.chainSnapshot !== 'object'
         || value.chainSnapshot.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION || !Array.isArray(value.chainSnapshot.chain)
         || !Array.isArray(value.chainSnapshot.parameters)
+        || !Array.isArray(value.chainSnapshot.modulation)
         || value.chainSnapshot.chain.some((/** @type {*} */ entry) => !entry || typeof entry !== 'object' || Array.isArray(entry))
         || value.chainSnapshot.parameters.some((/** @type {*} */ entry) => !entry || typeof entry !== 'object' || Array.isArray(entry) || typeof entry.name !== 'string')))
     throw new Error('invalid shader link snapshot');

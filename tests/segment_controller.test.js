@@ -543,7 +543,7 @@ test('snapshotParams() is empty when no engine is bound', () => {
 
 test('snapshot-capable effects rebuild from their exhaustive state', () => {
   const snapshot = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     chain: [{instance: 'project', operator: 'project.stereographic.v2'},
       {instance: 'sample', operator: 'sample.grid.v3'},
       {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],

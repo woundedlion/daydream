@@ -775,14 +775,15 @@ export async function createChainDocumentStore({
 
 /**
  * Builds an editable document from an executable chain snapshot.
- * @param {*} snapshot - Schema-v2 program and accepted parameter values.
+ * @param {*} snapshot - Schema-v3 program, parameters and modulation recipes.
  * @param {*} catalog - Operator catalog used to declare parameters and defaults.
  * @returns {*} The imported document; enum8 option indices map to authored option IDs.
  * @throws {Error} If the snapshot schema is unsupported or a parameter is unknown.
  */
 export function documentFromChainSnapshot(snapshot, catalog) {
   if (snapshot?.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION || !Array.isArray(snapshot.chain)
-      || !Array.isArray(snapshot.parameters)) throw new Error('unsupported chain snapshot');
+      || !Array.isArray(snapshot.parameters) || !Array.isArray(snapshot.modulation))
+    throw new Error('unsupported chain snapshot');
   const document = scratchChainDocument(catalog, snapshot.chain.map((/** @type {*} */ entry) => ({
     label: entry.instance, operator: entry.operator,
   })));
@@ -791,11 +792,35 @@ export function documentFromChainSnapshot(snapshot, catalog) {
   document.effect_metadata.display_name = 'Imported Chain';
   document.effect_metadata.description = 'Imported chain snapshot.';
   const values = document.preset_bank.presets[0].values;
-  for (const entry of snapshot.parameters) {
-    const parameter = document.descriptor.parameters.find((/** @type {*} */ p) => p.id === entry.name);
-    if (!parameter) throw new Error(`unknown chain snapshot parameter: ${entry.name}`);
-    values[entry.name] = parameter.storage === 'enum8'
-      ? parameter.domain.values[entry.value] : entry.value;
+  /** @param {string} name @param {*} value */
+  const setValue = (name, value) => {
+    const parameter = document.descriptor.parameters.find((/** @type {*} */ p) => p.id === name);
+    if (!parameter) throw new Error(`unknown chain snapshot parameter: ${name}`);
+    values[name] = parameter.storage === 'enum8' ? parameter.domain.values[value] : value;
+  };
+  for (const entry of snapshot.parameters) setValue(entry.name, entry.value);
+  for (const {instance, recipe} of snapshot.modulation) {
+    const set = (/** @type {string} */ field, /** @type {*} */ value) => setValue(`${instance}.${field}`, value);
+    set('modulation-enabled', Number(recipe.enabled));
+    set('modulation-source', recipe.source);
+    set('modulation-evaluation', recipe.evaluation);
+    set('modulation-mechanic', recipe.mechanic.kind);
+    set('modulation-amount', recipe.mechanic.amount);
+    set('pattern-noise-basis', recipe.noise.basis);
+    set('pattern-noise-variant', recipe.noise.variant);
+    for (const field of ['scale', 'speed', 'contrast']) set(`pattern-${field}`, recipe.noise[field]);
+    for (const source of ['sine', 'interference', 'grid']) {
+      const pattern = recipe[source];
+      for (const [index, axis] of ['x', 'y', 'z'].entries()) {
+        set(`${source}-axis-${axis}`, pattern.axis[index]);
+        if (source !== 'sine') set(`${source}-axis-b-${axis}`, pattern.axisB[index]);
+      }
+      for (const field of ['frequency', 'offset', 'speed']) set(`${source}-${field}`, pattern[field]);
+      if (source !== 'sine') {
+        set(`${source}-frequency-b`, pattern.frequencyB);
+        set(`${source}-offset-b`, pattern.offsetB);
+      }
+    }
   }
   return document;
 }

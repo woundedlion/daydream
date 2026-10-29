@@ -858,7 +858,7 @@ test('init restores accepted params before replaying rejected requests', async (
 
 test('init restores a ShaderChain snapshot', async () => {
   const snapshot = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     chain: [{instance: 'project', operator: 'project.stereographic.v2'},
       {instance: 'sample', operator: 'sample.grid.v3'},
       {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],
@@ -978,7 +978,7 @@ test('setEffect restores ShaderChain snapshot after rebuilding', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
     effectName: 'Plasma' });
   const snapshot = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     chain: [{instance: 'project', operator: 'project.stereographic.v2'},
       {instance: 'sample', operator: 'sample.grid.v3'},
       {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],

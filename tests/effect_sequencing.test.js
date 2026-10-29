@@ -738,7 +738,7 @@ test('an effect the resized engine rejects rejects the resolution change', () =>
 });
 
 test('resolution rebuild restores the chain runtime before rebuilding controls or broadcasting', () => {
-  const snapshot = {schemaVersion: 2, chain: [{instance: 'camera', operator: 'sphere.rotate.v2'}],
+  const snapshot = {schemaVersion: 3, chain: [{instance: 'camera', operator: 'sphere.rotate.v2'}],
     parameters: [{name: 'camera.wander', value: 0.3}],
     runtime: [{instance: 'camera', kind: 'spatial-walk-v2', state: {walkTime: 37}}], animationsPaused: false};
   const app = makeApp({chainSnapshot: snapshot, segmented: true});
@@ -754,13 +754,13 @@ test('resolution rebuild restores the chain runtime before rebuilding controls o
 });
 
 test('a refused chain restore rejects a resolution transaction before rebuilding its controls', () => {
-  const app = makeApp({chainSnapshot: {schemaVersion: 2}, restoreSnapshotResult: ChainSnapshotRestoreResult.INVALID_CHAIN});
+  const app = makeApp({chainSnapshot: {schemaVersion: 3}, restoreSnapshotResult: ChainSnapshotRestoreResult.INVALID_CHAIN});
   assert.equal(app.pipeline.applyResolution(), ApplyResult.REJECTED);
   assert.equal(app.log.includes('effectGui.build'), false);
 });
 
 test('resolution correction discards the outgoing chain snapshot and parameter URL', () => {
-  const app = makeApp({resolution: 'Lo', effect: 'Gamma', chainSnapshot: {schemaVersion: 2}});
+  const app = makeApp({resolution: 'Lo', effect: 'Gamma', chainSnapshot: {schemaVersion: 3}});
   assert.equal(app.pipeline.applyResolution({ preserveParams: true }), ApplyResult.APPLIED);
   assert.equal(app.log.includes('chain.capture'), true);
   assert.equal(app.log.includes('chain.restore'), false);
@@ -769,7 +769,7 @@ test('resolution correction discards the outgoing chain snapshot and parameter U
 
 test('rollback captures and restores complete chain runtime without individual parameter replay', () => {
   const effect = makeEffectControls({Speed: 0.25}, true);
-  const chain = {schemaVersion: 2, runtime: [{instance: 'sample', kind: 'source-clock-v1', state: {primary: 1.25}}]};
+  const chain = {schemaVersion: 3, runtime: [{instance: 'sample', kind: 'source-clock-v1', state: {primary: 1.25}}]};
   const snapshot = snapshotEffectControlState(effect, () => true, () => structuredClone(chain));
   assert.deepEqual(snapshot.chainSnapshot, chain);
   assert.deepEqual(snapshot.paramValues, []);

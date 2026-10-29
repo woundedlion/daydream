@@ -71,8 +71,8 @@ test('v2 shader links retain typed runtime and palette state', async () => {
     document: {descriptor: {chain: [{label: 'source'}]}},
     preset: 'night', bypassed: [], paused: true,
     chainSnapshot: {
-      schemaVersion: 2, chain: [{instance: 'source', operator: 'sample.grid.v3'}],
-      parameters: [{name: 'source.pattern-freq', value: 1}], animationsPaused: true,
+      schemaVersion: 3, chain: [{instance: 'source', operator: 'sample.grid.v3'}],
+      modulation: [], parameters: [{name: 'source.pattern-freq', value: 1}], animationsPaused: true,
       runtime: [{instance: 'source', kind: 'source-clock-v1',
         state: {primary: 1.25, secondary: 0.5, angle: 2}}],
       paletteBank: {chroma: 0.75, hues: [0, 159, 318],
@@ -82,6 +82,13 @@ test('v2 shader links retain typed runtime and palette state', async () => {
   assert.deepEqual(JSON.parse(JSON.stringify(
     await decodeShaderStateHash(await encodeShaderStateHash(state)))), state);
   await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: {schemaVersion: 1}}),
+    /invalid shader link snapshot/);
+  const legacySnapshot = {...state.chainSnapshot, schemaVersion: 2};
+  await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: legacySnapshot}),
+    /invalid shader link snapshot/);
+  const missingModulation = structuredClone(state.chainSnapshot);
+  delete missingModulation.modulation;
+  await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: missingModulation}),
     /invalid shader link snapshot/);
 });
 
@@ -2298,7 +2305,7 @@ test('query snapshot import rejects retired archive versions without adopting th
 test('shader links refuse null snapshot entries before initializing a candidate', async () => {
   for (const [chain, parameters] of [[[], [null]], [[null], []], [[], [{name: 42}]]]) {
     const compact = {d: {descriptor: {chain: []}}, p: 'night', b: [], a: true,
-      s: {schemaVersion: 2, chain, parameters}};
+      s: {schemaVersion: 3, chain, parameters, modulation: []}};
     const payload = gzipSync(JSON.stringify(compact)).toString('base64url');
     await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`), /invalid shader link snapshot/);
   }

@@ -141,7 +141,7 @@ test('ShaderChain Export names a missing clipboard operation', () => {
   const h = makeHarness({
     params: chainSnapshotParams(),
     chainSnapshotEnabled: true,
-    chainSnapshot: { schemaVersion: 2 },
+    chainSnapshot: { schemaVersion: 3 },
     copyText: null,
   });
   h.panel.build();

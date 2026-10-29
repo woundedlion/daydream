@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot, shaderChainCatalog } from '../src/engine/workbench_bindings.js';
 
 test('snapshot helpers share typed restore refusal and release their handles', () => {
-  const snapshot = {schemaVersion: 2};
+  const snapshot = {schemaVersion: 3};
   const unavailable = {};
   const applied = {};
   const module = {ChainSnapshotRestoreResult: {NOT_SHADER_CHAIN: unavailable}};

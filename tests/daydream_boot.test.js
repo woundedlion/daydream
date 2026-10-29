@@ -944,11 +944,11 @@ test('a workbench missing document controls preserves its URL across rendered an
     module.ChainSnapshotRestoreResult = ChainSnapshotRestoreResult;
     module.HolosphereEngine.prototype.getShaderChainBindings = () => ({
       isValid: () => true,
-      getSnapshot: () => ({schemaVersion: 2, chain: [
+      getSnapshot: () => ({schemaVersion: 3, chain: [
         {instance: 'project', operator: 'project.stereographic.v2'},
         {instance: 'sample', operator: 'sample.grid.v3'},
         {instance: 'colorize', operator: 'colorize.generated-palette.v3'},
-      ], parameters: [], animationsPaused: false}),
+      ], parameters: [], modulation: [], animationsPaused: false}),
       restoreSnapshot: () => ChainSnapshotRestoreResult.APPLIED,
       delete: () => { releases++; },
     });

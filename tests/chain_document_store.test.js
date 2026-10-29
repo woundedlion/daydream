@@ -1,3 +1,4 @@
+import {modulationRecipe} from './helpers/fake_engine.js';
 // Check transactional chain edits, reconciliation, undo and session bypass
 // against a multi-preset pattern fixture and the pinned engine catalog.
 import { test } from 'node:test';
@@ -975,7 +976,7 @@ test('the scratch document compiles clean against the catalog', async () => {
   const units = new Map(compiled.document.descriptor.parameters.map(
     (parameter) => [parameter.id, parameter.unit]));
   for (const id of [
-    'colorize.hue-noise-speed', 'colorize.phase-oscillation-speed',
+    'colorize.pattern-speed', 'colorize.phase-oscillation-speed',
   ]) assert.equal(units.get(id), 'turn-per-frame', id);
   for (const id of ['project.projection-spin-speed', 'sample.speed', 'sample.angle-speed'])
     assert.equal(units.get(id), 'radian-per-frame', id);
@@ -1206,7 +1207,7 @@ const SNAPSHOT_CHAIN = DEFAULT_SCRATCH_CHAIN.map(({ label, operator }) => ({ ins
 
 test('a chain snapshot imports its chain and maps enum indices to option ids', () => {
   const document = documentFromChainSnapshot({ schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION,
-    chain: SNAPSHOT_CHAIN, parameters: [
+    chain: SNAPSHOT_CHAIN, modulation: [{instance: 'colorize', recipe: modulationRecipe()}], parameters: [
       { name: 'sample.coverage-mode', value: 2 },
       { name: 'rotate.wander', value: 0.25 },
     ] }, CATALOG);
@@ -1219,10 +1220,43 @@ test('a chain snapshot imports its chain and maps enum indices to option ids', (
 
 test('a chain snapshot import refuses unknown parameters and unsupported shapes', () => {
   assert.throws(() => documentFromChainSnapshot({ schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION,
-    chain: SNAPSHOT_CHAIN, parameters: [{ name: 'missing.parameter', value: 0 }] }, CATALOG),
+    chain: SNAPSHOT_CHAIN, modulation: [{instance: 'colorize', recipe: modulationRecipe()}], parameters: [{ name: 'missing.parameter', value: 0 }] }, CATALOG),
   /unknown chain snapshot parameter: missing\.parameter/);
-  for (const snapshot of [null, { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION + 1, chain: SNAPSHOT_CHAIN, parameters: [] },
+  for (const snapshot of [null, { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION + 1, chain: SNAPSHOT_CHAIN, modulation: [{instance: 'colorize', recipe: modulationRecipe()}], parameters: [] },
     { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: null, parameters: [] },
-    { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: SNAPSHOT_CHAIN, parameters: null }])
+    { schemaVersion: 2, chain: SNAPSHOT_CHAIN, parameters: [], modulation: [] },
+    { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: SNAPSHOT_CHAIN, parameters: [] },
+    { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: SNAPSHOT_CHAIN, modulation: [{instance: 'colorize', recipe: modulationRecipe()}], parameters: null }])
     assert.throws(() => documentFromChainSnapshot(snapshot, CATALOG), /unsupported chain snapshot/);
+});
+
+test('a chain snapshot imports every modulation field under its instance label', () => {
+  const recipe = modulationRecipe();
+  Object.assign(recipe, {enabled: false, source: 3, evaluation: 0});
+  Object.assign(recipe.noise, {scale: 2.5, speed: -0.4, contrast: 1.2, basis: 2, variant: 1});
+  Object.assign(recipe.mechanic, {kind: 2, amount: 0.75});
+  for (const [index, source] of ['sine', 'interference', 'grid'].entries()) {
+    Object.assign(recipe[source], {axis: [1, 2, 3], frequency: 4 + index, offset: -2, speed: 0.5});
+    if (source !== 'sine') Object.assign(recipe[source], {axisB: [-3, -2, -1], frequencyB: 7, offsetB: 8});
+  }
+  const chain = SNAPSHOT_CHAIN.map((entry) => entry.instance === 'colorize' ? {...entry, instance: 'ink'} : entry);
+  const document = documentFromChainSnapshot({schemaVersion: 3, chain, parameters: [],
+    modulation: [{instance: 'ink', recipe}]}, CATALOG);
+  const expected = {
+    'modulation-enabled': 'disabled', 'modulation-source': 'sphere-smooth-grid',
+    'modulation-evaluation': 'direct', 'modulation-mechanic': 'opacity', 'modulation-amount': 0.75,
+    'pattern-noise-basis': 'ridged3', 'pattern-noise-variant': 'octave-contour',
+    'pattern-scale': 2.5, 'pattern-speed': -0.4, 'pattern-contrast': 1.2,
+  };
+  for (const [index, source] of ['sine', 'interference', 'grid'].entries()) {
+    for (const [component, axis] of ['x', 'y', 'z'].entries()) {
+      expected[`${source}-axis-${axis}`] = component + 1;
+      if (source !== 'sine') expected[`${source}-axis-b-${axis}`] = component - 3;
+    }
+    Object.assign(expected, {[`${source}-frequency`]: 4 + index,
+      [`${source}-offset`]: -2, [`${source}-speed`]: 0.5});
+    if (source !== 'sine') Object.assign(expected, {[`${source}-frequency-b`]: 7, [`${source}-offset-b`]: 8});
+  }
+  const values = document.preset_bank.presets[0].values;
+  for (const [field, value] of Object.entries(expected)) assert.equal(values[`ink.${field}`], value, field);
 });

@@ -405,7 +405,7 @@ test('chain snapshots match fake key sets, decode refusals and runtime round tri
   const missingPause = structuredClone(saved);
   delete missingPause.animationsPaused;
   const max = fake.catalog.budgets;
-  for (const snapshot of [null, { schemaVersion: 2 }, missingPause,
+  for (const snapshot of [null, { schemaVersion: 3 }, missingPause,
     { ...saved, chain: [] }, { ...saved, chain: null }, { ...saved, parameters: null },
     { ...saved, runtime: null }, { ...saved, paletteBank: {} },
     { ...saved, chain: Array(max.max_chain_ops + 1).fill(null) },

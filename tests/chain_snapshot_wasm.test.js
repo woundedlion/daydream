@@ -21,7 +21,7 @@ function evolve(temporal) {
     engine.setEffect('ShaderChain');
     assert.equal(callWorkbenchBinding(engine, 'setShaderChainParameters', [[
       {name: 'camera.wander', value: 0.1}, {name: 'project.projection-wander', value: 0.2},
-      {name: 'sample.speed', value: 0.004}, {name: 'colorize.hue-noise-speed', value: 0.003},
+      {name: 'sample.speed', value: 0.004}, {name: 'colorize.pattern-speed', value: 0.003},
     ]]), module.ParamSetResult.APPLIED);
     engine.setAnimationsPaused(false);
   };

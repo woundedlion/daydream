@@ -3,11 +3,12 @@
 import { fakePanelGui } from './fake_app.js';
 import { createEffectGui } from '../../src/ui/effect_gui.js';
 import { fakeElement, installDocument } from './fake_dom.js';
-import { ChainSnapshotRestoreResult } from './fake_engine.js';
+import { ChainSnapshotRestoreResult, modulationRecipe } from './fake_engine.js';
 
 export function chainSnapshot(value = 0) {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
+    modulation: [{instance: 'colorize', recipe: modulationRecipe()}],
     chain: [
       {instance: 'project', operator: 'project.stereographic.v2'},
       {instance: 'sample', operator: 'sample.grid.v3'},
@@ -249,7 +250,7 @@ export function makeHarness({
       restore: (snapshot) => {
         restoredChainSnapshots.push(snapshot);
         controllersAtRestore.push(guis.at(-1).controllers.length);
-        return restoreChainSnapshotAccepted && snapshot.schemaVersion === 2
+        return restoreChainSnapshotAccepted && snapshot.schemaVersion === 3
           ? ChainSnapshotRestoreResult.APPLIED : ChainSnapshotRestoreResult.INVALID_VALUE;
       },
       restoreResults: () => ChainSnapshotRestoreResult,
