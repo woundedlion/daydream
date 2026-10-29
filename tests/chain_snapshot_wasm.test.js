@@ -90,6 +90,11 @@ test('snapshot validation refuses malformed state transactionally', () => {
     [(value) => { delete value.modulation; }, result.INVALID_VALUE],
     [(value) => { value.modulation[0].recipe.source = 4; }, result.INVALID_VALUE],
     [(value) => { value.modulation[0].recipe.mechanic.amount = NaN; }, result.INVALID_VALUE],
+    [(value) => { value.modulation[0].recipe.mechanic.amount = 10; }, result.INVALID_VALUE],
+    [(value) => { value.modulation[0].recipe.noise.speed = 100; }, result.INVALID_VALUE],
+    [(value) => { value.modulation[0].recipe.sine.offset = 1000; }, result.INVALID_VALUE],
+    [(value) => { value.modulation[0].recipe.sine.axis = [100, 0, 0]; }, result.INVALID_VALUE],
+    [(value) => { value.modulation[0].recipe.noise.variant = 7; }, result.INVALID_VALUE],
     [(value) => { value.modulation = Array(33).fill(value.modulation[0]); }, result.INVALID_LENGTH],
     [(value) => { value.runtime.pop(); }, result.INVALID_VALUE],
     [(value) => { value.runtime[0].state.walkTime = -1; }, result.INVALID_VALUE],
@@ -101,6 +106,10 @@ test('snapshot validation refuses malformed state transactionally', () => {
     assert.equal(restore(candidate), expected);
     assert.deepEqual(capture(), previous);
   }
+  const accepted = structuredClone(previous);
+  accepted.modulation[0].recipe.mechanic.amount = 3;
+  assert.equal(restore(accepted), result.APPLIED);
+  assert.equal(capture().modulation[0].recipe.mechanic.amount, 3);
 });
 
 test('snapshot capability handles reject stale effect and geometry instances', () => {
