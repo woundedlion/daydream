@@ -1,7 +1,7 @@
 //
-// Daydream.advanceFrameClock: accrues elapsed time, clamps the backlog, and
-// consumes at most one frame interval per call. Run via prototype.call over a
-// stubbed `this`.
+// Daydream.advanceFrameClock advances at most one frame per call. The ordinary
+// clock clamps the backlog and consumes one interval; POV fidelity drops overdue
+// whole intervals and keeps the sweep phase.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Daydream } from '../src/renderer/driver.js';
