@@ -35,6 +35,18 @@ const SCRATCH_FILENAME = 'scratch.shader.json';
 export const SHADER_LINK_DEBOUNCE_MS = 200;
 export const SHADER_LINK_MAX_WAIT_MS = 1000;
 
+/** @param {*} expected @param {*} actual @returns {boolean} Float32 snapshot equality. */
+function snapshotValueEqual(expected, actual) {
+  if (typeof expected === 'number' && typeof actual === 'number')
+    return Math.fround(expected) === Math.fround(actual);
+  if (expected === null || actual === null || typeof expected !== 'object'
+      || typeof actual !== 'object') return expected === actual;
+  if (Array.isArray(expected) !== Array.isArray(actual)) return false;
+  const keys = Object.keys(expected);
+  return keys.length === Object.keys(actual).length
+    && keys.every((key) => Object.hasOwn(actual, key) && snapshotValueEqual(expected[key], actual[key]));
+}
+
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[], optionValues?: number[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string, diagnostics?: *, status?: string}} CompiledDocument */
 
@@ -673,6 +685,7 @@ export function createShaderDocumentController({
       const snapshot = session.chainSnapshot;
       const values = new Map(snapshot.parameters.map((/** @type {*} */ entry) => [entry.name, entry.value]));
       if (!expected || JSON.stringify(expected.chain) !== JSON.stringify(snapshot.chain)
+          || !snapshotValueEqual(expected.modulation, snapshot.modulation)
           || expected.parameters.length !== values.size
           || expected.parameters.some((/** @type {*} */ entry) => entry.value !== Math.fround(values.get(entry.name)))) {
         showError('The shader link snapshot does not match its document and preset.');

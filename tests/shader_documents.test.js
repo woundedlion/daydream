@@ -2264,6 +2264,32 @@ test('a linked runtime snapshot that disagrees with its document retains the ori
   assert.equal(harness.win.location.hash, hash);
 });
 
+test('a linked modulation recipe must match its document before restoration', async () => {
+  const seed = await editorWorkbench({source: null});
+  const original = await decodeShaderStateHash(seed.win.location.hash);
+  assert.ok(original.chainSnapshot.modulation.length > 0);
+  for (const change of [
+    (recipe) => { recipe.mechanic.amount += 0.25; },
+    (recipe) => { recipe.sine.offset += 0.25; },
+    (recipe) => { recipe.noise = null; },
+  ]) {
+    const state = structuredClone(original);
+    change(state.chainSnapshot.modulation[0].recipe);
+    const hash = await encodeShaderStateHash(state);
+    const harness = await editorWorkbench({source: null, hash});
+    assert.equal(harness.controller.preservesOriginalLink(), true);
+    assert.equal(harness.win.location.hash, hash);
+    assert.match(harness.elements.get('shader-document-status').textContent, /does not match/);
+  }
+  const rounded = structuredClone(original);
+  const recipe = rounded.chainSnapshot.modulation[0].recipe;
+  recipe.noise.scale += 1e-8;
+  rounded.chainSnapshot.modulation[0].recipe = Object.fromEntries(Object.entries(recipe).reverse());
+  const harness = await editorWorkbench({source: null, hash: await encodeShaderStateHash(rounded)});
+  assert.equal(harness.controller.preservesOriginalLink(), false);
+  assert.doesNotMatch(harness.elements.get('shader-document-status').textContent, /does not match/);
+});
+
 test('abandoning a refused link reports its release once', async () => {
   let releases = 0;
   const harness = await editorWorkbench({ source: null,
