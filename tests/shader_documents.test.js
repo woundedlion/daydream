@@ -1903,6 +1903,49 @@ test('a refused modulation source batch preserves both fields and the visible No
   assert.equal(groups.find((group) => group.getAttribute('aria-label') === 'Interference · wave A').hidden, true);
 });
 
+test('lightness lift preserves the noise recipe and clamps only strength in one undo', async () => {
+  const harness = await editorWorkbench();
+  const edit = stageEditor(harness, 'colorize');
+  edit('colorize.modulation-amount', 2);
+  edit('colorize.pattern-noise-variant', 'octave-contour');
+  edit('colorize.pattern-noise-basis', 'fbm3');
+  edit('colorize.pattern-contrast', 2);
+  const original = savedValues(harness);
+  const batches = [];
+  const apply = harness.engine.bindings.setShaderChainParameters;
+  harness.engine.bindings.setShaderChainParameters = (writes) => {
+    batches.push(writes);
+    return apply(writes);
+  };
+  edit('colorize.modulation-mechanic', 'positive-lightness-lift');
+  assert.deepEqual(batches, [[
+    { name: 'colorize.modulation-mechanic', value: 1 },
+    { name: 'colorize.modulation-amount', value: 1 },
+  ]]);
+  const values = savedValues(harness);
+  assert.equal(values['colorize.modulation-mechanic'], 'positive-lightness-lift');
+  assert.equal(values['colorize.modulation-amount'], 1);
+  assert.equal(values['colorize.pattern-noise-variant'], 'octave-contour');
+  assert.equal(values['colorize.pattern-noise-basis'], 'fbm3');
+  assert.equal(values['colorize.pattern-contrast'], 2);
+  harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
+  assert.deepEqual(savedValues(harness), original);
+});
+
+test('baked sampling clamps an existing direct Noise scale in the same edit', async () => {
+  const harness = await editorWorkbench();
+  const edit = stageEditor(harness, 'colorize');
+  edit('colorize.modulation-evaluation', 'direct');
+  edit('colorize.pattern-scale', 32);
+  edit('colorize.modulation-evaluation', 'baked-cube');
+  assert.equal(savedValues(harness)['colorize.pattern-scale'], 8);
+  assert.equal(displayedParameter(harness, 'colorize', 'colorize.pattern-scale'), '8');
+  harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
+  const values = savedValues(harness);
+  assert.equal(values['colorize.pattern-scale'], 32);
+  assert.equal(values['colorize.modulation-evaluation'], 'direct');
+});
+
 // A chip control's edit is a document edit, and the engine write is its
 // side effect, so Save reads the document and nothing else.
 test('a chip control writes the active preset and survives Save without an engine read', async () => {

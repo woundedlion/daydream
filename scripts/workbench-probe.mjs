@@ -910,9 +910,68 @@ export async function probeColorCard(tab) {
   return failures;
 }
 
+/** @param {import('puppeteer-core').Page} tab @returns {Promise<string[]>} */
+export async function probeNoiseScaleDrag(tab) {
+  const { failures, check } = checks();
+  await tab.select('#shader-document-select', 'grid-space');
+  await tab.waitForFunction(() => document.getElementById('shader-document-status')
+    ?.textContent.startsWith('Grid Space'));
+  await tab.$eval('.chain-chip[data-label="colorize"] .chain-chip-pin', (node) => node.click());
+  const selector = '[data-parameter="colorize.pattern-scale"] input[type="range"]';
+  await tab.$eval(selector, (node) => node.scrollIntoView({ block: 'center' }));
+  const start = await tab.$eval(selector, (node) => {
+    node.dataset.dragProbe = 'noise-scale';
+    const box = node.getBoundingClientRect();
+    return { x: box.left, y: box.top + box.height / 2, width: box.width,
+      fraction: (Number(node.value) - Number(node.min)) / (Number(node.max) - Number(node.min)),
+      scroll: document.querySelector('.chain-strip-viewport').scrollTop };
+  });
+  await tab.mouse.move(start.x + 8 + start.fraction * (start.width - 16), start.y);
+  await tab.mouse.down();
+  await tab.mouse.move(start.x + start.width * 0.8, start.y, { steps: 15 });
+  await tab.mouse.up();
+  const edited = await tab.$eval(selector, (node) => ({
+    retained: node.dataset.dragProbe === 'noise-scale', value: Number(node.value),
+    scroll: document.querySelector('.chain-strip-viewport').scrollTop,
+    status: document.getElementById('shader-document-status').dataset.status,
+  }));
+  check(edited.retained && Math.abs(edited.scroll - start.scroll) < 1,
+    'dragging Noise scale keeps the slider mounted and the column at the same scroll position');
+  check(edited.value > 3 && edited.value <= 8 && edited.status === 'ok',
+    'the Noise scale drag changes the value within the baked sampling limit');
+  const parameter = (field) => `[data-parameter="colorize.${field}"]`;
+  await tab.select(`${parameter('pattern-noise-variant')} select`, 'octave-contour');
+  await tab.select(`${parameter('pattern-noise-basis')} select`, 'fbm3');
+  for (const [field, value] of [['pattern-contrast', '2'], ['modulation-amount', '2']]) {
+    await tab.$eval(`${parameter(field)} .chain-param-value`, (node, value) => {
+      node.value = value;
+      node.dispatchEvent(new Event('change', { bubbles: true }));
+    }, value);
+  }
+  await tab.select(`${parameter('modulation-mechanic')} select`, 'positive-lightness-lift');
+  check(await tab.$eval(`${parameter('modulation-mechanic')} select`, (node) => node.value)
+      === 'positive-lightness-lift'
+      && await tab.$eval(`${parameter('pattern-noise-basis')} select`, (node) => node.value) === 'fbm3'
+      && await tab.$eval(`${parameter('pattern-contrast')} .chain-param-value`, (node) => Number(node.value)) === 2,
+    'lightness lift preserves the layered noise basis and contrast');
+  let recipe;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const state = await decodeShaderStateHash(await tab.evaluate(() => location.hash));
+    recipe = state?.chainSnapshot?.modulation.find((entry) => entry.instance === 'colorize')?.recipe;
+    if (recipe?.mechanic.kind === 1) break;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  check(recipe?.mechanic.kind === 1 && recipe.mechanic.amount === 1
+      && recipe.noise.variant === 1 && recipe.noise.basis === 1 && recipe.noise.contrast === 2
+      && await tab.$eval('#shader-document-status', (node) => node.dataset.status) === 'ok',
+    'the live engine and share link admit layered noise with lightness lift');
+  return failures;
+}
+
 export async function runWorkbenchSections(open, sections = [
   probeDocumentActions, probeStripHistory, probeStrip, probeParity, probeSnapshotImport, probeStartupPersistence,
   probeColorCard,
+  probeNoiseScaleDrag,
 ]) {
   const failures = [];
   for (const section of sections) {

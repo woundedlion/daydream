@@ -564,8 +564,24 @@ export function createChainStrip({
       const label = id.slice(0, id.indexOf('.'));
       const color = chain.find((entry) => entry.label === label)?.operator
         === 'colorize.generated-palette.v3';
+      const field = fieldOf(id);
+      if (color && ['pattern-scale', 'modulation-amount'].includes(field)) {
+        const domain = declarations.find((parameter) => parameter.id === id)?.domain;
+        let minimum = Number(domain?.minimum);
+        let maximum = Number(domain?.maximum);
+        if (field === 'pattern-scale' && values[`${label}.modulation-evaluation`] === 'baked-cube')
+          maximum = Math.min(maximum, 8);
+        if (field === 'modulation-amount' && values[`${label}.modulation-mechanic`] !== 'hue-rotation') {
+          minimum = Math.max(minimum, 0);
+          maximum = Math.min(maximum, 1);
+        }
+        for (const control of row.querySelectorAll('input')) {
+          control.min = String(minimum);
+          control.max = String(maximum);
+        }
+      }
       row.hidden = color && (off.has(id)
-        || colorParameterHidden(fieldOf(id), (field) => values[`${label}.${field}`]));
+        || colorParameterHidden(field, (field) => values[`${label}.${field}`]));
       const shown = row.querySelector('.chain-param-note');
       const live = parameterLive(id);
       for (const control of row.querySelectorAll('input, select')) control.disabled = !live;

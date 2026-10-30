@@ -1363,6 +1363,43 @@ test('Color source changes reveal only their own controls and preserve hidden va
     assert.equal(rowFor(h, 'colorize', `colorize.${field}`).hidden, false);
 });
 
+test('Noise scale follows the sampling limit without replacing its controls', async () => {
+  const h = await makeStrip({ writeThrough: true });
+  const row = rowFor(h, 'colorize', 'colorize.pattern-scale');
+  const slider = controlIn(row);
+  const readout = row.querySelector('.chain-param-value');
+  assert.equal(slider.max, '8');
+  assert.equal(readout.max, '8');
+  readout.value = '20';
+  readout.dispatch('change');
+  assert.equal(h.store.document().preset_bank.presets[0].values['colorize.pattern-scale'], 8);
+  const evaluation = controlIn(rowFor(h, 'colorize', 'colorize.modulation-evaluation'));
+  evaluation.value = 'direct';
+  evaluation.dispatch('change');
+  assert.equal(slider.max, '64');
+  assert.equal(readout.max, '64');
+  slider.value = '32';
+  slider.dispatch('input');
+  slider.dispatch('change');
+  assert.equal(h.store.document().preset_bank.presets[0].values['colorize.pattern-scale'], 32);
+  assert.ok(controlIn(rowFor(h, 'colorize', 'colorize.pattern-scale')) === slider);
+});
+
+test('modulation strength follows the selected mechanic range', async () => {
+  const h = await makeStrip();
+  const amount = rowFor(h, 'colorize', 'colorize.modulation-amount');
+  const control = controlIn(rowFor(h, 'colorize', 'colorize.modulation-mechanic'));
+  for (const [mechanic, minimum, maximum] of [
+    ['opacity', '0', '1'], ['positive-lightness-lift', '0', '1'], ['hue-rotation', '-4', '4'],
+  ]) {
+    control.value = mechanic;
+    control.dispatch('change');
+    assert.equal(controlIn(amount).min, minimum);
+    assert.equal(controlIn(amount).max, maximum);
+    assert.equal(amount.querySelector('.chain-param-value').max, maximum);
+  }
+});
+
 test('the inline controls keep their own keys and take no drag', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'camera').dispatch('click');

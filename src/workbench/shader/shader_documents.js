@@ -474,13 +474,15 @@ export function createShaderDocumentController({
       const field = fieldSegment(parameterId);
       const color = document.descriptor.chain.some((/** @type {*} */ entry) =>
         entry.label === label && entry.operator === 'colorize.generated-palette.v3');
-      if (color && field === 'modulation-source') {
-        if (value !== 'noise') values[`${label}.modulation-evaluation`] = 'direct';
-        else if (presetValues[`${label}.pattern-noise-variant`] === 'octave-contour')
-          values[`${label}.modulation-evaluation`] = 'baked-cube';
+      if (color && field === 'modulation-source' && value !== 'noise')
+        values[`${label}.modulation-evaluation`] = 'direct';
+      if (color && field === 'modulation-mechanic' && value !== 'hue-rotation') {
+        const amount = Number(presetValues[`${label}.modulation-amount`] ?? 0);
+        values[`${label}.modulation-amount`] = Math.max(0, Math.min(1, amount));
       }
-      if (color && field === 'pattern-noise-variant' && value === 'octave-contour')
-        values[`${label}.modulation-evaluation`] = 'baked-cube';
+      if (color && values[`${label}.modulation-evaluation`] === 'baked-cube'
+          && Number(presetValues[`${label}.pattern-scale`] ?? 1) > 8)
+        values[`${label}.pattern-scale`] = 8;
       const coupled = Object.keys(values).length > 1;
       if (active.compiledSide) {
         const editedPresetValues = { ...presetValues, [parameterId]: value };
