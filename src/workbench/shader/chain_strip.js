@@ -20,6 +20,7 @@ import {
 /** @typedef {import('./chain_presentation.js').BandLayout} BandLayout */
 
 import { createFrameScheduler } from '../../shared/page_lifecycle.js';
+import { createPointerDrag } from '../../shared/pointer_drag.js';
 
 /**
  * The pipeline strip: the document's operator chain in execution order as chips
@@ -66,6 +67,8 @@ const BYPASS_UNAVAILABLE = 'Bypass applies to the interpreter only: '
 
 const MIN_SCROLL_STEP = 160;
 const SCROLL_STEP_RATIO = 0.75;
+const DRAG_SLOP_PX = 5;
+const DRAG_SCROLL_EDGE_PX = 24;
 
 // Pixels one WheelEvent.DOM_DELTA_LINE notch stands for.
 const WHEEL_LINE_PX = 16;
@@ -133,6 +136,8 @@ export function createChainStrip({
   const rows = new Map();
   /** @type {Set<string>} */
   const pinnedLabels = new Set();
+  /** @type {Array<{remove: () => void}>} */
+  const drags = [];
 
   /**
    * @param {string} tag - Element tag.
@@ -231,6 +236,134 @@ export function createChainStrip({
       : store.replaceSpan(index, gap - index, [...chain.slice(index + 1, gap), entry]);
     if (!result.ok) return report(result);
     return commit(entry.label);
+  };
+
+  /**
+   * @param {*} chip - The movable chip.
+   * @param {*} header - Its drag surface.
+   * @param {number} index - The chip's chain index.
+   * @param {string|null} name - The stage name shown while dragging.
+   * @returns {() => boolean} Whether a completed drag consumes the next click.
+   */
+  const wireChipDrag = (chip, header, index, name) => {
+    let originX = 0;
+    let originY = 0;
+    let offsetX = 0;
+    let offsetY = 0;
+    let dragging = false;
+    let suppressClick = false;
+    /** @type {PointerEvent|null} */
+    let lastPointer = null;
+    /** @type {*|null} */
+    let preview = null;
+    /** @type {*|null} */
+    let marker = null;
+
+    const clearMarker = () => {
+      marker?.classList.remove('chain-chip--drop-before', 'chain-chip--drop-after');
+      marker = null;
+    };
+    const clear = () => {
+      scrollFrame.cancel();
+      lastPointer = null;
+      clearMarker();
+      preview?.remove();
+      preview = null;
+      dragging = false;
+      chip.classList.remove('chain-chip--dragging');
+    };
+    const dropGap = (/** @type {PointerEvent} */ event) => {
+      clearMarker();
+      const band = chip.parentNode;
+      const bounds = band.getBoundingClientRect();
+      const viewport = container.querySelector('.chain-strip-viewport').getBoundingClientRect();
+      if (event.clientX < bounds.left || event.clientX > bounds.right
+          || event.clientY < Math.max(bounds.top, viewport.top)
+          || event.clientY > Math.min(bounds.bottom, viewport.bottom)) return null;
+      const siblings = [...band.querySelectorAll('.chain-chip')];
+      const before = siblings.find((other) => {
+        const rect = other.getBoundingClientRect();
+        return event.clientY < rect.top + rect.height / 2;
+      });
+      const target = before ?? siblings[siblings.length - 1];
+      const gap = Number(target.dataset.index) + (before ? 0 : 1);
+      if (gap === index || gap === index + 1) return null;
+      marker = target;
+      marker.classList.add(before ? 'chain-chip--drop-before' : 'chain-chip--drop-after');
+      return gap;
+    };
+    const scrollViewport = (/** @type {PointerEvent} */ event) => {
+      const viewport = container.querySelector('.chain-strip-viewport');
+      const bounds = viewport.getBoundingClientRect();
+      if (event.clientX < bounds.left || event.clientX > bounds.right) return false;
+      const direction = event.clientY < bounds.top + DRAG_SCROLL_EDGE_PX ? -1
+        : event.clientY > bounds.bottom - DRAG_SCROLL_EDGE_PX ? 1 : 0;
+      const before = viewport.scrollTop;
+      viewport.scrollTop = Math.max(0, Math.min(
+        viewport.scrollHeight - viewport.clientHeight,
+        before + direction * DRAG_SCROLL_EDGE_PX));
+      return viewport.scrollTop !== before;
+    };
+    const scrollFrame = createFrameScheduler(() => {
+      if (lastPointer === null || !scrollViewport(lastPointer)) return;
+      dropGap(lastPointer);
+      scrollFrame();
+    });
+    const drag = createPointerDrag({
+      element: header,
+      onStart(event) {
+        suppressClick = false;
+        const target = /** @type {Element} */ (event.target);
+        if (target.closest('button, input, select, textarea, label, a')) return false;
+        originX = event.clientX;
+        originY = event.clientY;
+        const rect = header.getBoundingClientRect();
+        offsetX = originX - rect.left;
+        offsetY = originY - rect.top;
+        return true;
+      },
+      onMove(event) {
+        if (!dragging) {
+          if (Math.hypot(event.clientX - originX, event.clientY - originY) < DRAG_SLOP_PX) return;
+          dragging = true;
+          suppressClick = true;
+          focusChip(index);
+          chip.classList.add('chain-chip--dragging');
+          preview = el('div', 'chain-drag-preview');
+          preview.setAttribute('aria-hidden', 'true');
+          preview.textContent = name;
+          preview.style.width = `${header.getBoundingClientRect().width}px`;
+          doc.body.appendChild(preview);
+        }
+        preview.style.left = `${event.clientX - offsetX}px`;
+        preview.style.top = `${event.clientY - offsetY}px`;
+        lastPointer = event;
+        if (scrollViewport(event)) scrollFrame();
+        dropGap(event);
+      },
+      onEnd(event) {
+        if (!dragging) return;
+        const gap = event === null ? null : dropGap(event);
+        clear();
+        if (gap !== null) moveChip(index, gap);
+      },
+      onCancel: clear,
+    });
+    const cancelKeydown = (/** @type {*} */ event) => {
+      if (event.key !== 'Escape' || !dragging) return;
+      event.preventDefault();
+      drag.stop();
+    };
+    chip.addEventListener('keydown', cancelKeydown);
+    drags.push({ remove() {
+      chip.removeEventListener('keydown', cancelKeydown);
+      drag.remove();
+    } });
+    return () => {
+      const consumed = suppressClick;
+      suppressClick = false;
+      return consumed;
+    };
   };
 
   /**
@@ -933,32 +1066,6 @@ export function createChainStrip({
         toggleBypass(entry.label);
       });
       header.appendChild(toggle);
-      const earlier = el('button', 'chain-chip-move');
-      earlier.type = 'button';
-      earlier.setAttribute('tabindex', '0');
-      earlier.setAttribute('aria-keyshortcuts', 'Alt+ArrowUp');
-      earlier.textContent = '↑';
-      earlier.disabled = !sharesBand(index, -1);
-      earlier.setAttribute('aria-label', `Move ${op.name} · ${entry.label} earlier`);
-      earlier.setAttribute('title', 'Move earlier');
-      earlier.addEventListener('click', (/** @type {*} */ event) => {
-        event.stopPropagation();
-        moveChip(index, index - 1);
-      });
-      const later = el('button', 'chain-chip-move');
-      later.type = 'button';
-      later.setAttribute('tabindex', '0');
-      later.setAttribute('aria-keyshortcuts', 'Alt+ArrowDown');
-      later.textContent = '↓';
-      later.disabled = !sharesBand(index, 1);
-      later.setAttribute('aria-label', `Move ${op.name} · ${entry.label} later`);
-      later.setAttribute('title', 'Move later');
-      later.addEventListener('click', (/** @type {*} */ event) => {
-        event.stopPropagation();
-        moveChip(index, index + 2);
-      });
-      header.appendChild(earlier);
-      header.appendChild(later);
     }
 
     const pin = el('button', 'chain-chip-pin');
@@ -998,7 +1105,15 @@ export function createChainStrip({
     chip.appendChild(header);
     chip.appendChild(paramsElement(entry, declared));
 
+    const movable = !crossing && (sharesBand(index, -1) || sharesBand(index, 1));
+    header.classList.toggle('chain-chip-header--draggable', movable);
+    const consumeDragClick = movable ? wireChipDrag(chip, header, index, op.name) : () => false;
     chip.addEventListener('click', (/** @type {*} */ event) => {
+      if (consumeDragClick()) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       const clickedHeader = event.target === chip
         || event.target?.closest?.('.chain-chip-header') === header;
       if (clickedHeader) select(entry.label);
@@ -1071,6 +1186,8 @@ export function createChainStrip({
     const scrolled = Number(
       container.querySelector('.chain-strip-viewport')?.scrollTop ?? 0);
     palette = null;
+    for (const drag of drags) drag.remove();
+    drags.length = 0;
     const layout = bandLayout();
     rows.clear();
 
@@ -1254,6 +1371,8 @@ export function createChainStrip({
       pendingSliderEdit = null;
       container.removeEventListener('keydown', historyKeydown);
       doc.removeEventListener('pointerdown', pointerDown, true);
+      for (const drag of drags) drag.remove();
+      drags.length = 0;
       container.replaceChildren();
     },
   };

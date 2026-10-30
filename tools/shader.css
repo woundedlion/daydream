@@ -314,6 +314,54 @@
   cursor: pointer;
 }
 
+.chain-chip-header--draggable {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.chain-chip--dragging {
+  opacity: 0.5;
+}
+
+.chain-chip--dragging .chain-chip-header {
+  cursor: grabbing;
+}
+
+.chain-drag-preview {
+  position: fixed;
+  z-index: 1000;
+  box-sizing: border-box;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.25rem;
+  background: var(--panel-bg);
+  color: var(--bright-text);
+  font-size: 0.75rem;
+  box-shadow: 0 3px 12px #0008;
+  pointer-events: none;
+}
+
+.chain-chip--drop-before::before,
+.chain-chip--drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.chain-chip--drop-before::before {
+  top: -5px;
+}
+
+.chain-chip--drop-after::after {
+  bottom: -5px;
+}
+
 .chain-chip-name {
   min-width: 0;
   white-space: normal;
@@ -352,8 +400,7 @@
 
 .chain-chip-pin,
 .chain-chip-remove,
-.chain-chip-bypass,
-.chain-chip-move {
+.chain-chip-bypass {
   margin: 0;
   display: inline-grid;
   place-items: center;
@@ -379,14 +426,11 @@
 .chain-chip-remove:hover,
 .chain-chip-remove:focus-visible,
 .chain-chip-bypass:hover:not(:disabled),
-.chain-chip-bypass:focus-visible,
-.chain-chip-move:hover:not(:disabled),
-.chain-chip-move:focus-visible {
+.chain-chip-bypass:focus-visible {
   border-color: var(--accent);
   color: var(--bright-text);
 }
 
-.chain-chip-move:disabled,
 .chain-chip-bypass:disabled {
   color: var(--panel-border);
   cursor: default;

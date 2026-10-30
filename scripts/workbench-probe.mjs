@@ -54,8 +54,7 @@ export async function probeStrip(tab) {
     'the local effect panel is absent');
   check(await tab.$('#gui-container > .global-gui') !== null,
     'global controls remain mounted');
-  // The strip is the only chain region the page mounts: no stage library
-  // panel and no drag-and-drop insertion.
+  // Insertion stays in the strip; native HTML dragging is disabled.
   const regions = await tab.$$eval('.main-area > *',
     (nodes) => nodes.map((node) => node.id).join());
   const draggable = await tab.$('#chain-strip [draggable="true"]');
@@ -90,9 +89,9 @@ export async function probeStrip(tab) {
       projectSelector: getComputedStyle(functionLabel).display,
     };
   });
-  check(closedHeaders.icons.join('') === '◉↑↓×'
+  check(closedHeaders.icons.join('') === '◉×'
       && closedHeaders.rotateChildren.join(' ') === 'chain-chip-name '
-        + 'chain-chip-bypass chain-chip-move chain-chip-move chain-chip-pin chain-chip-remove'
+        + 'chain-chip-bypass chain-chip-pin chain-chip-remove'
       && closedHeaders.projectChildren.join(' ') === 'chain-chip-function-label chain-chip-pin'
       && closedHeaders.projectPrefix === 'Projection: '
       && closedHeaders.projectSelector !== 'none',
@@ -148,7 +147,7 @@ export async function probeStrip(tab) {
   check(Math.abs(openCard.width - closedCard.width) < 1
       && Math.abs(openHeader.width - closedHeader.width) < 1
       && Math.abs(openHeader.height - closedHeader.height) < 1,
-  `the header stays ${Math.round(openHeader.width)}?${Math.round(openHeader.height)}px when open`);
+  `the header stays ${Math.round(openHeader.width)} x ${Math.round(openHeader.height)}px when open`);
   check(await tab.$eval(projectChip, (node) =>
     node.classList.contains('chain-chip--expanded')
       && node.querySelector('.chain-chip-pin').getAttribute('aria-pressed') === 'true'
@@ -475,33 +474,101 @@ export async function probeStrip(tab) {
   check(sphereBandAfter.height > sphereBandBefore.height
       && Math.abs(sphereBandAfter.width - sphereBandBefore.width) < 1,
     `adding a stage grows its domain vertically (${Math.round(sphereBandBefore.height)}px → ${Math.round(sphereBandAfter.height)}px)`);
+  await tab.$$eval('.chain-band[data-carrier="sphere"] .chain-chip--expanded .chain-chip-pin',
+    (pins) => pins.forEach((pin) => pin.click()));
   const sphereBefore = await bandChipNames(tab, 'sphere');
-  const moveLater = '.chain-band[data-carrier="sphere"]'
-    + ' .chain-chip-move[aria-label$="later"]:not(:disabled)';
-  await (await tab.waitForSelector(moveLater)).click();
-  await tab.waitForFunction((previous) => [...document.querySelectorAll(
-    '.chain-band[data-carrier="sphere"] .chain-chip-name')].map((node) => node.textContent).join()
-      !== previous, {}, sphereBefore.join());
-  const sphereAfter = await bandChipNames(tab, 'sphere');
-  check(sphereAfter.join() === [...sphereBefore].reverse().join(),
-    `reorder buttons move stages (${sphereAfter.join(', ')})`);
-
-  // Reorder uses buttons or Alt+Arrow; a real press dragged over a second stage in
-  // the same band is how a drop target would show itself.
   const sphereLabels = await tab.$$eval('.chain-band[data-carrier="sphere"] .chain-chip',
     (nodes) => nodes.map((node) => (node instanceof HTMLElement ? node.dataset.label ?? '' : '')));
-  const dragged = await boxOf(tab,
-    `.chain-chip[data-label="${sphereLabels[0]}"] .chain-chip-header`);
-  await tab.mouse.move(centre(dragged).x, centre(dragged).y);
+  const firstHeader = `.chain-chip[data-label="${sphereLabels[0]}"] .chain-chip-header`;
+  const lastHeader = `.chain-chip[data-label="${sphereLabels.at(-1)}"] .chain-chip-header`;
+  const selectedBeforeDrag = await tab.$eval('.chain-chip[aria-current="true"]',
+    (node) => node.getAttribute('data-label')).catch(() => null);
+  const pinState = () => tab.$$eval('.chain-chip-pin',
+    (pins) => pins.map((pin) => `${pin.closest('.chain-chip').getAttribute('data-label')}:${pin.getAttribute('aria-pressed')}`)
+      .sort().join());
+  const pinsBeforeDrag = await pinState();
+  await (await tab.waitForSelector(firstHeader)).scrollIntoView();
+  const dragged = await boxOf(tab, firstHeader);
+  const onto = await boxOf(tab, lastHeader);
+  await tab.mouse.move(dragged.x + 12, centre(dragged).y);
   await tab.mouse.down();
-  const onto = await boxOf(tab,
-    `.chain-chip[data-label="${sphereLabels.at(-1)}"] .chain-chip-header`);
-  await tab.mouse.move(centre(onto).x, centre(onto).y, { steps: 8 });
+  await tab.mouse.move(onto.x + 12, onto.y + onto.height - 1, { steps: 8 });
+  check(await tab.$('.chain-drag-preview') !== null
+      && await tab.$('.chain-chip--dragging') !== null
+      && await tab.$('.chain-chip--drop-after') !== null,
+  'dragging a header shows a moving preview and an insertion marker');
   await tab.mouse.up();
-  await tab.mouse.move(0, 0);
-  check(sphereLabels.length > 1 && (await bandChipNames(tab, 'sphere')).join()
-      === sphereAfter.join(),
-  `dragging ${sphereLabels[0]} over ${sphereLabels.at(-1)} finds no drop target`);
+  const sphereAfter = await bandChipNames(tab, 'sphere');
+  check(sphereAfter.join() === [...sphereBefore].reverse().join(),
+    `dragging a header reorders its stages (${sphereAfter.join(', ')})`);
+  check(await tab.$('.chain-drag-preview, .chain-chip--dragging, .chain-chip--drop-after') === null,
+    'dropping removes the preview and insertion marker');
+  const selectedAfterDrag = await tab.$eval('.chain-chip[aria-current="true"]',
+    (node) => node.getAttribute('data-label')).catch(() => null);
+  check(await pinState() === pinsBeforeDrag && selectedAfterDrag === selectedBeforeDrag,
+    'a completed drag preserves every pin and the selected stage');
+
+  const upward = await boxOf(tab, firstHeader);
+  const beforeFirst = await boxOf(tab, lastHeader);
+  await tab.mouse.move(upward.x + 12, centre(upward).y);
+  await tab.mouse.down();
+  await tab.mouse.move(beforeFirst.x + 12, beforeFirst.y + 1, { steps: 8 });
+  check(await tab.$('.chain-chip--drop-before') !== null,
+    'dragging upward shows the insertion marker before its target');
+  await tab.mouse.up();
+  check((await bandChipNames(tab, 'sphere')).join() === sphereBefore.join(),
+    'dragging a header upward restores the original stage order');
+
+  const cancelFrom = await boxOf(tab, firstHeader);
+  await tab.mouse.move(cancelFrom.x + 12, centre(cancelFrom).y);
+  await tab.mouse.down();
+  await tab.mouse.move(cancelFrom.x + cancelFrom.width + 50, centre(cancelFrom).y, { steps: 8 });
+  await tab.mouse.up();
+  check((await bandChipNames(tab, 'sphere')).join() === sphereBefore.join()
+      && await pinState() === pinsBeforeDrag
+      && await tab.$('.chain-drag-preview') === null,
+  'releasing outside the carrier band cancels reordering without toggling a pin');
+  check(await tab.$('.chain-chip-move') === null,
+    'stage headers expose drag reordering without arrow buttons');
+  await tab.focus('#shader-document-select');
+  const escapeFrom = await boxOf(tab, firstHeader);
+  const escapeTo = await boxOf(tab, lastHeader);
+  await tab.mouse.move(escapeFrom.x + 12, centre(escapeFrom).y);
+  await tab.mouse.down();
+  await tab.mouse.move(escapeTo.x + 12, escapeTo.y + escapeTo.height - 1, {steps: 8});
+  await tab.keyboard.press('Escape');
+  await tab.mouse.up();
+  check(await tab.$('.chain-drag-preview, .chain-chip--dragging') === null
+      && (await bandChipNames(tab, 'sphere')).join() === sphereBefore.join()
+      && await pinState() === pinsBeforeDrag,
+  'Escape cancels a header drag even when focus started outside the tile');
+  await clickHeader(firstHeader);
+  check(await tab.$eval(`.chain-chip[data-label="${sphereLabels[0]}"]`, (node) =>
+    node.classList.contains('chain-chip--expanded')
+      && node.querySelector('.chain-chip-pin').getAttribute('aria-pressed') === 'true'),
+  'an ordinary click on a draggable header still expands and pins its tile');
+  await clickHeader(firstHeader);
+  check(await tab.$eval(`.chain-chip[data-label="${sphereLabels[0]}"]`, (node) =>
+    !node.classList.contains('chain-chip--expanded')
+      && node.querySelector('.chain-chip-pin').getAttribute('aria-pressed') === 'false'),
+  'clicking the draggable header again immediately collapses and unpins it');
+
+  const touchSession = await tab.createCDPSession();
+  await touchSession.send('Emulation.setTouchEmulationEnabled', {enabled: true});
+  try {
+    const touchFrom = await boxOf(tab, firstHeader);
+    const touchTo = await boxOf(tab, lastHeader);
+    const finger = await tab.touchscreen.touchStart(touchFrom.x + 12, centre(touchFrom).y);
+    await finger.move(touchTo.x + 12, touchTo.y + touchTo.height - 1);
+    await finger.end();
+    check((await bandChipNames(tab, 'sphere')).join() === [...sphereBefore].reverse().join()
+        && await pinState() === pinsBeforeDrag,
+    'a touch drag reorders stages without toggling their pins');
+  } finally {
+    await touchSession.send('Emulation.setTouchEmulationEnabled', {enabled: false});
+    await touchSession.detach();
+  }
+
 
   const track = '.chain-chip[data-label="rotate"]'
     + ' .chain-param[data-parameter="rotate.wander"] .chain-param-control';
@@ -992,7 +1059,7 @@ export async function runWorkbenchSections(open, sections = [
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'workbench-probe',
-  minimumChecks: 78,
+  minimumChecks: 108,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'every pipeline control behaved.',

@@ -182,7 +182,7 @@ test('endomorphisms carry controls; sockets carry only valid selectors', async (
   assert.match(remove.getAttribute('aria-label'), /^Remove .+ · lens$/);
   const controls = chipByLabel(h, 'camera').querySelector('.chain-chip-header')
     .querySelectorAll('button');
-  assert.deepEqual(controls.map((button) => button.textContent), ['◉', '↑', '↓', '', '×']);
+  assert.deepEqual(controls.map((button) => button.textContent), ['◉', '', '×']);
 });
 
 test('a socket names the function by the carrier its crossing produces', async () => {
@@ -404,7 +404,7 @@ for (const [backward, forward] of [
   });
 }
 
-test('Alt+Arrow reorders only where the move buttons are enabled', async () => {
+test('Alt+Arrow reorders only within the same carrier band', async () => {
   const h = await makeStrip();
   const untouched = ['camera', 'lens', 'project', 'warp2', 'sample', 'colorize'];
 
@@ -413,8 +413,7 @@ test('Alt+Arrow reorders only where the move buttons are enabled', async () => {
 
   chipByLabel(h, 'warp2').dispatch('keydown', { key: 'ArrowLeft', altKey: true });
   assert.deepEqual(labels(h), untouched, 'a band edge has no neighbour to swap with');
-  const moves = chipByLabel(h, 'warp2').querySelectorAll('.chain-chip-move');
-  assert.deepEqual(moves.map((button) => button.disabled), [true, true]);
+  assert.equal(chipByLabel(h, 'warp2').querySelector('.chain-chip-move'), null);
 
   assert.deepEqual(h.applied, []);
   assert.deepEqual(h.announced, []);
@@ -485,8 +484,30 @@ test('a palette carries its listbox selection on the focused option', async () =
     'the opened palette selects the option it focused, and only that one');
 
   entries[0].dispatch('keydown', { key: 'ArrowDown' });
+  entries[1].dispatch('keydown', { key: 'ArrowUp' });
+  assert.deepEqual(selection(), entries.map((_, at) => String(at === 0)));
+  entries[0].dispatch('keydown', { key: 'ArrowUp' });
+  assert.deepEqual(selection(), entries.map((_, at) => String(at === 0)),
+    'arrow navigation stops at the first option');
+  entries[0].dispatch('keydown', { key: 'ArrowDown' });
   assert.deepEqual(selection(), entries.map((_, at) => String(at === 1)),
     'the selection follows the arrow-key focus');
+});
+
+test('Enter and Space insert and pin the palette choice without pointer activation', async () => {
+  for (const key of ['Enter', ' ']) {
+    const h = await makeStrip();
+    bandFor(h, 'sphere').querySelector('.chain-band-add').dispatch('click');
+    const option = paletteEntries(h).find((entry) => entry.dataset.operator === 'sphere.lens.twist.v2');
+    option.dispatch('keydown', {key});
+    const inserted = h.store.chain().find((entry) => entry.operator === 'sphere.lens.twist.v2');
+    assert.ok(inserted);
+    assert.equal(h.applied.length, 1);
+    assert.equal(h.store.selectedLabel(), inserted.label);
+    assert.equal(chipByLabel(h, inserted.label).querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
+    assert.equal(chipByLabel(h, inserted.label).classList.contains('chain-chip--expanded'), true);
+    assert.equal(paletteOf(h), null);
+  }
 });
 
 test('an open palette is dismissed by an outside press and by losing focus', async () => {
@@ -787,8 +808,8 @@ test('the strip roves between chips and exposes their controls to Tab', async ()
   const h = await makeStrip();
   const strip = h.container.querySelector('.chain-strip');
   const headerControls = strip.querySelectorAll(
-    '.chain-chip-bypass, .chain-chip-move, .chain-chip-remove, .chain-chip-replace');
-  assert.ok(headerControls.length >= 12);
+    '.chain-chip-bypass, .chain-chip-remove, .chain-chip-replace');
+  assert.ok(headerControls.length >= 9);
   assert.deepEqual(
     [...new Set(headerControls.map((node) => node.getAttribute('tabindex')))], ['0'],
     'every chip header control is keyboard tabbable');
@@ -814,31 +835,187 @@ test('a chip selects by click', async () => {
   assert.deepEqual(h.applied, [], 'a selection is no structural edit');
 });
 
-test('endomorphisms carry reorder buttons enabled only toward a same-band neighbour', async () => {
-  const h = await makeStrip();
-  assert.equal(chipByLabel(h, 'camera').querySelectorAll('.chain-chip-move').length, 2);
-  assert.equal(chipByLabel(h, 'lens').querySelectorAll('.chain-chip-move').length, 2);
-  assert.equal(chipByLabel(h, 'warp2').querySelectorAll('.chain-chip-move').length, 2);
-  assert.equal(chipByLabel(h, 'warp2').querySelectorAll('.chain-chip-move')
-    .every((button) => button.disabled), true);
-  assert.equal(chipByLabel(h, 'project').querySelectorAll('.chain-chip-move').length, 0);
-
-  const later = chipByLabel(h, 'camera').querySelectorAll('.chain-chip-move')[1];
-  later.dispatch('click');
-  assert.deepEqual(labels(h).slice(0, 2), ['lens', 'camera']);
+const rect = (top, height = 30, left = 10, width = 200) => ({
+  top, bottom: top + height, left, right: left + width, width, height,
+});
+const dragGeometry = (h) => {
+  const band = bandFor(h, 'sphere');
+  band.getBoundingClientRect = () => rect(0, 140);
+  for (const [label, top] of [['camera', 20], ['lens', 70]]) {
+    const chip = chipByLabel(h, label);
+    chip.getBoundingClientRect = () => rect(top);
+    chip.querySelector('.chain-chip-header').getBoundingClientRect = () => rect(top, 20);
+  }
+  const viewport = h.container.querySelector('.chain-strip-viewport');
+  viewport.getBoundingClientRect = () => rect(0, 200);
+  viewport.clientHeight = viewport.scrollHeight = 200;
+};
+const dragPointer = (clientY, extra = {}) => ({
+  clientX: 20, clientY, pointerId: 7, isPrimary: true, button: 0, ...extra,
 });
 
-test('pointer gestures never start a chip drag', async () => {
+test('stage headers replace reorder arrows with a drag surface', async () => {
   const h = await makeStrip();
-  chipByLabel(h, 'lens').dispatch('pointerdown',
-    { isPrimary: true, button: 0, pointerId: 7 });
+  assert.equal(h.container.querySelector('.chain-chip-move'), null);
+  for (const label of ['camera', 'lens']) {
+    assert.equal(chipByLabel(h, label).querySelector('.chain-chip-header')
+      .classList.contains('chain-chip-header--draggable'), true);
+  }
+  for (const label of ['project', 'warp2']) {
+    assert.equal(chipByLabel(h, label).querySelector('.chain-chip-header')
+      .classList.contains('chain-chip-header--draggable'), false);
+  }
+});
+
+test('dragging a header reorders its stage before or after another in its band', async () => {
+  for (const [label, from, to, markerClass] of [
+    ['camera', 25, 100, 'chain-chip--drop-after'],
+    ['lens', 75, 25, 'chain-chip--drop-before'],
+  ]) {
+    const h = await makeStrip();
+    chipByLabel(h, 'camera').dispatch('click');
+    dragGeometry(h);
+    const chip = chipByLabel(h, label);
+    const header = chip.querySelector('.chain-chip-header');
+    header.dispatch('pointerdown', dragPointer(from));
+    header.dispatch('pointermove', dragPointer(to));
+    assert.equal(chip.classList.contains('chain-chip--dragging'), true);
+    assert.equal(h.doc.activeElement, chip);
+    assert.equal(h.container.querySelectorAll(`.${markerClass}`).length, 1);
+    assert.equal(h.doc.body.querySelector('.chain-drag-preview').getAttribute('aria-hidden'), 'true');
+    assert.deepEqual(labels(h).slice(0, 2), ['camera', 'lens']);
+    header.dispatch('pointerup', dragPointer(to));
+    assert.deepEqual(labels(h).slice(0, 2), ['lens', 'camera']);
+    assert.equal(h.applied.length, 1);
+    assert.equal(h.store.selectedLabel(), 'camera');
+    assert.equal(chipByLabel(h, 'camera').querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
+    assert.equal(h.doc.activeElement.dataset.label, label);
+    assert.equal(h.doc.body.querySelector('.chain-drag-preview'), null);
+    assert.equal(h.container.querySelector(`.${markerClass}`), null);
+    assert.equal(header.hasPointerCapture(7), false);
+    header.dispatch('click');
+    assert.equal(h.store.selectedLabel(), 'camera');
+  }
+});
+
+test('a header press below the drag threshold still clicks to pin its tile', async () => {
+  const h = await makeStrip();
+  dragGeometry(h);
+  const header = chipByLabel(h, 'camera').querySelector('.chain-chip-header');
+  header.dispatch('pointerdown', dragPointer(25));
+  header.dispatch('pointermove', dragPointer(27));
+  header.dispatch('pointerup', dragPointer(27));
   assert.deepEqual(h.applied, []);
-  assert.deepEqual(h.container.listeners.filter(
-    (listener) => listener.type.startsWith('pointer')), []);
-  for (const chip of chips(h))
-    assert.deepEqual(chip.listeners.filter((listener) => listener.type.startsWith('pointer')), []);
-  assert.equal(h.doc.listenerCount('pointermove'), 0);
-  assert.equal(h.doc.listenerCount('pointerup'), 0);
+  assert.equal(h.doc.body.querySelector('.chain-drag-preview'), null);
+  header.dispatch('click');
+  assert.equal(chipByLabel(h, 'camera').querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
+});
+
+test('header controls and parameters never start a stage drag', async () => {
+  const h = await makeStrip();
+  dragGeometry(h);
+  const chip = chipByLabel(h, 'camera');
+  const header = chip.querySelector('.chain-chip-header');
+  for (const control of [chip.querySelector('.chain-chip-bypass'),
+    chip.querySelector('.chain-chip-pin'), chip.querySelector('.chain-chip-remove'),
+    chip.querySelector('.chain-param-control')]) {
+    const down = control.dispatch('pointerdown', dragPointer(25));
+    header.dispatch('pointermove', dragPointer(100));
+    header.dispatch('pointerup', dragPointer(100));
+    assert.equal(down.defaultPrevented, false);
+    assert.equal(header.hasPointerCapture(7), false);
+    assert.equal(h.doc.body.querySelector('.chain-drag-preview'), null);
+  }
+  assert.deepEqual(h.applied, []);
+});
+
+test('outside, same-position and cross-band drops leave the chain and pin unchanged', async () => {
+  for (const position of [dragPointer(100, {clientX: 300}), dragPointer(-10),
+    dragPointer(160), dragPointer(30), dragPointer(60)]) {
+    const h = await makeStrip();
+    dragGeometry(h);
+    const chip = chipByLabel(h, 'camera');
+    const header = chip.querySelector('.chain-chip-header');
+    header.dispatch('pointerdown', dragPointer(25));
+    header.dispatch('pointermove', position);
+    assert.equal(h.container.querySelector('.chain-chip--drop-before, .chain-chip--drop-after'), null);
+    header.dispatch('pointerup', position);
+    assert.deepEqual(labels(h).slice(0, 2), ['camera', 'lens']);
+    assert.deepEqual(h.applied, []);
+    const click = header.dispatch('click');
+    assert.equal(click.defaultPrevented, true);
+    assert.equal(chip.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'false');
+    header.dispatch('pointerdown', dragPointer(25));
+    header.dispatch('pointerup', dragPointer(25));
+    header.dispatch('click');
+    assert.equal(chipByLabel(h, 'camera').querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
+  }
+});
+
+test('cancelling, rebuilding or destroying a dragged strip clears its preview and capture', async () => {
+  for (const action of ['pointercancel', 'lostpointercapture', 'Escape', 'render', 'destroy']) {
+    const h = await makeStrip();
+    dragGeometry(h);
+    const chip = chipByLabel(h, 'camera');
+    const header = chip.querySelector('.chain-chip-header');
+    header.dispatch('pointerdown', dragPointer(25));
+    header.dispatch('pointermove', dragPointer(100));
+    if (action === 'render' || action === 'destroy') h.strip[action]();
+    else if (action === 'Escape') {
+      assert.equal(chip.dispatch('keydown', {key: 'Escape'}).defaultPrevented, true);
+      assert.equal(header.dispatch('click').defaultPrevented, true);
+    } else header.dispatch(action, dragPointer(100));
+    assert.equal(h.doc.body.querySelector('.chain-drag-preview'), null);
+    assert.equal(chip.classList.contains('chain-chip--dragging'), false);
+    assert.equal(header.hasPointerCapture(7), false);
+    assert.deepEqual(h.applied, []);
+    if (action !== 'destroy') {
+      assert.equal(h.container.querySelector('.chain-chip--drop-before, .chain-chip--drop-after'), null);
+    }
+  }
+});
+
+test('a refused drag reports its legality failure and leaves the chain unchanged', async () => {
+  const h = await makeStrip();
+  dragGeometry(h);
+  const header = chipByLabel(h, 'camera').querySelector('.chain-chip-header');
+  h.store.replaceSpan = () => ({ok: false, diagnostics: [{message: 'move refused'}]});
+  header.dispatch('pointerdown', dragPointer(25));
+  header.dispatch('pointermove', dragPointer(100));
+  header.dispatch('pointerup', dragPointer(100));
+  assert.deepEqual(labels(h).slice(0, 2), ['camera', 'lens']);
+  assert.equal(lastAnnounced(h), 'move refused');
+  assert.deepEqual(h.applied, []);
+  assert.equal(h.doc.body.querySelector('.chain-drag-preview'), null);
+  assert.equal(header.dispatch('click').defaultPrevented, true);
+});
+
+test('a drag scrolls the pipeline near its edges and honors the final release position', async () => {
+  const h = await makeStrip();
+  dragGeometry(h);
+  const viewport = h.container.querySelector('.chain-strip-viewport');
+  viewport.scrollHeight = 500;
+  viewport.scrollTop = 100;
+  const header = chipByLabel(h, 'camera').querySelector('.chain-chip-header');
+  header.dispatch('pointerdown', dragPointer(25));
+  header.dispatch('pointermove', dragPointer(190));
+  assert.equal(viewport.scrollTop, 124);
+  runFrame();
+  assert.equal(viewport.scrollTop, 148);
+  runFrame();
+  assert.equal(viewport.scrollTop, 172);
+  header.dispatch('pointermove', dragPointer(5));
+  assert.equal(viewport.scrollTop, 148);
+  runFrame();
+  assert.equal(viewport.scrollTop, 124);
+  runFrame();
+  assert.equal(viewport.scrollTop, 100);
+  header.dispatch('pointermove', dragPointer(100));
+  assert.equal(viewport.scrollTop, 100);
+  header.dispatch('pointerup', dragPointer(100, {clientX: 300}));
+  runFrame();
+  assert.equal(viewport.scrollTop, 100);
+  assert.deepEqual(h.applied, []);
 });
 
 test('a strip whose first render throws binds nothing to the mount', async () => {
@@ -1653,6 +1830,10 @@ test('parameter and header controls keep a tile pinned without selecting it agai
   assert.equal(chipByLabel(h, 'camera').classList.contains('chain-chip--expanded'), true);
   assert.equal(h.store.selectedLabel(), 'camera');
   assert.deepEqual(h.selections, ['sample', 'camera']);
+  const socket = chipByLabel(h, 'project');
+  socket.querySelector('.chain-chip-replace').dispatch('click');
+  assert.equal(socket.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'false');
+  assert.equal(h.store.selectedLabel(), 'camera');
 });
 
 test('pointer exits, focus changes and outside presses preserve clicked tiles', async () => {
@@ -1673,6 +1854,21 @@ test('pointer exits, focus changes and outside presses preserve clicked tiles', 
     assert.equal(chipByLabel(h, label).classList.contains('chain-chip--expanded'), true);
     assert.equal(chipByLabel(h, label).querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
   }
+});
+
+test('synchronized parameter values update mounted controls without changing pins', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'sample').dispatch('click');
+  const chip = chipByLabel(h, 'sample');
+  const row = rowFor(h, 'sample', 'sample.pattern-freq');
+  const control = controlIn(row);
+  h.strip.syncParameterValues({'sample.pattern-freq': 5.5, 'absent.parameter': 2});
+  assert.equal(control.value, '5.5');
+  assert.equal(row.querySelector('.chain-param-value').value, '5.5');
+  assert.equal(chipByLabel(h, 'sample'), chip);
+  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
+  assert.equal(chip.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(h.edits, []);
 });
 
 test('separate slider drags form separate undo entries', async () => {

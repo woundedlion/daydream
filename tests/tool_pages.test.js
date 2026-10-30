@@ -475,13 +475,13 @@ const CONTRAST_SURFACES = {
     '.chain-scroll-button': '.chain-scroll-button',
     '.chain-scroll-button:hover, .chain-scroll-button:focus-visible': '.chain-scroll-button',
     '.chain-chip': '.chain-chip',
+    '.chain-drag-preview': '.chain-drag-preview',
     '.chain-chip:hover, .chain-chip:focus-visible': '.chain-chip',
     '.chain-chip[aria-current="true"]': '.chain-chip[aria-current="true"]',
     '.chain-chip--bypassed .chain-chip-name': '.chain-chip',
-    '.chain-chip-pin, .chain-chip-remove, .chain-chip-bypass, .chain-chip-move': '.chain-chip',
+    '.chain-chip-pin, .chain-chip-remove, .chain-chip-bypass': '.chain-chip',
     ['.chain-chip-pin:hover, .chain-chip-pin:focus-visible, .chain-chip-remove:hover, .chain-chip-remove:focus-visible,'
-      + ' .chain-chip-bypass:hover:not(:disabled), .chain-chip-bypass:focus-visible,'
-      + ' .chain-chip-move:hover:not(:disabled), .chain-chip-move:focus-visible']: '.chain-chip',
+      + ' .chain-chip-bypass:hover:not(:disabled), .chain-chip-bypass:focus-visible']: '.chain-chip',
     '.chain-chip-pin[aria-pressed="true"], .chain-chip-bypass[aria-pressed="true"]': '.chain-chip',
     '.chain-chip-function-label': '.chain-chip',
     '.chain-chip-replace': '.chain-chip-replace',
@@ -547,7 +547,7 @@ const CONTRAST_EXEMPT = {
       'inactive control, which SC 1.4.3 exempts from the contrast floor',
     '.chain-band-title': 'band tint is 10% carrier over the live canvas',
     '.chain-band-add': 'band tint is 10% carrier over the live canvas',
-    '.chain-chip-move:disabled, .chain-chip-bypass:disabled':
+    '.chain-chip-bypass:disabled':
       'inactive controls, which SC 1.4.3 exempts from the contrast floor',
     '.chain-chip-bypass:disabled[aria-pressed="true"]':
       'inactive control, which SC 1.4.3 exempts from the contrast floor',
