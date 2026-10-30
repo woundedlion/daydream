@@ -204,8 +204,10 @@ export function createShaderDocumentController({
   setParamFilter = () => {},
   onOriginalLinkReleased = () => {},
   fetchText = async (url) => {
-    const response = await fetch(new URL(url, import.meta.url));
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    const assetUrl = new URL(url, import.meta.url);
+    const response = await fetch(assetUrl, { cache: 'no-cache' });
+    if (!response.ok)
+      throw new Error(`${response.status} ${response.statusText} (${assetUrl.pathname})`);
     return response.text();
   },
   importCompiler = () => import('../../../generated/shader/shader_workbench.mjs'),

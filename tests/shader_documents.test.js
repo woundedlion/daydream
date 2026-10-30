@@ -682,7 +682,8 @@ function patternFetch(files, patternCatalog = PATTERN_CATALOG) {
 /**
  * Builds the workbench document controller over the shader.html control set.
  * @param {{files?: Object, engine?: *, patternCatalog?: string, selectEffect?: (effect: string) => boolean,
- *   initialEffect?: string|null, wrapImportCompiler?: (importer: Function) => Function}} [seams]
+ *   initialEffect?: string|null, useDefaultFetch?: boolean,
+ *   wrapImportCompiler?: (importer: Function) => Function}} [seams]
  * @returns {Object} The controller and everything it wrote to.
  */
 function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocument() },
@@ -690,6 +691,7 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
                      patternCatalog = PATTERN_CATALOG,
                      selectEffect = () => true,
                      initialEffect = null,
+                     useDefaultFetch = false,
                      wrapImportCompiler = (f) => f } = {}) {
   const elements = workbenchMounts();
   elements.get('shader-document-save').disabled = true;
@@ -707,7 +709,7 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
     selectEffect: (effect) => { selections.push(effect); return selectEffect(effect); },
     syncEffectGui: () => { ran.gui += 1; },
     invalidate: () => { ran.invalidated += 1; },
-    fetchText: patternFetch(files, patternCatalog),
+    fetchText: useDefaultFetch ? undefined : patternFetch(files, patternCatalog),
     // The fixtures are compiler results already; a document object is the
     // scratch build, which the fake passes through as its own compile.
     importCompiler: wrapImportCompiler(async () => ({
@@ -769,8 +771,37 @@ test('the source catalog lists each document by its product display name', async
     'the page opens rendering the scratch chain');
 });
 
-// init() reports a catalog that never loaded through its boolean return as well
-// as the status element.
+test('catalog requests revalidate cached catalogs and source documents', async (t) => {
+  const read = patternFetch({ 'kaleidoscope_flowers.shader.json': shaderDocument() });
+  const staleCatalog = JSON.parse(PATTERN_CATALOG);
+  staleCatalog.source_documents.KaleidoscopeFlowers = 'removed.shader.json';
+  const requests = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    requests.push([url.pathname.split('/generated/')[1], options?.cache]);
+    if (url.pathname.endsWith('/patterns/catalog.json') && options?.cache !== 'no-cache')
+      return new Response(JSON.stringify(staleCatalog));
+    return new Response(await read(url.href));
+  });
+  const { controller, elements } = workbench({ useDefaultFetch: true });
+
+  assert.equal(await controller.init(), true);
+  assert.deepEqual(requests, [
+    ['shader/engine_catalog.json', 'no-cache'],
+    ['shader/patterns/catalog.json', 'no-cache'],
+    ['shader/patterns/kaleidoscope_flowers.shader.json', 'no-cache'],
+  ]);
+  assert.equal(elements.get('shader-document-select').options.length, 2);
+});
+
+test('a failed catalog request identifies its asset path', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => new Response('', { status: 404 }));
+  const { controller, elements } = workbench({ useDefaultFetch: true });
+
+  assert.equal(await controller.init(), false);
+  assert.match(elements.get('shader-document-error').textContent,
+    /Source catalog failed to load: Error: 404 .*\(.*\/generated\/shader\/engine_catalog\.json\)/);
+});
+
 test('a catalog document that fails to compile reports its diagnostic', async () => {
   const { controller, elements } = workbench({ files: {
     'kaleidoscope_flowers.shader.json': shaderDocument({
