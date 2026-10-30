@@ -1998,7 +1998,7 @@ test('Modulations supports independent ordered Field stages and Hue shift after 
   assert.equal(next.ok, true);
   h.strip.render();
   assert.equal(controlIn(rowFor(h, 'another', 'another.modulation-source')).value, 'noise');
-  chipByLabel(h, 'another').querySelectorAll('.chain-chip-move')[0].dispatch('click');
+  chipByLabel(h, 'another').dispatch('keydown', {key: 'ArrowUp', altKey: true});
   assert.deepEqual(h.store.chain().slice(-3).map((entry) => entry.label), ['another', first, 'hue']);
   chipByLabel(h, first).querySelector('.chain-chip-bypass').dispatch('click');
   assert.equal(h.store.bypassedLabels().includes(first), true);

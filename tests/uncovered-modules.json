@@ -24,10 +24,6 @@
     "reason": "Halt paths are covered by shader_documents.test.js. Remaining gaps include default browser fetch/download callbacks, missing catalog selections, and optional UI mounts; these are partial unit coverage, not a claim that they are unreachable.",
     "branches": 83.7
   },
-  "src/workbench/shader/chain_strip.js": {
-    "reason": "Remaining branches include focus restoration, pointer capture and viewport geometry fallbacks, optional controls, and teardown after DOM removal. The fake DOM covers editing; browser probes cover native focus and pointer behavior.",
-    "branches": 84.59
-  },
   "src/ui/effect_panel_view.js": {
     "reason": "Browser probes exercise focused controller DOM paths.",
     "branches": 81.82

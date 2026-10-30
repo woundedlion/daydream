@@ -1,4 +1,5 @@
 import { closeProbeResources, checks, isMain, measureChecks } from '../scripts/probe_harness.mjs';
+import { encodeShaderStateHash } from '../src/workbench/shader/shader_deeplink.js';
 import { feedbackAtClick, probeColorStrip, probeHueWheel, rgbMovedTogether } from '../scripts/palettes-probe.mjs';
 import { readdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
@@ -10,7 +11,7 @@ beforeEach((t) => {
   const capture = installConsoleCapture('log');
   t.after(capture.restore);
 });
-import { runWorkbenchSections, probeColorCard, probeNoiseScaleDrag, probeDocumentActions, probeSnapshotImport, probeParity, probeStartupPersistence, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
+import { runWorkbenchSections, probeColorCard, probePaletteAndModulations, probeNoiseScaleDrag, probeDocumentActions, probeSnapshotImport, probeParity, probeStartupPersistence, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
 import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
 import {
   probeKeyboardEdits, probeMobilePanel, probePanel, probePresetName, probeSidebar, probeSliderDrag,
@@ -22,6 +23,7 @@ import { scratchDir } from './helpers/fixture_repo.js';
 
 const PROBES = [
   ['workbench-probe.mjs', 'probeColorCard', probeColorCard],
+  ['workbench-probe.mjs', 'probePaletteAndModulations', probePaletteAndModulations],
   ['workbench-probe.mjs', 'probeNoiseScaleDrag', probeNoiseScaleDrag],
   ['workbench-probe.mjs', 'probeDocumentActions', probeDocumentActions],
   ['workbench-probe.mjs', 'probeParity', probeParity],
@@ -352,17 +354,73 @@ test('workbench startup holds only the catalog request and releases it before te
 
 test('the parity probe reports a compiled preset refusal after a successful document load', async () => {
   const selectors = [];
+  const sources = [];
+  let parityReads = 0;
   const failures = await probeParity({
     select: async (selector, value) => {
       assert.equal(selector, '#shader-document-select');
-      assert.equal(value, 'ash-cloud');
+      sources.push(value);
     },
     waitForFunction: async () => {},
     waitForSelector: async (selector) => ({ click: async () => { selectors.push(selector); } }),
+    $: async () => ({}),
     $eval: async (selector) => selector === '#shader-parity-toggle'
-      ? { armed: true, status: 'ok' }
+      ? (++parityReads === 1 ? true : { armed: true, status: 'ok' })
       : { status: 'error', text: 'unknown parameter' },
   });
+  assert.deepEqual(sources, ['ash-cloud', 'alien-core']);
   assert.deepEqual(selectors, ['#shader-parity-toggle']);
   assert.deepEqual(failures, ['the compiled build takes every authored value (unknown parameter)']);
+});
+
+
+test('palette and modulation probe reports a family whose controls fail to appear', async () => {
+  for (const broken of [false, true]) {
+    let family = 'cycling-generated';
+    let stages = [];
+    let bypassed = null;
+    const tab = {
+      select: async (selector, value) => { family = value; },
+      waitForFunction: async () => {},
+      waitForSelector: async () => ({click: async () => {}}),
+      $: async (selector) => selector.includes('colorize') || stages.some((entry) => selector.includes(entry.label)) ? {} : null,
+      async $eval(selector, callback, ...args) {
+        if (selector === '#shader-document-status') return callback({dataset: {status: 'ok'}});
+        if (String(callback).includes('KeyboardEvent')) {
+          stages = [stages[1], stages[0], stages[2]];
+          return;
+        }
+        if (selector.includes('.chain-palette-entry')) {
+          stages.push({label: `stage${stages.length + 1}`,
+            operator: selector.includes('hue-shift') ? 'modulate.hue-shift.v1' : 'modulate.field.v1'});
+          return;
+        }
+        const label = selector.match(/data-label="([^"]+)"/)?.[1];
+        if (selector.includes('.chain-chip-bypass')) bypassed = label;
+        if (selector.includes('.chain-chip-remove')) stages = stages.filter((entry) => entry.label !== label);
+        const field = selector.match(/data-parameter="colorize.([^"]+)"/)?.[1];
+        const visible = {
+          generated: ['palette-harmony'], procedural: ['palette-name'], gradient: ['gradient-start-r'],
+          mutating: ['palette-name-b'], 'cycling-generated': ['palette-mode'],
+        }[family];
+        return callback({hidden: !visible.includes(field) || (broken && family === 'generated'),
+          click() {}, dispatchEvent() {}}, ...args);
+      },
+      async $$eval(selector, callback) {
+        return callback(selector.includes('option') ? Array.from({length: selector.includes('harmony') ? 8 : 27})
+          : stages.map((entry) => ({dataset: {label: entry.label}})));
+      },
+      async evaluate(callback) {
+        const document = {descriptor: {chain: stages}};
+        if (String(callback).includes('location.hash')) return encodeShaderStateHash({document,
+          preset: 'p', bypassed: [bypassed], paused: false, chainSnapshot: {schemaVersion: 3,
+            chain: stages.filter((entry) => entry.label !== bypassed).map(({label, operator}) => ({instance: label, operator})),
+            parameters: [], modulation: [], animationsPaused: false}});
+        if (String(callback).includes('Promise.all')) return JSON.stringify(document);
+      },
+    };
+    const failures = await probePaletteAndModulations(tab);
+    assert.deepEqual(failures, broken
+      ? ['generated reveals its own palette controls and reaches the live engine'] : []);
+  }
 });

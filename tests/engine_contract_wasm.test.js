@@ -496,7 +496,8 @@ test('every catalog operator matches fake snapshot runtime kinds and state keys'
   for (const operator of fake.catalog.operators) {
     const chain = [];
     if (operator.input !== 'sphere') chain.push(DEFAULT_CHAIN[1]);
-    if (operator.input === 'field') chain.push(DEFAULT_CHAIN[2]);
+    if (operator.input === 'field' || operator.input === 'color') chain.push(DEFAULT_CHAIN[2]);
+    if (operator.input === 'color') chain.push(DEFAULT_CHAIN[3]);
     chain.push({ instance: 'target', operator: operator.id });
     if (operator.output === 'sphere') chain.push(DEFAULT_CHAIN[1]);
     if (operator.output === 'sphere' || operator.output === 'plane') chain.push(DEFAULT_CHAIN[2]);
