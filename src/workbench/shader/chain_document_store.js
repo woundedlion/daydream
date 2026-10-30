@@ -124,6 +124,157 @@ export function scratchChainDocument(catalog, chain = DEFAULT_SCRATCH_CHAIN) {
 }
 
 /**
+ * Expands embedded color modulation into ordered editable stages.
+ * @param {*} document - A compiled shader document.
+ * @param {*} catalog - The installed operator catalog.
+ * @returns {*} The original document when no expansion is needed.
+ */
+export function expandColorModulations(document, catalog) {
+  if (!catalog?.operators || !document.descriptor.chain.some((/** @type {ChainEntry} */ entry) =>
+    entry.operator === 'colorize.generated-palette.v3')) return document;
+  const operators = new Map(catalog.operators.map((/** @type {*} */ operator) =>
+    [operator.id, operator]));
+  const fieldOperator = operators.get('modulate.field.v1');
+  const hueOperator = operators.get('modulate.hue-shift.v1');
+  if (!fieldOperator || !hueOperator) return document;
+  const candidate = structuredClone(document);
+  const descriptor = candidate.descriptor;
+  const presets = candidate.preset_bank.presets;
+  const labels = new Set(descriptor.chain.map((/** @type {ChainEntry} */ entry) => entry.label));
+  const defaults = new Map(descriptor.parameters.map((/** @type {ParameterDeclaration} */ parameter) =>
+    [parameter.id, parameter.default]));
+  const colorSchema = operators.get('colorize.generated-palette.v3');
+  let changed = false;
+  /** @type {ChainEntry[]} */
+  const chain = [];
+  for (const entry of descriptor.chain) {
+    chain.push(entry);
+    if (entry.operator !== 'colorize.generated-palette.v3') continue;
+    /** @param {*} preset @param {string} field */
+    const value = (preset, field) => preset.values[`${entry.label}.${field}`]
+      ?? defaults.get(`${entry.label}.${field}`)
+      ?? colorSchema.params.find((/** @type {*} */ parameter) => parameter.id === field)?.default;
+    for (const [operator, amountField, stem] of [
+      [hueOperator, 'hue-shift-amount', 'hue-shift'],
+      [fieldOperator, 'modulation-amount', 'field'],
+    ]) {
+      if (!presets.some((/** @type {*} */ preset) => Number(value(preset, amountField)) !== 0)) continue;
+      let label = stem;
+      for (let suffix = 1; labels.has(label); suffix += 1) label = `${stem}${suffix}`;
+      labels.add(label);
+      chain.push({ label, operator: operator.id });
+      for (const field of operator.params) {
+        const sourceDeclaration = descriptor.parameters.find((/** @type {ParameterDeclaration} */ parameter) =>
+          parameter.id === `${entry.label}.${field.id}`);
+        const declaration = sourceDeclaration ? structuredClone(sourceDeclaration)
+          : parameterFromField(label, field, operator.id);
+        declaration.id = `${label}.${field.id}`;
+        if (declaration.interpolation.group?.startsWith(`${entry.label}.`))
+          declaration.interpolation.group = `${label}.${declaration.interpolation.group.slice(entry.label.length + 1)}`;
+        descriptor.parameters.push(declaration);
+        descriptor.serialization.fields.push(declaration.id);
+        for (const policy of descriptor.path_policies) {
+          if (policy.kind === 'STAGGERED_ORDERED') {
+            const group = declaration.interpolation.group ?? declaration.id;
+            if (!policy.groups.includes(group)) policy.groups.push(group);
+          }
+        }
+        for (const preset of presets)
+          preset.values[declaration.id] = value(preset, field.id) ?? declaration.default;
+      }
+      const modeField = amountField === 'modulation-amount' ? 'modulation-enabled' : 'hue-shift-mode';
+      for (const field of [amountField, modeField]) {
+        if (defaults.has(`${entry.label}.${field}`)) continue;
+        const declaration = parameterFromField(entry.label,
+          colorSchema.params.find((/** @type {*} */ parameter) => parameter.id === field), entry.operator);
+        descriptor.parameters.push(declaration);
+        descriptor.serialization.fields.push(declaration.id);
+        for (const policy of descriptor.path_policies) {
+          if (policy.kind === 'STAGGERED_ORDERED') {
+            const group = declaration.interpolation.group ?? declaration.id;
+            if (!policy.groups.includes(group)) policy.groups.push(group);
+          }
+        }
+      }
+      for (const preset of presets) {
+        preset.values[`${entry.label}.${amountField}`] = 0;
+        preset.values[`${entry.label}.${modeField}`] = modeField === 'modulation-enabled' ? 'disabled' : 'none';
+      }
+      changed = true;
+    }
+  }
+  if (!changed) return document;
+  descriptor.chain = chain;
+  return candidate;
+}
+
+/**
+ * Moves embedded recipe clocks into the stages added by expansion.
+ * @param {*} snapshot - The original executable snapshot.
+ * @param {*} document - Its original document.
+ * @param {*} expanded - The expanded document.
+ * @returns {*} A snapshot matching the expanded chain.
+ */
+export function expandColorModulationSnapshot(snapshot, document, expanded) {
+  if (document === expanded) return snapshot;
+  const result = structuredClone(snapshot);
+  const original = new Set(document.descriptor.chain.map((/** @type {ChainEntry} */ entry) => entry.label));
+  let color = '';
+  for (const entry of expanded.descriptor.chain) {
+    if (entry.operator === 'colorize.generated-palette.v3') color = entry.label;
+    if (original.has(entry.label)) continue;
+    const index = result.chain.findIndex((/** @type {*} */ stage) => stage.instance === color);
+    result.chain.splice(index + 1, 0, { instance: entry.label, operator: entry.operator });
+    if (entry.operator === 'modulate.field.v1') {
+      const recipe = result.modulation.find((/** @type {*} */ stage) => stage.instance === color);
+      if (recipe) {
+        result.modulation.push({ instance: entry.label, recipe: structuredClone(recipe.recipe) });
+        recipe.recipe.enabled = false;
+        recipe.recipe.mechanic.amount = 0;
+      }
+      const runtime = result.runtime?.find((/** @type {*} */ stage) => stage.instance === color);
+      if (runtime) {
+        const field = structuredClone(runtime);
+        field.instance = entry.label;
+        field.state.oscillationPhase = 0;
+        result.runtime.push(field);
+      }
+    } else if (entry.operator === 'modulate.hue-shift.v1') {
+      for (const field of ['hue-shift-mode', 'hue-shift-amount']) {
+        const parameter = result.parameters.find((/** @type {*} */ parameter) => parameter.name === `${color}.${field}`);
+        result.parameters.push({ name: `${entry.label}.${field}`, value: parameter?.value ?? 0 });
+        if (parameter) parameter.value = 0;
+      }
+    }
+  }
+  const positions = new Map(expanded.descriptor.chain.map((/** @type {ChainEntry} */ entry, /** @type {number} */ index) => [entry.label, index]));
+  const order = (/** @type {*} */ a, /** @type {*} */ b) => positions.get(a.instance) - positions.get(b.instance);
+  result.chain.sort(order);
+  result.runtime?.sort(order);
+  result.modulation.sort(order);
+  return result;
+}
+
+/** @param {*} snapshot @param {*} catalog @returns {*} A legacy snapshot with palette-family defaults. */
+export function upgradePaletteSnapshot(snapshot, catalog) {
+  const schema = catalog?.operators?.find((/** @type {*} */ operator) => operator.id === 'colorize.generated-palette.v3');
+  if (!schema?.params.some((/** @type {*} */ field) => field.id === 'palette-type')) return snapshot;
+  const result = structuredClone(snapshot);
+  const names = new Set(result.parameters.map((/** @type {*} */ parameter) => parameter.name));
+  for (const entry of result.chain) {
+    if (entry.operator !== 'colorize.generated-palette.v3' || names.has(`${entry.instance}.palette-type`)) continue;
+    for (const field of schema.params) {
+      if ((!field.id.startsWith('palette-') && !field.id.startsWith('gradient-'))
+          || ['palette-mode', 'palette-chroma', 'palette-mapping'].includes(field.id)) continue;
+      const name = `${entry.instance}.${field.id}`;
+      if (!names.has(name)) result.parameters.push({name, value: field.topology
+        ? field.values.indexOf(field.default) : field.default});
+    }
+  }
+  return result;
+}
+
+/**
  * Creates the chain editor's document state machine: a validated chain
  * document, a selection, a session bypass set and an undo history. Every
  * mutation (`replaceSpan`, the one structural chain edit, plus `relabel` and

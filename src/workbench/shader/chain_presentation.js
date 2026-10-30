@@ -28,7 +28,19 @@ const READOUT_STEPS = 1000;
 
 /** @type {{name: string, fields: string[], source?: string}[]} */
 export const COLOR_PARAMETER_GROUPS = [
-  { name: 'Palette', fields: ['palette-mode', 'palette-chroma'] },
+  { name: 'Palette', fields: ['palette-type', 'palette-mode', 'palette-harmony',
+    'palette-name', 'palette-name-b', 'palette-mutation', 'palette-hue', 'palette-spread',
+    'palette-chroma', 'palette-lightness', 'palette-lightness-range', 'palette-lightness-curve'] },
+  ...['start', 'middle', 'end'].map((stop) => ({ name: `Gradient ${stop}`,
+    fields: ['r', 'g', 'b'].map((channel) => `gradient-${stop}-${channel}`) })),
+  { name: 'Color mapping', fields: ['palette-mapping', 'mapping-frequency', 'mapping-phase',
+    'phase-oscillation-depth', 'phase-oscillation-speed'] },
+  { name: 'Brightness & opacity', fields: ['brightness-envelope', 'brightness-bottom',
+    'brightness-top', 'value-opacity-low', 'value-opacity-high'] },
+];
+
+/** @type {{name: string, fields: string[], source?: string}[]} */
+export const MODULATION_PARAMETER_GROUPS = [
   { name: 'Modulation', fields: ['modulation-enabled', 'modulation-source',
     'modulation-mechanic', 'modulation-amount', 'modulation-evaluation'] },
   { name: 'Noise', source: 'noise', fields: ['pattern-scale', 'pattern-speed',
@@ -45,16 +57,16 @@ export const COLOR_PARAMETER_GROUPS = [
     'grid-speed', 'grid-offset', 'grid-axis-x', 'grid-axis-y', 'grid-axis-z'] },
   { name: 'Grid · wave B', source: 'sphere-smooth-grid', fields: ['grid-frequency-b',
     'grid-offset-b', 'grid-axis-b-x', 'grid-axis-b-y', 'grid-axis-b-z'] },
-  { name: 'Color mapping', fields: ['palette-mapping', 'mapping-frequency', 'mapping-phase',
-    'phase-oscillation-depth', 'phase-oscillation-speed'] },
-  { name: 'Hue shift', fields: ['hue-shift-mode', 'hue-shift-amount'] },
-  { name: 'Brightness & opacity', fields: ['brightness-envelope', 'brightness-bottom',
-    'brightness-top', 'value-opacity-low', 'value-opacity-high'] },
 ];
 
 /** @type {Record<string, string>} */
 export const COLOR_PARAMETER_NAMES = {
-  'palette-mode': 'Harmony', 'palette-chroma': 'Chroma',
+  'palette-type': 'Type', 'palette-mode': 'Harmony', 'palette-harmony': 'Harmony',
+  'palette-chroma': 'Chroma', 'palette-name': 'Palette', 'palette-name-b': 'Second palette',
+  'palette-mutation': 'Blend', 'palette-hue': 'Hue', 'palette-spread': 'Spread',
+  'palette-lightness': 'Lightness', 'palette-lightness-range': 'Lightness range',
+  'palette-lightness-curve': 'Lightness curve',
+  'hue-shift-mode': 'Mode', 'hue-shift-amount': 'Amount',
   'palette-mapping': 'Shape', 'mapping-frequency': 'Repeats', 'mapping-phase': 'Phase',
   'phase-oscillation-depth': 'Phase motion depth', 'phase-oscillation-speed': 'Phase motion speed',
   'modulation-enabled': 'Modulation', 'modulation-source': 'Source',
@@ -70,8 +82,8 @@ export const COLOR_PARAMETER_NAMES = {
  * @param {(field: string) => *} value - Current palette values.
  * @returns {boolean} Whether the selected modulation uses this field.
  */
-export function colorParameterHidden(field, value) {
-  const group = COLOR_PARAMETER_GROUPS.find((group) => group.fields.includes(field));
+export function modulationParameterHidden(field, value) {
+  const group = MODULATION_PARAMETER_GROUPS.find((group) => group.fields.includes(field));
   const modulation = group?.source !== undefined || group?.name === 'Modulation';
   if (modulation && field !== 'modulation-enabled' && value('modulation-enabled') === 'disabled')
     return true;
@@ -79,6 +91,19 @@ export function colorParameterHidden(field, value) {
   if (field === 'modulation-evaluation' && value('modulation-source') !== 'noise') return true;
   return ['pattern-noise-basis', 'pattern-contrast'].includes(field)
     && value('pattern-noise-variant') !== 'octave-contour';
+}
+
+/** @param {string} field @param {(field: string) => *} value @returns {boolean} */
+export function colorParameterHidden(field, value) {
+  if (field.startsWith('hue-shift-') || MODULATION_PARAMETER_GROUPS.some(
+    (group) => group.fields.includes(field))) return true;
+  const type = value('palette-type') ?? 'cycling-generated';
+  if (field === 'palette-mode') return type !== 'cycling-generated';
+  if (['palette-harmony', 'palette-hue', 'palette-spread', 'palette-lightness',
+    'palette-lightness-range', 'palette-lightness-curve'].includes(field)) return type !== 'generated';
+  if (field === 'palette-name') return !['procedural', 'mutating'].includes(type);
+  if (['palette-name-b', 'palette-mutation'].includes(field)) return type !== 'mutating';
+  return field.startsWith('gradient-') && type !== 'gradient';
 }
 
 /**
@@ -162,7 +187,9 @@ export function createChainPresentation({ catalog, chain: readChain, legalSequen
     /** @type {BandLayout[]} */
     const bands = [];
     let index = 0;
-    for (const carrier of catalog.carriers.slice(0, -1)) {
+    for (const carrier of catalog.carriers) {
+      if (carrier === catalog.carriers.at(-1)
+          && !catalog.operators.some((op) => op.input === carrier && op.output === carrier)) continue;
       /** @type {number[]} */
       const gaps = [];
       /** @type {number[]} */

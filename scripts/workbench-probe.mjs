@@ -121,8 +121,8 @@ export async function probeStrip(tab) {
   check(await tab.$('.chain-band[data-carrier="sphere"]') !== null
       && await tab.$('.chain-band[data-carrier="plane"]') !== null,
     'sphere and plane carriers render bands');
-  check(await tab.$('.chain-band[data-carrier="color"]') === null,
-    'the terminal color carrier renders no band');
+  check(await tab.$('.chain-band[data-carrier="color"]') !== null,
+    'Modulations renders after the permanent Color card');
 
   const projectChip = '.chain-chip[data-label="project"]';
   const projectHeader = `${projectChip} .chain-chip-header`;
@@ -917,13 +917,13 @@ export async function probeColorCard(tab) {
   await tab.select('#shader-document-select', 'grid-space');
   await tab.waitForFunction(() => document.getElementById('shader-document-status')
     ?.textContent.startsWith('Grid Space'));
-  const color = '.chain-chip[data-label="colorize"]';
+  const color = '.chain-chip[data-label="field"]';
   await tab.$eval(`${color} .chain-chip-pin`, (node) => node.click());
-  const row = (field) => `${color} [data-parameter="colorize.${field}"]`;
+  const row = (field) => `${color} [data-parameter="field.${field}"]`;
   const visible = (field) => tab.$eval(row(field), (node) => !node.hidden);
   check(await visible('pattern-scale') && !await visible('interference-frequency')
-      && !await visible('hue-shift-amount'),
-    'Grid Space exposes noise controls and hides unused Color settings');
+,
+    'Grid Space exposes Field noise controls and hides unused sources');
   await tab.select(`${row('modulation-source')} select`, 'sphere-interference');
   check(await tab.$eval(`${row('modulation-source')} select`, (node) => node.value)
       === 'sphere-interference' && await visible('interference-frequency')
@@ -939,7 +939,7 @@ export async function probeColorCard(tab) {
   let recipe;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const state = await decodeShaderStateHash(await tab.evaluate(() => location.hash));
-    recipe = state?.chainSnapshot?.modulation.find((entry) => entry.instance === 'colorize')?.recipe;
+    recipe = state?.chainSnapshot?.modulation.find((entry) => entry.instance === 'field')?.recipe;
     if (recipe?.interference.speed === Math.fround(0.01)) break;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
@@ -964,8 +964,8 @@ export async function probeNoiseScaleDrag(tab) {
   await tab.select('#shader-document-select', 'grid-space');
   await tab.waitForFunction(() => document.getElementById('shader-document-status')
     ?.textContent.startsWith('Grid Space'));
-  await tab.$eval('.chain-chip[data-label="colorize"] .chain-chip-pin', (node) => node.click());
-  const selector = '[data-parameter="colorize.pattern-scale"] input[type="range"]';
+  await tab.$eval('.chain-chip[data-label="field"] .chain-chip-pin', (node) => node.click());
+  const selector = '[data-parameter="field.pattern-scale"] input[type="range"]';
   await tab.$eval(selector, (node) => node.scrollIntoView({ block: 'center' }));
   const start = await tab.$eval(selector, (node) => {
     node.dataset.dragProbe = 'noise-scale';
@@ -987,7 +987,7 @@ export async function probeNoiseScaleDrag(tab) {
     'dragging Noise scale keeps the slider mounted and the column at the same scroll position');
   check(edited.value > 3 && edited.value <= 8 && edited.status === 'ok',
     'the Noise scale drag changes the value within the baked sampling limit');
-  const parameter = (field) => `[data-parameter="colorize.${field}"]`;
+  const parameter = (field) => `[data-parameter="field.${field}"]`;
   await tab.select(`${parameter('pattern-noise-variant')} select`, 'octave-contour');
   await tab.select(`${parameter('pattern-noise-basis')} select`, 'fbm3');
   for (const [field, value] of [['pattern-contrast', '2'], ['modulation-amount', '2']]) {
@@ -1005,7 +1005,7 @@ export async function probeNoiseScaleDrag(tab) {
   let recipe;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const state = await decodeShaderStateHash(await tab.evaluate(() => location.hash));
-    recipe = state?.chainSnapshot?.modulation.find((entry) => entry.instance === 'colorize')?.recipe;
+    recipe = state?.chainSnapshot?.modulation.find((entry) => entry.instance === 'field')?.recipe;
     if (recipe?.mechanic.kind === 1) break;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }

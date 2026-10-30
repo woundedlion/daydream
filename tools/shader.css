@@ -688,3 +688,8 @@ select.chain-param-control {
     grid-column: 1 / -1;
   }
 }
+
+[data-carrier="color"] {
+  --carrier: #f2bc63;
+  --carrier-fill: rgb(242 188 99 / 0.1);
+}

@@ -46,10 +46,10 @@ restoreDocumentAfterEach();
 async function makeStrip({
   presetId = null, bypassAvailable = () => true, writeThrough = false, parameterLive = () => true,
   acceptParameter = () => true,
-  source = structuredClone(BASE.document),
+  source = structuredClone(BASE.document), catalog = CATALOG,
 } = {}) {
   const store = await createChainDocumentStore({
-    document: source, catalog: CATALOG });
+    document: source, catalog });
   const container = fakeElement('section', { connected: true });
   const doc = installDocument({
     body: fakeElement('body', { connected: true }),
@@ -66,7 +66,7 @@ async function makeStrip({
     doc,
     container,
     store,
-    catalog: CATALOG,
+    catalog,
     announce: (message) => announced.push(message),
     onApply: () => applied.push(store.programShape().map((entry) => entry.instance)),
     onSelect: (label) => selections.push(label),
@@ -104,10 +104,10 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
 
   const bands = strip.querySelectorAll('.chain-band');
   assert.deepEqual(bands.map((band) => band.dataset.carrier),
-    ['sphere', 'plane', 'field'],
-    'color is the terminal output type, not an editable carrier band');
+    ['sphere', 'plane', 'field', 'color'],
+    'Modulations follows the Color crossing');
   assert.deepEqual(bands.map((band) => band.getAttribute('aria-label')),
-    ['Sphere stages', 'Plane stages', 'Field stages']);
+    ['Sphere stages', 'Plane stages', 'Field stages', 'Modulation stages']);
   for (const band of bands) {
     assert.equal(band.getAttribute('role'), 'group');
     assert.equal(band.querySelector('.chain-band-title').getAttribute('aria-hidden'),
@@ -115,7 +115,7 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
   }
   assert.deepEqual(
     bands.map((band) => band.querySelectorAll('.chain-chip').map((c) => c.dataset.label)),
-    [['camera', 'lens'], ['warp2'], []]);
+    [['camera', 'lens'], ['warp2'], [], []]);
 
   const sockets = strip.children.filter(
     (child) => child.classList?.contains('chain-chip--socket'));
@@ -139,11 +139,11 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
   // One roving-tabindex stop and a + only where an insertion is legal.
   assert.deepEqual(all.filter((chip) => chip.getAttribute('tabindex') === '0')
     .map((chip) => chip.dataset.label), ['camera']);
-  assert.equal(h.container.querySelectorAll('.chain-band-add').length, 3,
+  assert.equal(h.container.querySelectorAll('.chain-band-add').length, 4,
     'each band carries one + insertion control');
   assert.deepEqual(bands.map((band) => band.querySelector('.chain-band-add')
     ?.getAttribute('aria-label') ?? null),
-  ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage']);
+  ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage', 'Add a Modulation stage']);
 });
 
 test('endomorphisms carry controls; sockets carry only valid selectors', async () => {
@@ -212,7 +212,7 @@ test('a carrier the chain passes over has no band', async () => {
 
   assert.deepEqual(
     h.container.querySelectorAll('.chain-band').map((band) => band.dataset.carrier),
-    ['sphere', 'field'],
+    ['sphere', 'field', 'color'],
     'a framed, titled plane band would hold no gap, chip or socket');
 });
 
@@ -1485,36 +1485,19 @@ test('the inline controls read the named preset', async () => {
     .value), 2, 'the second preset’s value, not the first’s');
 });
 
-test('the Color card groups noise controls and hides unused source and topology fields', async () => {
+test('the Color card keeps palette mapping and brightness while hiding embedded modulation', async () => {
   const h = await makeStrip({ writeThrough: true });
-  const groups = () => paramsOf(h, 'colorize').querySelectorAll('.chain-param-group');
-  assert.deepEqual(groups().filter((group) => !group.hidden)
-    .map((group) => group.getAttribute('aria-label')),
-  ['Palette', 'Modulation', 'Noise', 'Color mapping', 'Hue shift', 'Brightness & opacity']);
-  const scale = rowFor(h, 'colorize', 'colorize.pattern-scale');
-  const speed = rowFor(h, 'colorize', 'colorize.pattern-speed');
-  assert.equal(scale.parentNode.getAttribute('aria-label'), 'Noise');
-  assert.equal(controlIn(scale).getAttribute('aria-label'), 'Noise scale (frequency)');
-  assert.equal(controlIn(speed).getAttribute('aria-label'), 'Noise speed');
-  for (const field of ['pattern-scale', 'pattern-speed', 'pattern-noise-variant'])
-    assert.equal(rowFor(h, 'colorize', `colorize.${field}`).hidden, false, field);
-  for (const field of ['sine-frequency', 'interference-frequency', 'grid-frequency',
-    'hue-shift-amount', 'brightness-bottom', 'brightness-top', 'pattern-contrast', 'pattern-noise-basis']) {
-    const row = rowFor(h, 'colorize', `colorize.${field}`);
-    assert.equal(row.hidden, true, field);
-    assert.equal(row.querySelector('.chain-param-note'), null, field);
-  }
-  for (const [field, value] of [['pattern-scale', '2'], ['pattern-speed', '0.0004']]) {
-    const control = controlIn(rowFor(h, 'colorize', `colorize.${field}`));
-    control.value = value;
-    control.dispatch('input');
-    control.dispatch('change');
-    assert.equal(h.store.document().preset_bank.presets[0].values[`colorize.${field}`],
-      Number(value));
-  }
+  const groups = paramsOf(h, 'colorize').querySelectorAll('.chain-param-group');
+  assert.deepEqual(groups.filter((group) => !group.hidden).map((group) => group.getAttribute('aria-label')),
+    ['Palette', 'Color mapping', 'Brightness & opacity']);
+  for (const field of ['modulation-enabled', 'modulation-source', 'pattern-scale', 'pattern-speed',
+    'hue-shift-mode', 'hue-shift-amount'])
+    assert.equal(rowFor(h, 'colorize', `colorize.${field}`).hidden, true, field);
+  assert.equal(rowFor(h, 'colorize', 'colorize.mapping-frequency').hidden, false);
+  assert.equal(rowFor(h, 'colorize', 'colorize.value-opacity-low').hidden, false);
 });
 
-test('Color source changes reveal only their own controls and preserve hidden values through undo', async () => {
+test('embedded Color modulation stays hidden while brightness follows its selector', async () => {
   const h = await makeStrip({ writeThrough: true });
   const edit = (field, value) => {
     const control = controlIn(rowFor(h, 'colorize', `colorize.${field}`));
@@ -1522,31 +1505,17 @@ test('Color source changes reveal only their own controls and preserve hidden va
     control.dispatch('change');
   };
   const noiseScale = controlIn(rowFor(h, 'colorize', 'colorize.pattern-scale')).value;
-  for (const [source, shown, hidden] of [
-    ['directional-sine', 'sine-frequency', 'interference-frequency'],
-    ['sphere-interference', 'interference-frequency', 'grid-frequency'],
-    ['sphere-smooth-grid', 'grid-frequency', 'sine-frequency'],
-    ['noise', 'pattern-scale', 'interference-frequency'],
-  ]) {
-    edit('modulation-source', source);
-    assert.equal(rowFor(h, 'colorize', `colorize.${shown}`).hidden, false);
-    assert.equal(rowFor(h, 'colorize', `colorize.${hidden}`).hidden, true);
-  }
-  assert.equal(controlIn(rowFor(h, 'colorize', 'colorize.pattern-scale')).value, noiseScale);
+  edit('modulation-source', 'sphere-interference');
   edit('modulation-enabled', 'disabled');
-  assert.equal(rowFor(h, 'colorize', 'colorize.modulation-enabled').hidden, false);
   assert.equal(rowFor(h, 'colorize', 'colorize.modulation-source').hidden, true);
   assert.equal(rowFor(h, 'colorize', 'colorize.pattern-scale').hidden, true);
   assert.equal(h.store.undo(), true);
   h.strip.render();
-  assert.equal(rowFor(h, 'colorize', 'colorize.pattern-scale').hidden, false);
   assert.equal(controlIn(rowFor(h, 'colorize', 'colorize.pattern-scale')).value, noiseScale);
-  edit('pattern-noise-variant', 'octave-contour');
-  assert.equal(rowFor(h, 'colorize', 'colorize.pattern-contrast').hidden, false);
-  assert.equal(rowFor(h, 'colorize', 'colorize.pattern-noise-basis').hidden, false);
   edit('hue-shift-mode', 'path-length');
+  assert.equal(rowFor(h, 'colorize', 'colorize.hue-shift-amount').hidden, true);
   edit('brightness-envelope', 'bell');
-  for (const field of ['hue-shift-amount', 'brightness-bottom', 'brightness-top'])
+  for (const field of ['brightness-bottom', 'brightness-top'])
     assert.equal(rowFor(h, 'colorize', `colorize.${field}`).hidden, false);
 });
 
@@ -2001,4 +1970,65 @@ test('Ripple random center toggles manual coordinates and follows synchronized v
   assert.equal(azimuth.hidden, true);
   assert.equal(polar.hidden, true);
   assert.equal(h.store.compile().status, 'VALID');
+});
+
+
+test('Modulations supports independent ordered Field stages and Hue shift after Color', async () => {
+  const h = await makeStrip({writeThrough: true});
+  const band = () => bandFor(h, 'color');
+  assert.equal(band().querySelector('.chain-band-title').textContent, 'Modulations');
+  band().querySelector('.chain-band-add').dispatch('click');
+  const choice = paletteEntries(h).find((entry) => entry.dataset.operator === 'modulate.field.v1');
+  assert.ok(choice);
+  choice.dispatch('click');
+  const first = h.store.chain().at(-1).label;
+  assert.equal(h.store.chain().at(-1).operator, 'modulate.field.v1');
+  const evaluation = controlIn(rowFor(h, first, `${first}.modulation-evaluation`));
+  evaluation.value = 'direct';
+  evaluation.dispatch('change');
+  const source = controlIn(rowFor(h, first, `${first}.modulation-source`));
+  source.value = 'directional-sine';
+  source.dispatch('change');
+  assert.equal(rowFor(h, first, `${first}.sine-frequency`).hidden, false);
+  assert.equal(rowFor(h, first, `${first}.pattern-scale`).hidden, true);
+  const next = h.store.replaceSpan(h.store.chain().length, 0, [
+    {label: 'another', operator: 'modulate.field.v1'},
+    {label: 'hue', operator: 'modulate.hue-shift.v1'},
+  ]);
+  assert.equal(next.ok, true);
+  h.strip.render();
+  assert.equal(controlIn(rowFor(h, 'another', 'another.modulation-source')).value, 'noise');
+  chipByLabel(h, 'another').querySelectorAll('.chain-chip-move')[0].dispatch('click');
+  assert.deepEqual(h.store.chain().slice(-3).map((entry) => entry.label), ['another', first, 'hue']);
+  chipByLabel(h, first).querySelector('.chain-chip-bypass').dispatch('click');
+  assert.equal(h.store.bypassedLabels().includes(first), true);
+  assert.equal(h.store.chain().at(-4).operator, 'colorize.generated-palette.v3');
+  chipByLabel(h, 'hue').querySelector('.chain-chip-remove').dispatch('click');
+  assert.equal(h.store.chain().some((entry) => entry.label === 'hue'), false);
+});
+
+
+test('the Color palette selector supports every family with family-specific controls', async () => {
+  const h = await makeStrip({writeThrough: true});
+  const type = controlIn(rowFor(h, 'colorize', 'colorize.palette-type'));
+  assert.deepEqual(type.children.map((option) => option.value),
+    ['cycling-generated', 'generated', 'procedural', 'gradient', 'mutating']);
+  const visible = (field) => !rowFor(h, 'colorize', `colorize.${field}`).hidden;
+  for (const [family, shown, hidden] of [
+    ['generated', 'palette-harmony', 'palette-name'],
+    ['procedural', 'palette-name', 'palette-harmony'],
+    ['gradient', 'gradient-start-r', 'palette-name'],
+    ['mutating', 'palette-name-b', 'gradient-start-r'],
+    ['cycling-generated', 'palette-mode', 'palette-harmony'],
+  ]) {
+    type.value = family;
+    type.dispatch('change');
+    assert.equal(visible(shown), true, `${family}: ${shown}`);
+    assert.equal(visible(hidden), false, `${family}: ${hidden}`);
+    assert.equal(visible('palette-chroma'), true);
+    assert.equal(visible('palette-mapping'), true);
+    assert.equal(visible('value-opacity-low'), true);
+  }
+  assert.equal(controlIn(rowFor(h, 'colorize', 'colorize.palette-harmony')).children.length, 8);
+  assert.equal(controlIn(rowFor(h, 'colorize', 'colorize.palette-name')).children.length, 27);
 });

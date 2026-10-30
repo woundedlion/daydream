@@ -7,7 +7,8 @@
 import { titleCase } from '../../shared/labels.js';
 import {
   createChainPresentation, deactivatedParameterIds, formatNumericValue, nudgeStep, fieldOf,
-  COLOR_PARAMETER_GROUPS, COLOR_PARAMETER_NAMES, colorParameterHidden,
+  COLOR_PARAMETER_GROUPS, MODULATION_PARAMETER_GROUPS, COLOR_PARAMETER_NAMES,
+  colorParameterHidden, modulationParameterHidden,
 } from './chain_presentation.js';
 
 /** @typedef {import('./chain_presentation.js').CatalogOperator} CatalogOperator */
@@ -688,9 +689,10 @@ export function createChainStrip({
       const label = id.slice(0, id.indexOf('.'));
       const operator = chain.find((entry) => entry.label === label)?.operator;
       const color = operator === 'colorize.generated-palette.v3';
+      const modulation = operator === 'modulate.field.v1';
       const ripple = operator === 'sphere.displace.ripple.v2';
       const field = fieldOf(id);
-      if (color && ['pattern-scale', 'modulation-amount'].includes(field)) {
+      if ((color || modulation) && ['pattern-scale', 'modulation-amount'].includes(field)) {
         const domain = declarations.find((parameter) => parameter.id === id)?.domain;
         let minimum = Number(domain?.minimum);
         let maximum = Number(domain?.maximum);
@@ -707,6 +709,9 @@ export function createChainStrip({
       }
       row.hidden = (color && (off.has(id)
         || colorParameterHidden(field, (field) => values[`${label}.${field}`])))
+        || (modulation && (off.has(id)
+          || modulationParameterHidden(field, (field) => values[`${label}.${field}`])))
+        || (operator === 'modulate.hue-shift.v1' && off.has(id))
         || (ripple && off.has(id) && ['center-azimuth', 'center-polar'].includes(field));
       const shown = row.querySelector('.chain-param-note');
       const live = parameterLive(id);
@@ -873,6 +878,9 @@ export function createChainStrip({
    */
   const paramsElement = (entry, declared) => {
     const color = entry.operator === 'colorize.generated-palette.v3';
+    const modulation = entry.operator === 'modulate.field.v1';
+    const grouped = color || modulation;
+    const parameterGroups = color ? COLOR_PARAMETER_GROUPS : MODULATION_PARAMETER_GROUPS;
     const region = el('div', 'chain-chip-params');
     region.dataset.label = entry.label;
     region.setAttribute('role', 'group');
@@ -885,16 +893,16 @@ export function createChainStrip({
     }
     /** @type {Map<string, *>} */
     const groups = new Map();
-    const ordered = color ? COLOR_PARAMETER_GROUPS.flatMap((group) => group.fields.flatMap(
+    const ordered = grouped ? parameterGroups.flatMap((group) => group.fields.flatMap(
       (field) => declared.filter((parameter) => fieldOf(parameter.id) === field))) : declared;
     for (const declaration of [...ordered, ...declared.filter((parameter) => !ordered.includes(parameter))]) {
       const field = fieldOf(declaration.id);
-      const name = color ? COLOR_PARAMETER_NAMES[field]
+      const name = grouped || entry.operator === 'modulate.hue-shift.v1' ? COLOR_PARAMETER_NAMES[field]
         ?? titleCase(field.replace(/^(sine|interference|grid)-/, '').replace(/-b(?=-|$)/, ''))
         : titleCase(field);
       let parent = region;
-      if (color) {
-        const groupName = COLOR_PARAMETER_GROUPS.find((group) => group.fields.includes(field))?.name
+      if (grouped) {
+        const groupName = parameterGroups.find((group) => group.fields.includes(field))?.name
           ?? 'Other';
         if (!groups.has(groupName)) {
           const group = el('div', 'chain-param-group');
@@ -1129,7 +1137,7 @@ export function createChainStrip({
    * @returns {*|null} The band's insertion affordance, when a stage fits.
    */
   const bandAddButton = (band) => {
-    const title = titleCase(band.carrier);
+    const title = band.carrier === 'color' ? 'Modulation' : titleCase(band.carrier);
     const gap = appendGap(band);
     if (gap === null || !store.legalInsertions(gap).some((entry) => entry.legal))
       return null;
@@ -1236,14 +1244,14 @@ export function createChainStrip({
     strip.setAttribute('aria-label', 'Shader chain');
     const view = { selected, bypassed, tabLabel };
     for (const band of layout) {
-      const title = titleCase(band.carrier);
+      const title = band.carrier === 'color' ? 'Modulation' : titleCase(band.carrier);
       const element = el('div', 'chain-band');
       element.setAttribute('role', 'group');
       element.setAttribute('aria-label', `${title} stages`);
       element.dataset.carrier = band.carrier;
       const heading = el('div', 'chain-band-title');
       heading.setAttribute('aria-hidden', 'true');
-      heading.textContent = title;
+      heading.textContent = band.carrier === 'color' ? 'Modulations' : title;
       element.appendChild(heading);
       for (const chip of band.chips) {
         element.appendChild(chipElement(chip, chain[chip],

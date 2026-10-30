@@ -7,8 +7,9 @@ import { gzipSync } from 'node:zlib';
 
 import { shaderWorkbenchUrl, start } from '../src/app/daydream.js';
 import { WORKBENCH_EFFECTS } from '../src/effects/effect_roster.js';
+import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
-import { scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
+import { scratchChainDocument, expandColorModulations } from '../src/workbench/shader/chain_document_store.js';
 import {
   decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
 } from '../src/workbench/shader/shader_deeplink.js';
@@ -1012,8 +1013,22 @@ test('returning to the scratch source reopens the default chain', async () => {
 
 // ── The pipeline strip over the real store, compiler and engine catalog ────
 
-const KALEIDOSCOPE_HEX_BRIGHT = readFileSync(
+const LEGACY_KALEIDOSCOPE_HEX_BRIGHT = readFileSync(
   new URL('../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8');
+function withoutEmbeddedModulation(source) {
+  const document = JSON.parse(source);
+  for (const parameter of document.descriptor.parameters) {
+    if (parameter.id.endsWith('.modulation-amount') || parameter.id.endsWith('.hue-shift-amount'))
+      parameter.default = 0;
+  }
+  for (const preset of document.preset_bank.presets) {
+    for (const id of Object.keys(preset.values)) {
+      if (id.endsWith('.modulation-amount') || id.endsWith('.hue-shift-amount')) preset.values[id] = 0;
+    }
+  }
+  return exportShaderDocumentJson(document);
+}
+const KALEIDOSCOPE_HEX_BRIGHT = withoutEmbeddedModulation(LEGACY_KALEIDOSCOPE_HEX_BRIGHT);
 const KALEIDOSCOPE_STAINED_GLASS = readFileSync(
   new URL('../generated/shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8');
 // No source documents: no load matches a promoted digest, so parity stays disarmed.
@@ -1064,7 +1079,7 @@ function compiledBuildEngine(source = KALEIDOSCOPE_HEX_BRIGHT) {
  * @returns {Promise<Object>} The controller and everything it wrote to.
  */
 async function editorWorkbench({
-  source = KALEIDOSCOPE_HEX_BRIGHT, patternCatalog = EMPTY_PATTERN_CATALOG, hash = '', search = '?effect=ShaderChain', initialEffect = null, paused = false,
+  source = KALEIDOSCOPE_HEX_BRIGHT, sourceFiles = {}, patternCatalog = EMPTY_PATTERN_CATALOG, hash = '', search = '?effect=ShaderChain', initialEffect = null, paused = false,
   selectEffect = () => true,
   onOriginalLinkReleased = () => {},
   pausedFromEngine = false,
@@ -1143,7 +1158,7 @@ async function editorWorkbench({
     fetchText: patternFetch(
       { 'kaleidoscope_hex_bright.shader.json': KALEIDOSCOPE_HEX_BRIGHT,
         'alien_core.shader.json': JSON.stringify(promotedDocument('alien_core.shader.json')),
-        'grid_space.shader.json': JSON.stringify(promotedDocument('grid_space.shader.json')) }, patternCatalog),
+        'grid_space.shader.json': JSON.stringify(promotedDocument('grid_space.shader.json')), ...sourceFiles }, patternCatalog),
     importCompiler,
     download: (filename, source) => downloads.push([filename, source]),
     win,
@@ -1617,6 +1632,7 @@ test('Kaleidoscope Stained Glass loads its effect preset into the interpreter co
     'warp.mirror-tile.v2',
     'sample.grid.v3',
     'colorize.generated-palette.v3',
+    'modulate.field.v1',
   ]);
   for (const [label, parameterId] of [
     ['camera', 'camera.wander'],
@@ -1862,54 +1878,54 @@ test('Grid Space switches modulation source and sampling atomically with one und
     return apply(writes);
   };
   harness.engine.setParameter = () => ParamSetResult.INADMISSIBLE;
-  const edit = stageEditor(harness, 'colorize');
-  const chip = stripChips(harness).find((chip) => chip.dataset.label === 'colorize');
-  edit('colorize.modulation-source', 'sphere-interference');
-  assert.ok(stripChips(harness).find((chip) => chip.dataset.label === 'colorize') === chip,
-    'the active Color card stays mounted');
+  const edit = stageEditor(harness, 'field');
+  const chip = stripChips(harness).find((chip) => chip.dataset.label === 'field');
+  edit('field.modulation-source', 'sphere-interference');
+  assert.ok(stripChips(harness).find((chip) => chip.dataset.label === 'field') === chip,
+    'the active Field card stays mounted');
   assert.deepEqual(batches, [[
-    { name: 'colorize.modulation-source', value: 2 },
-    { name: 'colorize.modulation-evaluation', value: 0 },
+    { name: 'field.modulation-source', value: 2 },
+    { name: 'field.modulation-evaluation', value: 0 },
   ]]);
   const values = savedValues(harness);
-  assert.equal(values['colorize.modulation-source'], 'sphere-interference');
-  assert.equal(values['colorize.modulation-evaluation'], 'direct');
-  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'colorize')
+  assert.equal(values['field.modulation-source'], 'sphere-interference');
+  assert.equal(values['field.modulation-evaluation'], 'direct');
+  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'field')
     .querySelectorAll('.chain-param');
-  assert.equal(colorRows.find((row) => row.dataset.parameter === 'colorize.modulation-evaluation')
+  assert.equal(colorRows.find((row) => row.dataset.parameter === 'field.modulation-evaluation')
     .querySelector('.chain-param-control').value, 'direct');
   await harness.controller.flushDeepLink();
   const linked = await decodeShaderStateHash(harness.win.location.hash);
-  assert.equal(linked.document.preset_bank.presets[0].values['colorize.modulation-source'],
+  assert.equal(linked.document.preset_bank.presets[0].values['field.modulation-source'],
     'sphere-interference');
   harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
   assert.deepEqual(savedValues(harness), original);
 });
 
 test('a refused modulation source batch preserves both fields and the visible Noise controls', async () => {
-  const harness = await editorWorkbench();
+  const harness = await editorWorkbench({source: JSON.stringify(promotedDocument('grid_space.shader.json'))});
   const original = savedValues(harness);
   harness.engine.bindings.setShaderChainParameters = () => ParamSetResult.INADMISSIBLE;
-  stageEditor(harness, 'colorize')('colorize.modulation-source', 'sphere-interference');
+  stageEditor(harness, 'field')('field.modulation-source', 'sphere-interference');
   assert.match(harness.elements.get('shader-document-status').textContent, /INADMISSIBLE/);
   assert.deepEqual(savedValues(harness), original);
-  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'colorize')
+  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'field')
     .querySelectorAll('.chain-param');
-  assert.equal(colorRows.find((row) => row.dataset.parameter === 'colorize.modulation-source')
+  assert.equal(colorRows.find((row) => row.dataset.parameter === 'field.modulation-source')
     .querySelector('.chain-param-control').value, 'noise');
-  const groups = stripChips(harness).find((chip) => chip.dataset.label === 'colorize')
+  const groups = stripChips(harness).find((chip) => chip.dataset.label === 'field')
     .querySelectorAll('.chain-param-group');
   assert.equal(groups.find((group) => group.getAttribute('aria-label') === 'Noise').hidden, false);
-  assert.equal(groups.find((group) => group.getAttribute('aria-label') === 'Interference · wave A').hidden, true);
+  assert.equal(colorRows.find((row) => row.dataset.parameter === 'field.pattern-scale').hidden, false);
 });
 
 test('lightness lift preserves the noise recipe and clamps only strength in one undo', async () => {
-  const harness = await editorWorkbench();
-  const edit = stageEditor(harness, 'colorize');
-  edit('colorize.modulation-amount', 2);
-  edit('colorize.pattern-noise-variant', 'octave-contour');
-  edit('colorize.pattern-noise-basis', 'fbm3');
-  edit('colorize.pattern-contrast', 2);
+  const harness = await editorWorkbench({source: JSON.stringify(promotedDocument('grid_space.shader.json'))});
+  const edit = stageEditor(harness, 'field');
+  edit('field.modulation-amount', 2);
+  edit('field.pattern-noise-variant', 'octave-contour');
+  edit('field.pattern-noise-basis', 'fbm3');
+  edit('field.pattern-contrast', 2);
   const original = savedValues(harness);
   const batches = [];
   const apply = harness.engine.bindings.setShaderChainParameters;
@@ -1917,33 +1933,33 @@ test('lightness lift preserves the noise recipe and clamps only strength in one 
     batches.push(writes);
     return apply(writes);
   };
-  edit('colorize.modulation-mechanic', 'positive-lightness-lift');
+  edit('field.modulation-mechanic', 'positive-lightness-lift');
   assert.deepEqual(batches, [[
-    { name: 'colorize.modulation-mechanic', value: 1 },
-    { name: 'colorize.modulation-amount', value: 1 },
+    { name: 'field.modulation-mechanic', value: 1 },
+    { name: 'field.modulation-amount', value: 1 },
   ]]);
   const values = savedValues(harness);
-  assert.equal(values['colorize.modulation-mechanic'], 'positive-lightness-lift');
-  assert.equal(values['colorize.modulation-amount'], 1);
-  assert.equal(values['colorize.pattern-noise-variant'], 'octave-contour');
-  assert.equal(values['colorize.pattern-noise-basis'], 'fbm3');
-  assert.equal(values['colorize.pattern-contrast'], 2);
+  assert.equal(values['field.modulation-mechanic'], 'positive-lightness-lift');
+  assert.equal(values['field.modulation-amount'], 1);
+  assert.equal(values['field.pattern-noise-variant'], 'octave-contour');
+  assert.equal(values['field.pattern-noise-basis'], 'fbm3');
+  assert.equal(values['field.pattern-contrast'], 2);
   harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
   assert.deepEqual(savedValues(harness), original);
 });
 
 test('baked sampling clamps an existing direct Noise scale in the same edit', async () => {
-  const harness = await editorWorkbench();
-  const edit = stageEditor(harness, 'colorize');
-  edit('colorize.modulation-evaluation', 'direct');
-  edit('colorize.pattern-scale', 32);
-  edit('colorize.modulation-evaluation', 'baked-cube');
-  assert.equal(savedValues(harness)['colorize.pattern-scale'], 8);
-  assert.equal(displayedParameter(harness, 'colorize', 'colorize.pattern-scale'), '8');
+  const harness = await editorWorkbench({source: JSON.stringify(promotedDocument('grid_space.shader.json'))});
+  const edit = stageEditor(harness, 'field');
+  edit('field.modulation-evaluation', 'direct');
+  edit('field.pattern-scale', 32);
+  edit('field.modulation-evaluation', 'baked-cube');
+  assert.equal(savedValues(harness)['field.pattern-scale'], 8);
+  assert.equal(displayedParameter(harness, 'field', 'field.pattern-scale'), '8');
   harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
   const values = savedValues(harness);
-  assert.equal(values['colorize.pattern-scale'], 32);
-  assert.equal(values['colorize.modulation-evaluation'], 'direct');
+  assert.equal(values['field.pattern-scale'], 32);
+  assert.equal(values['field.modulation-evaluation'], 'direct');
 });
 
 // A chip control's edit is a document edit, and the engine write is its
@@ -2479,8 +2495,8 @@ test('fixed document presets preserve sparse option IDs and refuse numeric gaps'
 });
 
 test('compiled lattice edits update the derived period atomically and reapply', async () => {
-  const source = JSON.stringify(promotedDocument('grid_space.shader.json'));
-  const harness = await editorWorkbench({ source, patternCatalog: JSON.stringify({
+  const source = withoutEmbeddedModulation(JSON.stringify(promotedDocument('grid_space.shader.json')));
+  const harness = await editorWorkbench({ source, sourceFiles: {'grid_space.shader.json': source}, patternCatalog: JSON.stringify({
     source_documents: { 'grid-space': 'grid_space.shader.json' },
     product_group: { children: [{ effect_id: 'grid-space', display_name: 'Grid Space' }] },
   }) });
@@ -2548,5 +2564,59 @@ for (const failure of ['editor', 'runtime']) {
     assert.equal(harness.elements.get('chain-strip').children[0], strip);
     assert.deepEqual(savedValues(harness), previous);
     assert.deepEqual(callWorkbenchBinding(harness.engine, 'getSnapshot', []), snapshot);
+  });
+}
+
+
+test('loading a legacy source previews the same expanded stages that Save records', async () => {
+  const harness = await editorWorkbench({source: LEGACY_KALEIDOSCOPE_HEX_BRIGHT});
+  const expected = expandColorModulations(compileShaderDocument(LEGACY_KALEIDOSCOPE_HEX_BRIGHT,
+    {catalog: JSON.parse(ENGINE_CATALOG)}).document, JSON.parse(ENGINE_CATALOG));
+  assert.deepEqual(harness.engine.chainCalls.at(-1), expected.descriptor.chain.map(({label, operator}) =>
+    ({instance: label, operator})));
+  assert.equal(harness.controller.save(), true);
+  const saved = JSON.parse(harness.downloads.at(-1)[1]);
+  assert.deepEqual(saved.descriptor.chain, expected.descriptor.chain);
+  assert.equal(saved.preset_bank.presets[0].values['colorize.modulation-enabled'], 'disabled');
+  assert.equal(saved.preset_bank.presets[0].values['colorize.modulation-amount'], 0);
+  assert.equal(saved.preset_bank.presets[0].values['field.modulation-amount'],
+    JSON.parse(LEGACY_KALEIDOSCOPE_HEX_BRIGHT).preset_bank.presets[0].values['colorize.modulation-amount']);
+});
+
+for (const route of ['link', 'query']) {
+  test(`legacy ${route} snapshots migrate Field source clocks and preserve their palette`, async () => {
+    const compiled = compileShaderDocument(LEGACY_KALEIDOSCOPE_HEX_BRIGHT, {catalog: JSON.parse(ENGINE_CATALOG)});
+    const legacy = new FakeChainEngine();
+    legacy.setEffect('shader-chain');
+    const presetId = compiled.document.preset_bank.presets[0].preset_id;
+    assert.equal(applyChainDocument({engine: legacy, module: MODULE, compiled, presetId,
+      syncEffectGui() {}, invalidate() {}}), null);
+    const snapshot = callWorkbenchBinding(legacy, 'getSnapshot', [], null);
+    const clock = snapshot.runtime.find((entry) => entry.instance === 'colorize');
+    clock.state.oscillationPhase = 0.37;
+    clock.state.modulation.phaseTurns = 0.63;
+    snapshot.paletteBank.chroma = 0.23;
+    snapshot.parameters = snapshot.parameters.filter(({name}) => {
+      const field = name.split('.')[1];
+      return !name.startsWith('colorize.') || (!field.startsWith('gradient-')
+        && (!field.startsWith('palette-') || ['palette-mode', 'palette-mapping', 'palette-chroma'].includes(field)));
+    });
+    snapshot.animationsPaused = true;
+    const hash = route === 'link' ? await encodeShaderStateHash({document: compiled.document,
+      preset: presetId, bypassed: [], paused: true, chainSnapshot: snapshot}) : '';
+    const search = route === 'query' ? `?fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(snapshot))}`
+      : '?effect=ShaderChain';
+    const harness = await editorWorkbench({source: null, hash, search, pausedFromEngine: true});
+    const restored = callWorkbenchBinding(harness.engine, 'getSnapshot', [], null);
+    assert.equal(restored.chain.at(-1).operator, 'modulate.field.v1', harness.elements.get('shader-document-status').textContent);
+    assert.equal(restored.runtime.find((entry) => entry.instance === 'field').state.modulation.phaseTurns, 0.63);
+    assert.equal(restored.runtime.find((entry) => entry.instance === 'field').state.oscillationPhase, 0);
+    assert.equal(restored.runtime.find((entry) => entry.instance === 'colorize').state.oscillationPhase, 0.37);
+    assert.equal(restored.modulation.find((entry) => entry.instance === 'colorize').recipe.enabled, false);
+    assert.deepEqual(restored.paletteBank, snapshot.paletteBank);
+    assert.equal(restored.animationsPaused, true);
+    const saved = savedValues(harness);
+    assert.equal(saved['colorize.modulation-amount'], 0);
+    assert.ok(saved['field.modulation-amount'] > 0);
   });
 }

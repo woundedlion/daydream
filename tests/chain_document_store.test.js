@@ -8,6 +8,9 @@ import { readFileSync } from 'node:fs';
 
 import {
   DEFAULT_SCRATCH_CHAIN,
+  expandColorModulations,
+  expandColorModulationSnapshot,
+  upgradePaletteSnapshot,
   UNDO_DEPTH,
   createChainDocumentStore,
   documentFromChainSnapshot,
@@ -1259,4 +1262,84 @@ test('a chain snapshot imports every modulation field under its instance label',
   }
   const values = document.preset_bank.presets[0].values;
   for (const [field, value] of Object.entries(expected)) assert.equal(values[`ink.${field}`], value, field);
+});
+
+test('embedded color modulation expands every preset and disables the embedded copy', () => {
+  const catalog = CATALOG;
+  const source = scratchChainDocument(catalog);
+  const first = source.preset_bank.presets[0];
+  source.descriptor.parameters.find((parameter) => parameter.id === 'colorize.pattern-scale').interpolation.group = 'colorize.noise';
+  Object.assign(first.values, {'colorize.modulation-amount': 0.75,
+    'colorize.modulation-source': 'sphere-interference', 'colorize.modulation-evaluation': 'direct',
+    'colorize.hue-shift-mode': 'path-length', 'colorize.hue-shift-amount': -0.2});
+  source.preset_bank.presets.push({...structuredClone(first), preset_id: 'quiet',
+    values: {...first.values, 'colorize.modulation-amount': 0, 'colorize.hue-shift-amount': 0}});
+  const expanded = expandColorModulations(source, catalog);
+  assert.deepEqual(expanded.descriptor.chain.slice(-3), [
+    {label: 'colorize', operator: 'colorize.generated-palette.v3'},
+    {label: 'hue-shift', operator: 'modulate.hue-shift.v1'},
+    {label: 'field', operator: 'modulate.field.v1'},
+  ]);
+  for (const [index, preset] of expanded.preset_bank.presets.entries()) {
+    assert.equal(preset.values['colorize.modulation-amount'], 0);
+    assert.equal(preset.values['colorize.modulation-enabled'], 'disabled');
+    assert.equal(preset.values['colorize.hue-shift-mode'], 'none');
+    assert.equal(preset.values['field.modulation-source'], 'sphere-interference');
+    assert.equal(preset.values['field.modulation-evaluation'], 'direct');
+    assert.equal(preset.values['field.modulation-amount'], index ? 0 : 0.75);
+    assert.equal(preset.values['hue-shift.hue-shift-amount'], index ? 0 : -0.2);
+  }
+  assert.equal(expanded.descriptor.parameters.find((parameter) => parameter.id === 'field.pattern-scale').interpolation.group, 'field.noise');
+  assert.equal(first.values['colorize.modulation-amount'], 0.75);
+  assert.equal(expandColorModulations(expanded, catalog), expanded);
+  const plain = scratchChainDocument(catalog);
+  assert.equal(expandColorModulations(plain, catalog), plain);
+});
+
+test('expanded snapshot retains palette and other clocks and moves the modulation clock', () => {
+  const catalog = CATALOG;
+  const source = scratchChainDocument(catalog);
+  Object.assign(source.preset_bank.presets[0].values, {'colorize.modulation-amount': 0.75,
+    'colorize.hue-shift-mode': 'path-length', 'colorize.hue-shift-amount': 0.2});
+  const expanded = expandColorModulations(source, catalog);
+  const recipe = modulationRecipe();
+  recipe.mechanic.amount = 0.75;
+  const snapshot = {schemaVersion: 3, chain: SNAPSHOT_CHAIN, parameters: [
+    {name: 'colorize.hue-shift-mode', value: 1}, {name: 'colorize.hue-shift-amount', value: 0.2}],
+  modulation: [{instance: 'colorize', recipe}], animationsPaused: true,
+  runtime: [{instance: 'colorize', kind: 'color-clock-v2', state: {oscillationPhase: 0.37,
+    modulation: {source: 0, version: 1, phaseTurns: 0.63, initialized: true}}},
+  {instance: 'sample', kind: 'phase-clock-v1', state: {phase: 0.91}}],
+  paletteBank: {seed: 123}};
+  const migrated = expandColorModulationSnapshot(snapshot, source, expanded);
+  assert.deepEqual(migrated.chain, expanded.descriptor.chain.map(({label, operator}) => ({instance: label, operator})));
+  assert.deepEqual(migrated.modulation.find((entry) => entry.instance === 'field').recipe, recipe);
+  assert.equal(migrated.modulation.find((entry) => entry.instance === 'colorize').recipe.enabled, false);
+  assert.equal(migrated.modulation.find((entry) => entry.instance === 'colorize').recipe.mechanic.amount, 0);
+  assert.deepEqual(migrated.runtime.find((entry) => entry.instance === 'colorize'), snapshot.runtime[0]);
+  assert.deepEqual(migrated.runtime.find((entry) => entry.instance === 'sample'), snapshot.runtime[1]);
+  assert.deepEqual(migrated.runtime.find((entry) => entry.instance === 'field').state,
+    {...snapshot.runtime[0].state, oscillationPhase: 0});
+  assert.deepEqual(migrated.parameters.slice(-2), [
+    {name: 'hue-shift.hue-shift-mode', value: 1}, {name: 'hue-shift.hue-shift-amount', value: 0.2}]);
+  assert.ok(migrated.parameters.filter((entry) => entry.name.startsWith('colorize.')).every((entry) => entry.value === 0));
+  assert.deepEqual(migrated.paletteBank, snapshot.paletteBank);
+  assert.equal(migrated.animationsPaused, true);
+  assert.equal(snapshot.modulation[0].recipe.enabled, true);
+});
+
+
+test('legacy snapshots gain palette-family defaults without filling missing existing controls', () => {
+  const catalog = structuredClone(CATALOG);
+  const color = catalog.operators.find((operator) => operator.id === 'colorize.generated-palette.v3');
+  const snapshot = {schemaVersion: 3, chain: SNAPSHOT_CHAIN, parameters: [], modulation: []};
+  const upgraded = upgradePaletteSnapshot(snapshot, catalog);
+  assert.equal(upgraded.parameters.find((parameter) => parameter.name === 'colorize.palette-type').value, 0);
+  const hue = color.params.find((field) => field.id === 'palette-hue');
+  assert.equal(upgraded.parameters.find((parameter) => parameter.name === 'colorize.palette-hue').value, hue.default);
+  assert.equal(upgraded.parameters.some((parameter) => parameter.name === 'colorize.palette-chroma'), false);
+  assert.equal(upgraded.parameters.some((parameter) => parameter.name === 'colorize.palette-mapping'), false);
+  const current = {...snapshot, parameters: [{name: 'colorize.palette-type', value: 1}]};
+  assert.deepEqual(upgradePaletteSnapshot(current, catalog), current);
+  assert.deepEqual(snapshot.parameters, []);
 });

@@ -51,8 +51,13 @@ protocol carries `chainSnapshot`.
 Snapshot schema version 3 requires `chain: [{instance, operator}]`,
 `parameters: [{name, value}]`, `animationsPaused` (boolean), and
 `modulation: [{instance, recipe}]`, with one
-recipe per colorize instance. Colorize modulation fields travel in `modulation`,
-not `parameters`. `runtime` and `paletteBank` are optional. Runtime entries identify their instance and stable
+recipe per colorize or Field modulation instance. Colorize and Field modulation fields travel in `modulation`,
+not `parameters`. Color4 stages run in the Modulations container after the permanent
+Color palette card. Field stages own their recipe and source clock; Hue shift stages
+use the path length retained by the interpreter. Palette family, mapping, brightness
+and opacity belong to the Color card. Authoring expands embedded color modulation
+into Hue shift then Field stages, moving recipe clocks into the Field instance in
+saved runtime snapshots. `runtime` and `paletteBank` are optional. Runtime entries identify their instance and stable
 state kind. Omit runtime to initialize fresh state; when present, it must include
 every stateful instance exactly once. `ChainRuntimeState` in the module declarations
 defines the walk, source, noise, affine, phase, ring and color state shapes.

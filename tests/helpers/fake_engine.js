@@ -180,7 +180,7 @@ export class FakeChainEngine {
         kind = 'spatial-walk-v2';
         state = { noiseSeed: 1337, walkTime: 0, position: [0, 1, 0], direction: [1, 0, 0],
           wander: [1, 0, 0, 0], angularVelocity: 0, spinPhase: 0 };
-      } else if (operator.startsWith('colorize.')) {
+      } else if (operator.startsWith('colorize.') || operator === 'modulate.field.v1') {
         kind = 'color-clock-v2';
         state = { oscillationPhase: 0,
           modulation: {source: 0, version: 1, phaseTurns: 0, initialized: true} };
@@ -209,7 +209,7 @@ export class FakeChainEngine {
     });
     this.paletteBank = { chroma: 0.15, hues: [159, 159, 159], cycles: Array.from({ length: 3 },
       () => ({ frame: 0, nextSequence: 2, fadeActive: false, displayDirty: true })) };
-    this.modulation = entries.filter(({operator}) => operator.startsWith('colorize.'))
+    this.modulation = entries.filter(({operator}) => operator.startsWith('colorize.') || operator === 'modulate.field.v1')
       .map(({instance}) => ({instance, recipe: modulationRecipe()}));
     this.generation += 1;
     return { status: ChainStatus.OK, code: 'APPLIED', entryIndex: -1 };
