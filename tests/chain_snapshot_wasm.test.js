@@ -72,6 +72,7 @@ test('snapshot validation refuses malformed state transactionally', () => {
   engine.setEffect('ShaderChain');
   assert.equal(callWorkbenchBinding(engine, 'setShaderChainParameters', [[
     {name: 'camera.wander', value: 0.1}, {name: 'sample.speed', value: 0.004},
+    {name: 'colorize.modulation-amount', value: 0.5},
   ]]), module.ParamSetResult.APPLIED);
   engine.setAnimationsPaused(false);
   for (let frame = 0; frame < 64; frame += 1) engine.drawFrame();
@@ -79,7 +80,7 @@ test('snapshot validation refuses malformed state transactionally', () => {
   engine.setEffect('ShaderChain');
   engine.setAnimationsPaused(true);
   const previous = capture();
-  for (const section of ['parameters', 'runtime', 'paletteBank'])
+  for (const section of ['parameters', 'modulation', 'runtime', 'paletteBank'])
     assert.notDeepEqual(advanced[section], previous[section], `${section} differ, so a partial apply is observable`);
   const result = module.ChainSnapshotRestoreResult;
   const changes = [
