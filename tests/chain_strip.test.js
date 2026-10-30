@@ -339,16 +339,16 @@ test('the viewport offset survives the rebuild a committed edit forces', async (
   assert.equal(h.container.querySelector('.chain-strip-viewport').scrollTop, 40);
 });
 
-test('clicking a chip header toggles selection without pinning', async () => {
+test('clicking a chip header toggles its pin and selection', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'warp2').querySelector('.chain-chip-name').dispatch('click');
 
   assert.equal(h.store.selectedLabel(), 'warp2');
   assert.deepEqual(h.selections, ['warp2']);
   const chip = chipByLabel(h, 'warp2');
-  assert.equal(chip.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'false');
+  assert.equal(chip.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
   chip.dispatch('mouseleave');
-  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
+  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
   assert.equal(chip.getAttribute('aria-current'), 'true',
     'aria-current carries the selection a group cannot express as aria-selected');
   assert.equal(h.doc.activeElement, chip, 'the selected chip takes focus');
@@ -362,6 +362,13 @@ test('clicking a chip header toggles selection without pinning', async () => {
   chipByLabel(h, 'warp2').dispatch('click');
   assert.equal(h.store.selectedLabel(), null);
   assert.deepEqual(h.selections, ['warp2', null]);
+  const collapsed = chipByLabel(h, 'warp2');
+  assert.equal(collapsed.classList.contains('chain-chip--expanded'), false);
+  assert.equal(collapsed.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'false');
+  assert.equal(h.doc.activeElement, collapsed);
+  collapsed.dispatch('focusin');
+  collapsed.dispatch('mouseenter');
+  assert.equal(collapsed.classList.contains('chain-chip--expanded'), false);
 
   chipByLabel(h, 'camera').dispatch('keydown', { key: 'Enter' });
   assert.deepEqual(h.selections, ['warp2', null, 'camera']);
@@ -831,7 +838,7 @@ test('pointer gestures never start a chip drag', async () => {
   for (const chip of chips(h))
     assert.deepEqual(chip.listeners.filter((listener) => listener.type.startsWith('pointer')), []);
   assert.equal(h.doc.listenerCount('pointermove'), 0);
-  assert.equal(h.doc.listenerCount('pointerup'), 1);
+  assert.equal(h.doc.listenerCount('pointerup'), 0);
 });
 
 test('a strip whose first render throws binds nothing to the mount', async () => {
@@ -864,8 +871,8 @@ test('a strip whose first render throws binds nothing to the mount', async () =>
   assert.deepEqual(container.listeners.map((listener) => listener.type), ['keydown'],
     'the next successful build owns the only history shortcut');
   assert.equal(doc.listenerCount('pointerdown'), 1);
-  assert.equal(doc.listenerCount('pointerup'), 1);
-  assert.equal(doc.listenerCount('pointercancel'), 1);
+  assert.equal(doc.listenerCount('pointerup'), 0);
+  assert.equal(doc.listenerCount('pointercancel'), 0);
 });
 
 test('destroy detaches the strip listeners and empties the strip', async () => {
@@ -901,7 +908,7 @@ const controlIn = (row) => row.querySelector('.chain-param-control');
 const declarationsFor = (h, label) => h.store.document().descriptor.parameters
   .filter((parameter) => parameter.id.startsWith(`${label}.`));
 
-test('stage controls open transiently on hover and pin with the pin button', async () => {
+test('stage controls ignore hover and toggle immediately with the pin button', async () => {
   const h = await makeStrip();
   assert.equal(chipByLabel(h, 'sample').getAttribute('aria-expanded'), null);
   assert.ok(paramsOf(h, 'sample'), 'an unselected chip carries its controls');
@@ -910,7 +917,7 @@ test('stage controls open transiently on hover and pin with the pin button', asy
   assert.equal(chip.classList.contains('chain-chip--expanded'), false);
 
   chip.dispatch('mouseenter');
-  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
+  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
   chip.dispatch('mouseleave');
   assert.equal(chip.classList.contains('chain-chip--expanded'), false);
 
@@ -921,8 +928,8 @@ test('stage controls open transiently on hover and pin with the pin button', asy
   assert.equal(pinned.classList.contains('chain-chip--expanded'), true,
     'mouse leave preserves a pinned card');
   pinned.querySelector('.chain-chip-pin').dispatch('click');
-  pinned.dispatch('mouseleave');
   assert.equal(chipByLabel(h, 'sample').classList.contains('chain-chip--expanded'), false);
+  assert.equal(pinned.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'false');
 
   const region = paramsOf(h, 'sample');
   assert.equal(region.getAttribute('role'), 'group');
@@ -954,26 +961,28 @@ test('stage controls open transiently on hover and pin with the pin button', asy
     (parameter) => parameter.id.startsWith('camera.')).length);
 });
 
-test('stage controls open under keyboard focus as they do under the pointer', async () => {
+test('Enter and Space toggle a tile while focus and Tab leave it collapsed', async () => {
   const h = await makeStrip();
-  const chip = chipByLabel(h, 'sample');
-  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
+  const initial = chipByLabel(h, 'sample');
+  initial.focus();
+  initial.dispatch('focusin');
+  initial.dispatch('keydown', { key: 'Tab' });
+  assert.equal(initial.classList.contains('chain-chip--expanded'), false);
 
-  chip.dispatch('focusin');
-  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
+  const enter = initial.dispatch('keydown', { key: 'Enter' });
+  assert.equal(enter.defaultPrevented, true);
+  const opened = chipByLabel(h, 'sample');
+  assert.equal(opened.classList.contains('chain-chip--expanded'), true);
+  assert.equal(opened.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
+  assert.equal(h.store.selectedLabel(), 'sample');
 
-  const inside = paramsOf(h, 'sample').querySelector('.chain-param-control');
-  chip.dispatch('focusout', { relatedTarget: inside });
-  assert.equal(chip.classList.contains('chain-chip--expanded'), true,
-    'focus moving into the controls keeps them open');
-
-  chip.dispatch('focusout', { relatedTarget: chipByLabel(h, 'camera') });
-  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
-
-  chip.querySelector('.chain-chip-pin').dispatch('click');
-  chipByLabel(h, 'sample').dispatch('focusout', { relatedTarget: null });
-  assert.equal(chipByLabel(h, 'sample').classList.contains('chain-chip--expanded'), true,
-    'losing focus preserves a pinned card');
+  const space = opened.dispatch('keydown', { key: ' ' });
+  assert.equal(space.defaultPrevented, true);
+  const closed = chipByLabel(h, 'sample');
+  assert.equal(closed.classList.contains('chain-chip--expanded'), false);
+  assert.equal(closed.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'false');
+  assert.equal(h.doc.activeElement, closed);
+  assert.equal(h.store.selectedLabel(), null);
 });
 
 test('a fixed stage expands to explain its parameters and allow renaming', async () => {
@@ -988,6 +997,7 @@ test('a fixed stage expands to explain its parameters and allow renaming', async
   const chip = chipByLabel(h, label);
   assert.equal(chip.getAttribute('aria-current'), 'true');
   assert.equal(chip.classList.contains('chain-chip--expanded'), true);
+  assert.equal(chip.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
   assert.equal(paramsOf(h, label).querySelector('.chain-strip-note').textContent,
     'No adjustable parameters');
   assert.ok(paramsOf(h, label).querySelector('.chain-chip-rename'));
@@ -1011,13 +1021,13 @@ test('stage and socket pins are independent of selection and each other', async 
   assert.equal(h.store.selectedLabel(), null);
   chipByLabel(h, 'lens').dispatch('click');
   chipByLabel(h, 'lens').dispatch('mouseleave');
-  assert.equal(chipByLabel(h, 'lens').classList.contains('chain-chip--expanded'), false);
+  assert.equal(chipByLabel(h, 'lens').classList.contains('chain-chip--expanded'), true);
   for (const label of ['camera', 'project']) {
     assert.equal(chipByLabel(h, label).classList.contains('chain-chip--expanded'), true);
   }
   const camera = chipByLabel(h, 'camera');
   camera.querySelector('.chain-chip-pin').dispatch('click');
-  assert.equal(camera.classList.contains('chain-chip--expanded'), true);
+  assert.equal(camera.classList.contains('chain-chip--expanded'), false);
   camera.dispatch('mouseleave');
   assert.equal(camera.classList.contains('chain-chip--expanded'), false);
   assert.equal(chipByLabel(h, 'project').classList.contains('chain-chip--expanded'), true);
@@ -1606,82 +1616,64 @@ test('parameters baked into the active build cannot commit edits', async () => {
 });
 
 
-test('leaving an unpinned stage closes controls even with focus inside', async () => {
+test('header collapse stays closed while focus and the pointer remain on the tile', async () => {
   const h = await makeStrip();
-  const chip = chipByLabel(h, 'sample');
-  chip.dispatch('mouseenter');
+  chipByLabel(h, 'sample').dispatch('click');
+  const opened = chipByLabel(h, 'sample');
+  opened.dispatch('mouseenter');
   const readout = rowFor(h, 'sample', 'sample.pattern-freq').querySelector('.chain-param-value');
   readout.focus();
   readout.dispatch('focusin');
+  opened.querySelector('.chain-chip-header').dispatch('click');
+  const closed = chipByLabel(h, 'sample');
+  assert.equal(closed.classList.contains('chain-chip--expanded'), false);
+  assert.equal(closed.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'false');
+  assert.equal(h.doc.activeElement, closed);
+  closed.dispatch('focusin');
+  closed.dispatch('mouseenter');
+  closed.dispatch('keydown', { key: 'Tab' });
+  assert.equal(closed.classList.contains('chain-chip--expanded'), false);
+});
+
+test('parameter and header controls keep a tile pinned without selecting it again', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'sample').dispatch('click');
+  const chip = chipByLabel(h, 'sample');
+  const control = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
+  control.dispatch('click');
+  control.dispatch('keydown', { key: 'Enter' });
+  control.dispatch('keydown', { key: ' ' });
+  assert.equal(chipByLabel(h, 'sample'), chip);
+  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
+  assert.equal(chip.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(h.selections, ['sample']);
+
+  chipByLabel(h, 'camera').dispatch('click');
+  chipByLabel(h, 'camera').querySelector('.chain-chip-bypass').dispatch('click');
+  assert.equal(chipByLabel(h, 'camera').classList.contains('chain-chip--expanded'), true);
+  assert.equal(h.store.selectedLabel(), 'camera');
+  assert.deepEqual(h.selections, ['sample', 'camera']);
+});
+
+test('pointer exits, focus changes and outside presses preserve clicked tiles', async () => {
+  const h = await makeStrip();
+  for (const label of ['camera', 'sample']) chipByLabel(h, label).dispatch('click');
+  const chip = chipByLabel(h, 'sample');
+  const slider = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
+  h.doc.dispatch('pointerdown', { target: slider, button: 0, pointerId: 5 });
+  slider.focus();
+  slider.dispatch('focusin');
   chip.dispatch('mouseleave');
-  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
-  assert.equal(h.doc.activeElement, chip);
-  chip.dispatch('mouseenter');
-  chip.dispatch('focusout', { relatedTarget: null });
-  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
-});
-
-test('keyboard focus opens controls, stays within the stage and closes on exit', async () => {
-  const h = await makeStrip();
-  const chip = chipByLabel(h, 'sample');
-  const control = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
-  chip.dispatch('focusin');
-  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
-  chip.dispatch('focusout', { relatedTarget: control });
-  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
-  control.dispatch('focusout', { relatedTarget: chipByLabel(h, 'colorize') });
-  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
-});
-
-test('Escape dismisses a transient stage and Tab can reopen its controls', async () => {
-  const h = await makeStrip();
-  const chip = chipByLabel(h, 'sample');
-  const control = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
-  chip.dispatch('mouseenter');
-  control.focus();
-  control.dispatch('focusin');
-  const escape = control.dispatch('keydown', { key: 'Escape' });
-  assert.equal(escape.defaultPrevented, true);
-  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
-  assert.equal(h.doc.activeElement, chip);
-  chip.dispatch('keydown', { key: 'Tab' });
-  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
-});
-
-test('outside pointer presses dismiss transients without unpinning stages', async () => {
-  const h = await makeStrip();
-  chipByLabel(h, 'camera').querySelector('.chain-chip-pin').dispatch('click');
-  const pinned = chipByLabel(h, 'camera');
-  const chip = chipByLabel(h, 'sample');
-  chip.dispatch('mouseenter');
+  h.doc.dispatch('pointerup', { pointerId: 5 });
+  h.doc.dispatch('pointercancel', { pointerId: 5 });
   h.doc.dispatch('pointerdown', { target: h.doc.body });
-  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
-  assert.equal(pinned.classList.contains('chain-chip--expanded'), true);
-  pinned.dispatch('mouseleave');
-  pinned.dispatch('focusout');
-  pinned.dispatch('keydown', { key: 'Escape' });
-  assert.equal(pinned.classList.contains('chain-chip--expanded'), true);
-});
-
-test('range drags stay open until their pointer is released outside', async () => {
-  for (const release of ['pointerup', 'pointercancel']) {
-    const h = await makeStrip();
-    const chip = chipByLabel(h, 'sample');
-    const slider = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
-    chip.dispatch('mouseenter');
-    h.doc.dispatch('pointerdown', { target: slider, button: 0, pointerId: 5 });
-    slider.focus();
-    slider.dispatch('focusin');
-    chip.dispatch('mouseleave');
-    assert.equal(chip.classList.contains('chain-chip--expanded'), true);
-    h.doc.dispatch('pointerup', { pointerId: 6 });
-    assert.equal(chip.classList.contains('chain-chip--expanded'), true);
-    h.doc.dispatch(release, { pointerId: 5 });
-    assert.equal(chip.classList.contains('chain-chip--expanded'), false);
-    h.strip.destroy();
+  slider.dispatch('focusout', { relatedTarget: chipByLabel(h, 'colorize') });
+  chip.dispatch('keydown', { key: 'Escape' });
+  for (const label of ['camera', 'sample']) {
+    assert.equal(chipByLabel(h, label).classList.contains('chain-chip--expanded'), true);
+    assert.equal(chipByLabel(h, label).querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
   }
 });
-
 
 test('separate slider drags form separate undo entries', async () => {
   const h = await makeStrip({ writeThrough: true });

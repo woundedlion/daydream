@@ -116,8 +116,6 @@ export function createChainStrip({
 
   /** @type {string|null} Roving-tabindex position, by instance label. */
   let focusedLabel = null;
-  // Focus restored by a rebuild must not open the chip it lands on.
-  let restoringFocus = false;
   /** @type {string|null} The last selection onSelect was told about. */
   let notifiedSelection = null;
   /** @type {{element: *, anchor: *}|null} */
@@ -133,8 +131,6 @@ export function createChainStrip({
    * builds its rows whether or not it is the expanded one.
    */
   const rows = new Map();
-  /** @type {Map<*, {press: (event: *) => void, release: (event: *) => void, open: () => void}>} */
-  const disclosures = new Map();
   /** @type {Set<string>} */
   const pinnedLabels = new Set();
 
@@ -205,16 +201,16 @@ export function createChainStrip({
   };
 
   /**
-   * Selects one chip (or clears the selection) and re-renders.
-   * @param {string|null} label - The instance label, or null.
+   * Toggles a chip's pin and selection and re-renders.
+   * @param {string} label - The instance label.
    * @returns {void}
    */
   const select = (label) => {
     const selected = label === store.selectedLabel() ? null : label;
     if (!store.setSelectedLabel(selected)) return;
     if (selected !== null) focusedLabel = selected;
+    if (!pinnedLabels.delete(label)) pinnedLabels.add(label);
     render({ focusLabel: label });
-    if (label !== null) disclosures.get(chipByLabel(label))?.open();
     notifySelection();
   };
 
@@ -322,19 +318,14 @@ export function createChainStrip({
   };
 
   /**
-   * Tracks slider presses and dismisses panels outside the pressed target.
+   * Dismisses a palette outside the pressed target.
    * @param {*} event - A pointerdown anywhere in the document.
    * @returns {void}
    */
   const pointerDown = (event) => {
-    for (const disclosure of disclosures.values()) disclosure.press(event);
     if (palette === null || palette.element.contains(event.target)
         || palette.anchor.contains(event.target)) return;
     closePalette();
-  };
-
-  const releaseDisclosure = (/** @type {*} */ event) => {
-    for (const disclosure of disclosures.values()) disclosure.release(event);
   };
 
   /**
@@ -387,8 +378,8 @@ export function createChainStrip({
         ? (after[index]?.label ?? after[index - 1]?.label ?? null)
         : (after[choice.start]?.label ?? null);
       if (kind === 'insert') store.setSelectedLabel(focusLabel);
+      if (focusLabel !== null) pinnedLabels.add(focusLabel);
       commit(focusLabel);
-      if (focusLabel !== null) disclosures.get(chipByLabel(focusLabel))?.open();
     };
 
     /** @type {Array<*>} */
@@ -986,7 +977,7 @@ export function createChainStrip({
       event.stopPropagation();
       if (!pinnedLabels.delete(entry.label)) pinnedLabels.add(entry.label);
       syncPin();
-      chip.classList.add('chain-chip--expanded');
+      chip.classList.toggle('chain-chip--expanded', pinnedLabels.has(entry.label));
       markDeactivated();
     });
     header.appendChild(pin);
@@ -1012,67 +1003,7 @@ export function createChainStrip({
         || event.target?.closest?.('.chain-chip-header') === header;
       if (clickedHeader) select(entry.label);
     });
-    const setTransientOpen = (/** @type {boolean} */ open) => {
-      if (pinnedLabels.has(entry.label)) return;
-      chip.classList.toggle('chain-chip--expanded', open);
-      if (open) markDeactivated();
-    };
-    let hovered = false;
-    let dismissing = false;
-    /** @type {number|null} */
-    let draggingPointer = null;
-    const dismiss = () => {
-      if (pinnedLabels.has(entry.label)) return;
-      dismissing = true;
-      try {
-        if (doc.activeElement !== chip && chip.contains(doc.activeElement)) chip.focus();
-        setTransientOpen(false);
-      } finally {
-        dismissing = false;
-      }
-    };
-    disclosures.set(chip, {
-      open: () => setTransientOpen(true),
-      press(event) {
-        if (!chip.contains(event.target)) {
-          draggingPointer = null;
-          dismiss();
-        } else if (event.target?.type === 'range' && event.button === 0) {
-          draggingPointer = event.pointerId;
-        }
-      },
-      release(event) {
-        if (draggingPointer === null || draggingPointer !== event.pointerId) return;
-        draggingPointer = null;
-        if (!hovered) dismiss();
-      },
-    });
-    chip.addEventListener('mouseenter', () => {
-      hovered = true;
-      setTransientOpen(true);
-    });
-    chip.addEventListener('mouseleave', () => {
-      hovered = false;
-      if (draggingPointer === null) dismiss();
-    });
-    chip.addEventListener('focusin', () => {
-      if (!restoringFocus && !dismissing) setTransientOpen(true);
-    });
-    chip.addEventListener('focusout', (/** @type {*} */ event) => {
-      const next = event.relatedTarget ?? null;
-      if (next !== null && chip.contains(next)) return;
-      setTransientOpen(false);
-    });
     chip.addEventListener('keydown', (/** @type {*} */ event) => {
-      if (event.key === 'Escape' && !event.defaultPrevented
-          && !pinnedLabels.has(entry.label)) {
-        event.preventDefault();
-        event.stopPropagation();
-        draggingPointer = null;
-        dismiss();
-        return;
-      }
-      if (event.key === 'Tab') setTransientOpen(true);
       chipKeydown(event, index, entry, crossing, chip);
     });
     return chip;
@@ -1142,7 +1073,6 @@ export function createChainStrip({
     palette = null;
     const layout = bandLayout();
     rows.clear();
-    disclosures.clear();
 
     const snapshot = store.document();
     declarations = store.parameterDeclarations();
@@ -1243,25 +1173,20 @@ export function createChainStrip({
     markDeactivated();
 
     const target = focusLabel !== null ? chipByLabel(focusLabel) : null;
-    restoringFocus = true;
-    try {
-      if (target) {
-        focusedLabel = focusLabel;
-        if (focusControl !== null) {
-          const control = target.querySelector(focusControl);
-          (control ?? target).focus();
-        } else {
-          target.focus();
-        }
-      } else if (hadFocus || focusLabel !== null) {
-        const fallback = tabLabel !== null ? chipByLabel(tabLabel) : null;
-        if (fallback) {
-          focusedLabel = tabLabel;
-          fallback.focus();
-        }
+    if (target) {
+      focusedLabel = focusLabel;
+      if (focusControl !== null) {
+        const control = target.querySelector(focusControl);
+        (control ?? target).focus();
+      } else {
+        target.focus();
       }
-    } finally {
-      restoringFocus = false;
+    } else if (hadFocus || focusLabel !== null) {
+      const fallback = tabLabel !== null ? chipByLabel(tabLabel) : null;
+      if (fallback) {
+        focusedLabel = tabLabel;
+        fallback.focus();
+      }
     }
   };
 
@@ -1288,8 +1213,6 @@ export function createChainStrip({
   render();
   container.addEventListener('keydown', historyKeydown);
   doc.addEventListener('pointerdown', pointerDown, true);
-  doc.addEventListener('pointerup', releaseDisclosure);
-  doc.addEventListener('pointercancel', releaseDisclosure);
 
   return {
     render,
@@ -1331,9 +1254,6 @@ export function createChainStrip({
       pendingSliderEdit = null;
       container.removeEventListener('keydown', historyKeydown);
       doc.removeEventListener('pointerdown', pointerDown, true);
-      doc.removeEventListener('pointerup', releaseDisclosure);
-      doc.removeEventListener('pointercancel', releaseDisclosure);
-      disclosures.clear();
       container.replaceChildren();
     },
   };

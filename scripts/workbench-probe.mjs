@@ -125,145 +125,124 @@ export async function probeStrip(tab) {
   check(await tab.$('.chain-band[data-carrier="color"]') === null,
     'the terminal color carrier renders no band');
 
-  const hoverHeader = '.chain-chip[data-label="project"] .chain-chip-header';
-  const closedCard = await boxOf(tab, '.chain-chip[data-label="project"]');
-  const closedHeader = await boxOf(tab, hoverHeader);
-  const closedBackground = await tab.$eval('.chain-chip[data-label="project"]',
+  const projectChip = '.chain-chip[data-label="project"]';
+  const projectHeader = `${projectChip} .chain-chip-header`;
+  const rotateChip = '.chain-chip[data-label="rotate"]';
+  const rotateHeader = `${rotateChip} .chain-chip-header`;
+  const clickHeader = async (selector) => {
+    const header = await tab.waitForSelector(selector);
+    await header.scrollIntoView();
+    const box = await boxOf(tab, selector);
+    await tab.mouse.click(box.x + 3, centre(box).y);
+  };
+  const closedCard = await boxOf(tab, projectChip);
+  const closedHeader = await boxOf(tab, projectHeader);
+  const closedBackground = await tab.$eval(projectChip,
     (node) => getComputedStyle(node).backgroundColor);
-  await (await tab.waitForSelector(hoverHeader)).hover();
-  await tab.waitForFunction(() => document.querySelector(
-    '.chain-chip[data-label="project"]')?.classList.contains('chain-chip--expanded') === true);
-  const hoverCard = await boxOf(tab, '.chain-chip[data-label="project"]');
-  const openHeader = await boxOf(tab, hoverHeader);
-  check(Math.abs(hoverCard.width - closedCard.width) < 1
+  await (await tab.waitForSelector(projectHeader)).hover();
+  check(await tab.$eval(projectChip, (node) => !node.classList.contains('chain-chip--expanded')),
+    'hover leaves a stage collapsed');
+  await clickHeader(projectHeader);
+  const openCard = await boxOf(tab, projectChip);
+  const openHeader = await boxOf(tab, projectHeader);
+  check(Math.abs(openCard.width - closedCard.width) < 1
       && Math.abs(openHeader.width - closedHeader.width) < 1
       && Math.abs(openHeader.height - closedHeader.height) < 1,
-  `the header stays ${Math.round(openHeader.width)}×${Math.round(openHeader.height)}px when open`);
-  check(await tab.$eval('.chain-chip[data-label="project"]', (node) =>
-    node.querySelector('.chain-chip-name') === null
+  `the header stays ${Math.round(openHeader.width)}?${Math.round(openHeader.height)}px when open`);
+  check(await tab.$eval(projectChip, (node) =>
+    node.classList.contains('chain-chip--expanded')
+      && node.querySelector('.chain-chip-pin').getAttribute('aria-pressed') === 'true'
+      && node.querySelector('.chain-chip-name') === null
       && getComputedStyle(node.querySelector('.chain-chip-function-label')).display !== 'none'),
-  'an open transition card keeps the same selector-only header');
+  'clicking a transition header expands and pins its selector-only card');
   await tab.mouse.move(0, 0);
-  check(await tab.waitForFunction(() => document.querySelector(
-    '.chain-chip[data-label="project"]')?.classList.contains('chain-chip--expanded') === false)
-    .then(() => true, () => false),
-  'mouse leave closes a transient stage card');
+  check(await tab.$eval(projectChip, (node) => node.classList.contains('chain-chip--expanded')),
+    'mouse leave preserves a clicked stage');
+  await clickHeader(projectHeader);
+  check(await tab.$eval(projectChip, (node) =>
+    !node.classList.contains('chain-chip--expanded') && document.activeElement === node
+      && node.querySelector('.chain-chip-pin').getAttribute('aria-pressed') === 'false'),
+  'a second header click collapses and unpins while its pointer and focus remain');
 
-  // The pointer is parked off the strip, so only the keyboard can be opening
-  // the card here.
-  await tab.$eval('.chain-chip[data-label="rotate"]', (node) => node.focus());
-  const focusOpened = await tab.$eval('.chain-chip[data-label="rotate"]', (node) => ({
-    expanded: String(node.classList.contains('chain-chip--expanded')),
-    controlsHeight: node.querySelector('.chain-chip-params').getBoundingClientRect().height,
-    controlsVisibility: getComputedStyle(node.querySelector('.chain-chip-params')).visibility,
-  }));
-  check(focusOpened.expanded === 'true' && focusOpened.controlsHeight > 0
-      && focusOpened.controlsVisibility === 'visible',
-  `keyboard focus discloses ${Math.round(focusOpened.controlsHeight)}px of controls`);
-  await tab.evaluate(() => {
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-  });
-  check(await tab.$eval('.chain-chip[data-label="rotate"]',
-    (node) => node.classList.contains('chain-chip--expanded') === false),
-  'losing focus closes the card again');
-
-  const rotateChip = '.chain-chip[data-label="rotate"]';
-  const rotateReadout = `${rotateChip} .chain-param-value`;
-  await (await tab.waitForSelector(`${rotateChip} .chain-chip-header`)).hover();
-  await (await tab.waitForSelector(rotateReadout)).click();
-  await tab.mouse.move(0, 0);
-  check(await tab.$eval(rotateChip, (node) =>
-    !node.classList.contains('chain-chip--expanded') && document.activeElement === node),
-  'mouse leave dismisses click-focused controls and returns focus to the stage');
-
-  await (await tab.waitForSelector(`${rotateChip} .chain-chip-header`)).hover();
-  await (await tab.waitForSelector(rotateReadout)).click();
-  await tab.keyboard.press('Escape');
-  check(await tab.$eval(rotateChip, (node) =>
-    !node.classList.contains('chain-chip--expanded') && document.activeElement === node),
-  'Escape dismisses controls without the returned focus reopening them');
-  await tab.keyboard.press('Tab');
+  await tab.$eval(rotateChip, (node) => node.focus());
+  check(await tab.$eval(rotateChip, (node) => !node.classList.contains('chain-chip--expanded')),
+    'keyboard focus leaves a tile collapsed');
+  await tab.keyboard.press('Enter');
   check(await tab.$eval(rotateChip, (node) =>
     node.classList.contains('chain-chip--expanded')
-      && node.contains(document.activeElement) && document.activeElement !== node),
-  'Tab reopens dismissed controls for keyboard navigation');
+      && node.querySelector('.chain-chip-pin').getAttribute('aria-pressed') === 'true'
+      && node.querySelector('.chain-chip-params').getBoundingClientRect().height > 0),
+  'Enter expands and pins the focused tile');
+  await tab.keyboard.press('Space');
+  check(await tab.$eval(rotateChip, (node) =>
+    !node.classList.contains('chain-chip--expanded') && document.activeElement === node
+      && node.querySelector('.chain-chip-pin').getAttribute('aria-pressed') === 'false'),
+  'Space collapses and unpins without focus reopening the tile');
+
+  await clickHeader(rotateHeader);
+  const rotateReadout = `${rotateChip} .chain-param-value`;
+  await (await tab.waitForSelector(rotateReadout)).click();
+  check(await tab.$eval(rotateChip, (node) =>
+    node.classList.contains('chain-chip--expanded')
+      && node.querySelector('.chain-chip-pin').getAttribute('aria-pressed') === 'true'
+      && node.getAttribute('aria-current') === 'true'),
+  'clicking an inline control preserves the tile pin and selection');
+  await tab.mouse.move(0, 0);
+  await tab.keyboard.press('Escape');
+  check(await tab.$eval(rotateChip, (node) => node.classList.contains('chain-chip--expanded')),
+    'pointer exit and Escape preserve a clicked tile');
   await tab.$eval(rotateChip, (node) => {
     const controls = node.querySelectorAll('input:not(:disabled), select:not(:disabled)');
     const last = controls[controls.length - 1];
     if (last instanceof HTMLElement) last.focus();
   });
   await tab.keyboard.press('Tab');
-  check(await tab.$eval(rotateChip, (node) => !node.classList.contains('chain-chip--expanded')),
-    'Tab leaving a stage closes it even while the pointer remains inside');
-  await tab.mouse.move(0, 0);
+  check(await tab.$eval(rotateChip, (node) => node.classList.contains('chain-chip--expanded')),
+    'Tab leaving a stage preserves its pin');
 
-  await (await tab.waitForSelector(`${rotateChip} .chain-chip-header`)).hover();
   const dragTrack = await boxOf(tab, `${rotateChip} input[type="range"]`);
-  await tab.mouse.move(dragTrack.x + dragTrack.width / 2, dragTrack.y + dragTrack.height / 2);
+  await tab.mouse.move(dragTrack.x + dragTrack.width / 2, centre(dragTrack).y);
   await tab.mouse.down();
   await tab.mouse.move(dragTrack.x + dragTrack.width / 2, 0);
   check(await tab.$eval(rotateChip, (node) => node.classList.contains('chain-chip--expanded')),
     'a slider drag keeps its controls visible after leaving the stage');
   await tab.mouse.up();
-  check(await tab.$eval(rotateChip, (node) => !node.classList.contains('chain-chip--expanded')),
-    'releasing a slider outside dismisses its unpinned controls');
-  await tab.mouse.move(0, 0);
+  check(await tab.$eval(rotateChip, (node) => node.classList.contains('chain-chip--expanded')),
+    'releasing a slider outside preserves its clicked tile');
 
-  const projectPin = '.chain-chip[data-label="project"] .chain-chip-pin';
+  const projectPin = `${projectChip} .chain-chip-pin`;
   const rotatePin = `${rotateChip} .chain-chip-pin`;
-  await (await tab.waitForSelector(projectPin)).click();
-  await (await tab.waitForSelector(rotatePin)).click();
+  await clickHeader(projectHeader);
   await tab.mouse.move(0, 0);
   check(await tab.$$eval('.chain-chip-pin[aria-pressed="true"]', (pins) =>
     pins.length === 2 && pins.every((pin) =>
       pin.getAttribute('aria-label').startsWith('Unpin ')
       && pin.closest('.chain-chip').classList.contains('chain-chip--expanded'))),
-  'stage and socket pin buttons keep multiple panels open after mouse leave');
-  check(await tab.$eval('.chain-chip[data-label="project"]',
+  'clicking multiple headers independently pins their panels');
+  check(await tab.$eval(projectChip,
     (node, expected) => getComputedStyle(node).backgroundColor === expected,
     closedBackground),
   `a pinned stage keeps its opaque ${closedBackground} panel`);
   await tab.$eval(rotatePin, (node) => node.focus());
   await tab.keyboard.press('Space');
-  await tab.mouse.move(0, 0);
-  await tab.keyboard.press('Escape');
   check(await tab.$eval(rotateChip, (node) =>
     !node.classList.contains('chain-chip--expanded')
-    && node.querySelector('.chain-chip-pin').getAttribute('aria-pressed') === 'false'),
-  'keyboard unpin restores normal Escape dismissal');
+      && node.querySelector('.chain-chip-pin').getAttribute('aria-pressed') === 'false'),
+  'keyboard unpin immediately collapses its tile');
   check(await tab.$eval(projectPin, (node) => node.getAttribute('aria-pressed') === 'true'),
     'unpinning one panel preserves the other pin');
   await tab.$eval(projectPin, (node) => node.focus());
   await tab.keyboard.press('Enter');
-  await tab.keyboard.press('Escape');
-  check(await tab.$eval(projectPin, (node) => node.getAttribute('aria-pressed') === 'false'),
-    'Enter toggles the focused pin button');
-
-  await tab.mouse.click(closedCard.x + 2, closedCard.y + closedCard.height / 2);
-  const elsewhereLabel = (await tab.$$eval('.chain-chip', (nodes) => nodes.map(
-    (node) => (node instanceof HTMLElement ? node.dataset.label ?? '' : ''))))
-    .find((label) => label !== '' && label !== 'project');
-  const travelled = await boxOf(tab,
-    `.chain-chip[data-label="${elsewhereLabel}"] .chain-chip-header`);
-  await tab.mouse.move(travelled.x + 2, centre(travelled).y);
-  await tab.mouse.down();
-  await tab.mouse.move(0, 0, { steps: 8 });
-  await tab.mouse.up();
-  check((await tab.$$eval('.chain-chip[aria-current="true"]', (nodes) => nodes.map(
-    (node) => (node instanceof HTMLElement ? node.dataset.label ?? '' : ''))))
-    .join() === 'project',
-  `a press that travels off ${elsewhereLabel} leaves the selection alone`);
-  await tab.mouse.click(closedCard.x + 2, closedCard.y + closedCard.height / 2);
-  await tab.mouse.move(0, 0);
+  check(await tab.$eval(projectChip, (node) =>
+    !node.classList.contains('chain-chip--expanded')
+      && node.querySelector('.chain-chip-pin').getAttribute('aria-pressed') === 'false'),
+  'Enter toggles the focused pin button and collapses its tile');
 
   const collapsedDomain = await tab.$eval('.chain-band[data-carrier="sphere"]', (node) => ({
     band: node.getBoundingClientRect().height,
     frame: Number.parseFloat(getComputedStyle(node, '::before').height),
   }));
-  await (await tab.waitForSelector(
-    '.chain-chip[data-label="rotate"] .chain-chip-header')).hover();
-  await tab.waitForFunction(() => document.querySelector(
-    '.chain-chip[data-label="rotate"]')?.classList.contains('chain-chip--expanded') === true);
+  await clickHeader(rotateHeader);
   const openDomain = await tab.$eval('.chain-band[data-carrier="sphere"]', (node) => ({
     band: node.getBoundingClientRect().height,
     frame: Number.parseFloat(getComputedStyle(node, '::before').height),
@@ -272,6 +251,7 @@ export async function probeStrip(tab) {
       && Math.abs((openDomain.frame - collapsedDomain.frame)
         - (openDomain.band - collapsedDomain.band)) < 1,
   `an open stage grows its enclosing domain frame to ${Math.round(openDomain.frame)}px`);
+  await clickHeader(rotateHeader);
   await tab.mouse.move(0, 0);
 
   const layout = await tab.evaluate(() => {
@@ -748,6 +728,7 @@ export async function probeDocumentActions(tab) {
     .then(() => true, () => false),
     'the bypass button bypasses the stage');
   await tab.focus(chip);
+  await tab.keyboard.press('Enter');
   await tab.keyboard.press('b');
   check(await tab.waitForFunction((selector) => document.querySelector(selector)?.getAttribute('aria-pressed') === 'false', {}, toggle)
     .then(() => true, () => false),
