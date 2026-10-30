@@ -562,8 +562,9 @@ export function createChainStrip({
     const off = deactivatedParameterIds(declarations, values, chain, catalog);
     for (const [id, row] of rows) {
       const label = id.slice(0, id.indexOf('.'));
-      const color = chain.find((entry) => entry.label === label)?.operator
-        === 'colorize.generated-palette.v3';
+      const operator = chain.find((entry) => entry.label === label)?.operator;
+      const color = operator === 'colorize.generated-palette.v3';
+      const ripple = operator === 'sphere.displace.ripple.v2';
       const field = fieldOf(id);
       if (color && ['pattern-scale', 'modulation-amount'].includes(field)) {
         const domain = declarations.find((parameter) => parameter.id === id)?.domain;
@@ -580,8 +581,9 @@ export function createChainStrip({
           control.max = String(maximum);
         }
       }
-      row.hidden = color && (off.has(id)
-        || colorParameterHidden(field, (field) => values[`${label}.${field}`]));
+      row.hidden = (color && (off.has(id)
+        || colorParameterHidden(field, (field) => values[`${label}.${field}`])))
+        || (ripple && off.has(id) && ['center-azimuth', 'center-polar'].includes(field));
       const shown = row.querySelector('.chain-param-note');
       const live = parameterLive(id);
       for (const control of row.querySelectorAll('input, select')) control.disabled = !live;
@@ -643,9 +645,24 @@ export function createChainStrip({
 
   /**
    * @param {ParameterDeclaration} declaration - An enum8 declaration.
-   * @returns {*} The dropdown of its domain values.
+   * @returns {*} The control for its domain values.
    */
   const enumControl = (declaration) => {
+    if (fieldOf(declaration.id) === 'random-center'
+      && declaration.domain?.values?.join(',') === 'off,on') {
+      const toggle = el('input', 'chain-param-control');
+      toggle.type = 'checkbox';
+      toggle.checked = values[declaration.id] === 'on';
+      toggle.addEventListener('change', () => {
+        const accepted = editParameter(declaration.id, toggle.checked ? 'on' : 'off');
+        toggle.checked = values[declaration.id] === 'on';
+        if (accepted) {
+          store.endValueRun();
+          onCommitParameter();
+        }
+      });
+      return toggle;
+    }
     const select = el('select', 'chain-param-control');
     for (const value of declaration.domain?.values ?? []) {
       const option = el('option', 'chain-param-option');
@@ -777,9 +794,9 @@ export function createChainStrip({
         label.setAttribute('title', 'Animation rate. Zero freezes the noise; negative values reverse it.');
       row.appendChild(label);
       if (declaration.storage === 'enum8') {
-        const select = enumControl(declaration);
-        select.setAttribute('aria-label', name);
-        row.appendChild(select);
+        const control = enumControl(declaration);
+        control.setAttribute('aria-label', name);
+        row.appendChild(control);
       } else {
         const readout = el('input', 'chain-param-value');
         readout.type = 'number';
@@ -1283,7 +1300,9 @@ export function createChainStrip({
         values[id] = value;
         const row = rows.get(id);
         if (!row) continue;
-        row.querySelector('.chain-param-control').value = String(value);
+        const control = row.querySelector('.chain-param-control');
+        if (control.type === 'checkbox') control.checked = value === 'on';
+        else control.value = String(value);
         const readout = row.querySelector('.chain-param-value');
         if (readout) readout.value = formatNumericValue(value);
       }

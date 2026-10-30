@@ -1580,7 +1580,8 @@ test('every catalog operator exposes its full schema in a declaration-free stage
       operator.params.map((field) => `audit.${field.id}`).sort(), operator.name);
     for (const field of operator.params) {
       const control = controlIn(rowFor(h, 'audit', `audit.${field.id}`));
-      assert.equal(String(control.value), String(field.default), `${operator.name}: ${field.id}`);
+      const value = control.type === 'checkbox' ? (control.checked ? 'on' : 'off') : control.value;
+      assert.equal(String(value), String(field.default), `${operator.name}: ${field.id}`);
     }
     if (operator.params.length === 0)
       assert.equal(paramsOf(h, 'audit').querySelector('.chain-strip-note').textContent,
@@ -1755,8 +1756,8 @@ test('loaded twist and glitch stages expose omitted controls and persist slider 
     { label: 'color', operator: 'colorize.generated-palette.v3' },
   ]);
   const controls = [
-    ['twist', 'origin-phi', 0, 0.5],
-    ['twist', 'origin-lambda', 0, 1.25],
+    ['twist', 'twist-rate', 3, 4.5],
+    ['twist', 'speed', 0.02, 0.035],
     ['glitch', 'polar-multiplier', 2, 4],
     ['glitch', 'azimuth-multiplier', 3, -2],
   ];
@@ -1784,5 +1785,32 @@ test('loaded twist and glitch stages expose omitted controls and persist slider 
   }
   assert.equal(h.edits.length, 4);
   assert.deepEqual(h.applied, []);
+  assert.equal(h.store.compile().status, 'VALID');
+});
+
+test('Ripple random center toggles manual coordinates and follows synchronized values', async () => {
+  const source = scratchChainDocument(CATALOG, [
+    { label: 'ripple', operator: 'sphere.displace.ripple.v2' },
+    { label: 'sample', operator: 'sample.spherical-rings.v3' },
+    { label: 'color', operator: 'colorize.generated-palette.v3' },
+  ]);
+  const h = await makeStrip({ source, writeThrough: true });
+  chipByLabel(h, 'ripple').dispatch('click');
+  const toggle = controlIn(rowFor(h, 'ripple', 'ripple.random-center'));
+  const azimuth = rowFor(h, 'ripple', 'ripple.center-azimuth');
+  const polar = rowFor(h, 'ripple', 'ripple.center-polar');
+  assert.equal(toggle.type, 'checkbox');
+  assert.equal(toggle.checked, true);
+  assert.equal(azimuth.hidden, true);
+  assert.equal(polar.hidden, true);
+  toggle.checked = false;
+  toggle.dispatch('change');
+  assert.deepEqual(h.edits.at(-1), ['ripple.random-center', 'off']);
+  assert.equal(azimuth.hidden, false);
+  assert.equal(polar.hidden, false);
+  h.strip.syncParameterValues({'ripple.random-center': 'on'});
+  assert.equal(toggle.checked, true);
+  assert.equal(azimuth.hidden, true);
+  assert.equal(polar.hidden, true);
   assert.equal(h.store.compile().status, 'VALID');
 });

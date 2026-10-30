@@ -175,7 +175,8 @@ export class FakeChainEngine {
       if (stateSize <= 1) return [];
       let kind;
       let state;
-      if (operator === 'sphere.rotate.v2' || operator.startsWith('project.')) {
+      if (operator === 'sphere.rotate.v2' || operator === 'sphere.lens.twist.v2'
+        || operator.startsWith('project.')) {
         kind = 'spatial-walk-v2';
         state = { noiseSeed: 1337, walkTime: 0, position: [0, 1, 0], direction: [1, 0, 0],
           wander: [1, 0, 0, 0], angularVelocity: 0, spinPhase: 0 };
@@ -190,8 +191,9 @@ export class FakeChainEngine {
         kind = 'noise-clock-v1';
         state = { phase: 0, noiseSeed: 1337 };
       } else if (operator === 'sphere.displace.ripple.v2') {
-        kind = 'ripple-clock-v1';
-        state = { phase: 0 };
+        kind = 'ripple-burst-v1';
+        state = { phase: 0, seed: 1337, burstCount: 0, frames: 0,
+          waves: Array.from({length: 16}, () => ({age: 1000, burst: 0})) };
       } else if (operator === 'sample.spherical-rings.v3') {
         kind = 'spherical-rings-v2';
         state = { walk: { noiseSeed: 1337, walkTime: 0, position: [0, 1, 0], direction: [1, 0, 0],
@@ -257,7 +259,7 @@ export class FakeChainEngine {
           'source-clock-v1': ['primary', 'secondary', 'angle'],
           'noise-clock-v1': ['phase'], 'affine-clock-v1': ['phase', 'rotation'],
           'color-clock-v2': ['oscillationPhase'],
-          'phase-clock-v1': ['phase'], 'ripple-clock-v1': ['phase'],
+          'phase-clock-v1': ['phase'],
         };
         if (snapshot.runtime?.some((entry) => {
           if (!entry || typeof entry.instance !== 'string' || typeof entry.kind !== 'string'
@@ -265,6 +267,11 @@ export class FakeChainEngine {
           if (entry.kind === 'spatial-walk-v2') return !spatial(entry.state);
           if (entry.kind === 'spherical-rings-v2')
             return !spatial(entry.state.walk) || !Number.isFinite(entry.state.phase);
+          if (entry.kind === 'ripple-burst-v1')
+            return !Number.isFinite(entry.state.phase) || !unsigned(entry.state.seed)
+              || !unsigned(entry.state.burstCount) || !unsigned(entry.state.frames)
+              || !Array.isArray(entry.state.waves) || entry.state.waves.length !== 16
+              || entry.state.waves.some((wave) => !Number.isFinite(wave.age) || !unsigned(wave.burst));
           const fields = runtimeFields[entry.kind];
           return !fields || fields.some((key) => !Number.isFinite(entry.state[key]))
             || (entry.kind === 'noise-clock-v1' && !signed32(entry.state.noiseSeed))
