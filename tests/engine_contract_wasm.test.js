@@ -298,7 +298,7 @@ const DEFAULT_CHAIN = [
   { instance: 'camera', operator: 'sphere.rotate.v2' },
   { instance: 'project', operator: 'project.stereographic.v2' },
   { instance: 'sample', operator: 'sample.grid.v3' },
-  { instance: 'colorize', operator: 'colorize.generated-palette.v3' },
+  { instance: 'colorize', operator: 'colorize.generated-palette.v4' },
 ];
 
 test('setShaderChain applies a chain, registers label.field params and bumps the generation', () => {
@@ -400,6 +400,9 @@ test('chain snapshots match fake key sets, decode refusals and runtime round tri
   const fake = new FakeChainEngine();
   fake.setEffect('ShaderChain');
   engine.setEffect('ShaderChain');
+  for (const target of [engine, fake])
+    assert.equal(chainCall(target, 'setShaderChain', [...DEFAULT_CHAIN,
+      {instance: 'modulation', operator: 'color.modulate.v1'}]).code, 'APPLIED');
   const saved = chainCall(engine, 'getSnapshot');
   assert.deepEqual(Object.keys(chainCall(fake, 'getSnapshot')).sort(), Object.keys(saved).sort());
   const missingPause = structuredClone(saved);
@@ -574,7 +577,7 @@ test('setShaderChain refuses transactionally and names the offending entry', () 
     { instance: 'camera', operator: 'sphere.rotate.v2' },
     { instance: 'project', operator: 'project.unknown.v9' },
     { instance: 'sample', operator: 'sample.grid.v3' },
-    { instance: 'colorize', operator: 'colorize.generated-palette.v3' },
+    { instance: 'colorize', operator: 'colorize.generated-palette.v4' },
   ]);
   assert.equal(unknown.status, M.ChainStatus.UNKNOWN_OPERATOR);
   assert.equal(unknown.code, 'UNKNOWN_OPERATOR');

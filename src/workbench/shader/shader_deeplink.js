@@ -14,7 +14,106 @@ const MAX_PAYLOAD_CHARS = 65536;
 const MAX_STATE_BYTES = 524288;
 
 /** Chain snapshot schema the engine's ChainSnapshot encodes and accepts. */
-export const CHAIN_SNAPSHOT_SCHEMA_VERSION = 3;
+export const CHAIN_SNAPSHOT_SCHEMA_VERSION = 4;
+
+/** @param {*} snapshot @returns {*} Snapshot with independent color modulation nodes. */
+export function migrateLegacyChainSnapshot(snapshot) {
+  if (snapshot?.schemaVersion !== 3 || !Array.isArray(snapshot.chain)
+      || !Array.isArray(snapshot.parameters) || !Array.isArray(snapshot.modulation)) return snapshot;
+  if (snapshot.chain.some((/** @type {*} */ entry) => !entry || typeof entry.instance !== 'string'
+      || typeof entry.operator !== 'string')
+      || snapshot.parameters.some((/** @type {*} */ entry) => !entry || typeof entry.name !== 'string'
+        || typeof entry.value !== 'number' || !Number.isFinite(Math.fround(entry.value)))
+      || snapshot.modulation.some((/** @type {*} */ entry) => !entry || typeof entry.instance !== 'string')) return snapshot;
+  if (new Set(snapshot.parameters.map((/** @type {*} */ entry) => entry.name)).size
+      !== snapshot.parameters.length) return snapshot;
+  const result = structuredClone(snapshot);
+  const used = new Set(result.chain.map((/** @type {*} */ entry) => entry.instance));
+  if (result.parameters.some((/** @type {*} */ parameter) =>
+    !used.has(parameter.name.slice(0, parameter.name.indexOf('.'))))) return snapshot;
+  if (result.runtime !== undefined && (!Array.isArray(result.runtime)
+      || result.runtime.some((/** @type {*} */ entry) => !entry || !used.has(entry.instance)))) return snapshot;
+  /** @param {string} stem @returns {string} */
+  const label = (stem) => {
+    let next = stem;
+    for (let index = 2; used.has(next); index += 1) next = `${stem}-${index}`;
+    used.add(next);
+    return next;
+  };
+  const recipes = new Map(result.modulation.map((/** @type {*} */ entry) => [entry.instance, entry.recipe]));
+  if (recipes.size !== result.modulation.length) return snapshot;
+  /** @param {boolean} enabled @param {number} amount @returns {*} */
+  const displacement = (enabled, amount) => {
+    const sine = () => ({axis: [0, 1, 0], frequency: 1, offset: 0, speed: 0});
+    const pair = () => ({...sine(), axisB: [1, 0, 0], frequencyB: 1, offsetB: 0});
+    return {enabled, source: 4, version: 1, evaluation: 0, seed: 6047,
+      noise: {scale: 1, speed: 0, contrast: 0, basis: 0, variant: 0},
+      sine: sine(), interference: pair(), grid: pair(), mechanic: {kind: 0, amount}};
+  };
+  const chain = [];
+  const modulation = [];
+  const runtime = [];
+  const removed = new Set();
+  for (const entry of result.chain) {
+    const color = entry.operator === 'colorize.generated-palette.v3';
+    const field = entry.operator === 'modulate.field.v1';
+    const hue = entry.operator === 'modulate.hue-shift.v1';
+    const clocks = result.runtime?.filter((/** @type {*} */ clock) => clock.instance === entry.instance) ?? [];
+    if (!color && !field && !hue) {
+      chain.push(entry);
+      runtime.push(...clocks);
+      continue;
+    }
+    const parameters = result.parameters.filter((/** @type {*} */ parameter) => parameter.name.startsWith(`${entry.instance}.`));
+    const fields = new Map(parameters.map((/** @type {*} */ parameter) =>
+      [parameter.name.slice(entry.instance.length + 1), Math.fround(parameter.value)]));
+    const mode = fields.get('hue-shift-mode') ?? (hue ? 1 : 0);
+    const amount = fields.get('hue-shift-amount') ?? 0;
+    if ((color || hue) && (![0, 1].includes(mode) || amount < -4 || amount > 4)) return snapshot;
+    if (field && parameters.length > 0) return snapshot;
+    if (hue && (parameters.some((/** @type {*} */ parameter) =>
+      !['hue-shift-mode', 'hue-shift-amount'].includes(parameter.name.slice(entry.instance.length + 1)))
+      || clocks.length > 0 || recipes.has(entry.instance))) return snapshot;
+    if (color || field) {
+      const recipe = recipes.get(entry.instance);
+      if (!recipe || !Number.isInteger(recipe.source) || recipe.source < 0 || recipe.source > 3) return snapshot;
+      if (result.runtime !== undefined && (clocks.length !== 1 || clocks[0].kind !== 'color-clock-v2'
+          || !clocks[0].state || !clocks[0].state.modulation
+          || typeof clocks[0].state.oscillationPhase !== 'number'
+          || !Number.isFinite(Math.fround(clocks[0].state.oscillationPhase))
+          || !Number.isInteger(clocks[0].state.modulation.source)
+          || clocks[0].state.modulation.source < 0 || clocks[0].state.modulation.source > 3)) return snapshot;
+      const path = color ? label('displacement') : null;
+      const spatial = color ? label('modulation') : entry.instance;
+      if (color) {
+        chain.push({...entry, operator: 'colorize.generated-palette.v4'},
+          {instance: path, operator: 'color.modulate.v1'});
+        modulation.push({instance: path, recipe: displacement(mode === 1, amount)});
+        if (result.runtime !== undefined) runtime.push({...clocks[0], kind: 'color-clock-v3',
+          state: {oscillationPhase: clocks[0].state.oscillationPhase}},
+        {instance: path, kind: 'modulation-clock-v1',
+          state: {source: 4, version: 1, phaseTurns: 0, initialized: true}});
+      }
+      chain.push({instance: spatial, operator: 'color.modulate.v1'});
+      modulation.push({instance: spatial, recipe});
+      if (result.runtime !== undefined) runtime.push({instance: spatial,
+        kind: 'modulation-clock-v1', state: clocks[0].state.modulation});
+      recipes.delete(entry.instance);
+    } else {
+      chain.push({instance: entry.instance, operator: 'color.modulate.v1'});
+      modulation.push({instance: entry.instance, recipe: displacement(mode === 1, amount)});
+      if (result.runtime !== undefined) runtime.push({instance: entry.instance, kind: 'modulation-clock-v1',
+        state: {source: 4, version: 1, phaseTurns: 0, initialized: true}});
+    }
+    for (const parameter of parameters)
+      if (hue || ['hue-shift-mode', 'hue-shift-amount'].includes(parameter.name.slice(entry.instance.length + 1)))
+        removed.add(parameter.name);
+  }
+  if (recipes.size > 0) return snapshot;
+  return {...result, schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain, modulation,
+    parameters: result.parameters.filter((/** @type {*} */ parameter) => !removed.has(parameter.name)),
+    ...(result.runtime === undefined ? {} : {runtime})};
+}
 
 /** @param {*} value @returns {*} */
 function normalizedState(value) {
@@ -28,21 +127,22 @@ function normalizedState(value) {
       || typeof value.paused !== 'boolean') {
     throw new Error('invalid shader link state');
   }
-  if (value.chainSnapshot !== undefined
-      && (!value.chainSnapshot || typeof value.chainSnapshot !== 'object'
-        || value.chainSnapshot.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION || !Array.isArray(value.chainSnapshot.chain)
-        || !Array.isArray(value.chainSnapshot.parameters)
-        || !Array.isArray(value.chainSnapshot.modulation)
-        || value.chainSnapshot.modulation.some((/** @type {*} */ entry) => !entry || typeof entry !== 'object' || Array.isArray(entry))
-        || value.chainSnapshot.chain.some((/** @type {*} */ entry) => !entry || typeof entry !== 'object' || Array.isArray(entry))
-        || value.chainSnapshot.parameters.some((/** @type {*} */ entry) => !entry || typeof entry !== 'object' || Array.isArray(entry) || typeof entry.name !== 'string')))
+  const snapshot = migrateLegacyChainSnapshot(value.chainSnapshot);
+  if (snapshot !== undefined
+      && (!snapshot || typeof snapshot !== 'object'
+        || snapshot.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION || !Array.isArray(snapshot.chain)
+        || !Array.isArray(snapshot.parameters)
+        || !Array.isArray(snapshot.modulation)
+        || snapshot.modulation.some((/** @type {*} */ entry) => !entry || typeof entry !== 'object' || Array.isArray(entry))
+        || snapshot.chain.some((/** @type {*} */ entry) => !entry || typeof entry !== 'object' || Array.isArray(entry))
+        || snapshot.parameters.some((/** @type {*} */ entry) => !entry || typeof entry !== 'object' || Array.isArray(entry) || typeof entry.name !== 'string')))
     throw new Error('invalid shader link snapshot');
   return {
     document: value.document,
     preset: value.preset,
     bypassed: [...value.bypassed],
     paused: value.paused,
-    ...(value.chainSnapshot === undefined ? {} : {chainSnapshot: value.chainSnapshot}),
+    ...(snapshot === undefined ? {} : {chainSnapshot: snapshot}),
   };
 }
 

@@ -540,6 +540,44 @@
   display: none;
 }
 
+.chain-modulation-stack,
+.chain-modulation-layer,
+.chain-modulation-layer > .chain-chip-params {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  gap: 0.25rem;
+}
+
+.chain-modulation-layer {
+  padding: 0.375rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.25rem;
+}
+
+.chain-modulation-header {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.chain-modulation-title {
+  flex: 1;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.chain-modulation-move,
+.chain-modulation-remove,
+.chain-modulation-enabled {
+  flex: 0 0 auto;
+}
+
+.chain-modulation-add {
+  grid-column: 1 / -1;
+}
+
 /* Topology-deactivated fields stay editable; baked fields are disabled. */
 .chain-param[data-deactivated="true"] > :not(.chain-param-note) {
   color: var(--muted-text);

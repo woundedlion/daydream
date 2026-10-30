@@ -121,8 +121,8 @@ export async function probeStrip(tab) {
   check(await tab.$('.chain-band[data-carrier="sphere"]') !== null
       && await tab.$('.chain-band[data-carrier="plane"]') !== null,
     'sphere and plane carriers render bands');
-  check(await tab.$('.chain-band[data-carrier="color"]') !== null,
-    'Modulations renders after the permanent Color card');
+  check(await tab.$('.chain-modulation-stack') !== null,
+    'Modulations renders inside the permanent Color card');
 
   const projectChip = '.chain-chip[data-label="project"]';
   const projectHeader = `${projectChip} .chain-chip-header`;
@@ -920,12 +920,12 @@ export async function probeColorCard(tab) {
   await tab.select('#shader-document-select', 'grid-space');
   await tab.waitForFunction(() => document.getElementById('shader-document-status')
     ?.textContent.startsWith('Grid Space'));
-  const color = '.chain-chip[data-label="field"]';
+  const color = '.chain-chip[data-label="colorize"]';
   await tab.$eval(`${color} .chain-chip-pin`, (node) => node.click());
-  const row = (field) => `${color} [data-parameter="field.${field}"]`;
+  const row = (field) => `${color} [data-parameter="modulation.${field}"]`;
   const visible = (field) => tab.$eval(row(field), (node) => !node.hidden);
   check(await visible('pattern-scale') && !await visible('interference-frequency'),
-    'Grid Space exposes Field noise controls and hides unused sources');
+    'Grid Space exposes modulation noise controls and hides unused sources');
   await tab.select(`${row('modulation-source')} select`, 'sphere-interference');
   check(await tab.$eval(`${row('modulation-source')} select`, (node) => node.value)
       === 'sphere-interference' && await visible('interference-frequency')
@@ -941,7 +941,7 @@ export async function probeColorCard(tab) {
   let recipe;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const state = await decodeShaderStateHash(await tab.evaluate(() => location.hash));
-    recipe = state?.chainSnapshot?.modulation.find((entry) => entry.instance === 'field')?.recipe;
+    recipe = state?.chainSnapshot?.modulation.find((entry) => entry.instance === 'modulation')?.recipe;
     if (recipe?.interference.speed === Math.fround(0.01)) break;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
@@ -966,8 +966,8 @@ export async function probeNoiseScaleDrag(tab) {
   await tab.select('#shader-document-select', 'grid-space');
   await tab.waitForFunction(() => document.getElementById('shader-document-status')
     ?.textContent.startsWith('Grid Space'));
-  await tab.$eval('.chain-chip[data-label="field"] .chain-chip-pin', (node) => node.click());
-  const selector = '[data-parameter="field.pattern-scale"] input[type="range"]';
+  await tab.$eval('.chain-chip[data-label="colorize"] .chain-chip-pin', (node) => node.click());
+  const selector = '[data-parameter="modulation.pattern-scale"] input[type="range"]';
   await tab.$eval(selector, (node) => node.scrollIntoView({ block: 'center' }));
   const start = await tab.$eval(selector, (node) => {
     node.dataset.dragProbe = 'noise-scale';
@@ -989,7 +989,7 @@ export async function probeNoiseScaleDrag(tab) {
     'dragging Noise scale keeps the slider mounted and the column at the same scroll position');
   check(edited.value > 3 && edited.value <= 8 && edited.status === 'ok',
     'the Noise scale drag changes the value within the baked sampling limit');
-  const parameter = (field) => `[data-parameter="field.${field}"]`;
+  const parameter = (field) => `[data-parameter="modulation.${field}"]`;
   await tab.select(`${parameter('pattern-noise-variant')} select`, 'octave-contour');
   await tab.select(`${parameter('pattern-noise-basis')} select`, 'fbm3');
   for (const [field, value] of [['pattern-contrast', '2'], ['modulation-amount', '2']]) {
@@ -1007,7 +1007,7 @@ export async function probeNoiseScaleDrag(tab) {
   let recipe;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const state = await decodeShaderStateHash(await tab.evaluate(() => location.hash));
-    recipe = state?.chainSnapshot?.modulation.find((entry) => entry.instance === 'field')?.recipe;
+    recipe = state?.chainSnapshot?.modulation.find((entry) => entry.instance === 'modulation')?.recipe;
     if (recipe?.mechanic.kind === 1) break;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
@@ -1039,35 +1039,37 @@ export async function probePaletteAndModulations(tab) {
   check(await tab.$$eval(`${row('colorize', 'palette-harmony')} option`, (nodes) => nodes.length) === 8
     && await tab.$$eval(`${row('colorize', 'palette-name')} option`, (nodes) => nodes.length) === 27,
   'the Color palette exposes every harmony and named palette');
-  const band = '.chain-band[data-carrier="color"]';
-  const add = async (operator) => {
-    await tab.$eval(`${band} .chain-band-add`, (node) => node.click());
-    await tab.$eval(`.chain-palette-entry[data-operator="${operator}"]`, (node) => node.click());
-    return tab.$$eval(`${band} .chain-chip`, (nodes) => nodes.at(-1).dataset.label);
+  const stack = '.chain-modulation-stack';
+  const layer = (label) => `${stack} .chain-modulation-layer[data-label="${label}"]`;
+  const add = async () => {
+    await tab.$eval(`${stack} .chain-modulation-add`, (node) => node.click());
+    return tab.$$eval(`${stack} .chain-modulation-layer`, (nodes) => nodes.at(-1).dataset.label);
   };
-  const first = await add('modulate.field.v1');
-  const second = await add('modulate.field.v1');
-  const hue = await add('modulate.hue-shift.v1');
+  const first = await add();
+  const second = await add();
+  const hue = await add();
+  await tab.select(`${row(hue, 'modulation-source')} select`, 'displacement');
   for (const [label, amount] of [[first, '0.3'], [second, '0.6']]) {
     await tab.$eval(`${row(label, 'modulation-amount')} .chain-param-value`, (node, amount) => {
       node.value = amount;
       node.dispatchEvent(new Event('change', {bubbles: true}));
     }, amount);
   }
-  await tab.$eval(`.chain-chip[data-label="${second}"]`, (node) => node.dispatchEvent(
-    new KeyboardEvent('keydown', {key: 'ArrowUp', altKey: true, bubbles: true})));
-  check((await tab.$$eval(`${band} .chain-chip`, (nodes) => nodes.map((node) => node.dataset.label))).join()
-    === [second, first, hue].join(), 'multiple Field and Hue shift stages reorder after the permanent Color card');
-  await tab.$eval(`.chain-chip[data-label="${first}"] .chain-chip-bypass`, (node) => node.click());
+  await tab.$eval(`${layer(second)} .chain-modulation-move`, (node) => node.click());
+  check((await tab.$$eval(`${stack} .chain-modulation-layer`, (nodes) => nodes.map((node) => node.dataset.label))).join()
+    === [second, first, hue].join(), 'independent modulation layers reorder inside the Color card');
+  await tab.$eval(`${layer(first)} .chain-modulation-enabled`, (node) => {
+    node.checked = false;
+    node.dispatchEvent(new Event('change', {bubbles: true}));
+  });
   const document = await savedDocument(tab);
   const snapshot = (await decodeShaderStateHash(await tab.evaluate(() => location.hash)))?.chainSnapshot;
   check(document.descriptor.chain.slice(-3).map((entry) => entry.label).join() === [second, first, hue].join()
-    && snapshot?.chain.filter((entry) => entry.operator.startsWith('modulate.')).map((entry) => entry.instance).join()
-      === [second, hue].join(), 'a bypass keeps its authored modulation stage while the live snapshot omits it');
-  await tab.$eval(`.chain-chip[data-label="${hue}"] .chain-chip-remove`, (node) => node.click());
-  check(await tab.$(`.chain-chip[data-label="${hue}"]`) === null
-    && await tab.$('.chain-chip[data-label="colorize"]') !== null,
-  'removing a modulation preserves the permanent Color card');
+    && snapshot?.modulation.find((entry) => entry.instance === first)?.recipe.enabled === false,
+  'one header toggle disables a layer while preserving its authored order and settings');
+  await tab.$eval(`${layer(hue)} .chain-modulation-remove`, (node) => node.click());
+  check(await tab.$(layer(hue)) === null && await tab.$('.chain-chip[data-label="colorize"]') !== null,
+    'removing a modulation preserves the permanent Color card');
   return failures;
 }
 

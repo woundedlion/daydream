@@ -104,10 +104,10 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
 
   const bands = strip.querySelectorAll('.chain-band');
   assert.deepEqual(bands.map((band) => band.dataset.carrier),
-    ['sphere', 'plane', 'field', 'color'],
-    'Modulations follows the Color crossing');
+    ['sphere', 'plane', 'field'],
+    'modulations are folded into the Color card');
   assert.deepEqual(bands.map((band) => band.getAttribute('aria-label')),
-    ['Sphere stages', 'Plane stages', 'Field stages', 'Modulation stages']);
+    ['Sphere stages', 'Plane stages', 'Field stages']);
   for (const band of bands) {
     assert.equal(band.getAttribute('role'), 'group');
     assert.equal(band.querySelector('.chain-band-title').getAttribute('aria-hidden'),
@@ -115,7 +115,7 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
   }
   assert.deepEqual(
     bands.map((band) => band.querySelectorAll('.chain-chip').map((c) => c.dataset.label)),
-    [['camera', 'lens'], ['warp2'], [], []]);
+    [['camera', 'lens'], ['warp2'], []]);
 
   const sockets = strip.children.filter(
     (child) => child.classList?.contains('chain-chip--socket'));
@@ -139,11 +139,11 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
   // One roving-tabindex stop and a + only where an insertion is legal.
   assert.deepEqual(all.filter((chip) => chip.getAttribute('tabindex') === '0')
     .map((chip) => chip.dataset.label), ['camera']);
-  assert.equal(h.container.querySelectorAll('.chain-band-add').length, 4,
+  assert.equal(h.container.querySelectorAll('.chain-band-add').length, 3,
     'each band carries one + insertion control');
   assert.deepEqual(bands.map((band) => band.querySelector('.chain-band-add')
     ?.getAttribute('aria-label') ?? null),
-  ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage', 'Add a Modulation stage']);
+  ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage']);
 });
 
 test('endomorphisms carry controls; sockets carry only valid selectors', async () => {
@@ -212,14 +212,14 @@ test('a carrier the chain passes over has no band', async () => {
 
   assert.deepEqual(
     h.container.querySelectorAll('.chain-band').map((band) => band.dataset.carrier),
-    ['sphere', 'field', 'color'],
+    ['sphere', 'field'],
     'a framed, titled plane band would hold no gap, chip or socket');
 });
 
 test('a socket collapses an emptied band and expands back out of one', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'warp2').dispatch('keydown', { key: 'Delete' });
-  assert.deepEqual(labels(h), ['camera', 'lens', 'project', 'sample', 'colorize'],
+  assert.deepEqual(labels(h), ['camera', 'lens', 'project', 'sample', 'colorize', 'modulation'],
     'the plane band is empty, so Project and Sample are adjacent crossings');
 
   let select = chipByLabel(h, 'sample').querySelector('.chain-chip-replace');
@@ -230,7 +230,7 @@ test('a socket collapses an emptied band and expands back out of one', async () 
   select.dispatch('change');
   assert.deepEqual(h.store.chain().map((entry) => entry.operator),
     ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2',
-      'sample.spherical-rings.v3', 'colorize.generated-palette.v3'],
+      'sample.spherical-rings.v3', 'colorize.generated-palette.v4', 'color.modulate.v1'],
     'the one source replaces both crossings');
   assert.equal(bandFor(h, 'plane') === undefined, true,
     'a skipped band has no gap to insert at, so it is not drawn');
@@ -246,7 +246,7 @@ test('a socket collapses an emptied band and expands back out of one', async () 
   select.dispatch('change');
   assert.deepEqual(h.store.chain().map((entry) => entry.operator),
     ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2', 'project.equirectangular.v2',
-      'sample.lattice.v2', 'colorize.generated-palette.v3']);
+      'sample.lattice.v2', 'colorize.generated-palette.v4', 'color.modulate.v1']);
   assert.ok(bandFor(h, 'plane').querySelector('.chain-band-add'),
     'the plane band and its operator vocabulary are back');
   assert.equal(h.applied.length, 3);
@@ -269,7 +269,7 @@ test('a loaded plane-skipping chain reaches the plane vocabulary through Delete'
   assert.equal(paletteOf(h), null);
   assert.deepEqual(h.store.chain().map((entry) => entry.operator),
     ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2', 'project.gnomonic.v2',
-      'sample.fractal.v2', 'colorize.generated-palette.v3']);
+      'sample.fractal.v2', 'colorize.generated-palette.v4', 'color.modulate.v1']);
   assert.ok(bandFor(h, 'plane').querySelector('.chain-band-add'));
 });
 
@@ -406,7 +406,7 @@ for (const [backward, forward] of [
 
 test('Alt+Arrow reorders only within the same carrier band', async () => {
   const h = await makeStrip();
-  const untouched = ['camera', 'lens', 'project', 'warp2', 'sample', 'colorize'];
+  const untouched = ['camera', 'lens', 'project', 'warp2', 'sample', 'colorize', 'modulation'];
 
   chipByLabel(h, 'project').dispatch('keydown', { key: 'ArrowRight', altKey: true });
   assert.deepEqual(labels(h), untouched, 'a crossing has no reorder');
@@ -425,9 +425,9 @@ test('× and Delete remove an endomorphism and re-apply the program', async () =
   chipByLabel(h, 'lens').querySelector('.chain-chip-remove').dispatch('click');
 
   assert.deepEqual(labels(h),
-    ['camera', 'project', 'warp2', 'sample', 'colorize']);
+    ['camera', 'project', 'warp2', 'sample', 'colorize', 'modulation']);
   assert.deepEqual(h.applied,
-    [['camera', 'project', 'warp2', 'sample', 'colorize']]);
+    [['camera', 'project', 'warp2', 'sample', 'colorize', 'modulation']]);
   assert.equal(h.doc.activeElement.dataset.label, 'project',
     'focus lands on the chip that filled the removed slot');
   assert.deepEqual(h.selections, ['lens', null],
@@ -435,7 +435,7 @@ test('× and Delete remove an endomorphism and re-apply the program', async () =
 
   chipByLabel(h, 'warp2').dispatch('keydown', { key: 'Delete' });
   assert.deepEqual(labels(h),
-    ['camera', 'project', 'sample', 'colorize']);
+    ['camera', 'project', 'sample', 'colorize', 'modulation']);
   assert.equal(paletteOf(h), null, 'Delete on an endomorphism needs no palette');
 });
 
@@ -712,41 +712,41 @@ test('undo and redo revert and reapply whole edits through the same apply path',
   paletteEntries(h)
     .find((entry) => entry.dataset.operator === 'warp.wave-shear.v2')
     .dispatch('click');
-  assert.equal(labels(h).length, 7);
+  assert.equal(labels(h).length, 8);
   assert.equal(h.applied.length, 1);
 
   h.container.querySelector('.chain-undo').dispatch('click');
-  assert.equal(labels(h).length, 6);
+  assert.equal(labels(h).length, 7);
   assert.equal(h.applied.length, 2);
 
   const redo = h.container.querySelector('.chain-redo');
   assert.equal(redo.disabled, false);
   redo.dispatch('click');
-  assert.equal(labels(h).length, 7);
+  assert.equal(labels(h).length, 8);
   assert.equal(h.applied.length, 3);
 
   chipByLabel(h, 'camera').querySelector('.chain-chip-rename')
     .dispatch('keydown', { key: 'z', ctrlKey: true });
-  assert.equal(labels(h).length, 7);
+  assert.equal(labels(h).length, 8);
   assert.equal(h.applied.length, 3,
     'text-field undo stays with the native input editor');
 
   // Ctrl+Z reaches the container's shortcut from any chip.
   chipByLabel(h, 'camera').dispatch('keydown', { key: 'z', ctrlKey: true });
-  assert.equal(labels(h).length, 6);
+  assert.equal(labels(h).length, 7);
   assert.equal(h.applied.length, 4);
   chipByLabel(h, 'camera').dispatch('keydown', { key: 'y', ctrlKey: true });
-  assert.equal(labels(h).length, 7);
+  assert.equal(labels(h).length, 8);
   chipByLabel(h, 'camera').dispatch('keydown', { key: 'z', metaKey: true });
-  assert.equal(labels(h).length, 6);
-  chipByLabel(h, 'camera').dispatch('keydown', { key: 'z', ctrlKey: true, shiftKey: true });
   assert.equal(labels(h).length, 7);
+  chipByLabel(h, 'camera').dispatch('keydown', { key: 'z', ctrlKey: true, shiftKey: true });
+  assert.equal(labels(h).length, 8);
   const selector = h.doc.createElement('select');
   const textArea = h.doc.createElement('textarea');
   for (const control of [selector, textArea]) {
     h.container.appendChild(control);
     control.dispatch('keydown', { key: 'z', ctrlKey: true });
-    assert.equal(labels(h).length, 7);
+    assert.equal(labels(h).length, 8);
   }
 });
 
@@ -756,7 +756,7 @@ test('bypass toggles the program shape without touching the document', async () 
 
   chipByLabel(h, 'lens').querySelector('.chain-chip-bypass').dispatch('click');
   assert.deepEqual(h.applied.at(-1),
-    ['camera', 'project', 'warp2', 'sample', 'colorize']);
+    ['camera', 'project', 'warp2', 'sample', 'colorize', 'modulation']);
   const chip = chipByLabel(h, 'lens');
   assert.equal(chip.classList.contains('chain-chip--bypassed'), true);
   assert.match(chip.getAttribute('aria-label'), /, bypassed$/);
@@ -820,7 +820,7 @@ test('the strip roves between chips and exposes their controls to Tab', async ()
 
   chipByLabel(h, 'lens').dispatch('keydown', { key: 'b' });
   assert.deepEqual(h.applied.at(-1),
-    ['camera', 'project', 'warp2', 'sample', 'colorize']);
+    ['camera', 'project', 'warp2', 'sample', 'colorize', 'modulation']);
   chipByLabel(h, 'lens').dispatch('keydown', { key: 'b' });
   assert.equal(h.applied.at(-1).includes('lens'), true);
 });
@@ -1070,7 +1070,7 @@ test('destroy detaches the strip listeners and empties the strip', async () => {
     'the next document reuses the mount, so nothing may stay bound to it');
 
   h.container.dispatch('keydown', { key: 'z', ctrlKey: true });
-  assert.equal(labels(h).length, 7, 'a destroyed strip undoes nothing');
+  assert.equal(labels(h).length, 8, 'a destroyed strip undoes nothing');
   assert.equal(h.container.childNodes.length, 0, 'and repaints nothing');
 });
 
@@ -1487,49 +1487,86 @@ test('the inline controls read the named preset', async () => {
 
 test('the Color card keeps palette mapping and brightness while hiding embedded modulation', async () => {
   const h = await makeStrip({ writeThrough: true });
-  const groups = paramsOf(h, 'colorize').querySelectorAll('.chain-param-group');
-  assert.deepEqual(groups.filter((group) => !group.hidden).map((group) => group.getAttribute('aria-label')),
-    ['Palette', 'Color mapping', 'Brightness & opacity']);
-  for (const field of ['modulation-enabled', 'modulation-source', 'pattern-scale', 'pattern-speed',
-    'hue-shift-mode', 'hue-shift-amount'])
-    assert.equal(rowFor(h, 'colorize', `colorize.${field}`).hidden, true, field);
-  assert.equal(rowFor(h, 'colorize', 'colorize.mapping-frequency').hidden, false);
-  assert.equal(rowFor(h, 'colorize', 'colorize.value-opacity-low').hidden, false);
+  const groups = () => paramsOf(h, 'colorize').querySelectorAll('.chain-param-group');
+  assert.deepEqual(groups().filter((group) => !group.hidden)
+    .map((group) => group.getAttribute('aria-label')),
+  ['Palette', 'Color mapping', 'Brightness & opacity', 'Modulation', 'Noise']);
+  const scale = rowFor(h, 'colorize', 'modulation.pattern-scale');
+  const speed = rowFor(h, 'colorize', 'modulation.pattern-speed');
+  assert.equal(scale.parentNode.getAttribute('aria-label'), 'Noise');
+  assert.equal(controlIn(scale).getAttribute('aria-label'), 'Noise scale (frequency)');
+  assert.equal(controlIn(speed).getAttribute('aria-label'), 'Noise speed');
+  for (const field of ['pattern-scale', 'pattern-speed', 'pattern-noise-variant'])
+    assert.equal(rowFor(h, 'colorize', `modulation.${field}`).hidden, false, field);
+  for (const field of ['sine-frequency', 'interference-frequency', 'grid-frequency',
+    'pattern-contrast', 'pattern-noise-basis']) {
+    const row = rowFor(h, 'colorize', `modulation.${field}`);
+    assert.equal(row.hidden, true, field);
+    assert.equal(row.querySelector('.chain-param-note'), null, field);
+  }
+  for (const [field, value] of [['pattern-scale', '2'], ['pattern-speed', '0.0004']]) {
+    const control = controlIn(rowFor(h, 'colorize', `modulation.${field}`));
+    control.value = value;
+    control.dispatch('input');
+    control.dispatch('change');
+    assert.equal(h.store.document().preset_bank.presets[0].values[`modulation.${field}`],
+      Number(value));
+  }
 });
 
 test('embedded Color modulation stays hidden while brightness follows its selector', async () => {
   const h = await makeStrip({ writeThrough: true });
   const edit = (field, value) => {
-    const control = controlIn(rowFor(h, 'colorize', `colorize.${field}`));
+    if (field === 'modulation-enabled') {
+      const control = h.container.querySelectorAll('.chain-modulation-enabled').find((node) => node.dataset.label === 'modulation');
+      control.checked = value === 'enabled';
+      control.dispatch('change');
+      return;
+    }
+    const control = controlIn(rowFor(h, 'colorize', `modulation.${field}`));
     control.value = value;
     control.dispatch('change');
   };
-  const noiseScale = controlIn(rowFor(h, 'colorize', 'colorize.pattern-scale')).value;
-  edit('modulation-source', 'sphere-interference');
+  const noiseScale = controlIn(rowFor(h, 'colorize', 'modulation.pattern-scale')).value;
+  for (const [source, shown, hidden] of [
+    ['directional-sine', 'sine-frequency', 'interference-frequency'],
+    ['sphere-interference', 'interference-frequency', 'grid-frequency'],
+    ['sphere-smooth-grid', 'grid-frequency', 'sine-frequency'],
+    ['noise', 'pattern-scale', 'interference-frequency'],
+  ]) {
+    edit('modulation-source', source);
+    assert.equal(rowFor(h, 'colorize', `modulation.${shown}`).hidden, false);
+    assert.equal(rowFor(h, 'colorize', `modulation.${hidden}`).hidden, true);
+  }
+  assert.equal(controlIn(rowFor(h, 'colorize', 'modulation.pattern-scale')).value, noiseScale);
   edit('modulation-enabled', 'disabled');
-  assert.equal(rowFor(h, 'colorize', 'colorize.modulation-source').hidden, true);
-  assert.equal(rowFor(h, 'colorize', 'colorize.pattern-scale').hidden, true);
+  assert.equal(rowFor(h, 'colorize', 'modulation.modulation-enabled'), undefined);
+  assert.equal(h.container.querySelector('.chain-modulation-enabled').checked, false);
+  assert.equal(rowFor(h, 'colorize', 'modulation.modulation-source').hidden, true);
+  assert.equal(rowFor(h, 'colorize', 'modulation.pattern-scale').hidden, true);
   assert.equal(h.store.undo(), true);
   h.strip.render();
-  assert.equal(controlIn(rowFor(h, 'colorize', 'colorize.pattern-scale')).value, noiseScale);
-  edit('hue-shift-mode', 'path-length');
-  assert.equal(rowFor(h, 'colorize', 'colorize.hue-shift-amount').hidden, true);
-  edit('brightness-envelope', 'bell');
-  for (const field of ['brightness-bottom', 'brightness-top'])
-    assert.equal(rowFor(h, 'colorize', `colorize.${field}`).hidden, false);
+  assert.equal(rowFor(h, 'colorize', 'modulation.pattern-scale').hidden, false);
+  assert.equal(controlIn(rowFor(h, 'colorize', 'modulation.pattern-scale')).value, noiseScale);
+  edit('pattern-noise-variant', 'octave-contour');
+  assert.equal(rowFor(h, 'colorize', 'modulation.pattern-contrast').hidden, false);
+  assert.equal(rowFor(h, 'colorize', 'modulation.pattern-noise-basis').hidden, false);
+  edit('modulation-source', 'displacement');
+  assert.equal(rowFor(h, 'colorize', 'modulation.pattern-scale').hidden, true);
+  assert.equal(rowFor(h, 'colorize', 'modulation.modulation-amount').hidden, false);
 });
 
 test('Noise scale follows the sampling limit without replacing its controls', async () => {
   const h = await makeStrip({ writeThrough: true });
-  const row = rowFor(h, 'colorize', 'colorize.pattern-scale');
+  const row = rowFor(h, 'colorize', 'modulation.pattern-scale');
   const slider = controlIn(row);
   const readout = row.querySelector('.chain-param-value');
   assert.equal(slider.max, '8');
   assert.equal(readout.max, '8');
   readout.value = '20';
   readout.dispatch('change');
-  assert.equal(h.store.document().preset_bank.presets[0].values['colorize.pattern-scale'], 8);
-  const evaluation = controlIn(rowFor(h, 'colorize', 'colorize.modulation-evaluation'));
+  assert.equal(h.store.document().preset_bank.presets[0].values['modulation.pattern-scale'], 8);
+  const evaluation = controlIn(rowFor(h, 'colorize', 'modulation.modulation-evaluation'));
   evaluation.value = 'direct';
   evaluation.dispatch('change');
   assert.equal(slider.max, '64');
@@ -1537,14 +1574,14 @@ test('Noise scale follows the sampling limit without replacing its controls', as
   slider.value = '32';
   slider.dispatch('input');
   slider.dispatch('change');
-  assert.equal(h.store.document().preset_bank.presets[0].values['colorize.pattern-scale'], 32);
-  assert.ok(controlIn(rowFor(h, 'colorize', 'colorize.pattern-scale')) === slider);
+  assert.equal(h.store.document().preset_bank.presets[0].values['modulation.pattern-scale'], 32);
+  assert.ok(controlIn(rowFor(h, 'colorize', 'modulation.pattern-scale')) === slider);
 });
 
 test('modulation strength follows the selected mechanic range', async () => {
   const h = await makeStrip();
-  const amount = rowFor(h, 'colorize', 'colorize.modulation-amount');
-  const control = controlIn(rowFor(h, 'colorize', 'colorize.modulation-mechanic'));
+  const amount = rowFor(h, 'colorize', 'modulation.modulation-amount');
+  const control = controlIn(rowFor(h, 'colorize', 'modulation.modulation-mechanic'));
   for (const [mechanic, minimum, maximum] of [
     ['opacity', '0', '1'], ['positive-lightness-lift', '0', '1'], ['hue-rotation', '-4', '4'],
   ]) {
@@ -1554,6 +1591,79 @@ test('modulation strength follows the selected mechanic range', async () => {
     assert.equal(controlIn(amount).max, maximum);
     assert.equal(amount.querySelector('.chain-param-value').max, maximum);
   }
+});
+
+test('the Color card adds, reorders, and removes independent modulation layers with undo', async () => {
+  const source = scratchChainDocument(CATALOG);
+  source.preset_bank.presets.push({...structuredClone(source.preset_bank.presets[0]), preset_id: 'second'});
+  source.preset_bank.choreography.generated_order.push('second');
+  source.preset_bank.choreography.dwell.second = 600;
+  const h = await makeStrip({source});
+  const layers = () => h.container.querySelectorAll('.chain-modulation-layer');
+  const add = () => h.container.querySelector('.chain-modulation-add').dispatch('click');
+  assert.equal(layers().length, 0);
+  add();
+  add();
+  assert.equal(layers().length, 2);
+  assert.equal(h.container.querySelectorAll('.chain-modulation-enabled').length, 2);
+  assert.equal(h.container.querySelectorAll('.chain-param').some((row) =>
+    row.dataset.parameter.endsWith('.modulation-enabled')), false);
+  assert.equal(chips(h).length, source.descriptor.chain.length);
+  const [first, second] = h.store.chain().slice(-2);
+  assert.notEqual(first.label, second.label);
+  const presets = h.store.document().preset_bank.presets;
+  for (const [index, preset] of presets.entries()) {
+    assert.equal(h.store.setPresetValues(preset.preset_id, {
+      [`${first.label}.modulation-source`]: 'displacement',
+      [`${first.label}.modulation-evaluation`]: 'direct',
+      [`${first.label}.modulation-amount`]: 0.25 + index,
+      [`${second.label}.modulation-amount`]: -0.5 - index,
+    }).ok, true);
+  }
+  h.strip.render();
+  assert.equal(rowFor(h, 'colorize', `${first.label}.pattern-scale`).hidden, true);
+  assert.equal(rowFor(h, 'colorize', `${first.label}.modulation-evaluation`).hidden, true);
+  const before = h.store.document();
+  layers()[1].querySelector('.chain-modulation-move').dispatch('click');
+  assert.deepEqual(h.store.chain().slice(-2), [second, first]);
+  assert.deepEqual(h.store.document().preset_bank.presets, before.preset_bank.presets);
+  h.container.querySelector('.chain-undo').dispatch('click');
+  assert.deepEqual(h.store.document(), before);
+  layers()[0].querySelector('.chain-modulation-remove').dispatch('click');
+  assert.equal(layers().length, 1);
+  assert.equal(h.store.document().preset_bank.presets.some((preset) =>
+    Object.keys(preset.values).some((id) => id.startsWith(`${first.label}.`))), false);
+  h.container.querySelector('.chain-undo').dispatch('click');
+  assert.deepEqual(h.store.document(), before);
+  assert.equal(h.applied.length, 6);
+});
+
+test('dragging a folded modulation header reorders layers within the Color card', async () => {
+  const h = await makeStrip();
+  h.container.querySelector('.chain-modulation-add').dispatch('click');
+  chipByLabel(h, 'colorize').dispatch('click');
+  const stack = h.container.querySelector('.chain-modulation-stack');
+  stack.getBoundingClientRect = () => rect(0, 140);
+  const layers = stack.querySelectorAll('.chain-modulation-layer');
+  for (const [index, layer] of layers.entries()) {
+    layer.getBoundingClientRect = () => rect(20 + index * 50);
+    layer.querySelector('.chain-modulation-header').getBoundingClientRect = () => rect(20 + index * 50, 20);
+  }
+  const viewport = h.container.querySelector('.chain-strip-viewport');
+  viewport.getBoundingClientRect = () => rect(0, 200);
+  viewport.clientHeight = viewport.scrollHeight = 200;
+  const before = h.store.document();
+  const header = layers[0].querySelector('.chain-modulation-header');
+  header.dispatch('pointerdown', dragPointer(25));
+  header.dispatch('pointermove', dragPointer(100));
+  assert.equal(layers[0].classList.contains('chain-chip--dragging'), true);
+  header.dispatch('pointerup', dragPointer(100));
+  assert.deepEqual(h.store.chain().slice(-2).map((entry) => entry.label), before.descriptor.chain.slice(-2).map((entry) => entry.label).reverse());
+  assert.deepEqual(h.store.document().preset_bank.presets, before.preset_bank.presets);
+  assert.equal(h.doc.activeElement.dataset.label, 'colorize');
+  assert.equal(chipByLabel(h, 'colorize').querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
+  h.container.querySelector('.chain-undo').dispatch('click');
+  assert.deepEqual(h.store.document(), before);
 });
 
 test('the inline controls keep their own keys and take no drag', async () => {
@@ -1566,13 +1676,13 @@ test('the inline controls keep their own keys and take no drag', async () => {
     'a slider’s own arrow keys are not the strip’s chip roving');
   slider.dispatch('keydown', { key: 'Delete' });
   assert.deepEqual(labels(h),
-    ['camera', 'lens', 'project', 'warp2', 'sample', 'colorize']);
+    ['camera', 'lens', 'project', 'warp2', 'sample', 'colorize', 'modulation']);
 
   slider.dispatch('pointerdown', { isPrimary: true, button: 0, pointerId: 4 });
   assert.deepEqual(h.applied, [],
     'a press on a control must not apply a chain edit');
   assert.deepEqual(labels(h),
-    ['camera', 'lens', 'project', 'warp2', 'sample', 'colorize']);
+    ['camera', 'lens', 'project', 'warp2', 'sample', 'colorize', 'modulation']);
 });
 
 test('syncHistory repaints Undo and Redo without rebuilding the strip', async () => {
@@ -1597,10 +1707,6 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     { id: 'warp1.envelope', storage: 'enum8' },
     { id: 'warp1.edge-width', storage: 'binary32' },
     { id: 'camera.wander', storage: 'binary32' },
-    { id: 'colorize.hue-shift-mode', storage: 'enum8' },
-    { id: 'colorize.hue-shift-amount', storage: 'binary32' },
-    { id: 'colorize.pattern-scale', storage: 'binary32' },
-    { id: 'colorize.pattern-speed', storage: 'binary32' },
     { id: 'colorize.brightness-envelope', storage: 'enum8' },
     { id: 'colorize.brightness-bottom', storage: 'binary32' },
     { id: 'colorize.brightness-top', storage: 'binary32' },
@@ -1611,10 +1717,6 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     'warp1.envelope': 'edge-fade',
     'warp1.edge-width': 0.1,
     'camera.wander': 0,
-    'colorize.hue-shift-mode': 'path-length',
-    'colorize.hue-shift-amount': 1,
-    'colorize.pattern-scale': 1,
-    'colorize.pattern-speed': 0,
     'colorize.brightness-envelope': 'none',
     'colorize.brightness-bottom': 0,
     'colorize.brightness-top': 1,
@@ -1623,7 +1725,7 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     { label: 'sample', operator: 'sample.grid.v3' },
     { label: 'warp1', operator: 'warp.wave-shear.v2' },
     { label: 'camera', operator: 'sphere.rotate.v2' },
-    { label: 'colorize', operator: 'colorize.generated-palette.v3' },
+    { label: 'colorize', operator: 'colorize.generated-palette.v4' },
   ];
   assert.deepEqual([...deactivatedParameterIds(parameters, values, chain, CATALOG)],
     ['sample.edge-width', 'colorize.brightness-bottom',
@@ -1731,15 +1833,15 @@ test('every catalog operator exposes its parameter controls without declarations
       for (const id of Object.keys(preset.values))
         if (id.startsWith('audit.')) delete preset.values[id];
     const h = await makeStrip({ source });
-    chipByLabel(h, 'audit').dispatch('click');
-    const fields = operator.params.filter((field) =>
-      operator.id !== 'modulate.field.v1' || field.id !== 'modulation-enabled');
-    assert.deepEqual(rowsOf(h, 'audit').map((row) => row.dataset.parameter).sort(),
+    const owner = operator.id === 'color.modulate.v1' ? chain[prefix.length - 1].label : 'audit';
+    chipByLabel(h, owner).dispatch('click');
+    const fields = operator.params.filter((field) => operator.id !== 'color.modulate.v1' || field.id !== 'modulation-enabled');
+    assert.deepEqual(rowsOf(h, owner).filter((row) => row.dataset.parameter.startsWith('audit.')).map((row) => row.dataset.parameter).sort(),
       fields.map((field) => `audit.${field.id}`).sort(), operator.name);
     for (const field of fields) {
-      const control = controlIn(rowFor(h, 'audit', `audit.${field.id}`));
-      const value = control.type === 'checkbox' ? (control.checked ? 'on' : 'off') : control.value;
-      assert.equal(String(value), String(field.default), `${operator.name}: ${field.id}`);
+      const control = controlIn(rowFor(h, owner, `audit.${field.id}`));
+      if (control.type === 'checkbox') assert.equal(control.checked, field.default === 'on', `${operator.name}: ${field.id}`);
+      else assert.equal(String(control.value), String(field.default), `${operator.name}: ${field.id}`);
     }
     if (operator.params.length === 0)
       assert.equal(paramsOf(h, 'audit').querySelector('.chain-strip-note').textContent,
@@ -1912,7 +2014,7 @@ test('loaded twist and glitch stages expose omitted controls and persist slider 
     { label: 'glitch', operator: 'sphere.lens.glitch.v2' },
     { label: 'project', operator: 'project.stereographic.v2' },
     { label: 'sample', operator: 'sample.grid.v3' },
-    { label: 'color', operator: 'colorize.generated-palette.v3' },
+    { label: 'color', operator: 'colorize.generated-palette.v4' },
   ]);
   const controls = [
     ['twist', 'twist-rate', 3, 4.5],
@@ -1951,7 +2053,7 @@ test('Ripple random center toggles manual coordinates and follows synchronized v
   const source = scratchChainDocument(CATALOG, [
     { label: 'ripple', operator: 'sphere.displace.ripple.v2' },
     { label: 'sample', operator: 'sample.spherical-rings.v3' },
-    { label: 'color', operator: 'colorize.generated-palette.v3' },
+    { label: 'color', operator: 'colorize.generated-palette.v4' },
   ]);
   const h = await makeStrip({ source, writeThrough: true });
   chipByLabel(h, 'ripple').dispatch('click');
@@ -1972,45 +2074,6 @@ test('Ripple random center toggles manual coordinates and follows synchronized v
   assert.equal(azimuth.hidden, true);
   assert.equal(polar.hidden, true);
   assert.equal(h.store.compile().status, 'VALID');
-});
-
-
-test('Modulations supports independent ordered Field stages and Hue shift after Color', async () => {
-  const h = await makeStrip({writeThrough: true});
-  const band = () => bandFor(h, 'color');
-  assert.equal(band().querySelector('.chain-band-title').textContent, 'Modulations');
-  band().querySelector('.chain-band-add').dispatch('click');
-  const choice = paletteEntries(h).find((entry) => entry.dataset.operator === 'modulate.field.v1');
-  assert.ok(choice);
-  choice.dispatch('click');
-  const first = h.store.chain().at(-1).label;
-  assert.equal(h.store.chain().at(-1).operator, 'modulate.field.v1');
-  assert.equal(Boolean(rowFor(h, first, `${first}.modulation-enabled`)), false,
-    'modulation-enabled has no inline control');
-  const evaluation = controlIn(rowFor(h, first, `${first}.modulation-evaluation`));
-  evaluation.value = 'direct';
-  evaluation.dispatch('change');
-  const source = controlIn(rowFor(h, first, `${first}.modulation-source`));
-  source.value = 'directional-sine';
-  source.dispatch('change');
-  assert.equal(rowFor(h, first, `${first}.sine-frequency`).hidden, false);
-  assert.equal(rowFor(h, first, `${first}.pattern-scale`).hidden, true);
-  const next = h.store.replaceSpan(h.store.chain().length, 0, [
-    {label: 'another', operator: 'modulate.field.v1'},
-    {label: 'hue', operator: 'modulate.hue-shift.v1'},
-  ]);
-  assert.equal(next.ok, true);
-  h.strip.render();
-  assert.equal(controlIn(rowFor(h, 'another', 'another.modulation-source')).value, 'noise');
-  chipByLabel(h, 'another').dispatch('keydown', {key: 'ArrowUp', altKey: true});
-  assert.deepEqual(h.store.chain().slice(-3).map((entry) => entry.label), ['another', first, 'hue']);
-  chipByLabel(h, first).querySelector('.chain-chip-bypass').dispatch('click');
-  assert.equal(h.store.bypassedLabels().includes(first), true);
-  chipByLabel(h, first).querySelector('.chain-chip-bypass').dispatch('click');
-  assert.equal(h.store.bypassedLabels().includes(first), false);
-  assert.equal(h.store.chain().at(-4).operator, 'colorize.generated-palette.v3');
-  chipByLabel(h, 'hue').querySelector('.chain-chip-remove').dispatch('click');
-  assert.equal(h.store.chain().some((entry) => entry.label === 'hue'), false);
 });
 
 

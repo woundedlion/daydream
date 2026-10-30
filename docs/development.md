@@ -48,19 +48,19 @@ URL persistence stores the snapshot in `fx.__chainSnapshot`;
 resolution rollback and segment-worker initialization use the same snapshot. Worker
 protocol carries `chainSnapshot`.
 
-Snapshot schema version 3 requires `chain: [{instance, operator}]`,
+Snapshot schema version 4 requires `chain: [{instance, operator}]`,
 `parameters: [{name, value}]`, `animationsPaused` (boolean), and
-`modulation: [{instance, recipe}]`, with one
-recipe per colorize or Field modulation instance. Colorize and Field modulation fields travel in `modulation`,
-not `parameters`. Color4 stages run in the Modulations container after the permanent
-Color palette card. Field stages own their recipe and source clock; Hue shift stages
-use the path length retained by the interpreter. Palette family, mapping, brightness
-and opacity belong to the Color card. Authoring expands embedded color modulation
-into Hue shift then Field stages, moving recipe clocks into the Field instance in
-saved runtime snapshots. `runtime` and `paletteBank` are optional. Runtime entries identify their instance and stable
+`modulation: [{instance, recipe}]`, with one recipe per `color.modulate.v1`
+instance. Modulation fields travel in `modulation`, not `parameters`.
+The Color card presents the ordered layers with add, remove, reorder and
+header drag controls. Each layer owns its recipe and source clock;
+displacement is one of the available sources. Palette family, mapping,
+brightness and opacity belong to the Color card. Legacy embedded hue shift
+and spatial recipes migrate into independent layers, retaining their clocks.
+`runtime` and `paletteBank` are optional. Runtime entries identify their instance and stable
 state kind. Omit runtime to initialize fresh state; when present, it must include
 every stateful instance exactly once. `ChainRuntimeState` in the module declarations
-defines the walk, source, noise, affine, phase, ring and color state shapes.
+defines the walk, source, noise, affine, phase, ring, color and modulation state shapes.
 The engine validates a replacement before applying it, so refusal commits no
 snapshot state. Caller-accessor side effects during WASM payload cloning are
 not rolled back.

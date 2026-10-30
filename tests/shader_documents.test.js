@@ -9,9 +9,9 @@ import { shaderWorkbenchUrl, start } from '../src/app/daydream.js';
 import { WORKBENCH_EFFECTS } from '../src/effects/effect_roster.js';
 import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
-import { scratchChainDocument, expandColorModulations } from '../src/workbench/shader/chain_document_store.js';
+import { scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
 import {
-  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
+  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash, migrateLegacyChainSnapshot,
 } from '../src/workbench/shader/shader_deeplink.js';
 import {
   applyFixedShaderDocument,
@@ -70,7 +70,7 @@ test('v2 shader links retain typed runtime and palette state', async () => {
     document: {descriptor: {chain: [{label: 'source'}]}},
     preset: 'night', bypassed: [], paused: true,
     chainSnapshot: {
-      schemaVersion: 3, chain: [{instance: 'source', operator: 'sample.grid.v3'}],
+      schemaVersion: 4, chain: [{instance: 'source', operator: 'sample.grid.v3'}],
       modulation: [], parameters: [{name: 'source.pattern-freq', value: 1}], animationsPaused: true,
       runtime: [{instance: 'source', kind: 'source-clock-v1',
         state: {primary: 1.25, secondary: 0.5, angle: 2}}],
@@ -89,6 +89,69 @@ test('v2 shader links retain typed runtime and palette state', async () => {
   delete missingModulation.modulation;
   await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: missingModulation}),
     /invalid shader link snapshot/);
+});
+
+test('legacy snapshots split displacement and spatial modulation without losing runtime', () => {
+  const recipe = {enabled: false, source: 2, version: 1, seed: 123, mechanic: {kind: 1, amount: 0.5}};
+  const clock = {source: 2, version: 1, phaseTurns: 0.25, initialized: true};
+  const legacy = {schemaVersion: 3,
+    chain: [{instance: 'displacement', operator: 'sphere.rotate.v2'},
+      {instance: 'ink', operator: 'colorize.generated-palette.v3'}],
+    parameters: [{name: 'ink.hue-shift-mode', value: 1},
+      {name: 'ink.hue-shift-amount', value: -2}, {name: 'ink.palette-chroma', value: 0.7}],
+    modulation: [{instance: 'ink', recipe}],
+    runtime: [{instance: 'ink', kind: 'color-clock-v2', state: {oscillationPhase: 0.75, modulation: clock}}],
+    animationsPaused: true};
+  const snapshot = migrateLegacyChainSnapshot(legacy);
+  assert.equal(snapshot.schemaVersion, 4);
+  assert.deepEqual(snapshot.chain.slice(1), [
+    {instance: 'ink', operator: 'colorize.generated-palette.v4'},
+    {instance: 'displacement-2', operator: 'color.modulate.v1'},
+    {instance: 'modulation', operator: 'color.modulate.v1'},
+  ]);
+  assert.deepEqual(snapshot.parameters, [{name: 'ink.palette-chroma', value: 0.7}]);
+  assert.deepEqual(snapshot.modulation[0].recipe.mechanic, {kind: 0, amount: -2});
+  assert.equal(snapshot.modulation[0].recipe.source, 4);
+  assert.equal(snapshot.modulation[0].recipe.evaluation, 0);
+  assert.equal(snapshot.modulation[0].recipe.enabled, true);
+  assert.deepEqual(snapshot.modulation[1].recipe, recipe);
+  assert.deepEqual(snapshot.runtime, [
+    {instance: 'ink', kind: 'color-clock-v3', state: {oscillationPhase: 0.75}},
+    {instance: 'displacement-2', kind: 'modulation-clock-v1',
+      state: {source: 4, version: 1, phaseTurns: 0, initialized: true}},
+    {instance: 'modulation', kind: 'modulation-clock-v1', state: clock},
+  ]);
+  assert.equal(legacy.schemaVersion, 3);
+  assert.equal(migrateLegacyChainSnapshot(snapshot), snapshot);
+});
+
+test('legacy snapshot migration preserves malformed values for rejection', async () => {
+  const legacy = {schemaVersion: 3,
+    chain: [{instance: 'ink', operator: 'colorize.generated-palette.v3'}],
+    parameters: [{name: 'ink.hue-shift-mode', value: 1},
+      {name: 'ink.hue-shift-amount', value: 0.5}],
+    modulation: [{instance: 'ink', recipe: {source: 0}}],
+    runtime: [{instance: 'ink', kind: 'color-clock-v2', state: {oscillationPhase: 0,
+      modulation: {source: 0, version: 1, phaseTurns: 0, initialized: true}}}],
+    animationsPaused: false};
+  for (const change of [
+    (snapshot) => { snapshot.parameters[0].value = 2; },
+    (snapshot) => { snapshot.parameters[0].value = '1'; },
+    (snapshot) => { snapshot.parameters[1].value = 5; },
+    (snapshot) => { snapshot.parameters[1].value = NaN; },
+    (snapshot) => { snapshot.parameters.push({...snapshot.parameters[0]}); },
+    (snapshot) => { snapshot.parameters.push({...snapshot.parameters[1]}); },
+    (snapshot) => { snapshot.modulation[0].recipe.source = 4; },
+    (snapshot) => { snapshot.runtime[0].state.modulation.source = 4; },
+    (snapshot) => { snapshot.runtime[0].kind = 'color-clock-v3'; },
+  ]) {
+    const snapshot = structuredClone(legacy);
+    change(snapshot);
+    assert.equal(migrateLegacyChainSnapshot(snapshot), snapshot);
+    await assert.rejects(encodeShaderStateHash({document: {descriptor: {chain: []}},
+      preset: 'test', bypassed: [], paused: false, chainSnapshot: snapshot}),
+    /invalid shader link snapshot/);
+  }
 });
 
 test('shader links bound the expanded UTF-8 state including its wrapper', async () => {
@@ -387,8 +450,10 @@ test('the fixed path skips every topology field the catalog flags', () => {
 
 const PATTERNS = new URL('../generated/shader/patterns/', import.meta.url);
 /** @param {string} filename */
-const promotedDocument = (filename) =>
-  JSON.parse(readFileSync(new URL(filename, PATTERNS), 'utf8'));
+const promotedDocument = (filename) => {
+  const document = JSON.parse(readFileSync(new URL(filename, PATTERNS), 'utf8'));
+  return document.descriptor ? compileShaderDocument(document, {catalog: JSON.parse(ENGINE_CATALOG)}).document : document;
+};
 const PROMOTED = promotedDocument('catalog.json').source_documents;
 
 // The compiled build hard-codes these values, so it registers no control for
@@ -1013,8 +1078,26 @@ test('returning to the scratch source reopens the default chain', async () => {
 
 // ── The pipeline strip over the real store, compiler and engine catalog ────
 
-const LEGACY_KALEIDOSCOPE_HEX_BRIGHT = readFileSync(
+const CANONICAL_KALEIDOSCOPE_HEX_BRIGHT = readFileSync(
   new URL('../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8');
+function embeddedLegacySource(source) {
+  const document = JSON.parse(source);
+  const modulation = document.descriptor.chain.find((entry) => entry.operator === 'color.modulate.v1');
+  if (!modulation) return source;
+  const prefix = `${modulation.label}.`;
+  const remap = (id) => id.startsWith(prefix) ? `colorize.${id.slice(prefix.length)}` : id;
+  document.descriptor.chain = document.descriptor.chain.filter((entry) => entry !== modulation);
+  document.descriptor.chain.find((entry) => entry.label === 'colorize').operator = 'colorize.generated-palette.v3';
+  for (const parameter of document.descriptor.parameters) {
+    parameter.id = remap(parameter.id);
+    if (parameter.interpolation.group) parameter.interpolation.group = remap(parameter.interpolation.group);
+  }
+  document.descriptor.serialization.fields = document.descriptor.serialization.fields.map(remap);
+  for (const preset of document.preset_bank.presets)
+    preset.values = Object.fromEntries(Object.entries(preset.values).map(([id, value]) => [remap(id), value]));
+  return exportShaderDocumentJson(document);
+}
+const LEGACY_KALEIDOSCOPE_HEX_BRIGHT = embeddedLegacySource(CANONICAL_KALEIDOSCOPE_HEX_BRIGHT);
 function withoutEmbeddedModulation(source) {
   const document = JSON.parse(source);
   for (const parameter of document.descriptor.parameters) {
@@ -1028,7 +1111,7 @@ function withoutEmbeddedModulation(source) {
   }
   return exportShaderDocumentJson(document);
 }
-const KALEIDOSCOPE_HEX_BRIGHT = withoutEmbeddedModulation(LEGACY_KALEIDOSCOPE_HEX_BRIGHT);
+const KALEIDOSCOPE_HEX_BRIGHT = withoutEmbeddedModulation(CANONICAL_KALEIDOSCOPE_HEX_BRIGHT);
 const KALEIDOSCOPE_STAINED_GLASS = readFileSync(
   new URL('../generated/shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8');
 // No source documents: no load matches a promoted digest, so parity stays disarmed.
@@ -1210,7 +1293,7 @@ test('the scratch document opens as a live, editable chain', async () => {
   assert.deepEqual(harness.selections, ['shader-chain']);
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
     ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v3',
-      'colorize.generated-palette.v3']);
+      'colorize.generated-palette.v4']);
   assert.deepEqual(stripChips(harness).map((chip) => chip.dataset.label),
     ['rotate', 'project', 'sample', 'colorize']);
   assert.deepEqual(
@@ -1368,7 +1451,7 @@ test('a shader state link restores its document, preset, bypasses, and pause', a
   assert.ok(harness.engine.writes.some(
     ([name, value]) => name === 'sample.pattern-freq' && value === 7.25));
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.instance),
-    ['lens', 'project', 'warp2', 'sample', 'colorize']);
+    ['lens', 'project', 'warp2', 'sample', 'colorize', 'modulation']);
   assert.equal(stripChips(harness).find((chip) => chip.dataset.label === 'camera')
     .querySelector('.chain-chip-bypass').getAttribute('aria-pressed'), 'true');
 });
@@ -1587,7 +1670,7 @@ test('a malformed shader state link falls back to an editable scratch chain', as
 
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
     ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v3',
-      'colorize.generated-palette.v3']);
+      'colorize.generated-palette.v4']);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /shader link could not be restored: Error: invalid shader link payload/i);
 });
@@ -1596,7 +1679,7 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   const harness = await editorWorkbench();
   assert.deepEqual(harness.selections, [canonicalEffectId('shader-chain'), canonicalEffectId('shader-chain')]);
   assert.equal(harness.engine.chainCalls.length, 2);
-  assert.equal(harness.engine.chainCalls.at(-1).length, 6);
+  assert.equal(harness.engine.chainCalls.at(-1).length, 7);
   assert.equal(stripChips(harness).length, 6);
   const digest = compileShaderDocument(KALEIDOSCOPE_HEX_BRIGHT,
     { catalog: JSON.parse(ENGINE_CATALOG) }).descriptor_digest;
@@ -1608,14 +1691,14 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   clickPlaneBandEntry(harness, 'warp.wave-shear.v2');
 
   assert.equal(harness.engine.chainCalls.length, 3);
-  assert.equal(harness.engine.chainCalls.at(-1).length, 7);
+  assert.equal(harness.engine.chainCalls.at(-1).length, 8);
   assert.ok(harness.engine.writes.some(([name]) => name === 'warp.strength'),
     'the re-apply carries the backfilled catalog defaults');
 
   // Save exports the store's edited document, not the load-time compile.
   assert.equal(harness.controller.save(), true);
   const saved = JSON.parse(harness.downloads[0][1]);
-  assert.equal(saved.descriptor.chain.length, 7);
+  assert.equal(saved.descriptor.chain.length, 8);
   assert.ok(Object.keys(saved.preset_bank.presets[0].values)
     .some((id) => id.startsWith('warp.')));
 });
@@ -1631,8 +1714,8 @@ test('Kaleidoscope Stained Glass loads its effect preset into the interpreter co
     'warp.vector-noise.v2',
     'warp.mirror-tile.v2',
     'sample.grid.v3',
-    'colorize.generated-palette.v3',
-    'modulate.field.v1',
+    'colorize.generated-palette.v4',
+    'color.modulate.v1',
   ]);
   for (const [label, parameterId] of [
     ['camera', 'camera.wander'],
@@ -1739,7 +1822,7 @@ test('a descriptor edit under the compiled build returns the preview to the inte
   assert.equal(harness.selections.at(-1), 'shader-chain');
   assert.equal(toggle.disabled, true);
   assert.equal(toggle.getAttribute('aria-pressed'), 'false');
-  assert.equal(harness.engine.chainCalls.at(-1).length, 7,
+  assert.equal(harness.engine.chainCalls.at(-1).length, 8,
     'the edited chain is what renders');
   assert.match(status.textContent, /back on the interpreter/);
 });
@@ -1751,7 +1834,8 @@ test('Save writes the canonical v2 serialization', async () => {
   assert.equal(harness.controller.save(), true);
   const [filename, source] = harness.downloads.at(-1);
   assert.equal(filename, 'study.shader.json');
-  assert.equal(source, KALEIDOSCOPE_HEX_BRIGHT);
+  assert.equal(source, exportShaderDocumentJson(compileShaderDocument(
+    KALEIDOSCOPE_HEX_BRIGHT, {catalog: JSON.parse(ENGINE_CATALOG)}).document));
 });
 
 // Save As is a copy, not a rename - the loaded document and the
@@ -1783,7 +1867,7 @@ test('a Save As copy carries the edits made since the load', async () => {
 
   assert.equal(harness.controller.saveAs(), true);
   const copy = JSON.parse(harness.downloads.at(-1)[1]);
-  assert.equal(copy.descriptor.chain.length, 7);
+  assert.equal(copy.descriptor.chain.length, 8);
   assert.deepEqual(
     validateShaderDocument(copy, { catalog: JSON.parse(ENGINE_CATALOG) }), []);
 });
@@ -1826,7 +1910,7 @@ test('a bypass reshapes the engine program while the saved document keeps the st
     .querySelector('.chain-chip-bypass').dispatch('click');
 
   const shape = harness.engine.chainCalls.at(-1);
-  assert.equal(shape.length, 5);
+  assert.equal(shape.length, 6);
   assert.ok(!shape.some((entry) => entry.instance === 'lens'));
   assert.ok(harness.engine.writes.length > writesBefore,
     'the re-apply rewrote the surviving instances');
@@ -1836,7 +1920,7 @@ test('a bypass reshapes the engine program while the saved document keeps the st
 
   assert.equal(harness.controller.save(), true);
   const saved = JSON.parse(harness.downloads.at(-1)[1]);
-  assert.equal(saved.descriptor.chain.length, 6);
+  assert.equal(saved.descriptor.chain.length, 7);
   assert.ok(saved.descriptor.chain.some((entry) => entry.label === 'lens'),
     'bypass is session state, never serialized');
 });
@@ -1878,25 +1962,25 @@ test('Grid Space switches modulation source and sampling atomically with one und
     return apply(writes);
   };
   harness.engine.setParameter = () => ParamSetResult.INADMISSIBLE;
-  const edit = stageEditor(harness, 'field');
-  const chip = stripChips(harness).find((chip) => chip.dataset.label === 'field');
-  edit('field.modulation-source', 'sphere-interference');
-  assert.ok(stripChips(harness).find((chip) => chip.dataset.label === 'field') === chip,
-    'the active Field card stays mounted');
+  const edit = stageEditor(harness, 'colorize');
+  const chip = stripChips(harness).find((chip) => chip.dataset.label === 'colorize');
+  edit('modulation.modulation-source', 'sphere-interference');
+  assert.ok(stripChips(harness).find((chip) => chip.dataset.label === 'colorize') === chip,
+    'the active Color card stays mounted');
   assert.deepEqual(batches, [[
-    { name: 'field.modulation-source', value: 2 },
-    { name: 'field.modulation-evaluation', value: 0 },
+    { name: 'modulation.modulation-source', value: 2 },
+    { name: 'modulation.modulation-evaluation', value: 0 },
   ]]);
   const values = savedValues(harness);
-  assert.equal(values['field.modulation-source'], 'sphere-interference');
-  assert.equal(values['field.modulation-evaluation'], 'direct');
-  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'field')
+  assert.equal(values['modulation.modulation-source'], 'sphere-interference');
+  assert.equal(values['modulation.modulation-evaluation'], 'direct');
+  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'colorize')
     .querySelectorAll('.chain-param');
-  assert.equal(colorRows.find((row) => row.dataset.parameter === 'field.modulation-evaluation')
+  assert.equal(colorRows.find((row) => row.dataset.parameter === 'modulation.modulation-evaluation')
     .querySelector('.chain-param-control').value, 'direct');
   await harness.controller.flushDeepLink();
   const linked = await decodeShaderStateHash(harness.win.location.hash);
-  assert.equal(linked.document.preset_bank.presets[0].values['field.modulation-source'],
+  assert.equal(linked.document.preset_bank.presets[0].values['modulation.modulation-source'],
     'sphere-interference');
   harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
   assert.deepEqual(savedValues(harness), original);
@@ -1906,26 +1990,26 @@ test('a refused modulation source batch preserves both fields and the visible No
   const harness = await editorWorkbench({source: JSON.stringify(promotedDocument('grid_space.shader.json'))});
   const original = savedValues(harness);
   harness.engine.bindings.setShaderChainParameters = () => ParamSetResult.INADMISSIBLE;
-  stageEditor(harness, 'field')('field.modulation-source', 'sphere-interference');
+  stageEditor(harness, 'colorize')('modulation.modulation-source', 'sphere-interference');
   assert.match(harness.elements.get('shader-document-status').textContent, /INADMISSIBLE/);
   assert.deepEqual(savedValues(harness), original);
-  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'field')
+  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'colorize')
     .querySelectorAll('.chain-param');
-  assert.equal(colorRows.find((row) => row.dataset.parameter === 'field.modulation-source')
+  assert.equal(colorRows.find((row) => row.dataset.parameter === 'modulation.modulation-source')
     .querySelector('.chain-param-control').value, 'noise');
-  const groups = stripChips(harness).find((chip) => chip.dataset.label === 'field')
+  const groups = stripChips(harness).find((chip) => chip.dataset.label === 'colorize')
     .querySelectorAll('.chain-param-group');
-  assert.equal(groups.find((group) => group.getAttribute('aria-label') === 'Noise').hidden, false);
-  assert.equal(colorRows.find((row) => row.dataset.parameter === 'field.pattern-scale').hidden, false);
+  assert.equal(groups.filter((group) => group.getAttribute('aria-label') === 'Noise').at(-1).hidden, false);
+  assert.equal(groups.find((group) => group.getAttribute('aria-label') === 'Interference · wave A').hidden, true);
 });
 
 test('lightness lift preserves the noise recipe and clamps only strength in one undo', async () => {
-  const harness = await editorWorkbench({source: JSON.stringify(promotedDocument('grid_space.shader.json'))});
-  const edit = stageEditor(harness, 'field');
-  edit('field.modulation-amount', 2);
-  edit('field.pattern-noise-variant', 'octave-contour');
-  edit('field.pattern-noise-basis', 'fbm3');
-  edit('field.pattern-contrast', 2);
+  const harness = await editorWorkbench();
+  const edit = stageEditor(harness, 'colorize');
+  edit('modulation.modulation-amount', 2);
+  edit('modulation.pattern-noise-variant', 'octave-contour');
+  edit('modulation.pattern-noise-basis', 'fbm3');
+  edit('modulation.pattern-contrast', 2);
   const original = savedValues(harness);
   const batches = [];
   const apply = harness.engine.bindings.setShaderChainParameters;
@@ -1933,33 +2017,33 @@ test('lightness lift preserves the noise recipe and clamps only strength in one 
     batches.push(writes);
     return apply(writes);
   };
-  edit('field.modulation-mechanic', 'positive-lightness-lift');
+  edit('modulation.modulation-mechanic', 'positive-lightness-lift');
   assert.deepEqual(batches, [[
-    { name: 'field.modulation-mechanic', value: 1 },
-    { name: 'field.modulation-amount', value: 1 },
+    { name: 'modulation.modulation-mechanic', value: 1 },
+    { name: 'modulation.modulation-amount', value: 1 },
   ]]);
   const values = savedValues(harness);
-  assert.equal(values['field.modulation-mechanic'], 'positive-lightness-lift');
-  assert.equal(values['field.modulation-amount'], 1);
-  assert.equal(values['field.pattern-noise-variant'], 'octave-contour');
-  assert.equal(values['field.pattern-noise-basis'], 'fbm3');
-  assert.equal(values['field.pattern-contrast'], 2);
+  assert.equal(values['modulation.modulation-mechanic'], 'positive-lightness-lift');
+  assert.equal(values['modulation.modulation-amount'], 1);
+  assert.equal(values['modulation.pattern-noise-variant'], 'octave-contour');
+  assert.equal(values['modulation.pattern-noise-basis'], 'fbm3');
+  assert.equal(values['modulation.pattern-contrast'], 2);
   harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
   assert.deepEqual(savedValues(harness), original);
 });
 
 test('baked sampling clamps an existing direct Noise scale in the same edit', async () => {
-  const harness = await editorWorkbench({source: JSON.stringify(promotedDocument('grid_space.shader.json'))});
-  const edit = stageEditor(harness, 'field');
-  edit('field.modulation-evaluation', 'direct');
-  edit('field.pattern-scale', 32);
-  edit('field.modulation-evaluation', 'baked-cube');
-  assert.equal(savedValues(harness)['field.pattern-scale'], 8);
-  assert.equal(displayedParameter(harness, 'field', 'field.pattern-scale'), '8');
+  const harness = await editorWorkbench();
+  const edit = stageEditor(harness, 'colorize');
+  edit('modulation.modulation-evaluation', 'direct');
+  edit('modulation.pattern-scale', 32);
+  edit('modulation.modulation-evaluation', 'baked-cube');
+  assert.equal(savedValues(harness)['modulation.pattern-scale'], 8);
+  assert.equal(displayedParameter(harness, 'colorize', 'modulation.pattern-scale'), '8');
   harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
   const values = savedValues(harness);
-  assert.equal(values['field.pattern-scale'], 32);
-  assert.equal(values['field.modulation-evaluation'], 'direct');
+  assert.equal(values['modulation.pattern-scale'], 32);
+  assert.equal(values['modulation.modulation-evaluation'], 'direct');
 });
 
 // A chip control's edit is a document edit, and the engine write is its
@@ -2375,7 +2459,7 @@ test('a linked runtime snapshot that disagrees with its document retains the ori
 });
 
 test('a linked modulation recipe must match its document before restoration', async () => {
-  const seed = await editorWorkbench({source: null});
+  const seed = await editorWorkbench();
   const original = await decodeShaderStateHash(seed.win.location.hash);
   assert.ok(original.chainSnapshot.modulation.length > 0);
   for (const change of [
@@ -2442,7 +2526,7 @@ test('shader links refuse null snapshot entries before initializing a candidate'
     [[], [], [null]], [[], [], [[]]], [[], [], [3]],
   ]) {
     const compact = {d: {descriptor: {chain: []}}, p: 'night', b: [], a: true,
-      s: {schemaVersion: 3, chain, parameters, modulation}};
+      s: {schemaVersion: 4, chain, parameters, modulation}};
     const payload = gzipSync(JSON.stringify(compact)).toString('base64url');
     await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`), /invalid shader link snapshot/);
     await assert.rejects(encodeShaderStateHash({document: compact.d, preset: compact.p,
@@ -2570,16 +2654,16 @@ for (const failure of ['editor', 'runtime']) {
 
 test('loading a legacy source previews the same expanded stages that Save records', async () => {
   const harness = await editorWorkbench({source: LEGACY_KALEIDOSCOPE_HEX_BRIGHT});
-  const expected = expandColorModulations(compileShaderDocument(LEGACY_KALEIDOSCOPE_HEX_BRIGHT,
-    {catalog: JSON.parse(ENGINE_CATALOG)}).document, JSON.parse(ENGINE_CATALOG));
+  const expected = compileShaderDocument(LEGACY_KALEIDOSCOPE_HEX_BRIGHT,
+    {catalog: JSON.parse(ENGINE_CATALOG)}).document;
   assert.deepEqual(harness.engine.chainCalls.at(-1), expected.descriptor.chain.map(({label, operator}) =>
     ({instance: label, operator})));
   assert.equal(harness.controller.save(), true);
   const saved = JSON.parse(harness.downloads.at(-1)[1]);
   assert.deepEqual(saved.descriptor.chain, expected.descriptor.chain);
-  assert.equal(saved.preset_bank.presets[0].values['colorize.modulation-enabled'], 'disabled');
-  assert.equal(saved.preset_bank.presets[0].values['colorize.modulation-amount'], 0);
-  assert.equal(saved.preset_bank.presets[0].values['field.modulation-amount'],
+  assert.equal(saved.preset_bank.presets[0].values['colorize.modulation-enabled'], undefined);
+  assert.equal(saved.preset_bank.presets[0].values['colorize.modulation-amount'], undefined);
+  assert.equal(saved.preset_bank.presets[0].values['modulation.modulation-amount'],
     JSON.parse(LEGACY_KALEIDOSCOPE_HEX_BRIGHT).preset_bank.presets[0].values['colorize.modulation-amount']);
 });
 
@@ -2594,7 +2678,7 @@ for (const route of ['link', 'query']) {
     const snapshot = callWorkbenchBinding(legacy, 'getSnapshot', [], null);
     const clock = snapshot.runtime.find((entry) => entry.instance === 'colorize');
     clock.state.oscillationPhase = 0.37;
-    clock.state.modulation.phaseTurns = 0.63;
+    snapshot.runtime.find((entry) => entry.instance === 'modulation').state.phaseTurns = 0.63;
     snapshot.paletteBank.chroma = 0.23;
     snapshot.parameters = snapshot.parameters.filter(({name}) => {
       const field = name.split('.')[1];
@@ -2608,15 +2692,13 @@ for (const route of ['link', 'query']) {
       : '?effect=ShaderChain';
     const harness = await editorWorkbench({source: null, hash, search, pausedFromEngine: true});
     const restored = callWorkbenchBinding(harness.engine, 'getSnapshot', [], null);
-    assert.equal(restored.chain.at(-1).operator, 'modulate.field.v1', harness.elements.get('shader-document-status').textContent);
-    assert.equal(restored.runtime.find((entry) => entry.instance === 'field').state.modulation.phaseTurns, 0.63);
-    assert.equal(restored.runtime.find((entry) => entry.instance === 'field').state.oscillationPhase, 0);
+    assert.equal(restored.chain.at(-1).operator, 'color.modulate.v1', harness.elements.get('shader-document-status').textContent);
+    assert.equal(restored.runtime.find((entry) => entry.instance === 'modulation').state.phaseTurns, 0.63);
     assert.equal(restored.runtime.find((entry) => entry.instance === 'colorize').state.oscillationPhase, 0.37);
-    assert.equal(restored.modulation.find((entry) => entry.instance === 'colorize').recipe.enabled, false);
     assert.deepEqual(restored.paletteBank, snapshot.paletteBank);
     assert.equal(restored.animationsPaused, true);
     const saved = savedValues(harness);
-    assert.equal(saved['colorize.modulation-amount'], 0);
-    assert.ok(saved['field.modulation-amount'] > 0);
+    assert.equal(saved['colorize.modulation-amount'], undefined);
+    assert.ok(saved['modulation.modulation-amount'] > 0);
   });
 }

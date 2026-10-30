@@ -61,8 +61,8 @@ test('socket choices prefer the narrowest span and stop collapse at an endomorph
 
 
 test('terminal Color endomorphisms form an ordered modulation band after Color', () => {
-  const field = op('modulate.field.v1', 'color');
-  const hue = op('modulate.hue-shift.v1', 'color');
+  const field = op('color.modulate.v1', 'color');
+  const hue = op('color.modulate.v1', 'color');
   const extended = {...catalog, operators: [...catalog.operators, field, hue]};
   let chain = [entry(direct), entry(color)];
   const model = createChainPresentation({catalog: extended, chain: () => chain, legalSequences: () => []});

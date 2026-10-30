@@ -380,24 +380,23 @@ test('palette and modulation probe reports a family whose controls fail to appea
     let stages = [];
     let bypassed = null;
     const tab = {
-      select: async (selector, value) => { family = value; },
+      select: async (selector, value) => { if (selector.includes('palette-type')) family = value; },
       waitForFunction: async () => {},
       waitForSelector: async () => ({click: async () => {}}),
       $: async (selector) => selector.includes('colorize') || stages.some((entry) => selector.includes(entry.label)) ? {} : null,
       async $eval(selector, callback, ...args) {
         if (selector === '#shader-document-status') return callback({dataset: {status: 'ok'}});
-        if (String(callback).includes('KeyboardEvent')) {
+        if (selector.includes('.chain-modulation-move')) {
           stages = [stages[1], stages[0], stages[2]];
           return;
         }
-        if (selector.includes('.chain-palette-entry')) {
-          stages.push({label: `stage${stages.length + 1}`,
-            operator: selector.includes('hue-shift') ? 'modulate.hue-shift.v1' : 'modulate.field.v1'});
+        if (selector.includes('.chain-modulation-add')) {
+          stages.push({label: `stage${stages.length + 1}`, operator: 'color.modulate.v1'});
           return;
         }
         const label = selector.match(/data-label="([^"]+)"/)?.[1];
-        if (selector.includes('.chain-chip-bypass')) bypassed = label;
-        if (selector.includes('.chain-chip-remove')) stages = stages.filter((entry) => entry.label !== label);
+        if (selector.includes('.chain-modulation-enabled')) bypassed = label;
+        if (selector.includes('.chain-modulation-remove')) stages = stages.filter((entry) => entry.label !== label);
         const field = selector.match(/data-parameter="colorize.([^"]+)"/)?.[1];
         const visible = {
           generated: ['palette-harmony'], procedural: ['palette-name'], gradient: ['gradient-start-r'],
@@ -413,9 +412,9 @@ test('palette and modulation probe reports a family whose controls fail to appea
       async evaluate(callback) {
         const document = {descriptor: {chain: stages}};
         if (String(callback).includes('location.hash')) return encodeShaderStateHash({document,
-          preset: 'p', bypassed: [bypassed], paused: false, chainSnapshot: {schemaVersion: 3,
-            chain: stages.filter((entry) => entry.label !== bypassed).map(({label, operator}) => ({instance: label, operator})),
-            parameters: [], modulation: [], animationsPaused: false}});
+          preset: 'p', bypassed: [], paused: false, chainSnapshot: {schemaVersion: 4,
+            chain: stages.map(({label, operator}) => ({instance: label, operator})),
+            parameters: [], modulation: stages.map((entry) => ({instance: entry.label, recipe: {enabled: entry.label !== bypassed}})), animationsPaused: false}});
         if (String(callback).includes('Promise.all')) return JSON.stringify(document);
       },
     };

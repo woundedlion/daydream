@@ -8,8 +8,6 @@ import { readFileSync } from 'node:fs';
 
 import {
   DEFAULT_SCRATCH_CHAIN,
-  expandColorModulations,
-  expandColorModulationSnapshot,
   upgradePaletteSnapshot,
   UNDO_DEPTH,
   createChainDocumentStore,
@@ -109,7 +107,7 @@ test('insertion backfills presets, fields and staggered groups atomically', asyn
   const result = store.replaceSpan(WARP, 0, [{ operator: 'warp.wave-shear.v2' }]);
   assert.equal(result.ok, true);
   assert.deepEqual(labels(store),
-    ['camera', 'lens', 'project', 'warp', 'warp2', 'sample', 'colorize']);
+    ['camera', 'lens', 'project', 'warp', 'warp2', 'sample', 'colorize', 'modulation']);
   const document = store.document();
   const ids = ['speed', 'strength', 'frequency', 'field-angle', 'edge-width', 'envelope']
     .map((field) => `warp.${field}`);
@@ -360,7 +358,7 @@ test('a crossing cannot be removed, only replaced', async () => {
   ]);
   assert.equal(replacement.ok, true);
   assert.deepEqual(labels(store),
-    ['camera', 'lens', 'project', 'sample', 'colorize']);
+    ['camera', 'lens', 'project', 'sample', 'colorize', 'modulation']);
   const document = store.document();
   for (const preset of document.preset_bank.presets) {
     assert.equal(preset.values['sample.complexity'], 0);
@@ -500,7 +498,7 @@ test('bypass shapes the program without touching the document', async () => {
   assert.equal(store.setBypassed('lens', true).ok, true);
   assert.deepEqual(store.bypassedLabels(), ['lens']);
   assert.deepEqual(store.programShape().map((entry) => entry.instance),
-    ['camera', 'project', 'warp2', 'sample', 'colorize']);
+    ['camera', 'project', 'warp2', 'sample', 'colorize', 'modulation']);
   assert.deepEqual(store.programShape()[0],
     { instance: 'camera', operator: 'sphere.rotate.v2' });
   assert.ok(store.chain().some((entry) => entry.label === 'lens'));
@@ -533,7 +531,7 @@ test('a bypassed label reused by a crossing loses its bypass', async () => {
   assert.equal(store.setBypassed('warp2', true).ok, true);
   assert.equal(store.replaceSpan(PROJECT, 2,
     [{ label: 'warp2', operator: 'project.equirectangular.v2' }]).ok, true);
-  assert.deepEqual(labels(store), ['camera', 'lens', 'warp2', 'sample', 'colorize']);
+  assert.deepEqual(labels(store), ['camera', 'lens', 'warp2', 'sample', 'colorize', 'modulation']);
   assert.deepEqual(store.bypassedLabels(), []);
   assert.ok(store.programShape().some((entry) => entry.instance === 'warp2'));
 });
@@ -678,7 +676,7 @@ test('legality lists every operator with reasons for the illegal', async () => {
 
 test('the last entry is replaceable only by operators that exit on the color carrier', async () => {
   const store = await makeStore();
-  const last = store.chain().length - 1;
+  const last = store.chain().findIndex((entry) => entry.operator === 'colorize.generated-palette.v4');
   const exits = CATALOG.operators
     .filter((operator) => operator.input === 'field' && operator.output === 'color')
     .map((operator) => operator.id);
@@ -734,14 +732,15 @@ test('legalSequences bridges a span with a run of crossings', async () => {
   assert.equal(store.replaceSpan(PROJECT, 1, [
     { operator: 'project.stereographic.v2' }, { operator: 'sample.grid.v3' }]).ok, true);
   assert.deepEqual(store.chain().slice(PROJECT).map((entry) => entry.operator),
-    ['project.stereographic.v2', 'sample.grid.v3', 'colorize.generated-palette.v3']);
+    ['project.stereographic.v2', 'sample.grid.v3', 'colorize.generated-palette.v4',
+      'color.modulate.v1']);
   assertGreen(store);
   assert.throws(() => store.legalSequences(99, 0, 1), RangeError);
 });
 
 test('an exhausted operator budget refuses insertion but not replacement', async () => {
   const catalog = structuredClone(CATALOG);
-  catalog.budgets.max_chain_ops = 6;
+  catalog.budgets.max_chain_ops = 7;
   const store = await makeStore({ catalog });
   for (const entry of store.legalInsertions(WARP)) {
     assert.equal(entry.legal, false);
@@ -850,7 +849,7 @@ test('chainArenaBytes matches a mixed-alignment golden and validator diagnostic 
       { label: 'glitch', operator: 'sphere.lens.glitch.v2' },
       { label: 'project', operator: 'project.stereographic.v2' },
       { label: 'sample', operator: 'sample.lattice.v2' },
-      { label: 'colorize', operator: 'colorize.generated-palette.v3' },
+      { label: 'colorize', operator: 'colorize.generated-palette.v4' },
     ],
   ];
   const endomorphisms = [
@@ -864,7 +863,7 @@ test('chainArenaBytes matches a mixed-alignment golden and validator diagnostic 
           (unused, index) => ({ label: `endo${index}`, operator })),
         { label: 'project', operator: 'project.stereographic.v2' },
         { label: 'sample', operator: 'sample.grid.v3' },
-        { label: 'colorize', operator: 'colorize.generated-palette.v3' },
+        { label: 'colorize', operator: 'colorize.generated-palette.v4' },
       ]);
     }
   }
@@ -943,7 +942,7 @@ test('document() returns an isolated copy', async () => {
   copy.descriptor.chain.length = 0;
   copy.preset_bank.presets[0].values['sample.speed'] = 99;
   assertGreen(store);
-  assert.equal(store.chain().length, 6);
+  assert.equal(store.chain().length, 7);
 });
 
 test('a malformed span or sequence is refused without side effects', async () => {
@@ -968,7 +967,7 @@ test('the scratch document compiles clean against the catalog', async () => {
     { label: 'rotate', operator: 'sphere.rotate.v2' },
     { label: 'project', operator: 'project.stereographic.v2' },
     { label: 'sample', operator: 'sample.grid.v3' },
-    { label: 'colorize', operator: 'colorize.generated-palette.v3' },
+    { label: 'colorize', operator: 'colorize.generated-palette.v4' },
   ]);
   assert.equal(compiled.document.preset_bank.presets.length, 1);
   const values = compiled.document.preset_bank.presets[0].values;
@@ -979,7 +978,7 @@ test('the scratch document compiles clean against the catalog', async () => {
   const units = new Map(compiled.document.descriptor.parameters.map(
     (parameter) => [parameter.id, parameter.unit]));
   for (const id of [
-    'colorize.pattern-speed', 'colorize.phase-oscillation-speed',
+    'colorize.phase-oscillation-speed',
   ]) assert.equal(units.get(id), 'turn-per-frame', id);
   for (const id of ['project.projection-spin-speed', 'sample.speed', 'sample.angle-speed'])
     assert.equal(units.get(id), 'radian-per-frame', id);
@@ -1210,7 +1209,7 @@ const SNAPSHOT_CHAIN = DEFAULT_SCRATCH_CHAIN.map(({ label, operator }) => ({ ins
 
 test('a chain snapshot imports its chain and maps enum indices to option ids', () => {
   const document = documentFromChainSnapshot({ schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION,
-    chain: SNAPSHOT_CHAIN, modulation: [{instance: 'colorize', recipe: modulationRecipe()}], parameters: [
+    chain: SNAPSHOT_CHAIN, modulation: [], parameters: [
       { name: 'sample.coverage-mode', value: 2 },
       { name: 'rotate.wander', value: 0.25 },
     ] }, CATALOG);
@@ -1223,13 +1222,13 @@ test('a chain snapshot imports its chain and maps enum indices to option ids', (
 
 test('a chain snapshot import refuses unknown parameters and unsupported shapes', () => {
   assert.throws(() => documentFromChainSnapshot({ schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION,
-    chain: SNAPSHOT_CHAIN, modulation: [{instance: 'colorize', recipe: modulationRecipe()}], parameters: [{ name: 'missing.parameter', value: 0 }] }, CATALOG),
+    chain: SNAPSHOT_CHAIN, modulation: [], parameters: [{ name: 'missing.parameter', value: 0 }] }, CATALOG),
   /unknown chain snapshot parameter: missing\.parameter/);
-  for (const snapshot of [null, { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION + 1, chain: SNAPSHOT_CHAIN, modulation: [{instance: 'colorize', recipe: modulationRecipe()}], parameters: [] },
+  for (const snapshot of [null, { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION + 1, chain: SNAPSHOT_CHAIN, modulation: [], parameters: [] },
     { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: null, parameters: [] },
     { schemaVersion: 2, chain: SNAPSHOT_CHAIN, parameters: [], modulation: [] },
     { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: SNAPSHOT_CHAIN, parameters: [] },
-    { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: SNAPSHOT_CHAIN, modulation: [{instance: 'colorize', recipe: modulationRecipe()}], parameters: null }])
+    { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: SNAPSHOT_CHAIN, modulation: [], parameters: null }])
     assert.throws(() => documentFromChainSnapshot(snapshot, CATALOG), /unsupported chain snapshot/);
 });
 
@@ -1242,8 +1241,8 @@ test('a chain snapshot imports every modulation field under its instance label',
     Object.assign(recipe[source], {axis: [1, 2, 3], frequency: 4 + index, offset: -2, speed: 0.5});
     if (source !== 'sine') Object.assign(recipe[source], {axisB: [-3, -2, -1], frequencyB: 7, offsetB: 8});
   }
-  const chain = SNAPSHOT_CHAIN.map((entry) => entry.instance === 'colorize' ? {...entry, instance: 'ink'} : entry);
-  const document = documentFromChainSnapshot({schemaVersion: 3, chain, parameters: [],
+  const chain = [...SNAPSHOT_CHAIN, {instance: 'ink', operator: 'color.modulate.v1'}];
+  const document = documentFromChainSnapshot({schemaVersion: 4, chain, parameters: [],
     modulation: [{instance: 'ink', recipe}]}, CATALOG);
   const expected = {
     'modulation-enabled': 'disabled', 'modulation-source': 'sphere-smooth-grid',
@@ -1264,74 +1263,9 @@ test('a chain snapshot imports every modulation field under its instance label',
   for (const [field, value] of Object.entries(expected)) assert.equal(values[`ink.${field}`], value, field);
 });
 
-test('embedded color modulation expands every preset and disables the embedded copy', () => {
-  const catalog = CATALOG;
-  const source = scratchChainDocument(catalog);
-  const first = source.preset_bank.presets[0];
-  source.descriptor.parameters.find((parameter) => parameter.id === 'colorize.pattern-scale').interpolation.group = 'colorize.noise';
-  Object.assign(first.values, {'colorize.modulation-amount': 0.75,
-    'colorize.modulation-source': 'sphere-interference', 'colorize.modulation-evaluation': 'direct',
-    'colorize.hue-shift-mode': 'path-length', 'colorize.hue-shift-amount': -0.2});
-  source.preset_bank.presets.push({...structuredClone(first), preset_id: 'quiet',
-    values: {...first.values, 'colorize.modulation-amount': 0, 'colorize.hue-shift-amount': 0}});
-  const expanded = expandColorModulations(source, catalog);
-  assert.deepEqual(expanded.descriptor.chain.slice(-3), [
-    {label: 'colorize', operator: 'colorize.generated-palette.v3'},
-    {label: 'hue-shift', operator: 'modulate.hue-shift.v1'},
-    {label: 'field', operator: 'modulate.field.v1'},
-  ]);
-  for (const [index, preset] of expanded.preset_bank.presets.entries()) {
-    assert.equal(preset.values['colorize.modulation-amount'], 0);
-    assert.equal(preset.values['colorize.modulation-enabled'], 'disabled');
-    assert.equal(preset.values['colorize.hue-shift-mode'], 'none');
-    assert.equal(preset.values['field.modulation-source'], 'sphere-interference');
-    assert.equal(preset.values['field.modulation-evaluation'], 'direct');
-    assert.equal(preset.values['field.modulation-amount'], index ? 0 : 0.75);
-    assert.equal(preset.values['hue-shift.hue-shift-amount'], index ? 0 : -0.2);
-  }
-  assert.equal(expanded.descriptor.parameters.find((parameter) => parameter.id === 'field.pattern-scale').interpolation.group, 'field.noise');
-  assert.equal(first.values['colorize.modulation-amount'], 0.75);
-  assert.equal(expandColorModulations(expanded, catalog), expanded);
-  const plain = scratchChainDocument(catalog);
-  assert.equal(expandColorModulations(plain, catalog), plain);
-});
-
-test('expanded snapshot retains palette and other clocks and moves the modulation clock', () => {
-  const catalog = CATALOG;
-  const source = scratchChainDocument(catalog);
-  Object.assign(source.preset_bank.presets[0].values, {'colorize.modulation-amount': 0.75,
-    'colorize.hue-shift-mode': 'path-length', 'colorize.hue-shift-amount': 0.2});
-  const expanded = expandColorModulations(source, catalog);
-  const recipe = modulationRecipe();
-  recipe.mechanic.amount = 0.75;
-  const snapshot = {schemaVersion: 3, chain: SNAPSHOT_CHAIN, parameters: [
-    {name: 'colorize.hue-shift-mode', value: 1}, {name: 'colorize.hue-shift-amount', value: 0.2}],
-  modulation: [{instance: 'colorize', recipe}], animationsPaused: true,
-  runtime: [{instance: 'colorize', kind: 'color-clock-v2', state: {oscillationPhase: 0.37,
-    modulation: {source: 0, version: 1, phaseTurns: 0.63, initialized: true}}},
-  {instance: 'sample', kind: 'phase-clock-v1', state: {phase: 0.91}}],
-  paletteBank: {seed: 123}};
-  const migrated = expandColorModulationSnapshot(snapshot, source, expanded);
-  assert.deepEqual(migrated.chain, expanded.descriptor.chain.map(({label, operator}) => ({instance: label, operator})));
-  assert.deepEqual(migrated.modulation.find((entry) => entry.instance === 'field').recipe, recipe);
-  assert.equal(migrated.modulation.find((entry) => entry.instance === 'colorize').recipe.enabled, false);
-  assert.equal(migrated.modulation.find((entry) => entry.instance === 'colorize').recipe.mechanic.amount, 0);
-  assert.deepEqual(migrated.runtime.find((entry) => entry.instance === 'colorize'), snapshot.runtime[0]);
-  assert.deepEqual(migrated.runtime.find((entry) => entry.instance === 'sample'), snapshot.runtime[1]);
-  assert.deepEqual(migrated.runtime.find((entry) => entry.instance === 'field').state,
-    {...snapshot.runtime[0].state, oscillationPhase: 0});
-  assert.deepEqual(migrated.parameters.slice(-2), [
-    {name: 'hue-shift.hue-shift-mode', value: 1}, {name: 'hue-shift.hue-shift-amount', value: 0.2}]);
-  assert.ok(migrated.parameters.filter((entry) => entry.name.startsWith('colorize.')).every((entry) => entry.value === 0));
-  assert.deepEqual(migrated.paletteBank, snapshot.paletteBank);
-  assert.equal(migrated.animationsPaused, true);
-  assert.equal(snapshot.modulation[0].recipe.enabled, true);
-});
-
-
 test('legacy snapshots gain palette-family defaults without filling missing existing controls', () => {
   const catalog = structuredClone(CATALOG);
-  const color = catalog.operators.find((operator) => operator.id === 'colorize.generated-palette.v3');
+  const color = catalog.operators.find((operator) => operator.id === 'colorize.generated-palette.v4');
   const snapshot = {schemaVersion: 3, chain: SNAPSHOT_CHAIN, parameters: [], modulation: []};
   const upgraded = upgradePaletteSnapshot(snapshot, catalog);
   assert.equal(upgraded.parameters.find((parameter) => parameter.name === 'colorize.palette-type').value, 0);

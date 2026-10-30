@@ -8,7 +8,7 @@ import { titleCase } from '../../shared/labels.js';
 import {
   createChainPresentation, deactivatedParameterIds, formatNumericValue, nudgeStep, fieldOf,
   COLOR_PARAMETER_GROUPS, MODULATION_PARAMETER_GROUPS, COLOR_PARAMETER_NAMES,
-  colorParameterHidden, modulationParameterHidden,
+  colorParameterHidden, modulationParameterHidden, PALETTE_OPERATOR, MODULATION_OPERATOR,
 } from './chain_presentation.js';
 
 /** @typedef {import('./chain_presentation.js').CatalogOperator} CatalogOperator */
@@ -225,9 +225,10 @@ export function createChainStrip({
    * that keeps every label (and so every parameter value).
    * @param {number} index - The chip's chain index.
    * @param {number} gap - Target gap, 0..chain length.
+   * @param {string|null} [focusLabel] - Parent card for a folded modulation.
    * @returns {boolean} Whether the move committed.
    */
-  const moveChip = (index, gap) => {
+  const moveChip = (index, gap, focusLabel = null) => {
     const chain = store.chain();
     if (gap < 0 || gap > chain.length) return false;
     if (gap === index || gap === index + 1) return true;
@@ -236,7 +237,7 @@ export function createChainStrip({
       ? store.replaceSpan(gap, index - gap + 1, [entry, ...chain.slice(gap, index)])
       : store.replaceSpan(index, gap - index, [...chain.slice(index + 1, gap), entry]);
     if (!result.ok) return report(result);
-    return commit(entry.label);
+    return commit(focusLabel ?? entry.label);
   };
 
   /**
@@ -244,9 +245,10 @@ export function createChainStrip({
    * @param {*} header - Its drag surface.
    * @param {number} index - The chip's chain index.
    * @param {string|null} name - The stage name shown while dragging.
+   * @param {string|null} [owner] - Parent card of a folded modulation.
    * @returns {() => boolean} Whether a completed drag consumes the next click.
    */
-  const wireChipDrag = (chip, header, index, name) => {
+  const wireChipDrag = (chip, header, index, name, owner = null) => {
     let originX = 0;
     let originY = 0;
     let offsetX = 0;
@@ -281,7 +283,7 @@ export function createChainStrip({
       if (event.clientX < bounds.left || event.clientX > bounds.right
           || event.clientY < Math.max(bounds.top, viewport.top)
           || event.clientY > Math.min(bounds.bottom, viewport.bottom)) return null;
-      const siblings = [...band.querySelectorAll('.chain-chip')];
+      const siblings = [...band.querySelectorAll(owner === null ? '.chain-chip' : '.chain-modulation-layer')];
       const before = siblings.find((other) => {
         const rect = other.getBoundingClientRect();
         return event.clientY < rect.top + rect.height / 2;
@@ -328,7 +330,8 @@ export function createChainStrip({
           if (Math.hypot(event.clientX - originX, event.clientY - originY) < DRAG_SLOP_PX) return;
           dragging = true;
           suppressClick = true;
-          focusChip(index);
+          if (owner === null) focusChip(index);
+          else chipByLabel(owner)?.focus();
           chip.classList.add('chain-chip--dragging');
           preview = el('div', 'chain-drag-preview');
           preview.setAttribute('aria-hidden', 'true');
@@ -346,7 +349,10 @@ export function createChainStrip({
         if (!dragging) return;
         const gap = event === null ? null : dropGap(event);
         clear();
-        if (gap !== null) moveChip(index, gap);
+        if (gap !== null) {
+          if (owner !== null) pinnedLabels.add(owner);
+          moveChip(index, gap, owner);
+        }
       },
       onCancel: clear,
     });
@@ -685,11 +691,16 @@ export function createChainStrip({
   const markDeactivated = () => {
     const chain = store.chain();
     const off = deactivatedParameterIds(declarations, values, chain, catalog);
+    for (const control of container.querySelectorAll('.chain-modulation-enabled')) {
+      const id = `${control.dataset.label}.modulation-enabled`;
+      control.checked = values[id] !== 'disabled';
+      control.disabled = !parameterLive(id);
+    }
     for (const [id, row] of rows) {
       const label = id.slice(0, id.indexOf('.'));
       const operator = chain.find((entry) => entry.label === label)?.operator;
-      const color = operator === 'colorize.generated-palette.v3';
-      const modulation = operator === 'modulate.field.v1';
+      const color = operator === PALETTE_OPERATOR;
+      const modulation = operator === MODULATION_OPERATOR;
       const ripple = operator === 'sphere.displace.ripple.v2';
       const field = fieldOf(id);
       if ((color || modulation) && ['pattern-scale', 'modulation-amount'].includes(field)) {
@@ -711,7 +722,6 @@ export function createChainStrip({
         || colorParameterHidden(field, (field) => values[`${label}.${field}`])))
         || (modulation && (off.has(id)
           || modulationParameterHidden(field, (field) => values[`${label}.${field}`])))
-        || (operator === 'modulate.hue-shift.v1' && off.has(id))
         || (ripple && off.has(id) && ['center-azimuth', 'center-polar'].includes(field));
       const shown = row.querySelector('.chain-param-note');
       const live = parameterLive(id);
@@ -877,10 +887,10 @@ export function createChainStrip({
    * @returns {*} The parameter region.
    */
   const paramsElement = (entry, declared) => {
-    const color = entry.operator === 'colorize.generated-palette.v3';
-    const modulation = entry.operator === 'modulate.field.v1';
-    const grouped = color || modulation;
-    const parameterGroups = color ? COLOR_PARAMETER_GROUPS : MODULATION_PARAMETER_GROUPS;
+    const palette = entry.operator === PALETTE_OPERATOR;
+    const modulation = entry.operator === MODULATION_OPERATOR;
+    const color = palette || modulation;
+    const parameterGroups = modulation ? MODULATION_PARAMETER_GROUPS : COLOR_PARAMETER_GROUPS;
     const region = el('div', 'chain-chip-params');
     region.dataset.label = entry.label;
     region.setAttribute('role', 'group');
@@ -893,16 +903,16 @@ export function createChainStrip({
     }
     /** @type {Map<string, *>} */
     const groups = new Map();
-    const ordered = grouped ? parameterGroups.flatMap((group) => group.fields.flatMap(
+    const ordered = color ? parameterGroups.flatMap((group) => group.fields.flatMap(
       (field) => declared.filter((parameter) => fieldOf(parameter.id) === field))) : declared;
     for (const declaration of [...ordered, ...declared.filter((parameter) => !ordered.includes(parameter))]) {
       const field = fieldOf(declaration.id);
       if (modulation && field === 'modulation-enabled') continue;
-      const name = grouped || entry.operator === 'modulate.hue-shift.v1' ? COLOR_PARAMETER_NAMES[field]
+      const name = color ? COLOR_PARAMETER_NAMES[field]
         ?? titleCase(field.replace(/^(sine|interference|grid)-/, '').replace(/-b(?=-|$)/, ''))
         : titleCase(field);
       let parent = region;
-      if (grouped) {
+      if (color) {
         const groupName = parameterGroups.find((group) => group.fields.includes(field))?.name
           ?? 'Other';
         if (!groups.has(groupName)) {
@@ -977,8 +987,102 @@ export function createChainStrip({
       rows.set(declaration.id, row);
       parent.appendChild(row);
     }
-    if (color) region.appendChild(renameRow(entry));
+    if (palette) {
+      region.appendChild(modulationStackElement(entry));
+      region.appendChild(renameRow(entry));
+    }
     return region;
+  };
+
+  /** @param {ChainEntry} owner @returns {*} */
+  const modulationStackElement = (owner) => {
+    const chain = store.chain();
+    const ownerIndex = chain.findIndex((entry) => entry.label === owner.label);
+    let end = ownerIndex + 1;
+    while (chain[end]?.operator === MODULATION_OPERATOR) end += 1;
+    const stack = el('div', 'chain-modulation-stack');
+    stack.setAttribute('role', 'group');
+    stack.setAttribute('aria-label', 'Modulations');
+    const title = el('div', 'chain-param-group-title');
+    title.textContent = 'Modulations';
+    stack.appendChild(title);
+    for (let index = ownerIndex + 1; index < end; index += 1) {
+      const entry = chain[index];
+      const layer = el('div', 'chain-modulation-layer');
+      layer.dataset.label = entry.label;
+      layer.dataset.index = String(index);
+      layer.setAttribute('role', 'group');
+      layer.setAttribute('aria-label', `Modulation ${index - ownerIndex}`);
+      const header = el('div', 'chain-modulation-header');
+      header.classList.add('chain-chip-header--draggable');
+      const name = el('span', 'chain-modulation-title');
+      name.textContent = `Modulation ${index - ownerIndex}`;
+      header.appendChild(name);
+      const enabled = el('input', 'chain-modulation-enabled');
+      enabled.type = 'checkbox';
+      enabled.dataset.label = entry.label;
+      enabled.setAttribute('aria-label', `Enable modulation ${index - ownerIndex}`);
+      enabled.addEventListener('change', () => {
+        editParameter(`${entry.label}.modulation-enabled`, enabled.checked ? 'enabled' : 'disabled');
+        store.endValueRun();
+        onCommitParameter();
+      });
+      header.appendChild(enabled);
+      for (const {step, text, action} of [
+        {step: -1, text: '↑', action: 'earlier'}, {step: 1, text: '↓', action: 'later'},
+      ]) {
+        const move = el('button', 'chain-modulation-move');
+        move.type = 'button';
+        move.textContent = text;
+        move.setAttribute('aria-label', `Move modulation ${index - ownerIndex} ${action}`);
+        move.disabled = step < 0 ? index === ownerIndex + 1 : index === end - 1;
+        move.addEventListener('click', (/** @type {*} */ event) => {
+          event.stopPropagation();
+          const start = step < 0 ? index - 1 : index;
+          const result = store.replaceSpan(start, 2, [chain[start + 1], chain[start]]);
+          if (!result.ok) { report(result); return; }
+          pinnedLabels.add(owner.label);
+          commit(owner.label, '.chain-modulation-add');
+        });
+        header.appendChild(move);
+      }
+      const remove = el('button', 'chain-modulation-remove');
+      remove.type = 'button';
+      remove.textContent = '×';
+      remove.setAttribute('aria-label', `Remove modulation ${index - ownerIndex}`);
+      remove.addEventListener('click', (/** @type {*} */ event) => {
+        event.stopPropagation();
+        const result = store.replaceSpan(index, 1, []);
+        if (!result.ok) { report(result); return; }
+        pinnedLabels.add(owner.label);
+        commit(owner.label, '.chain-modulation-add');
+      });
+      header.appendChild(remove);
+      const consumeDragClick = wireChipDrag(layer, header, index,
+        `Modulation ${index - ownerIndex}`, owner.label);
+      header.addEventListener('click', (/** @type {*} */ event) => {
+        if (consumeDragClick()) { event.preventDefault(); event.stopPropagation(); }
+      });
+      layer.appendChild(header);
+      layer.appendChild(paramsElement(entry, declarations.filter(
+        (declaration) => declaration.id.startsWith(`${entry.label}.`))));
+      stack.appendChild(layer);
+    }
+    const add = el('button', 'chain-modulation-add');
+    add.type = 'button';
+    add.textContent = '+ Add modulation';
+    add.setAttribute('aria-label', 'Add modulation');
+    add.disabled = !store.legalInsertions(end).some(
+      (entry) => entry.operator.id === MODULATION_OPERATOR && entry.legal);
+    add.addEventListener('click', (/** @type {*} */ event) => {
+      event.stopPropagation();
+      const result = store.replaceSpan(end, 0, [{operator: MODULATION_OPERATOR}]);
+      if (!result.ok) { report(result); return; }
+      pinnedLabels.add(owner.label);
+      commit(owner.label, '.chain-modulation-add');
+    });
+    stack.appendChild(add);
+    return stack;
   };
 
   /**
@@ -1244,7 +1348,7 @@ export function createChainStrip({
     strip.setAttribute('role', 'group');
     strip.setAttribute('aria-label', 'Shader chain');
     const view = { selected, bypassed, tabLabel };
-    for (const band of layout) {
+    for (const band of layout.filter((band) => band.carrier !== 'color')) {
       const title = band.carrier === 'color' ? 'Modulation' : titleCase(band.carrier);
       const element = el('div', 'chain-band');
       element.setAttribute('role', 'group');

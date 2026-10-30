@@ -7,12 +7,12 @@ import { canonicalEffectId, effectDisplayName } from "../../effects/effect_ident
 import { engineHalted } from '../../shared/engine_halt.js';
 import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot, shaderChainCatalog } from '../../engine/workbench_bindings.js';
 import { enumConstantName } from '../../effects/param_sync.js';
-import { fieldOf as fieldSegment } from './chain_presentation.js';
+import { fieldOf as fieldSegment, MODULATION_OPERATOR } from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
 import { applyChainDocument, resolveParameterWrite } from './chain_apply.js';
 import {
   createChainDocumentStore, documentFromChainSnapshot, scratchChainDocument,
-  expandColorModulations, expandColorModulationSnapshot, upgradePaletteSnapshot,
+  upgradePaletteSnapshot,
 } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
 import { BAKED_CONSTANT_IDS, bakedTopologyFields, engineControlNames } from '../../../generated/shader/shader_workbench.mjs';
@@ -20,7 +20,7 @@ import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../../effects/effect_persistence.js'
 import { copyToClipboard } from '../../shared/copy_text.js';
 import { downloadBlob } from '../../shared/download_file.js';
 import {
-  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
+  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash, migrateLegacyChainSnapshot,
 } from './shader_deeplink.js';
 
 const PATTERN_CATALOG_URL = '../../../generated/shader/patterns/catalog.json';
@@ -476,7 +476,7 @@ export function createShaderDocumentController({
       const label = parameterId.slice(0, parameterId.indexOf('.'));
       const field = fieldSegment(parameterId);
       const modulated = document.descriptor.chain.some((/** @type {*} */ entry) =>
-        entry.label === label && ['colorize.generated-palette.v3', 'modulate.field.v1'].includes(entry.operator));
+        entry.label === label && entry.operator === MODULATION_OPERATOR);
       if (modulated && field === 'modulation-source' && value !== 'noise')
         values[`${label}.modulation-evaluation`] = 'direct';
       if (modulated && field === 'modulation-mechanic' && value !== 'hue-rotation') {
@@ -619,20 +619,8 @@ export function createShaderDocumentController({
       showError(diagnosticText(compiled));
       return false;
     }
-    {
-      const expanded = expandColorModulations(compiled.document, operatorCatalog);
-      if (expanded !== compiled.document) {
-        if (session?.chainSnapshot) session = { ...session, chainSnapshot:
-          expandColorModulationSnapshot(session.chainSnapshot, compiled.document, expanded) };
-        compiled = compiler.compileShaderDocument(expanded, { catalog: operatorCatalog });
-        if (compiled.status !== 'VALID') {
-          showError(diagnosticText(compiled));
-          return false;
-        }
-      }
-    }
     if (session?.chainSnapshot) session = { ...session,
-      chainSnapshot: upgradePaletteSnapshot(session.chainSnapshot, operatorCatalog) };
+      chainSnapshot: upgradePaletteSnapshot(migrateLegacyChainSnapshot(session.chainSnapshot), operatorCatalog) };
     // Resolved before anything is built: the strip renders the active preset's values.
     const presetId = session?.preset
       ?? compiled.document.preset_bank.presets[0]?.preset_id;
@@ -955,12 +943,11 @@ export function createShaderDocumentController({
     const chainText = query.get(`fx.${CHAIN_SNAPSHOT_STORAGE_KEY}`);
     if (!linked && !linkError && chainText !== null) {
       try {
-        let snapshot = JSON.parse(chainText);
+        let snapshot = migrateLegacyChainSnapshot(JSON.parse(chainText));
         const imported = documentFromChainSnapshot(snapshot, operatorCatalog);
-        const expanded = expandColorModulations(imported, operatorCatalog);
-        snapshot = upgradePaletteSnapshot(expandColorModulationSnapshot(snapshot, imported, expanded), operatorCatalog);
+        snapshot = upgradePaletteSnapshot(snapshot, operatorCatalog);
         const previous = getChainSnapshot(getEngine());
-        if (!await loadSource(expanded, 'imported.shader.json'))
+        if (!await loadSource(imported, 'imported.shader.json'))
           throw new Error(status.textContent || 'the imported chain could not be adopted');
         const outcome = restoreChainSnapshot(getEngine(), getModule(), snapshot);
         if (outcome !== getModule().ChainSnapshotRestoreResult.APPLIED) {

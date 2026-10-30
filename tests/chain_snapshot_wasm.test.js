@@ -2,12 +2,20 @@ import assert from 'node:assert/strict';
 import {after, test} from 'node:test';
 import createModule from '../generated/holosphere_wasm.js';
 import {callWorkbenchBinding} from '../src/engine/workbench_bindings.js';
+import {migrateLegacyChainSnapshot} from '../src/workbench/shader/shader_deeplink.js';
 
 const module = await createModule({print: () => {}});
 const engine = new module.HolosphereEngine();
 const capture = () => callWorkbenchBinding(engine, 'getSnapshot', []);
 const restore = (snapshot) => callWorkbenchBinding(engine, 'restoreSnapshot', [snapshot]);
 after(() => engine.delete());
+
+function installModulatedChain() {
+  engine.setEffect('ShaderChain');
+  const chain = callWorkbenchBinding(engine, 'getProgram', []);
+  assert.equal(callWorkbenchBinding(engine, 'setShaderChain', [[...chain,
+    {instance: 'modulation', operator: 'color.modulate.v1'}]]).code, 'APPLIED');
+}
 
 /**
  * Evolves a wandering ShaderChain, snapshots it, and records the frames that follow uninterrupted.
@@ -18,10 +26,10 @@ function evolve(temporal) {
   engine.setResolution(96, 20);
   engine.setTemporalSampling(temporal);
   const install = () => {
-    engine.setEffect('ShaderChain');
+    installModulatedChain();
     assert.equal(callWorkbenchBinding(engine, 'setShaderChainParameters', [[
       {name: 'camera.wander', value: 0.1}, {name: 'project.projection-wander', value: 0.2},
-      {name: 'sample.speed', value: 0.004}, {name: 'colorize.pattern-speed', value: 0.003},
+      {name: 'sample.speed', value: 0.004}, {name: 'modulation.pattern-speed', value: 0.0003},
     ]]), module.ParamSetResult.APPLIED);
     engine.setAnimationsPaused(false);
   };
@@ -42,7 +50,7 @@ function evolve(temporal) {
 
 /** Replaces the current effect and restores `snapshot` into a fresh ShaderChain. */
 function restoreFresh(snapshot) {
-  engine.setEffect('ShaderChain');
+  installModulatedChain();
   assert.equal(restore(snapshot), module.ChainSnapshotRestoreResult.APPLIED);
 }
 
@@ -69,15 +77,15 @@ test('a restored snapshot draws its first temporal frame at the current endpoint
 });
 
 test('snapshot validation refuses malformed state transactionally', () => {
-  engine.setEffect('ShaderChain');
+  installModulatedChain();
   assert.equal(callWorkbenchBinding(engine, 'setShaderChainParameters', [[
     {name: 'camera.wander', value: 0.1}, {name: 'sample.speed', value: 0.004},
-    {name: 'colorize.modulation-amount', value: 0.5},
+    {name: 'modulation.modulation-amount', value: 0.5},
   ]]), module.ParamSetResult.APPLIED);
   engine.setAnimationsPaused(false);
   for (let frame = 0; frame < 64; frame += 1) engine.drawFrame();
   const advanced = capture();
-  engine.setEffect('ShaderChain');
+  installModulatedChain();
   engine.setAnimationsPaused(true);
   const previous = capture();
   for (const section of ['parameters', 'modulation', 'runtime', 'paletteBank'])
@@ -89,7 +97,7 @@ test('snapshot validation refuses malformed state transactionally', () => {
     [(value) => { value.parameters[0].value = NaN; }, result.INVALID_VALUE],
     [(value) => { value.parameters.push({...value.parameters[0]}); }, result.INVALID_VALUE],
     [(value) => { delete value.modulation; }, result.INVALID_VALUE],
-    [(value) => { value.modulation[0].recipe.source = 4; }, result.INVALID_VALUE],
+    [(value) => { value.modulation[0].recipe.source = 5; }, result.INVALID_VALUE],
     [(value) => { value.modulation[0].recipe.mechanic.amount = NaN; }, result.INVALID_VALUE],
     [(value) => { value.modulation[0].recipe.mechanic.amount = 10; }, result.INVALID_VALUE],
     [(value) => { value.modulation[0].recipe.noise.speed = 100; }, result.INVALID_VALUE],
@@ -111,6 +119,53 @@ test('snapshot validation refuses malformed state transactionally', () => {
   accepted.modulation[0].recipe.mechanic.amount = 3;
   assert.equal(restore(accepted), result.APPLIED);
   assert.equal(capture().modulation[0].recipe.mechanic.amount, 3);
+});
+
+test('legacy standalone modulation stages restore as unified layers with the same clocks', () => {
+  installModulatedChain();
+  const legacy = capture();
+  legacy.schemaVersion = 3;
+  legacy.chain = legacy.chain.map((entry) => ({...entry, operator:
+    entry.operator === 'colorize.generated-palette.v4' ? 'colorize.generated-palette.v3'
+      : entry.operator === 'color.modulate.v1' ? 'modulate.field.v1' : entry.operator}));
+  legacy.chain.push({instance: 'old-hue', operator: 'modulate.hue-shift.v1'});
+  legacy.parameters.push({name: 'old-hue.hue-shift-mode', value: 1},
+    {name: 'old-hue.hue-shift-amount', value: 0.25});
+  const recipe = structuredClone(legacy.modulation[0].recipe);
+  recipe.enabled = false;
+  recipe.mechanic.amount = 0;
+  legacy.modulation.unshift({instance: 'colorize', recipe});
+  legacy.runtime = legacy.runtime.map((entry) => {
+    if (entry.instance === 'colorize') return {...entry, kind: 'color-clock-v2',
+      state: {...entry.state, modulation: {source: 0, version: 1, phaseTurns: 0, initialized: true}}};
+    if (entry.instance === 'modulation') return {...entry, kind: 'color-clock-v2',
+      state: {oscillationPhase: 0, modulation: {...entry.state, phaseTurns: 0.375}}};
+    return entry;
+  });
+  assert.equal(restore(legacy), module.ChainSnapshotRestoreResult.APPLIED);
+  const native = capture();
+  assert.equal(native.schemaVersion, 4);
+  assert.deepEqual(native.chain.slice(-2), [
+    {instance: 'modulation', operator: 'color.modulate.v1'},
+    {instance: 'old-hue', operator: 'color.modulate.v1'},
+  ]);
+  assert.equal(native.runtime.find((entry) => entry.instance === 'modulation').state.phaseTurns, 0.375);
+  assert.equal(native.modulation.find((entry) => entry.instance === 'old-hue').recipe.source, 4);
+  assert.equal(restore(migrateLegacyChainSnapshot(legacy)), module.ChainSnapshotRestoreResult.APPLIED);
+  assert.deepEqual(capture(), native);
+  for (const change of [
+    (snapshot) => { snapshot.parameters.at(-2).value = 2; },
+    (snapshot) => { snapshot.parameters.push({...snapshot.parameters.at(-1)}); },
+    (snapshot) => { snapshot.modulation[1].recipe.source = 4; },
+    (snapshot) => { snapshot.runtime.find((entry) => entry.instance === 'modulation').state.modulation.source = 4; },
+    (snapshot) => { snapshot.runtime.find((entry) => entry.instance === 'modulation').state.oscillationPhase = Infinity; },
+  ]) {
+    const candidate = structuredClone(legacy);
+    change(candidate);
+    assert.equal(migrateLegacyChainSnapshot(candidate), candidate);
+    assert.equal(restore(candidate), module.ChainSnapshotRestoreResult.INVALID_VALUE);
+    assert.deepEqual(capture(), native);
+  }
 });
 
 test('snapshot capability handles reject stale effect and geometry instances', () => {

@@ -6,7 +6,8 @@
 
 import { LABEL_PATTERN, declarationFromCatalogField as parameterFromField }
   from '../../../generated/shader/shader_workbench.mjs';
-import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from './shader_deeplink.js';
+import { CHAIN_SNAPSHOT_SCHEMA_VERSION, migrateLegacyChainSnapshot } from './shader_deeplink.js';
+import { PALETTE_OPERATOR } from './chain_presentation.js';
 
 /** @typedef {{id: string, name: string|null, min: number, max: number, default: *, curve?: string, topology?: false}} CatalogNumericField */
 /** @typedef {{id: string, topology: true, values: string[], default: *}} CatalogTopologyField */
@@ -41,14 +42,14 @@ export const UNDO_DEPTH = 100;
 
 /**
  * The default scratch chain uses a rotation, stereographic projection and plane-space sampling.
- * A minimal legal chain is sample.spherical-noise.v3 followed by colorize.generated-palette.v3.
+ * A minimal legal chain is sample.spherical-noise.v3 followed by colorize.generated-palette.v4.
  * @type {ReadonlyArray<ChainEntry>}
  */
 export const DEFAULT_SCRATCH_CHAIN = Object.freeze([
   { label: 'rotate', operator: 'sphere.rotate.v2' },
   { label: 'project', operator: 'project.stereographic.v2' },
   { label: 'sample', operator: 'sample.grid.v3' },
-  { label: 'colorize', operator: 'colorize.generated-palette.v3' },
+  { label: 'colorize', operator: PALETTE_OPERATOR },
 ]);
 
 const SCRATCH_PRESET_ID = 'catalog-defaults';
@@ -123,146 +124,14 @@ export function scratchChainDocument(catalog, chain = DEFAULT_SCRATCH_CHAIN) {
   };
 }
 
-/**
- * Expands embedded color modulation into ordered editable stages.
- * @param {*} document - A compiled shader document.
- * @param {*} catalog - The installed operator catalog.
- * @returns {*} The original document when no expansion is needed.
- */
-export function expandColorModulations(document, catalog) {
-  if (!catalog?.operators || !document.descriptor.chain.some((/** @type {ChainEntry} */ entry) =>
-    entry.operator === 'colorize.generated-palette.v3')) return document;
-  const operators = new Map(catalog.operators.map((/** @type {*} */ operator) =>
-    [operator.id, operator]));
-  const fieldOperator = operators.get('modulate.field.v1');
-  const hueOperator = operators.get('modulate.hue-shift.v1');
-  if (!fieldOperator || !hueOperator) return document;
-  const candidate = structuredClone(document);
-  const descriptor = candidate.descriptor;
-  const presets = candidate.preset_bank.presets;
-  const labels = new Set(descriptor.chain.map((/** @type {ChainEntry} */ entry) => entry.label));
-  const defaults = new Map(descriptor.parameters.map((/** @type {ParameterDeclaration} */ parameter) =>
-    [parameter.id, parameter.default]));
-  const colorSchema = operators.get('colorize.generated-palette.v3');
-  let changed = false;
-  /** @type {ChainEntry[]} */
-  const chain = [];
-  for (const entry of descriptor.chain) {
-    chain.push(entry);
-    if (entry.operator !== 'colorize.generated-palette.v3') continue;
-    /** @param {*} preset @param {string} field */
-    const value = (preset, field) => preset.values[`${entry.label}.${field}`]
-      ?? defaults.get(`${entry.label}.${field}`)
-      ?? colorSchema.params.find((/** @type {*} */ parameter) => parameter.id === field)?.default;
-    for (const [operator, amountField, stem] of [
-      [hueOperator, 'hue-shift-amount', 'hue-shift'],
-      [fieldOperator, 'modulation-amount', 'field'],
-    ]) {
-      if (!presets.some((/** @type {*} */ preset) => Number(value(preset, amountField)) !== 0)) continue;
-      let label = stem;
-      for (let suffix = 1; labels.has(label); suffix += 1) label = `${stem}${suffix}`;
-      labels.add(label);
-      chain.push({ label, operator: operator.id });
-      for (const field of operator.params) {
-        const sourceDeclaration = descriptor.parameters.find((/** @type {ParameterDeclaration} */ parameter) =>
-          parameter.id === `${entry.label}.${field.id}`);
-        const declaration = sourceDeclaration ? structuredClone(sourceDeclaration)
-          : parameterFromField(label, field, operator.id);
-        declaration.id = `${label}.${field.id}`;
-        if (declaration.interpolation.group?.startsWith(`${entry.label}.`))
-          declaration.interpolation.group = `${label}.${declaration.interpolation.group.slice(entry.label.length + 1)}`;
-        descriptor.parameters.push(declaration);
-        descriptor.serialization.fields.push(declaration.id);
-        for (const policy of descriptor.path_policies) {
-          if (policy.kind === 'STAGGERED_ORDERED') {
-            const group = declaration.interpolation.group ?? declaration.id;
-            if (!policy.groups.includes(group)) policy.groups.push(group);
-          }
-        }
-        for (const preset of presets)
-          preset.values[declaration.id] = value(preset, field.id) ?? declaration.default;
-      }
-      const modeField = amountField === 'modulation-amount' ? 'modulation-enabled' : 'hue-shift-mode';
-      for (const field of [amountField, modeField]) {
-        if (defaults.has(`${entry.label}.${field}`)) continue;
-        const declaration = parameterFromField(entry.label,
-          colorSchema.params.find((/** @type {*} */ parameter) => parameter.id === field), entry.operator);
-        descriptor.parameters.push(declaration);
-        descriptor.serialization.fields.push(declaration.id);
-        for (const policy of descriptor.path_policies) {
-          if (policy.kind === 'STAGGERED_ORDERED') {
-            const group = declaration.interpolation.group ?? declaration.id;
-            if (!policy.groups.includes(group)) policy.groups.push(group);
-          }
-        }
-      }
-      for (const preset of presets) {
-        preset.values[`${entry.label}.${amountField}`] = 0;
-        preset.values[`${entry.label}.${modeField}`] = modeField === 'modulation-enabled' ? 'disabled' : 'none';
-      }
-      changed = true;
-    }
-  }
-  if (!changed) return document;
-  descriptor.chain = chain;
-  return candidate;
-}
-
-/**
- * Moves embedded recipe clocks into the stages added by expansion.
- * @param {*} snapshot - The original executable snapshot.
- * @param {*} document - Its original document.
- * @param {*} expanded - The expanded document.
- * @returns {*} A snapshot matching the expanded chain.
- */
-export function expandColorModulationSnapshot(snapshot, document, expanded) {
-  if (document === expanded) return snapshot;
-  const result = structuredClone(snapshot);
-  const original = new Set(document.descriptor.chain.map((/** @type {ChainEntry} */ entry) => entry.label));
-  let color = '';
-  for (const entry of expanded.descriptor.chain) {
-    if (entry.operator === 'colorize.generated-palette.v3') color = entry.label;
-    if (original.has(entry.label)) continue;
-    const index = result.chain.findIndex((/** @type {*} */ stage) => stage.instance === color);
-    result.chain.splice(index + 1, 0, { instance: entry.label, operator: entry.operator });
-    if (entry.operator === 'modulate.field.v1') {
-      const recipe = result.modulation.find((/** @type {*} */ stage) => stage.instance === color);
-      if (recipe) {
-        result.modulation.push({ instance: entry.label, recipe: structuredClone(recipe.recipe) });
-        recipe.recipe.enabled = false;
-        recipe.recipe.mechanic.amount = 0;
-      }
-      const runtime = result.runtime?.find((/** @type {*} */ stage) => stage.instance === color);
-      if (runtime) {
-        const field = structuredClone(runtime);
-        field.instance = entry.label;
-        field.state.oscillationPhase = 0;
-        result.runtime.push(field);
-      }
-    } else if (entry.operator === 'modulate.hue-shift.v1') {
-      for (const field of ['hue-shift-mode', 'hue-shift-amount']) {
-        const parameter = result.parameters.find((/** @type {*} */ parameter) => parameter.name === `${color}.${field}`);
-        result.parameters.push({ name: `${entry.label}.${field}`, value: parameter?.value ?? 0 });
-        if (parameter) parameter.value = 0;
-      }
-    }
-  }
-  const positions = new Map(expanded.descriptor.chain.map((/** @type {ChainEntry} */ entry, /** @type {number} */ index) => [entry.label, index]));
-  const order = (/** @type {*} */ a, /** @type {*} */ b) => positions.get(a.instance) - positions.get(b.instance);
-  result.chain.sort(order);
-  result.runtime?.sort(order);
-  result.modulation.sort(order);
-  return result;
-}
-
 /** @param {*} snapshot @param {*} catalog @returns {*} A legacy snapshot with palette-family defaults. */
 export function upgradePaletteSnapshot(snapshot, catalog) {
-  const schema = catalog?.operators?.find((/** @type {*} */ operator) => operator.id === 'colorize.generated-palette.v3');
+  const schema = catalog?.operators?.find((/** @type {*} */ operator) => operator.id === PALETTE_OPERATOR);
   if (!schema?.params.some((/** @type {*} */ field) => field.id === 'palette-type')) return snapshot;
   const result = structuredClone(snapshot);
   const names = new Set(result.parameters.map((/** @type {*} */ parameter) => parameter.name));
   for (const entry of result.chain) {
-    if (entry.operator !== 'colorize.generated-palette.v3' || names.has(`${entry.instance}.palette-type`)) continue;
+    if (entry.operator !== PALETTE_OPERATOR || names.has(`${entry.instance}.palette-type`)) continue;
     for (const field of schema.params) {
       if ((!field.id.startsWith('palette-') && !field.id.startsWith('gradient-'))
           || ['palette-mode', 'palette-chroma', 'palette-mapping'].includes(field.id)) continue;
@@ -331,7 +200,7 @@ export async function createChainDocumentStore({
     }
   };
 
-  let doc = structuredClone(document);
+  let doc = structuredClone(compiler.migrateLegacyShaderDocument?.(document, catalog) ?? document);
   {
     const diagnostics = diagnosticsOf(doc);
     if (diagnostics.length > 0) {
@@ -926,12 +795,13 @@ export async function createChainDocumentStore({
 
 /**
  * Builds an editable document from an executable chain snapshot.
- * @param {*} snapshot - Schema-v3 program, parameters and modulation recipes.
+ * @param {*} snapshot - Executable program, parameters and modulation recipes.
  * @param {*} catalog - Operator catalog used to declare parameters and defaults.
  * @returns {*} The imported document; enum8 option indices map to authored option IDs.
  * @throws {Error} If the snapshot schema is unsupported or a parameter is unknown.
  */
 export function documentFromChainSnapshot(snapshot, catalog) {
+  snapshot = migrateLegacyChainSnapshot(snapshot);
   if (snapshot?.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION || !Array.isArray(snapshot.chain)
       || !Array.isArray(snapshot.parameters) || !Array.isArray(snapshot.modulation))
     throw new Error('unsupported chain snapshot');

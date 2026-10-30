@@ -26,6 +26,9 @@ import { float32Decimal } from '../../shared/cpp_format.js';
 
 const READOUT_STEPS = 1000;
 
+export const PALETTE_OPERATOR = 'colorize.generated-palette.v4';
+export const MODULATION_OPERATOR = 'color.modulate.v1';
+
 /** @type {{name: string, fields: string[], source?: string}[]} */
 export const COLOR_PARAMETER_GROUPS = [
   { name: 'Palette', fields: ['palette-type', 'palette-mode', 'palette-harmony',
@@ -69,7 +72,7 @@ export const COLOR_PARAMETER_NAMES = {
   'hue-shift-mode': 'Mode', 'hue-shift-amount': 'Amount',
   'palette-mapping': 'Shape', 'mapping-frequency': 'Repeats', 'mapping-phase': 'Phase',
   'phase-oscillation-depth': 'Phase motion depth', 'phase-oscillation-speed': 'Phase motion speed',
-  'modulation-enabled': 'Modulation', 'modulation-source': 'Source',
+  'modulation-enabled': 'Enabled', 'modulation-source': 'Source',
   'modulation-mechanic': 'Affects', 'modulation-amount': 'Amount',
   'modulation-evaluation': 'Sampling', 'pattern-scale': 'Noise scale (frequency)',
   'pattern-speed': 'Noise speed', 'pattern-contrast': 'Noise contrast',
