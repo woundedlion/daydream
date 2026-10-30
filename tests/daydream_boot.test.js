@@ -78,7 +78,7 @@ test('catalog effects are offered at both simulator resolutions', async () => {
   captureConsole(() => resolutionControl(app).setValue('Holosphere (96x20)'));
   const loRes = offeredEffects(app);
 
-  for (const effect of ['AshCloud', 'HyperLattice']) {
+  for (const effect of ['AshCloud', 'HyperLattice', 'Millefiori']) {
     assert.ok(hiRes.includes(canonicalEffectId(effect)),
       `the sidebar must offer ${effect} at the high-res preset`);
     assert.ok(loRes.includes(canonicalEffectId(effect)),
@@ -86,6 +86,26 @@ test('catalog effects are offered at both simulator resolutions', async () => {
   }
   assert.equal(hiRes.includes(canonicalEffectId('Dynamo')), false);
   assert.equal(loRes.includes(canonicalEffectId('Dynamo')), true);
+});
+
+test('Millefiori starts at both resolutions and explicit effects override it', async () => {
+  for (const resolution of ['Phantasm (288x144)', 'Holosphere (96x20)']) {
+    for (const effect of [null, 'Comets']) {
+      const module = fakeWasmModule();
+      const installed = [];
+      module.HolosphereEngine.prototype.setEffect = (name) => {
+        installed.push(name);
+        return EffectSetResult.INSTALLED;
+      };
+      const query = new URLSearchParams();
+      if (resolution !== 'Phantasm (288x144)') query.set('resolution', resolution);
+      if (effect) query.set('effect', effect);
+      const app = await bootedApp({ search: query.size ? `?${query}` : '',
+        loadModule: async () => module });
+      assert.equal(installed.at(-1), effect ? 'comets' : 'millefiori');
+      assert.deepEqual(app.replaced, []);
+    }
+  }
 });
 
 test('a booted render reconciles live panel values', async () => {

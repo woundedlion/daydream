@@ -40,6 +40,7 @@ const HiResFavorites = [
   "AlienCore",
   "KaleidoscopeMandala",
   "GridSpace",
+  "Millefiori",
   "HyperLattice",
   "AshCloud",
   "KaleidoscopeMelt",
@@ -82,6 +83,7 @@ const LoResFavorites = [
   "AlienCore",
   "KaleidoscopeMandala",
   "GridSpace",
+  "Millefiori",
   "HyperLattice",
   "AshCloud",
   "KaleidoscopeMelt",
@@ -114,7 +116,7 @@ const LoResFavorites = [
 ];
 
 // The effect the simulator seeds when the URL names none.
-export const DEFAULT_EFFECT = 'IslamicStars';
+export const DEFAULT_EFFECT = 'Millefiori';
 
 // Display metadata (dot size), geometry, and the effect list offered per
 // resolution. Null prototype: a URL string indexes this table, and an inherited
