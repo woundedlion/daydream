@@ -49,7 +49,8 @@ resolution rollback and segment-worker initialization use the same snapshot. Wor
 protocol carries `chainSnapshot`.
 
 Snapshot schema version 3 requires `chain: [{instance, operator}]`,
-`parameters: [{name, value}]`, and `modulation: [{instance, recipe}]`, with one
+`parameters: [{name, value}]`, `animationsPaused` (boolean), and
+`modulation: [{instance, recipe}]`, with one
 recipe per colorize instance. Colorize modulation fields travel in `modulation`,
 not `parameters`. `runtime` and `paletteBank` are optional. Runtime entries identify their instance and stable
 state kind. Omit runtime to initialize fresh state; when present, it must include
