@@ -10,7 +10,7 @@ beforeEach((t) => {
   const capture = installConsoleCapture('log');
   t.after(capture.restore);
 });
-import { runWorkbenchSections, probeDocumentActions, probeSnapshotImport, probeParity, probeStartupPersistence, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
+import { runWorkbenchSections, probeColorCard, probeNoiseScaleDrag, probeDocumentActions, probeSnapshotImport, probeParity, probeStartupPersistence, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
 import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
 import {
   probeKeyboardEdits, probeMobilePanel, probePanel, probePresetName, probeSidebar, probeSliderDrag,
@@ -21,6 +21,8 @@ import { probePad } from '../scripts/mobius-probe.mjs';
 import { scratchDir } from './helpers/fixture_repo.js';
 
 const PROBES = [
+  ['workbench-probe.mjs', 'probeColorCard', probeColorCard],
+  ['workbench-probe.mjs', 'probeNoiseScaleDrag', probeNoiseScaleDrag],
   ['workbench-probe.mjs', 'probeDocumentActions', probeDocumentActions],
   ['workbench-probe.mjs', 'probeParity', probeParity],
   ['workbench-probe.mjs', 'probeStripHistory', probeStripHistory],
