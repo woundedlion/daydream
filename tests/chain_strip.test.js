@@ -1712,7 +1712,7 @@ test('omitted catalog fields display defaults and become undoable document edits
 });
 
 
-test('every catalog operator exposes its full schema in a declaration-free stage', async () => {
+test('every catalog operator exposes its parameter controls without declarations', async () => {
   const crossings = CATALOG.carriers.slice(0, -1).map((carrier, index) =>
     CATALOG.operators.find((operator) => operator.input === carrier
       && operator.output === CATALOG.carriers[index + 1]));
@@ -1732,9 +1732,11 @@ test('every catalog operator exposes its full schema in a declaration-free stage
         if (id.startsWith('audit.')) delete preset.values[id];
     const h = await makeStrip({ source });
     chipByLabel(h, 'audit').dispatch('click');
+    const fields = operator.params.filter((field) =>
+      operator.id !== 'modulate.field.v1' || field.id !== 'modulation-enabled');
     assert.deepEqual(rowsOf(h, 'audit').map((row) => row.dataset.parameter).sort(),
-      operator.params.map((field) => `audit.${field.id}`).sort(), operator.name);
-    for (const field of operator.params) {
+      fields.map((field) => `audit.${field.id}`).sort(), operator.name);
+    for (const field of fields) {
       const control = controlIn(rowFor(h, 'audit', `audit.${field.id}`));
       const value = control.type === 'checkbox' ? (control.checked ? 'on' : 'off') : control.value;
       assert.equal(String(value), String(field.default), `${operator.name}: ${field.id}`);
@@ -1983,6 +1985,8 @@ test('Modulations supports independent ordered Field stages and Hue shift after 
   choice.dispatch('click');
   const first = h.store.chain().at(-1).label;
   assert.equal(h.store.chain().at(-1).operator, 'modulate.field.v1');
+  assert.equal(Boolean(rowFor(h, first, `${first}.modulation-enabled`)), false,
+    'modulation-enabled has no inline control');
   const evaluation = controlIn(rowFor(h, first, `${first}.modulation-evaluation`));
   evaluation.value = 'direct';
   evaluation.dispatch('change');
@@ -2002,6 +2006,8 @@ test('Modulations supports independent ordered Field stages and Hue shift after 
   assert.deepEqual(h.store.chain().slice(-3).map((entry) => entry.label), ['another', first, 'hue']);
   chipByLabel(h, first).querySelector('.chain-chip-bypass').dispatch('click');
   assert.equal(h.store.bypassedLabels().includes(first), true);
+  chipByLabel(h, first).querySelector('.chain-chip-bypass').dispatch('click');
+  assert.equal(h.store.bypassedLabels().includes(first), false);
   assert.equal(h.store.chain().at(-4).operator, 'colorize.generated-palette.v3');
   chipByLabel(h, 'hue').querySelector('.chain-chip-remove').dispatch('click');
   assert.equal(h.store.chain().some((entry) => entry.label === 'hue'), false);

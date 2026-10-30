@@ -897,6 +897,7 @@ export function createChainStrip({
       (field) => declared.filter((parameter) => fieldOf(parameter.id) === field))) : declared;
     for (const declaration of [...ordered, ...declared.filter((parameter) => !ordered.includes(parameter))]) {
       const field = fieldOf(declaration.id);
+      if (modulation && field === 'modulation-enabled') continue;
       const name = grouped || entry.operator === 'modulate.hue-shift.v1' ? COLOR_PARAMETER_NAMES[field]
         ?? titleCase(field.replace(/^(sine|interference|grid)-/, '').replace(/-b(?=-|$)/, ''))
         : titleCase(field);
