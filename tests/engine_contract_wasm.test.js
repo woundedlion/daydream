@@ -441,6 +441,52 @@ test('chain snapshots match fake key sets, decode refusals and runtime round tri
   assert.equal(chainCall(fake, 'restoreSnapshot', saved), ChainSnapshotRestoreResult.APPLIED);
   assert.deepEqual(chainCall(fake, 'getSnapshot').runtime, saved.runtime);
   assert.deepEqual(chainCall(fake, 'getSnapshot').paletteBank, saved.paletteBank);
+
+  const fakeDefault = chainCall(fake, 'getSnapshot');
+  assert.equal(chainCall(engine, 'restoreSnapshot', fakeDefault).value, ChainSnapshotRestoreResult.APPLIED.value);
+  for (const seed of [-0x80000000, -1, 0x7fffffff, -0x80000001, 0x80000000, 3e9]) {
+    for (const field of ['recipe', 'spatial', 'noise']) {
+      const snapshot = structuredClone(saved);
+      if (field === 'recipe') snapshot.modulation[0].recipe.seed = seed;
+      else if (field === 'spatial') snapshot.runtime.find(({kind}) => kind === 'spatial-walk-v2').state.noiseSeed = seed;
+      else {
+        const noise = {instance: 'noise', operator: 'warp.vector-noise.v2'};
+        const chain = [...DEFAULT_CHAIN.slice(0, 2), noise, ...DEFAULT_CHAIN.slice(2)];
+        for (const target of [engine, fake])
+          assert.equal(chainCall(target, 'setShaderChain', chain).code, 'APPLIED');
+        Object.assign(snapshot, chainCall(engine, 'getSnapshot'));
+        snapshot.runtime.find(({kind}) => kind === 'noise-clock-v1').state.noiseSeed = seed;
+      }
+      const expected = seed >= -0x80000000 && seed <= 0x7fffffff
+        ? ChainSnapshotRestoreResult.APPLIED : ChainSnapshotRestoreResult.INVALID_VALUE;
+      assert.equal(chainCall(engine, 'restoreSnapshot', snapshot).value, expected.value, `${field}: ${seed}`);
+      assert.equal(chainCall(fake, 'restoreSnapshot', snapshot), expected, `${field}: ${seed}`);
+    }
+  }
+  const advanced = structuredClone(saved);
+  advanced.paletteBank.hues.fill(318);
+  for (const cycle of advanced.paletteBank.cycles) {
+    cycle.nextSequence = 3;
+    cycle.fadeActive = true;
+    cycle.frame = 1;
+  }
+  for (const target of [engine, fake]) {
+    assert.equal(chainCall(target, 'restoreSnapshot', advanced).value, ChainSnapshotRestoreResult.APPLIED.value);
+    assert.deepEqual(chainCall(target, 'getSnapshot').paletteBank, advanced.paletteBank);
+  }
+  for (const change of [
+    (snapshot) => { snapshot.paletteBank.chroma = -0.1; },
+    (snapshot) => { snapshot.paletteBank.chroma = 1.1; },
+    (snapshot) => { snapshot.paletteBank.cycles[0].nextSequence = 1; },
+    (snapshot) => { snapshot.paletteBank.hues[0] += 1; },
+    (snapshot) => { snapshot.paletteBank.cycles[0].frame = 600; },
+    (snapshot) => { snapshot.paletteBank.cycles[0].fadeActive = false; },
+  ]) {
+    const snapshot = structuredClone(advanced);
+    change(snapshot);
+    for (const target of [engine, fake])
+      assert.equal(chainCall(target, 'restoreSnapshot', snapshot).value, ChainSnapshotRestoreResult.INVALID_VALUE.value);
+  }
 });
 
 test('every catalog operator matches fake snapshot runtime kinds and state keys', () => {

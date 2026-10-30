@@ -117,7 +117,7 @@ test('fake snapshots refuse invalid modulation recipes without changing state', 
     (value) => { value.modulation[0].recipe.noise.basis = 1; },
     (value) => { value.modulation[0].recipe.mechanic = {kind: 2, amount: -0.1}; },
     (value) => { value.modulation[0].recipe.version = 2; },
-    (value) => { value.modulation[0].recipe.seed = -1; },
+    (value) => { value.modulation[0].recipe.seed = 2 ** 31; },
     (value) => { value.parameters.push({name: 'colorize.pattern-speed', value: 0}); },
     (value) => { value.runtime.find((entry) => entry.kind === 'color-clock-v2').state.modulation.source = 1; },
   ]) {

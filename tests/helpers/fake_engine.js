@@ -45,10 +45,11 @@ for (const source of ['sine', 'interference', 'grid']) {
   }
 }
 
+const signed32 = (value) => Number.isInteger(value) && value >= -0x80000000 && value <= 0x7fffffff;
+
 function validModulationRecipe(recipe, definitions, instance) {
-  const unsigned = (value) => Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
   if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)
-      || typeof recipe.enabled !== 'boolean' || recipe.version !== 1 || !unsigned(recipe.seed)) return false;
+      || typeof recipe.enabled !== 'boolean' || recipe.version !== 1 || !signed32(recipe.seed)) return false;
   for (const source of ['sine', 'interference', 'grid']) {
     if (!Array.isArray(recipe[source]?.axis) || recipe[source].axis.length !== 3
         || (source !== 'sine' && (!Array.isArray(recipe[source]?.axisB)
@@ -204,8 +205,8 @@ export class FakeChainEngine {
       }
       return [{ instance, kind, state }];
     });
-    this.paletteBank = { chroma: 0.15, hues: [0, 1, 2], cycles: Array.from({ length: 3 },
-      () => ({ frame: 0, nextSequence: 0, fadeActive: false, displayDirty: true })) };
+    this.paletteBank = { chroma: 0.15, hues: [159, 159, 159], cycles: Array.from({ length: 3 },
+      () => ({ frame: 0, nextSequence: 2, fadeActive: false, displayDirty: true })) };
     this.modulation = entries.filter(({operator}) => operator.startsWith('colorize.'))
       .map(({instance}) => ({instance, recipe: modulationRecipe()}));
     this.generation += 1;
@@ -248,7 +249,7 @@ export class FakeChainEngine {
         if (snapshot.runtime?.length > this.catalog.budgets.max_chain_ops)
           return ChainSnapshotRestoreResult.INVALID_LENGTH;
         const unsigned = (value) => Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
-        const spatial = (state) => state && unsigned(state.noiseSeed) && unsigned(state.walkTime)
+        const spatial = (state) => state && signed32(state.noiseSeed) && unsigned(state.walkTime)
           && ['position', 'direction', 'wander'].every((key) => Array.isArray(state[key])
             && state[key].length === (key === 'wander' ? 4 : 3) && state[key].every(Number.isFinite))
           && Number.isFinite(state.angularVelocity) && Number.isFinite(state.spinPhase);
@@ -266,7 +267,7 @@ export class FakeChainEngine {
             return !spatial(entry.state.walk) || !Number.isFinite(entry.state.phase);
           const fields = runtimeFields[entry.kind];
           return !fields || fields.some((key) => !Number.isFinite(entry.state[key]))
-            || (entry.kind === 'noise-clock-v1' && !unsigned(entry.state.noiseSeed))
+            || (entry.kind === 'noise-clock-v1' && !signed32(entry.state.noiseSeed))
             || (entry.kind === 'color-clock-v2' && (!entry.state.modulation
               || !unsigned(entry.state.modulation.source) || entry.state.modulation.source > 3
               || entry.state.modulation.version !== 1 || typeof entry.state.modulation.initialized !== 'boolean'
@@ -280,10 +281,13 @@ export class FakeChainEngine {
           return ChainSnapshotRestoreResult.INVALID_VALUE;
         if (palette !== undefined && (palette.hues.length !== 3 || palette.cycles.length !== 3))
           return ChainSnapshotRestoreResult.INVALID_LENGTH;
-        if (palette !== undefined && (palette.hues.some((hue) => !Number.isInteger(hue) || hue < 0 || hue > 255)
-            || palette.cycles.some((cycle) => !cycle || !unsigned(cycle.frame)
-              || !unsigned(cycle.nextSequence) || typeof cycle.fadeActive !== 'boolean'
-              || typeof cycle.displayDirty !== 'boolean')))
+        if (palette !== undefined && (palette.chroma < 0 || palette.chroma > 1
+            || palette.hues.some((hue) => !unsigned(hue))
+            || palette.cycles.some((cycle, index) => !cycle || !unsigned(cycle.frame)
+              || !unsigned(cycle.nextSequence) || cycle.nextSequence < 2
+              || typeof cycle.fadeActive !== 'boolean' || typeof cycle.displayDirty !== 'boolean'
+              || cycle.frame >= (cycle.fadeActive ? 600 : 1)
+              || palette.hues[index] !== (((cycle.nextSequence - 1) * 159) >>> 0))))
           return ChainSnapshotRestoreResult.INVALID_VALUE;
         if (snapshot.chain.length === 0) return ChainSnapshotRestoreResult.INVALID_LENGTH;
         const candidate = new FakeChainEngine();
