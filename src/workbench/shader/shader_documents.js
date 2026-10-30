@@ -5,7 +5,7 @@
 
 import { canonicalEffectId, effectDisplayName } from "../../effects/effect_identity.js";
 import { engineHalted } from '../../shared/engine_halt.js';
-import { getChainSnapshot, restoreChainSnapshot, shaderChainCatalog } from '../../engine/workbench_bindings.js';
+import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot, shaderChainCatalog } from '../../engine/workbench_bindings.js';
 import { enumConstantName } from '../../effects/param_sync.js';
 import { fieldOf as fieldSegment } from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
@@ -470,6 +470,18 @@ export function createShaderDocumentController({
       const presetValues = document.preset_bank.presets
         .find((/** @type {*} */ preset) => preset.preset_id === active.presetId).values;
       const values = { [parameterId]: value };
+      const label = parameterId.slice(0, parameterId.indexOf('.'));
+      const field = fieldSegment(parameterId);
+      const color = document.descriptor.chain.some((/** @type {*} */ entry) =>
+        entry.label === label && entry.operator === 'colorize.generated-palette.v3');
+      if (color && field === 'modulation-source') {
+        if (value !== 'noise') values[`${label}.modulation-evaluation`] = 'direct';
+        else if (presetValues[`${label}.pattern-noise-variant`] === 'octave-contour')
+          values[`${label}.modulation-evaluation`] = 'baked-cube';
+      }
+      if (color && field === 'pattern-noise-variant' && value === 'octave-contour')
+        values[`${label}.modulation-evaluation`] = 'baked-cube';
+      const coupled = Object.keys(values).length > 1;
       if (active.compiledSide) {
         const editedPresetValues = { ...presetValues, [parameterId]: value };
         for (const id of Object.keys(presetValues)) {
@@ -486,8 +498,23 @@ export function createShaderDocumentController({
         const definitions = engine.getParameterDefinitions();
         const control = engineControlName(parameterId, definitions);
         const paused = getAnimationsPaused();
-        const refusal = control.refusal ?? (control.name === null ? null
-          : writeEngineValue(engine, module, definitions, control.name, value));
+        let refusal = control.refusal;
+        if (refusal === null && control.name !== null) {
+          if (coupled && !active.compiledSide) {
+            const writes = [];
+            for (const [id, next] of Object.entries(values)) {
+              const write = resolveParameterWrite(definitions, id, next);
+              if (typeof write === 'string') { refusal = write; break; }
+              writes.push({ name: write.name, value: write.stored });
+            }
+            if (refusal === null) {
+              const written = callWorkbenchBinding(engine, 'setShaderChainParameters', [writes],
+                module.ParamSetResult.NO_EFFECT);
+              if (written !== module.ParamSetResult.APPLIED)
+                refusal = `"${parameterId}" was refused: ${enumConstantName(module.ParamSetResult, written)}`;
+            }
+          } else refusal = writeEngineValue(engine, module, definitions, control.name, value);
+        }
         if (paused !== null) {
           setAnimationsPaused(paused);
           syncEffectGui();
@@ -511,6 +538,7 @@ export function createShaderDocumentController({
         applyPreset(active.presetId);
         if (dropped) chainUi.strip.render();
       }
+      if (coupled) chainUi.strip.syncParameterValues(values);
       chainUi.strip.syncHistory();
       scheduleDeepLink();
       return true;

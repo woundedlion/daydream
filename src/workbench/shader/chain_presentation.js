@@ -26,6 +26,61 @@ import { float32Decimal } from '../../shared/cpp_format.js';
 
 const READOUT_STEPS = 1000;
 
+/** @type {{name: string, fields: string[], source?: string}[]} */
+export const COLOR_PARAMETER_GROUPS = [
+  { name: 'Palette', fields: ['palette-mode', 'palette-chroma'] },
+  { name: 'Modulation', fields: ['modulation-enabled', 'modulation-source',
+    'modulation-mechanic', 'modulation-amount', 'modulation-evaluation'] },
+  { name: 'Noise', source: 'noise', fields: ['pattern-scale', 'pattern-speed',
+    'pattern-noise-variant', 'pattern-noise-basis', 'pattern-contrast'] },
+  { name: 'Sine wave', source: 'directional-sine', fields: ['sine-frequency', 'sine-speed',
+    'sine-offset', 'sine-axis-x', 'sine-axis-y', 'sine-axis-z'] },
+  { name: 'Interference · wave A', source: 'sphere-interference', fields: [
+    'interference-frequency', 'interference-speed', 'interference-offset',
+    'interference-axis-x', 'interference-axis-y', 'interference-axis-z'] },
+  { name: 'Interference · wave B', source: 'sphere-interference', fields: [
+    'interference-frequency-b', 'interference-offset-b', 'interference-axis-b-x',
+    'interference-axis-b-y', 'interference-axis-b-z'] },
+  { name: 'Grid · wave A', source: 'sphere-smooth-grid', fields: ['grid-frequency',
+    'grid-speed', 'grid-offset', 'grid-axis-x', 'grid-axis-y', 'grid-axis-z'] },
+  { name: 'Grid · wave B', source: 'sphere-smooth-grid', fields: ['grid-frequency-b',
+    'grid-offset-b', 'grid-axis-b-x', 'grid-axis-b-y', 'grid-axis-b-z'] },
+  { name: 'Color mapping', fields: ['palette-mapping', 'mapping-frequency', 'mapping-phase',
+    'phase-oscillation-depth', 'phase-oscillation-speed'] },
+  { name: 'Hue shift', fields: ['hue-shift-mode', 'hue-shift-amount'] },
+  { name: 'Brightness & opacity', fields: ['brightness-envelope', 'brightness-bottom',
+    'brightness-top', 'value-opacity-low', 'value-opacity-high'] },
+];
+
+/** @type {Record<string, string>} */
+export const COLOR_PARAMETER_NAMES = {
+  'palette-mode': 'Harmony', 'palette-chroma': 'Chroma',
+  'palette-mapping': 'Shape', 'mapping-frequency': 'Repeats', 'mapping-phase': 'Phase',
+  'phase-oscillation-depth': 'Phase motion depth', 'phase-oscillation-speed': 'Phase motion speed',
+  'modulation-enabled': 'Modulation', 'modulation-source': 'Source',
+  'modulation-mechanic': 'Affects', 'modulation-amount': 'Amount',
+  'modulation-evaluation': 'Sampling', 'pattern-scale': 'Noise scale (frequency)',
+  'pattern-speed': 'Noise speed', 'pattern-contrast': 'Noise contrast',
+  'pattern-noise-basis': 'Noise basis', 'pattern-noise-variant': 'Noise detail',
+  'interference-speed': 'Shared speed', 'grid-speed': 'Shared speed',
+};
+
+/**
+ * @param {string} field - Palette field id.
+ * @param {(field: string) => *} value - Current palette values.
+ * @returns {boolean} Whether the selected modulation uses this field.
+ */
+export function colorParameterHidden(field, value) {
+  const group = COLOR_PARAMETER_GROUPS.find((group) => group.fields.includes(field));
+  const modulation = group?.source !== undefined || group?.name === 'Modulation';
+  if (modulation && field !== 'modulation-enabled' && value('modulation-enabled') === 'disabled')
+    return true;
+  if (group?.source !== undefined && group.source !== value('modulation-source')) return true;
+  if (field === 'modulation-evaluation' && value('modulation-source') !== 'noise') return true;
+  return ['pattern-noise-basis', 'pattern-contrast'].includes(field)
+    && value('pattern-noise-variant') !== 'octave-contour';
+}
+
 /**
  * @param {number} value - A stored parameter value.
  * @returns {string} The shortest decimal that reads back as the same binary32.

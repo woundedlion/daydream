@@ -1852,6 +1852,57 @@ const savedValues = (harness) => {
   return JSON.parse(harness.downloads.at(-1)[1]).preset_bank.presets[0].values;
 };
 
+test('Grid Space switches modulation source and sampling atomically with one undo', async () => {
+  const harness = await editorWorkbench({ source: JSON.stringify(promotedDocument('grid_space.shader.json')) });
+  const original = savedValues(harness);
+  const batches = [];
+  const apply = harness.engine.bindings.setShaderChainParameters;
+  harness.engine.bindings.setShaderChainParameters = (writes) => {
+    batches.push(writes);
+    return apply(writes);
+  };
+  harness.engine.setParameter = () => ParamSetResult.INADMISSIBLE;
+  const edit = stageEditor(harness, 'colorize');
+  const chip = stripChips(harness).find((chip) => chip.dataset.label === 'colorize');
+  edit('colorize.modulation-source', 'sphere-interference');
+  assert.ok(stripChips(harness).find((chip) => chip.dataset.label === 'colorize') === chip,
+    'the active Color card stays mounted');
+  assert.deepEqual(batches, [[
+    { name: 'colorize.modulation-source', value: 2 },
+    { name: 'colorize.modulation-evaluation', value: 0 },
+  ]]);
+  const values = savedValues(harness);
+  assert.equal(values['colorize.modulation-source'], 'sphere-interference');
+  assert.equal(values['colorize.modulation-evaluation'], 'direct');
+  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'colorize')
+    .querySelectorAll('.chain-param');
+  assert.equal(colorRows.find((row) => row.dataset.parameter === 'colorize.modulation-evaluation')
+    .querySelector('.chain-param-control').value, 'direct');
+  await harness.controller.flushDeepLink();
+  const linked = await decodeShaderStateHash(harness.win.location.hash);
+  assert.equal(linked.document.preset_bank.presets[0].values['colorize.modulation-source'],
+    'sphere-interference');
+  harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
+  assert.deepEqual(savedValues(harness), original);
+});
+
+test('a refused modulation source batch preserves both fields and the visible Noise controls', async () => {
+  const harness = await editorWorkbench();
+  const original = savedValues(harness);
+  harness.engine.bindings.setShaderChainParameters = () => ParamSetResult.INADMISSIBLE;
+  stageEditor(harness, 'colorize')('colorize.modulation-source', 'sphere-interference');
+  assert.match(harness.elements.get('shader-document-status').textContent, /INADMISSIBLE/);
+  assert.deepEqual(savedValues(harness), original);
+  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'colorize')
+    .querySelectorAll('.chain-param');
+  assert.equal(colorRows.find((row) => row.dataset.parameter === 'colorize.modulation-source')
+    .querySelector('.chain-param-control').value, 'noise');
+  const groups = stripChips(harness).find((chip) => chip.dataset.label === 'colorize')
+    .querySelectorAll('.chain-param-group');
+  assert.equal(groups.find((group) => group.getAttribute('aria-label') === 'Noise').hidden, false);
+  assert.equal(groups.find((group) => group.getAttribute('aria-label') === 'Interference · wave A').hidden, true);
+});
+
 // A chip control's edit is a document edit, and the engine write is its
 // side effect, so Save reads the document and nothing else.
 test('a chip control writes the active preset and survives Save without an engine read', async () => {

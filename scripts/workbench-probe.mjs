@@ -5,6 +5,7 @@
  *   node scripts/workbench-probe.mjs
  */
 import { boxOf, centre, checks, isMain, runProbe } from './probe_harness.mjs';
+import { decodeShaderStateHash } from '../src/workbench/shader/shader_deeplink.js';
 
 const PAGE = 'tools/shader.html';
 const VIEWPORT = { width: 1674, height: 543 };
@@ -862,8 +863,56 @@ export async function probeStartupPersistence(tab, releaseCatalog = () => {}, he
   return failures;
 }
 
+/** @param {import('puppeteer-core').Page} tab @returns {Promise<string[]>} */
+export async function probeColorCard(tab) {
+  const { failures, check } = checks();
+  await tab.select('#shader-document-select', 'grid-space');
+  await tab.waitForFunction(() => document.getElementById('shader-document-status')
+    ?.textContent.startsWith('Grid Space'));
+  const color = '.chain-chip[data-label="colorize"]';
+  await tab.$eval(`${color} .chain-chip-pin`, (node) => node.click());
+  const row = (field) => `${color} [data-parameter="colorize.${field}"]`;
+  const visible = (field) => tab.$eval(row(field), (node) => !node.hidden);
+  check(await visible('pattern-scale') && !await visible('interference-frequency')
+      && !await visible('hue-shift-amount'),
+    'Grid Space exposes noise controls and hides unused Color settings');
+  await tab.select(`${row('modulation-source')} select`, 'sphere-interference');
+  check(await tab.$eval(`${row('modulation-source')} select`, (node) => node.value)
+      === 'sphere-interference' && await visible('interference-frequency')
+      && !await visible('pattern-scale'),
+    'interference selection stays selected and reveals its own controls');
+  for (const [field, value] of [['interference-frequency', '3'], ['interference-speed', '0.01']]) {
+    await tab.$eval(`${row(field)} .chain-param-value`, (node, value) => {
+      node.value = value;
+      node.dispatchEvent(new Event('change', { bubbles: true }));
+    }, value);
+  }
+  await tab.waitForFunction(() => location.hash.startsWith('#shader=v2.'));
+  let recipe;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const state = await decodeShaderStateHash(await tab.evaluate(() => location.hash));
+    recipe = state?.chainSnapshot?.modulation.find((entry) => entry.instance === 'colorize')?.recipe;
+    if (recipe?.interference.speed === Math.fround(0.01)) break;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  check(recipe?.source === 2 && recipe.evaluation === 0
+      && recipe.interference.frequency === 3
+      && recipe.interference.speed === Math.fround(0.01),
+    'the live engine snapshot and share link contain the edited interference recipe');
+  check(await tab.$eval('#shader-document-status', (node) => node.dataset.status) === 'ok',
+    'interference edits produce no shader link error');
+  await tab.reload();
+  await tab.waitForSelector(`${row('modulation-source')} select`);
+  check(await tab.$eval(`${row('modulation-source')} select`, (node) => node.value)
+      === 'sphere-interference'
+      && await tab.$eval(`${row('interference-frequency')} .chain-param-value`, (node) => Number(node.value)) === 3,
+    'reloading the share link restores interference and its edited frequency');
+  return failures;
+}
+
 export async function runWorkbenchSections(open, sections = [
   probeDocumentActions, probeStripHistory, probeStrip, probeParity, probeSnapshotImport, probeStartupPersistence,
+  probeColorCard,
 ]) {
   const failures = [];
   for (const section of sections) {

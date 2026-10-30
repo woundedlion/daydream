@@ -7,6 +7,7 @@
 import { titleCase } from '../../shared/labels.js';
 import {
   createChainPresentation, deactivatedParameterIds, formatNumericValue, nudgeStep, fieldOf,
+  COLOR_PARAMETER_GROUPS, COLOR_PARAMETER_NAMES, colorParameterHidden,
 } from './chain_presentation.js';
 
 /** @typedef {import('./chain_presentation.js').CatalogOperator} CatalogOperator */
@@ -557,13 +558,19 @@ export function createChainStrip({
    * beside them.
    */
   const markDeactivated = () => {
-    const off = deactivatedParameterIds(declarations, values, store.chain(), catalog);
+    const chain = store.chain();
+    const off = deactivatedParameterIds(declarations, values, chain, catalog);
     for (const [id, row] of rows) {
+      const label = id.slice(0, id.indexOf('.'));
+      const color = chain.find((entry) => entry.label === label)?.operator
+        === 'colorize.generated-palette.v3';
+      row.hidden = color && (off.has(id)
+        || colorParameterHidden(fieldOf(id), (field) => values[`${label}.${field}`]));
       const shown = row.querySelector('.chain-param-note');
       const live = parameterLive(id);
       for (const control of row.querySelectorAll('input, select')) control.disabled = !live;
       const reason = live ? DEACTIVATED_REASON : 'This parameter is baked into the compiled build';
-      if (!live || off.has(id)) {
+      if (!row.hidden && (!live || off.has(id))) {
         row.dataset.deactivated = 'true';
         if (shown !== null) { shown.textContent = reason; continue; }
         const note = el('span', 'chain-param-note');
@@ -577,6 +584,9 @@ export function createChainStrip({
         row.removeChild(shown);
         describeControls(row, null);
       }
+    }
+    for (const group of container.querySelectorAll('.chain-param-group')) {
+      group.hidden = [...group.querySelectorAll('.chain-param')].every((row) => row.hidden);
     }
   };
 
@@ -705,22 +715,50 @@ export function createChainStrip({
    * @returns {*} The parameter region.
    */
   const paramsElement = (entry, declared) => {
+    const color = entry.operator === 'colorize.generated-palette.v3';
     const region = el('div', 'chain-chip-params');
     region.dataset.label = entry.label;
     region.setAttribute('role', 'group');
     region.setAttribute('aria-label', `${opOf(entry).name} · ${entry.label} parameters`);
-    region.appendChild(renameRow(entry));
+    if (!color) region.appendChild(renameRow(entry));
     if (declared.length === 0) {
       const note = el('p', 'chain-strip-note');
       note.textContent = 'No adjustable parameters';
       region.appendChild(note);
     }
-    for (const declaration of declared) {
-      const name = titleCase(fieldOf(declaration.id));
+    /** @type {Map<string, *>} */
+    const groups = new Map();
+    const ordered = color ? COLOR_PARAMETER_GROUPS.flatMap((group) => group.fields.flatMap(
+      (field) => declared.filter((parameter) => fieldOf(parameter.id) === field))) : declared;
+    for (const declaration of [...ordered, ...declared.filter((parameter) => !ordered.includes(parameter))]) {
+      const field = fieldOf(declaration.id);
+      const name = color ? COLOR_PARAMETER_NAMES[field]
+        ?? titleCase(field.replace(/^(sine|interference|grid)-/, '').replace(/-b(?=-|$)/, ''))
+        : titleCase(field);
+      let parent = region;
+      if (color) {
+        const groupName = COLOR_PARAMETER_GROUPS.find((group) => group.fields.includes(field))?.name
+          ?? 'Other';
+        if (!groups.has(groupName)) {
+          const group = el('div', 'chain-param-group');
+          group.setAttribute('role', 'group');
+          group.setAttribute('aria-label', groupName);
+          const heading = el('div', 'chain-param-group-title');
+          heading.textContent = groupName;
+          group.appendChild(heading);
+          region.appendChild(group);
+          groups.set(groupName, group);
+        }
+        parent = groups.get(groupName);
+      }
       const row = el('div', 'chain-param');
       row.dataset.parameter = declaration.id;
       const label = el('span', 'chain-param-name');
       label.textContent = name;
+      if (color && field === 'pattern-scale')
+        label.setAttribute('title', 'Higher values produce finer noise; lower values produce broader patches.');
+      if (color && field === 'pattern-speed')
+        label.setAttribute('title', 'Animation rate. Zero freezes the noise; negative values reverse it.');
       row.appendChild(label);
       if (declaration.storage === 'enum8') {
         const select = enumControl(declaration);
@@ -771,8 +809,9 @@ export function createChainStrip({
         row.appendChild(readout);
       }
       rows.set(declaration.id, row);
-      region.appendChild(row);
+      parent.appendChild(row);
     }
+    if (color) region.appendChild(renameRow(entry));
     return region;
   };
 
@@ -1221,6 +1260,19 @@ export function createChainStrip({
 
   return {
     render,
+
+    /** @param {Record<string, *>} updates - Committed parameter values. */
+    syncParameterValues(updates) {
+      for (const [id, value] of Object.entries(updates)) {
+        values[id] = value;
+        const row = rows.get(id);
+        if (!row) continue;
+        row.querySelector('.chain-param-control').value = String(value);
+        const readout = row.querySelector('.chain-param-value');
+        if (readout) readout.value = formatNumericValue(value);
+      }
+      markDeactivated();
+    },
 
     /**
      * Repaints the Undo/Redo buttons without a rebuild, which would replace the

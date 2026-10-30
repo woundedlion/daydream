@@ -1298,6 +1298,71 @@ test('the inline controls read the named preset', async () => {
     .value), 2, 'the second preset’s value, not the first’s');
 });
 
+test('the Color card groups noise controls and hides unused source and topology fields', async () => {
+  const h = await makeStrip({ writeThrough: true });
+  const groups = () => paramsOf(h, 'colorize').querySelectorAll('.chain-param-group');
+  assert.deepEqual(groups().filter((group) => !group.hidden)
+    .map((group) => group.getAttribute('aria-label')),
+  ['Palette', 'Modulation', 'Noise', 'Color mapping', 'Hue shift', 'Brightness & opacity']);
+  const scale = rowFor(h, 'colorize', 'colorize.pattern-scale');
+  const speed = rowFor(h, 'colorize', 'colorize.pattern-speed');
+  assert.equal(scale.parentNode.getAttribute('aria-label'), 'Noise');
+  assert.equal(controlIn(scale).getAttribute('aria-label'), 'Noise scale (frequency)');
+  assert.equal(controlIn(speed).getAttribute('aria-label'), 'Noise speed');
+  for (const field of ['pattern-scale', 'pattern-speed', 'pattern-noise-variant'])
+    assert.equal(rowFor(h, 'colorize', `colorize.${field}`).hidden, false, field);
+  for (const field of ['sine-frequency', 'interference-frequency', 'grid-frequency',
+    'hue-shift-amount', 'brightness-bottom', 'brightness-top', 'pattern-contrast', 'pattern-noise-basis']) {
+    const row = rowFor(h, 'colorize', `colorize.${field}`);
+    assert.equal(row.hidden, true, field);
+    assert.equal(row.querySelector('.chain-param-note'), null, field);
+  }
+  for (const [field, value] of [['pattern-scale', '2'], ['pattern-speed', '0.0004']]) {
+    const control = controlIn(rowFor(h, 'colorize', `colorize.${field}`));
+    control.value = value;
+    control.dispatch('input');
+    control.dispatch('change');
+    assert.equal(h.store.document().preset_bank.presets[0].values[`colorize.${field}`],
+      Number(value));
+  }
+});
+
+test('Color source changes reveal only their own controls and preserve hidden values through undo', async () => {
+  const h = await makeStrip({ writeThrough: true });
+  const edit = (field, value) => {
+    const control = controlIn(rowFor(h, 'colorize', `colorize.${field}`));
+    control.value = value;
+    control.dispatch('change');
+  };
+  const noiseScale = controlIn(rowFor(h, 'colorize', 'colorize.pattern-scale')).value;
+  for (const [source, shown, hidden] of [
+    ['directional-sine', 'sine-frequency', 'interference-frequency'],
+    ['sphere-interference', 'interference-frequency', 'grid-frequency'],
+    ['sphere-smooth-grid', 'grid-frequency', 'sine-frequency'],
+    ['noise', 'pattern-scale', 'interference-frequency'],
+  ]) {
+    edit('modulation-source', source);
+    assert.equal(rowFor(h, 'colorize', `colorize.${shown}`).hidden, false);
+    assert.equal(rowFor(h, 'colorize', `colorize.${hidden}`).hidden, true);
+  }
+  assert.equal(controlIn(rowFor(h, 'colorize', 'colorize.pattern-scale')).value, noiseScale);
+  edit('modulation-enabled', 'disabled');
+  assert.equal(rowFor(h, 'colorize', 'colorize.modulation-enabled').hidden, false);
+  assert.equal(rowFor(h, 'colorize', 'colorize.modulation-source').hidden, true);
+  assert.equal(rowFor(h, 'colorize', 'colorize.pattern-scale').hidden, true);
+  assert.equal(h.store.undo(), true);
+  h.strip.render();
+  assert.equal(rowFor(h, 'colorize', 'colorize.pattern-scale').hidden, false);
+  assert.equal(controlIn(rowFor(h, 'colorize', 'colorize.pattern-scale')).value, noiseScale);
+  edit('pattern-noise-variant', 'octave-contour');
+  assert.equal(rowFor(h, 'colorize', 'colorize.pattern-contrast').hidden, false);
+  assert.equal(rowFor(h, 'colorize', 'colorize.pattern-noise-basis').hidden, false);
+  edit('hue-shift-mode', 'path-length');
+  edit('brightness-envelope', 'bell');
+  for (const field of ['hue-shift-amount', 'brightness-bottom', 'brightness-top'])
+    assert.equal(rowFor(h, 'colorize', `colorize.${field}`).hidden, false);
+});
+
 test('the inline controls keep their own keys and take no drag', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'camera').dispatch('click');
@@ -1474,8 +1539,8 @@ test('every catalog operator exposes its full schema in a declaration-free stage
         if (id.startsWith('audit.')) delete preset.values[id];
     const h = await makeStrip({ source });
     chipByLabel(h, 'audit').dispatch('click');
-    assert.deepEqual(rowsOf(h, 'audit').map((row) => row.dataset.parameter),
-      operator.params.map((field) => `audit.${field.id}`), operator.name);
+    assert.deepEqual(rowsOf(h, 'audit').map((row) => row.dataset.parameter).sort(),
+      operator.params.map((field) => `audit.${field.id}`).sort(), operator.name);
     for (const field of operator.params) {
       const control = controlIn(rowFor(h, 'audit', `audit.${field.id}`));
       assert.equal(String(control.value), String(field.default), `${operator.name}: ${field.id}`);

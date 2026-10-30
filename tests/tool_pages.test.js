@@ -487,6 +487,7 @@ const CONTRAST_SURFACES = {
     '.chain-chip-replace': '.chain-chip-replace',
     '.chain-chip-rename': '.chain-chip-rename',
     '.chain-param-name': '.chain-chip',
+    '.chain-param-group-title': '.chain-chip',
     '.chain-param-note': '.chain-chip',
     '.chain-param[data-deactivated="true"] > :not(.chain-param-note)': '.chain-chip',
     '.chain-param-control': '.chain-chip',
