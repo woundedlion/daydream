@@ -545,7 +545,7 @@ export function createShaderDocumentController({
         applyPreset(active.presetId);
         if (dropped) chainUi.strip.render();
       }
-      if (coupled) chainUi.strip.syncParameterValues(values);
+      if (Object.keys(values).length > 1) chainUi.strip.syncParameterValues(values);
       chainUi.strip.syncHistory();
       scheduleDeepLink();
       return true;

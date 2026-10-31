@@ -2624,6 +2624,10 @@ test('compiled lattice edits update the derived period atomically and reapply', 
   edit('sample.lattice-cell-scale', 3.1);
   const values = savedValues(harness);
   assert.equal(values['warp1.lattice-period'], Math.fround(1 / Math.fround(3.1)));
+  const period = harness.elements.get('chain-strip').querySelectorAll('.chain-param')
+    .find((row) => row.dataset.parameter === 'warp1.lattice-period')
+    .querySelector('.chain-param-value');
+  assert.equal(Math.fround(Number(period.value)), values['warp1.lattice-period']);
   await onChange(harness.elements.get('shader-preset-select'))();
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
   harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
