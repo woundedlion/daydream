@@ -177,8 +177,7 @@ export class FakeChainEngine {
       if (stateSize <= 1) return [];
       let kind;
       let state;
-      if (operator === 'sphere.rotate.v2' || operator === 'sphere.lens.twist.v2'
-        || operator.startsWith('project.')) {
+      if (operator === 'sphere.rotate.v2' || operator.startsWith('project.')) {
         kind = 'spatial-walk-v2';
         state = { noiseSeed: 1337, walkTime: 0, position: [0, 1, 0], direction: [1, 0, 0],
           wander: [1, 0, 0, 0], angularVelocity: 0, spinPhase: 0 };
@@ -202,7 +201,7 @@ export class FakeChainEngine {
         kind = 'spherical-rings-v2';
         state = { walk: { noiseSeed: 1337, walkTime: 0, position: [0, 1, 0], direction: [1, 0, 0],
           wander: [1, 0, 0, 0], angularVelocity: 0, spinPhase: 0 }, phase: 0 };
-      } else if (operator.startsWith('sample.')) {
+      } else if (operator.startsWith('sample.') || operator === 'sphere.lens.twist.v2') {
         kind = 'source-clock-v1';
         state = { primary: 0, secondary: 0, angle: 0 };
       } else {

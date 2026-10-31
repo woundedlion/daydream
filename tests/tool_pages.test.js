@@ -347,6 +347,7 @@ const CLASS_EXEMPTIONS = new Set([
   'op-param', 'move-op-up', 'move-op-down', 'remove-op-btn',
   'fatal-error-message', 'fatal-error-dismiss',
   'chain-chip-replace-option', 'chain-chip--stage',
+  'chain-palette-type', 'chain-modulation-enabled',
 ]);
 
 // daydream.js loads the shader-document graph on both simulator pages, but it

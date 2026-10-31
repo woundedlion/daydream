@@ -135,7 +135,7 @@ async function smokeTwistParameters(tab) {
     const source = scratchChainDocument(catalog, [
       { label: 'twist', operator: 'sphere.lens.twist.v2' },
       { label: 'sample', operator: 'sample.spherical-rings.v3' },
-      { label: 'colorize', operator: 'colorize.generated-palette.v3' },
+      { label: 'colorize', operator: 'colorize.generated-palette.v4' },
     ]);
     source.effect_metadata.display_name = 'Twist parameter smoke';
     source.descriptor.parameters = source.descriptor.parameters.filter(
