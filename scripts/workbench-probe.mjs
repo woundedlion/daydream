@@ -762,9 +762,9 @@ export async function probeParity(tab) {
 
   await tab.select('#shader-document-select', 'ash-cloud');
   await tab.waitForFunction(() => document.getElementById('shader-document-status')?.textContent?.startsWith('Ash Cloud'));
-  check(await tab.$eval('#shader-parity-toggle', (node) => node.disabled)
+  check(await tab.$eval('#shader-parity-toggle', (node) => !node.disabled)
     && await tab.$('.chain-band[data-carrier="color"] .chain-chip') !== null,
-  'an expanded legacy document previews its modulation stages and disarms compiled parity');
+  'the promoted Ash Cloud document previews its modulation stages and arms compiled parity');
   await tab.select('#shader-document-select', PARITY_EFFECT);
   await tab.waitForFunction((title) => document
     .getElementById('shader-document-status')?.textContent?.startsWith(title),
