@@ -61,13 +61,12 @@ test('socket choices prefer the narrowest span and stop collapse at an endomorph
 
 
 test('terminal color endomorphisms form an ordered band after the palette', () => {
-  const field = op('color.modulate.v1', 'color');
-  const hue = op('color.modulate.v1', 'color');
-  const extended = {...catalog, operators: [...catalog.operators, field, hue]};
+  const modulate = op('color.modulate.v1', 'color');
+  const extended = {...catalog, operators: [...catalog.operators, modulate]};
   let chain = [entry(direct), entry(color)];
   const model = createChainPresentation({catalog: extended, chain: () => chain, legalSequences: () => []});
   assert.deepEqual(model.bandLayout().at(-1), {carrier: 'color', gaps: [2], chips: [], socket: null});
-  chain = [...chain, entry(field), entry(hue)];
+  chain = [...chain, entry(modulate, 'modulation'), entry(modulate, 'modulation1')];
   assert.deepEqual(model.bandLayout().at(-1), {carrier: 'color', gaps: [2, 3, 4], chips: [2, 3], socket: null});
   assert.equal(model.sharesBand(2, -1), false);
   assert.equal(model.sharesBand(2, 1), true);
