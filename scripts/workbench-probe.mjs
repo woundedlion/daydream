@@ -4,7 +4,7 @@
  *
  *   node scripts/workbench-probe.mjs
  */
-import { boxOf, centre, checks, isMain, runProbe } from './probe_harness.mjs';
+import { boxOf, centre, checks, dragBetween, isMain, runProbe } from './probe_harness.mjs';
 import { decodeShaderStateHash } from '../src/workbench/shader/shader_deeplink.js';
 
 const PAGE = 'tools/shader.html';
@@ -121,8 +121,8 @@ export async function probeStrip(tab) {
   check(await tab.$('.chain-band[data-carrier="sphere"]') !== null
       && await tab.$('.chain-band[data-carrier="plane"]') !== null,
     'sphere and plane carriers render bands');
-  check(await tab.$('.chain-modulation-stack') !== null,
-    'Modulations renders inside the permanent Color card');
+  check(await tab.$('.chain-band[data-carrier="color"]') !== null,
+    'the Color carrier renders a separate container after Palette');
 
   const projectChip = '.chain-chip[data-label="project"]';
   const projectHeader = `${projectChip} .chain-chip-header`;
@@ -920,7 +920,7 @@ export async function probeColorCard(tab) {
   await tab.select('#shader-document-select', 'grid-space');
   await tab.waitForFunction(() => document.getElementById('shader-document-status')
     ?.textContent.startsWith('Grid Space'));
-  const color = '.chain-chip[data-label="colorize"]';
+  const color = '.chain-chip[data-label="modulation"]';
   await tab.$eval(`${color} .chain-chip-pin`, (node) => node.click());
   const row = (field) => `${color} [data-parameter="modulation.${field}"]`;
   const visible = (field) => tab.$eval(row(field), (node) => !node.hidden);
@@ -966,7 +966,7 @@ export async function probeNoiseScaleDrag(tab) {
   await tab.select('#shader-document-select', 'grid-space');
   await tab.waitForFunction(() => document.getElementById('shader-document-status')
     ?.textContent.startsWith('Grid Space'));
-  await tab.$eval('.chain-chip[data-label="colorize"] .chain-chip-pin', (node) => node.click());
+  await tab.$eval('.chain-chip[data-label="modulation"] .chain-chip-pin', (node) => node.click());
   const selector = '[data-parameter="modulation.pattern-scale"] input[type="range"]';
   await tab.$eval(selector, (node) => node.scrollIntoView({ block: 'center' }));
   const start = await tab.$eval(selector, (node) => {
@@ -1030,7 +1030,7 @@ export async function probePaletteAndModulations(tab) {
     ['mutating', 'palette-name-b', 'gradient-start-r'],
     ['cycling-generated', 'palette-mode', 'palette-harmony'],
   ]) {
-    await tab.select(`${row('colorize', 'palette-type')} select`, family);
+    await tab.select('.chain-chip[data-label="colorize"] .chain-palette-type', family);
     const visible = await tab.$eval(row('colorize', shown), (node) => !node.hidden);
     const absent = await tab.$eval(row('colorize', hidden), (node) => node.hidden);
     check(visible && absent && await tab.$eval('#shader-document-status', (node) => node.dataset.status) === 'ok',
@@ -1038,12 +1038,15 @@ export async function probePaletteAndModulations(tab) {
   }
   check(await tab.$$eval(`${row('colorize', 'palette-harmony')} option`, (nodes) => nodes.length) === 8
     && await tab.$$eval(`${row('colorize', 'palette-name')} option`, (nodes) => nodes.length) === 27,
-  'the Color palette exposes every harmony and named palette');
-  const stack = '.chain-modulation-stack';
-  const layer = (label) => `${stack} .chain-modulation-layer[data-label="${label}"]`;
+  'the Palette card exposes every harmony and named palette');
+  const stack = '.chain-band[data-carrier="color"]';
+  const layer = (label) => `${stack} .chain-chip[data-label="${label}"]`;
   const add = async () => {
-    await tab.$eval(`${stack} .chain-modulation-add`, (node) => node.click());
-    return tab.$$eval(`${stack} .chain-modulation-layer`, (nodes) => nodes.at(-1).dataset.label);
+    await tab.$eval(`${stack} .chain-band-add`, (node) => node.click());
+    await tab.$eval('.chain-palette-entry[data-operator="color.modulate.v1"]', (node) => node.click());
+    const label = await tab.$$eval(`${stack} .chain-chip`, (nodes) => nodes.at(-1).dataset.label);
+    await tab.$eval(`${layer(label)} .chain-chip-header`, (node) => node.click());
+    return label;
   };
   const first = await add();
   const second = await add();
@@ -1055,9 +1058,10 @@ export async function probePaletteAndModulations(tab) {
       node.dispatchEvent(new Event('change', {bubbles: true}));
     }, amount);
   }
-  await tab.$eval(`${layer(second)} .chain-modulation-move`, (node) => node.click());
-  check((await tab.$$eval(`${stack} .chain-modulation-layer`, (nodes) => nodes.map((node) => node.dataset.label))).join()
-    === [second, first, hue].join(), 'independent modulation layers reorder inside the Color card');
+  await tab.$eval(layer(second), (node) => node.dispatchEvent(
+    new KeyboardEvent('keydown', {key: 'ArrowUp', altKey: true, bubbles: true})));
+  check((await tab.$$eval(`${stack} .chain-chip`, (nodes) => nodes.map((node) => node.dataset.label))).join()
+    === [second, first, hue].join(), 'independent modulation stages reorder inside the Color container');
   await tab.$eval(`${layer(first)} .chain-modulation-enabled`, (node) => {
     node.checked = false;
     node.dispatchEvent(new Event('change', {bubbles: true}));
@@ -1067,16 +1071,48 @@ export async function probePaletteAndModulations(tab) {
   check(document.descriptor.chain.slice(-3).map((entry) => entry.label).join() === [second, first, hue].join()
     && snapshot?.modulation.find((entry) => entry.instance === first)?.recipe.enabled === false,
   'one header toggle disables a layer while preserving its authored order and settings');
-  await tab.$eval(`${layer(hue)} .chain-modulation-remove`, (node) => node.click());
+  await tab.$eval(`${layer(hue)} .chain-chip-remove`, (node) => node.click());
   check(await tab.$(layer(hue)) === null && await tab.$('.chain-chip[data-label="colorize"]') !== null,
-    'removing a modulation preserves the permanent Color card');
+    'removing a modulation preserves the permanent Palette card');
+  return failures;
+}
+
+/** @param {import('puppeteer-core').Page} tab @returns {Promise<string[]>} */
+export async function probeColorStageDrag(tab) {
+  const { failures, check } = checks();
+  const band = '.chain-band[data-carrier="color"]';
+  for (let index = 0; index < 2; index += 1) {
+    await tab.$eval(`${band} .chain-band-add`, (node) => node.click());
+    await tab.$eval('.chain-palette-entry[data-operator="color.modulate.v1"]', (node) => node.click());
+    await tab.$eval(`${band} .chain-chip:last-of-type .chain-chip-pin`, (node) => node.click());
+  }
+  const labels = () => tab.$$eval(`${band} .chain-chip`, (nodes) => nodes.map((node) => node.dataset.label));
+  const before = await labels();
+  const stage = `${band} .chain-chip[data-label="${before[0]}"]`;
+  const name = `${stage} .chain-chip-name`;
+  await (await tab.waitForSelector(name)).click();
+  check(await tab.$eval(stage, (node) => node.classList.contains('chain-chip--expanded')),
+    'clicking a Color stage opens its own parameter panel');
+  await (await tab.waitForSelector(name)).click();
+  check(await tab.$eval(stage, (node) => !node.classList.contains('chain-chip--expanded')),
+    'clicking the Color header again closes its parameter panel');
+  await tab.$eval(band, (node) => node.scrollIntoView({block: 'center'}));
+  const first = await boxOf(tab, name);
+  const second = await boxOf(tab, `${band} .chain-chip[data-label="${before[1]}"] .chain-chip-name`);
+  await dragBetween(tab, {x: second.x + 8, y: second.y + second.height / 2},
+    {x: first.x + 8, y: first.y + 1});
+  check((await labels()).join() === [...before].reverse().join(),
+    'dragging a Color stage header reorders the stages in their own container');
+  const document = await savedDocument(tab);
+  check(document.descriptor.chain.slice(-2).map((entry) => entry.label).join() === [...before].reverse().join(),
+    'Save retains the order committed by the Color header drag');
   return failures;
 }
 
 export async function runWorkbenchSections(open, sections = [
   probeDocumentActions, probeStripHistory, probeStrip, probeParity, probeSnapshotImport, probeStartupPersistence,
   probeColorCard,
-  probeNoiseScaleDrag, probePaletteAndModulations,
+  probeNoiseScaleDrag, probePaletteAndModulations, probeColorStageDrag,
 ]) {
   const failures = [];
   for (const section of sections) {

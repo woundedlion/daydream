@@ -104,10 +104,9 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
 
   const bands = strip.querySelectorAll('.chain-band');
   assert.deepEqual(bands.map((band) => band.dataset.carrier),
-    ['sphere', 'plane', 'field'],
-    'modulations are folded into the Color card');
+    ['sphere', 'plane', 'field', 'color']);
   assert.deepEqual(bands.map((band) => band.getAttribute('aria-label')),
-    ['Sphere stages', 'Plane stages', 'Field stages']);
+    ['Sphere stages', 'Plane stages', 'Field stages', 'Color stages']);
   for (const band of bands) {
     assert.equal(band.getAttribute('role'), 'group');
     assert.equal(band.querySelector('.chain-band-title').getAttribute('aria-hidden'),
@@ -115,7 +114,7 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
   }
   assert.deepEqual(
     bands.map((band) => band.querySelectorAll('.chain-chip').map((c) => c.dataset.label)),
-    [['camera', 'lens'], ['warp2'], []]);
+    [['camera', 'lens'], ['warp2'], [], ['modulation']]);
 
   const sockets = strip.children.filter(
     (child) => child.classList?.contains('chain-chip--socket'));
@@ -124,7 +123,7 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
     'a crossing sits between the two bands it joins');
 
   const all = chips(h);
-  assert.equal(all.length, 6);
+  assert.equal(all.length, 7);
   // Groups, not listbox options: an option's children are presentational.
   for (const chip of all) {
     assert.equal(chip.getAttribute('role'), 'group');
@@ -139,11 +138,11 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
   // One roving-tabindex stop and a + only where an insertion is legal.
   assert.deepEqual(all.filter((chip) => chip.getAttribute('tabindex') === '0')
     .map((chip) => chip.dataset.label), ['camera']);
-  assert.equal(h.container.querySelectorAll('.chain-band-add').length, 3,
+  assert.equal(h.container.querySelectorAll('.chain-band-add').length, 4,
     'each band carries one + insertion control');
   assert.deepEqual(bands.map((band) => band.querySelector('.chain-band-add')
     ?.getAttribute('aria-label') ?? null),
-  ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage']);
+  ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage', 'Add a Color stage']);
 });
 
 test('endomorphisms carry controls; sockets carry only valid selectors', async () => {
@@ -169,7 +168,7 @@ test('endomorphisms carry controls; sockets carry only valid selectors', async (
   for (const [label, text, accessibleName] of [
     ['project', 'Projection: ', 'Projection'],
     ['sample', 'Source: ', 'Source function'],
-    ['colorize', 'Color: ', 'Color'],
+    ['colorize', 'Palette: ', 'Palette'],
   ]) {
     const functionLabel = chipByLabel(h, label)
       .querySelector('.chain-chip-function-label');
@@ -196,12 +195,12 @@ test('a socket names the function by the carrier its crossing produces', async (
   const sockets = h.container.querySelectorAll('.chain-chip--socket');
   const names = sockets.map((chip) => chip.querySelector('.chain-chip-function-label')
     .childNodes[0]);
-  assert.deepEqual(names, ['Source: ', 'Color: ']);
+  assert.deepEqual(names, ['Source: ', 'Palette: ']);
   assert.deepEqual(
     sockets.map((chip) => chip.querySelector('.chain-chip-replace')
       .getAttribute('aria-label')),
-    ['Source function', 'Color'],
-    'the sphere to field crossing is a source, not a second Color socket');
+    ['Source function', 'Palette'],
+    'the sphere to field crossing is a source, not a second Palette socket');
 });
 
 test('a carrier the chain passes over has no band', async () => {
@@ -212,7 +211,7 @@ test('a carrier the chain passes over has no band', async () => {
 
   assert.deepEqual(
     h.container.querySelectorAll('.chain-band').map((band) => band.dataset.carrier),
-    ['sphere', 'field'],
+    ['sphere', 'field', 'color'],
     'a framed, titled plane band would hold no gap, chip or socket');
 });
 
@@ -1485,27 +1484,30 @@ test('the inline controls read the named preset', async () => {
     .value), 2, 'the second preset’s value, not the first’s');
 });
 
-test('the Color card keeps palette mapping and brightness while hiding embedded modulation', async () => {
+test('the Palette card keeps palette controls and Color stages own modulation controls', async () => {
   const h = await makeStrip({ writeThrough: true });
   const groups = () => paramsOf(h, 'colorize').querySelectorAll('.chain-param-group');
   assert.deepEqual(groups().filter((group) => !group.hidden)
     .map((group) => group.getAttribute('aria-label')),
-  ['Palette', 'Color mapping', 'Brightness & opacity', 'Modulation', 'Noise']);
-  const scale = rowFor(h, 'colorize', 'modulation.pattern-scale');
-  const speed = rowFor(h, 'colorize', 'modulation.pattern-speed');
+  ['Palette', 'Color mapping', 'Brightness & opacity']);
+  assert.deepEqual(paramsOf(h, 'modulation').querySelectorAll('.chain-param-group')
+    .filter((group) => !group.hidden).map((group) => group.getAttribute('aria-label')),
+  ['Modulation', 'Noise']);
+  const scale = rowFor(h, 'modulation', 'modulation.pattern-scale');
+  const speed = rowFor(h, 'modulation', 'modulation.pattern-speed');
   assert.equal(scale.parentNode.getAttribute('aria-label'), 'Noise');
   assert.equal(controlIn(scale).getAttribute('aria-label'), 'Noise scale (frequency)');
   assert.equal(controlIn(speed).getAttribute('aria-label'), 'Noise speed');
   for (const field of ['pattern-scale', 'pattern-speed', 'pattern-noise-variant'])
-    assert.equal(rowFor(h, 'colorize', `modulation.${field}`).hidden, false, field);
+    assert.equal(rowFor(h, 'modulation', `modulation.${field}`).hidden, false, field);
   for (const field of ['sine-frequency', 'interference-frequency', 'grid-frequency',
     'pattern-contrast', 'pattern-noise-basis']) {
-    const row = rowFor(h, 'colorize', `modulation.${field}`);
+    const row = rowFor(h, 'modulation', `modulation.${field}`);
     assert.equal(row.hidden, true, field);
     assert.equal(row.querySelector('.chain-param-note'), null, field);
   }
   for (const [field, value] of [['pattern-scale', '2'], ['pattern-speed', '0.0004']]) {
-    const control = controlIn(rowFor(h, 'colorize', `modulation.${field}`));
+    const control = controlIn(rowFor(h, 'modulation', `modulation.${field}`));
     control.value = value;
     control.dispatch('input');
     control.dispatch('change');
@@ -1514,7 +1516,7 @@ test('the Color card keeps palette mapping and brightness while hiding embedded 
   }
 });
 
-test('embedded Color modulation stays hidden while brightness follows its selector', async () => {
+test('Color stages reveal their selected source and retain settings while disabled', async () => {
   const h = await makeStrip({ writeThrough: true });
   const edit = (field, value) => {
     if (field === 'modulation-enabled') {
@@ -1523,11 +1525,11 @@ test('embedded Color modulation stays hidden while brightness follows its select
       control.dispatch('change');
       return;
     }
-    const control = controlIn(rowFor(h, 'colorize', `modulation.${field}`));
+    const control = controlIn(rowFor(h, 'modulation', `modulation.${field}`));
     control.value = value;
     control.dispatch('change');
   };
-  const noiseScale = controlIn(rowFor(h, 'colorize', 'modulation.pattern-scale')).value;
+  const noiseScale = controlIn(rowFor(h, 'modulation', 'modulation.pattern-scale')).value;
   for (const [source, shown, hidden] of [
     ['directional-sine', 'sine-frequency', 'interference-frequency'],
     ['sphere-interference', 'interference-frequency', 'grid-frequency'],
@@ -1535,30 +1537,36 @@ test('embedded Color modulation stays hidden while brightness follows its select
     ['noise', 'pattern-scale', 'interference-frequency'],
   ]) {
     edit('modulation-source', source);
-    assert.equal(rowFor(h, 'colorize', `modulation.${shown}`).hidden, false);
-    assert.equal(rowFor(h, 'colorize', `modulation.${hidden}`).hidden, true);
+    assert.equal(rowFor(h, 'modulation', `modulation.${shown}`).hidden, false);
+    assert.equal(rowFor(h, 'modulation', `modulation.${hidden}`).hidden, true);
   }
-  assert.equal(controlIn(rowFor(h, 'colorize', 'modulation.pattern-scale')).value, noiseScale);
+  assert.equal(controlIn(rowFor(h, 'modulation', 'modulation.pattern-scale')).value, noiseScale);
   edit('modulation-enabled', 'disabled');
-  assert.equal(rowFor(h, 'colorize', 'modulation.modulation-enabled'), undefined);
+  assert.equal(rowFor(h, 'modulation', 'modulation.modulation-enabled'), undefined);
   assert.equal(h.container.querySelector('.chain-modulation-enabled').checked, false);
-  assert.equal(rowFor(h, 'colorize', 'modulation.modulation-source').hidden, true);
-  assert.equal(rowFor(h, 'colorize', 'modulation.pattern-scale').hidden, true);
+  assert.equal(rowFor(h, 'modulation', 'modulation.modulation-source').hidden, true);
+  assert.equal(rowFor(h, 'modulation', 'modulation.pattern-scale').hidden, true);
   assert.equal(h.store.undo(), true);
   h.strip.render();
-  assert.equal(rowFor(h, 'colorize', 'modulation.pattern-scale').hidden, false);
-  assert.equal(controlIn(rowFor(h, 'colorize', 'modulation.pattern-scale')).value, noiseScale);
+  assert.equal(rowFor(h, 'modulation', 'modulation.pattern-scale').hidden, false);
+  assert.equal(controlIn(rowFor(h, 'modulation', 'modulation.pattern-scale')).value, noiseScale);
+  chipByLabel(h, 'modulation').dispatch('keydown', {key: 'b'});
+  assert.equal(h.store.document().preset_bank.presets[0].values['modulation.modulation-enabled'], 'disabled');
+  assert.equal(h.container.querySelector('.chain-modulation-enabled').checked, false);
+  assert.equal(h.store.bypassedLabels().includes('modulation'), false);
+  chipByLabel(h, 'modulation').dispatch('keydown', {key: 'b'});
+  assert.equal(h.container.querySelector('.chain-modulation-enabled').checked, true);
   edit('pattern-noise-variant', 'octave-contour');
-  assert.equal(rowFor(h, 'colorize', 'modulation.pattern-contrast').hidden, false);
-  assert.equal(rowFor(h, 'colorize', 'modulation.pattern-noise-basis').hidden, false);
+  assert.equal(rowFor(h, 'modulation', 'modulation.pattern-contrast').hidden, false);
+  assert.equal(rowFor(h, 'modulation', 'modulation.pattern-noise-basis').hidden, false);
   edit('modulation-source', 'displacement');
-  assert.equal(rowFor(h, 'colorize', 'modulation.pattern-scale').hidden, true);
-  assert.equal(rowFor(h, 'colorize', 'modulation.modulation-amount').hidden, false);
+  assert.equal(rowFor(h, 'modulation', 'modulation.pattern-scale').hidden, true);
+  assert.equal(rowFor(h, 'modulation', 'modulation.modulation-amount').hidden, false);
 });
 
 test('Noise scale follows the sampling limit without replacing its controls', async () => {
   const h = await makeStrip({ writeThrough: true });
-  const row = rowFor(h, 'colorize', 'modulation.pattern-scale');
+  const row = rowFor(h, 'modulation', 'modulation.pattern-scale');
   const slider = controlIn(row);
   const readout = row.querySelector('.chain-param-value');
   assert.equal(slider.max, '8');
@@ -1566,7 +1574,7 @@ test('Noise scale follows the sampling limit without replacing its controls', as
   readout.value = '20';
   readout.dispatch('change');
   assert.equal(h.store.document().preset_bank.presets[0].values['modulation.pattern-scale'], 8);
-  const evaluation = controlIn(rowFor(h, 'colorize', 'modulation.modulation-evaluation'));
+  const evaluation = controlIn(rowFor(h, 'modulation', 'modulation.modulation-evaluation'));
   evaluation.value = 'direct';
   evaluation.dispatch('change');
   assert.equal(slider.max, '64');
@@ -1575,13 +1583,13 @@ test('Noise scale follows the sampling limit without replacing its controls', as
   slider.dispatch('input');
   slider.dispatch('change');
   assert.equal(h.store.document().preset_bank.presets[0].values['modulation.pattern-scale'], 32);
-  assert.ok(controlIn(rowFor(h, 'colorize', 'modulation.pattern-scale')) === slider);
+  assert.ok(controlIn(rowFor(h, 'modulation', 'modulation.pattern-scale')) === slider);
 });
 
 test('modulation strength follows the selected mechanic range', async () => {
   const h = await makeStrip();
-  const amount = rowFor(h, 'colorize', 'modulation.modulation-amount');
-  const control = controlIn(rowFor(h, 'colorize', 'modulation.modulation-mechanic'));
+  const amount = rowFor(h, 'modulation', 'modulation.modulation-amount');
+  const control = controlIn(rowFor(h, 'modulation', 'modulation.modulation-mechanic'));
   for (const [mechanic, minimum, maximum] of [
     ['opacity', '0', '1'], ['positive-lightness-lift', '0', '1'], ['hue-rotation', '-4', '4'],
   ]) {
@@ -1593,22 +1601,26 @@ test('modulation strength follows the selected mechanic range', async () => {
   }
 });
 
-test('the Color card adds, reorders, and removes independent modulation layers with undo', async () => {
+test('the Color container adds, reorders, and removes modulation stages with undo', async () => {
   const source = scratchChainDocument(CATALOG);
   source.preset_bank.presets.push({...structuredClone(source.preset_bank.presets[0]), preset_id: 'second'});
   source.preset_bank.choreography.generated_order.push('second');
   source.preset_bank.choreography.dwell.second = 600;
   const h = await makeStrip({source});
-  const layers = () => h.container.querySelectorAll('.chain-modulation-layer');
-  const add = () => h.container.querySelector('.chain-modulation-add').dispatch('click');
-  assert.equal(layers().length, 0);
+  const stages = () => bandFor(h, 'color').querySelectorAll('.chain-chip');
+  const add = () => {
+    bandFor(h, 'color').querySelector('.chain-band-add').dispatch('click');
+    paletteEntries(h).find((entry) => entry.dataset.operator === 'color.modulate.v1').dispatch('click');
+  };
+  assert.equal(bandFor(h, 'color').querySelector('.chain-band-title').textContent, 'Color');
+  assert.equal(stages().length, 0);
   add();
   add();
-  assert.equal(layers().length, 2);
+  assert.equal(stages().length, 2);
   assert.equal(h.container.querySelectorAll('.chain-modulation-enabled').length, 2);
   assert.equal(h.container.querySelectorAll('.chain-param').some((row) =>
     row.dataset.parameter.endsWith('.modulation-enabled')), false);
-  assert.equal(chips(h).length, source.descriptor.chain.length);
+  assert.equal(chips(h).length, source.descriptor.chain.length + 2);
   const [first, second] = h.store.chain().slice(-2);
   assert.notEqual(first.label, second.label);
   const presets = h.store.document().preset_bank.presets;
@@ -1621,16 +1633,16 @@ test('the Color card adds, reorders, and removes independent modulation layers w
     }).ok, true);
   }
   h.strip.render();
-  assert.equal(rowFor(h, 'colorize', `${first.label}.pattern-scale`).hidden, true);
-  assert.equal(rowFor(h, 'colorize', `${first.label}.modulation-evaluation`).hidden, true);
+  assert.equal(rowFor(h, first.label, `${first.label}.pattern-scale`).hidden, true);
+  assert.equal(rowFor(h, first.label, `${first.label}.modulation-evaluation`).hidden, true);
   const before = h.store.document();
-  layers()[1].querySelector('.chain-modulation-move').dispatch('click');
+  chipByLabel(h, second.label).dispatch('keydown', {key: 'ArrowUp', altKey: true});
   assert.deepEqual(h.store.chain().slice(-2), [second, first]);
   assert.deepEqual(h.store.document().preset_bank.presets, before.preset_bank.presets);
   h.container.querySelector('.chain-undo').dispatch('click');
   assert.deepEqual(h.store.document(), before);
-  layers()[0].querySelector('.chain-modulation-remove').dispatch('click');
-  assert.equal(layers().length, 1);
+  stages()[0].querySelector('.chain-chip-remove').dispatch('click');
+  assert.equal(stages().length, 1);
   assert.equal(h.store.document().preset_bank.presets.some((preset) =>
     Object.keys(preset.values).some((id) => id.startsWith(`${first.label}.`))), false);
   h.container.querySelector('.chain-undo').dispatch('click');
@@ -1638,32 +1650,41 @@ test('the Color card adds, reorders, and removes independent modulation layers w
   assert.equal(h.applied.length, 6);
 });
 
-test('dragging a folded modulation header reorders layers within the Color card', async () => {
+test('Color stage headers click to toggle panels and drag to reorder within Color', async () => {
   const h = await makeStrip();
-  h.container.querySelector('.chain-modulation-add').dispatch('click');
-  chipByLabel(h, 'colorize').dispatch('click');
-  const stack = h.container.querySelector('.chain-modulation-stack');
-  stack.getBoundingClientRect = () => rect(0, 140);
-  const layers = stack.querySelectorAll('.chain-modulation-layer');
-  for (const [index, layer] of layers.entries()) {
-    layer.getBoundingClientRect = () => rect(20 + index * 50);
-    layer.querySelector('.chain-modulation-header').getBoundingClientRect = () => rect(20 + index * 50, 20);
+  bandFor(h, 'color').querySelector('.chain-band-add').dispatch('click');
+  paletteEntries(h).find((entry) => entry.dataset.operator === 'color.modulate.v1').dispatch('click');
+  const [first, second] = h.store.chain().slice(-2);
+  chipByLabel(h, first.label).querySelector('.chain-chip-header').dispatch('click');
+  assert.equal(chipByLabel(h, first.label).classList.contains('chain-chip--expanded'), true);
+  assert.equal(chipByLabel(h, 'colorize').classList.contains('chain-chip--expanded'), false);
+  const band = bandFor(h, 'color');
+  band.getBoundingClientRect = () => rect(0, 140);
+  const stages = band.querySelectorAll('.chain-chip');
+  for (const [index, stage] of stages.entries()) {
+    stage.getBoundingClientRect = () => rect(20 + index * 50);
+    stage.querySelector('.chain-chip-header').getBoundingClientRect = () => rect(20 + index * 50, 20);
   }
   const viewport = h.container.querySelector('.chain-strip-viewport');
   viewport.getBoundingClientRect = () => rect(0, 200);
   viewport.clientHeight = viewport.scrollHeight = 200;
   const before = h.store.document();
-  const header = layers[0].querySelector('.chain-modulation-header');
+  const header = stages[0].querySelector('.chain-chip-header');
   header.dispatch('pointerdown', dragPointer(25));
   header.dispatch('pointermove', dragPointer(100));
-  assert.equal(layers[0].classList.contains('chain-chip--dragging'), true);
+  assert.equal(stages[0].classList.contains('chain-chip--dragging'), true);
+  assert.equal(stages[1].classList.contains('chain-chip--drop-after'), true);
   header.dispatch('pointerup', dragPointer(100));
-  assert.deepEqual(h.store.chain().slice(-2).map((entry) => entry.label), before.descriptor.chain.slice(-2).map((entry) => entry.label).reverse());
+  assert.deepEqual(h.store.chain().slice(-2), [second, first]);
   assert.deepEqual(h.store.document().preset_bank.presets, before.preset_bank.presets);
-  assert.equal(h.doc.activeElement.dataset.label, 'colorize');
-  assert.equal(chipByLabel(h, 'colorize').querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
+  assert.equal(h.doc.activeElement.dataset.label, first.label);
+  assert.equal(chipByLabel(h, first.label).querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
+  header.dispatch('click');
+  assert.equal(chipByLabel(h, first.label).classList.contains('chain-chip--expanded'), true);
   h.container.querySelector('.chain-undo').dispatch('click');
   assert.deepEqual(h.store.document(), before);
+  chipByLabel(h, first.label).querySelector('.chain-chip-header').dispatch('click');
+  assert.equal(chipByLabel(h, first.label).classList.contains('chain-chip--expanded'), false);
 });
 
 test('the inline controls keep their own keys and take no drag', async () => {
@@ -1833,9 +1854,13 @@ test('every catalog operator exposes its parameter controls without declarations
       for (const id of Object.keys(preset.values))
         if (id.startsWith('audit.')) delete preset.values[id];
     const h = await makeStrip({ source });
-    const owner = operator.id === 'color.modulate.v1' ? chain[prefix.length - 1].label : 'audit';
+    const owner = 'audit';
     chipByLabel(h, owner).dispatch('click');
-    const fields = operator.params.filter((field) => operator.id !== 'color.modulate.v1' || field.id !== 'modulation-enabled');
+    const fields = operator.params.filter((field) =>
+      !(operator.id === 'color.modulate.v1' && field.id === 'modulation-enabled')
+      && !(operator.id === 'colorize.generated-palette.v4' && field.id === 'palette-type'));
+    if (operator.id === 'colorize.generated-palette.v4')
+      assert.equal(chipByLabel(h, owner).querySelector('.chain-palette-type').value, 'cycling-generated');
     assert.deepEqual(rowsOf(h, owner).filter((row) => row.dataset.parameter.startsWith('audit.')).map((row) => row.dataset.parameter).sort(),
       fields.map((field) => `audit.${field.id}`).sort(), operator.name);
     for (const field of fields) {
@@ -2077,9 +2102,10 @@ test('Ripple random center toggles manual coordinates and follows synchronized v
 });
 
 
-test('the Color palette selector supports every family with family-specific controls', async () => {
+test('the Palette selector supports every family with family-specific controls', async () => {
   const h = await makeStrip({writeThrough: true});
-  const type = controlIn(rowFor(h, 'colorize', 'colorize.palette-type'));
+  const type = chipByLabel(h, 'colorize').querySelector('.chain-palette-type');
+  assert.equal(rowFor(h, 'colorize', 'colorize.palette-type'), undefined);
   assert.deepEqual(type.children.map((option) => option.value),
     ['cycling-generated', 'generated', 'procedural', 'gradient', 'mutating']);
   const visible = (field) => !rowFor(h, 'colorize', `colorize.${field}`).hidden;
@@ -2097,7 +2123,19 @@ test('the Color palette selector supports every family with family-specific cont
     assert.equal(visible('palette-chroma'), true);
     assert.equal(visible('palette-mapping'), true);
     assert.equal(visible('value-opacity-low'), true);
+    assert.equal(h.store.document().preset_bank.presets[0].values['colorize.palette-type'], family);
   }
   assert.equal(controlIn(rowFor(h, 'colorize', 'colorize.palette-harmony')).children.length, 8);
   assert.equal(controlIn(rowFor(h, 'colorize', 'colorize.palette-name')).children.length, 27);
+  h.strip.syncParameterValues({'colorize.palette-type': 'gradient'});
+  assert.equal(type.value, 'gradient');
+  assert.equal(visible('gradient-start-r'), true);
+  for (const stop of ['start', 'middle', 'end']) {
+    for (const channel of ['r', 'g', 'b']) {
+      const row = rowFor(h, 'colorize', `colorize.gradient-${stop}-${channel}`);
+      const expected = `Gradient ${stop[0].toUpperCase()}${stop.slice(1)} ${channel.toUpperCase()}`;
+      assert.equal(row.querySelector('.chain-param-name').textContent, expected);
+      assert.equal(controlIn(row).getAttribute('aria-label'), expected);
+    }
+  }
 });

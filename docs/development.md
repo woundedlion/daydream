@@ -52,10 +52,12 @@ Snapshot schema version 4 requires `chain: [{instance, operator}]`,
 `parameters: [{name, value}]`, `animationsPaused` (boolean), and
 `modulation: [{instance, recipe}]`, with one recipe per `color.modulate.v1`
 instance. Modulation fields travel in `modulation`, not `parameters`.
-The Color card presents the ordered layers with add, remove, reorder and
-header drag controls. Each layer owns its recipe and source clock;
-displacement is one of the available sources. Palette family, mapping,
-brightness and opacity belong to the Color card. Legacy embedded hue shift
+The Color carrier container follows the permanent Palette card and presents modulation
+stages with add, remove, enable and header drag controls. Clicking a stage
+opens or closes its parameter panel; dragging its header reorders it within Color.
+Each layer owns its recipe and source clock; displacement is one of the available
+sources. The Palette header selects the palette family; mapping, brightness
+and opacity belong to its parameter panel. Legacy embedded hue shift
 and spatial recipes migrate into independent layers, retaining their clocks.
 `runtime` and `paletteBank` are optional. Runtime entries identify their instance and stable
 state kind. Omit runtime to initialize fresh state; when present, it must include

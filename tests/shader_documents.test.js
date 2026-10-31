@@ -1711,7 +1711,7 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   assert.deepEqual(harness.selections, [canonicalEffectId('shader-chain'), canonicalEffectId('shader-chain')]);
   assert.equal(harness.engine.chainCalls.length, 2);
   assert.equal(harness.engine.chainCalls.at(-1).length, 7);
-  assert.equal(stripChips(harness).length, 6);
+  assert.equal(stripChips(harness).length, 7);
   const digest = compileShaderDocument(KALEIDOSCOPE_HEX_BRIGHT,
     { catalog: JSON.parse(ENGINE_CATALOG) }).descriptor_digest;
   assert.equal(harness.elements.get('shader-document-digest').dataset.digest, digest,
@@ -1993,11 +1993,11 @@ test('Grid Space switches modulation source and sampling atomically with one und
     return apply(writes);
   };
   harness.engine.setParameter = () => ParamSetResult.INADMISSIBLE;
-  const edit = stageEditor(harness, 'colorize');
-  const chip = stripChips(harness).find((chip) => chip.dataset.label === 'colorize');
+  const edit = stageEditor(harness, 'modulation');
+  const chip = stripChips(harness).find((chip) => chip.dataset.label === 'modulation');
   edit('modulation.modulation-source', 'sphere-interference');
-  assert.ok(stripChips(harness).find((chip) => chip.dataset.label === 'colorize') === chip,
-    'the active Color card stays mounted');
+  assert.ok(stripChips(harness).find((chip) => chip.dataset.label === 'modulation') === chip,
+    'the active Color stage stays mounted');
   assert.deepEqual(batches, [[
     { name: 'modulation.modulation-source', value: 2 },
     { name: 'modulation.modulation-evaluation', value: 0 },
@@ -2005,7 +2005,7 @@ test('Grid Space switches modulation source and sampling atomically with one und
   const values = savedValues(harness);
   assert.equal(values['modulation.modulation-source'], 'sphere-interference');
   assert.equal(values['modulation.modulation-evaluation'], 'direct');
-  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'colorize')
+  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'modulation')
     .querySelectorAll('.chain-param');
   assert.equal(colorRows.find((row) => row.dataset.parameter === 'modulation.modulation-evaluation')
     .querySelector('.chain-param-control').value, 'direct');
@@ -2021,14 +2021,14 @@ test('a refused modulation source batch preserves both fields and the visible No
   const harness = await editorWorkbench({source: JSON.stringify(promotedDocument('grid_space.shader.json'))});
   const original = savedValues(harness);
   harness.engine.bindings.setShaderChainParameters = () => ParamSetResult.INADMISSIBLE;
-  stageEditor(harness, 'colorize')('modulation.modulation-source', 'sphere-interference');
+  stageEditor(harness, 'modulation')('modulation.modulation-source', 'sphere-interference');
   assert.match(harness.elements.get('shader-document-status').textContent, /INADMISSIBLE/);
   assert.deepEqual(savedValues(harness), original);
-  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'colorize')
+  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'modulation')
     .querySelectorAll('.chain-param');
   assert.equal(colorRows.find((row) => row.dataset.parameter === 'modulation.modulation-source')
     .querySelector('.chain-param-control').value, 'noise');
-  const groups = stripChips(harness).find((chip) => chip.dataset.label === 'colorize')
+  const groups = stripChips(harness).find((chip) => chip.dataset.label === 'modulation')
     .querySelectorAll('.chain-param-group');
   assert.equal(groups.filter((group) => group.getAttribute('aria-label') === 'Noise').at(-1).hidden, false);
   assert.equal(groups.find((group) => group.getAttribute('aria-label') === 'Interference · wave A').hidden, true);
@@ -2036,7 +2036,7 @@ test('a refused modulation source batch preserves both fields and the visible No
 
 test('lightness lift preserves the noise recipe and clamps only strength in one undo', async () => {
   const harness = await editorWorkbench();
-  const edit = stageEditor(harness, 'colorize');
+  const edit = stageEditor(harness, 'modulation');
   edit('modulation.modulation-amount', 2);
   edit('modulation.pattern-noise-variant', 'octave-contour');
   edit('modulation.pattern-noise-basis', 'fbm3');
@@ -2065,12 +2065,12 @@ test('lightness lift preserves the noise recipe and clamps only strength in one 
 
 test('baked sampling clamps an existing direct Noise scale in the same edit', async () => {
   const harness = await editorWorkbench();
-  const edit = stageEditor(harness, 'colorize');
+  const edit = stageEditor(harness, 'modulation');
   edit('modulation.modulation-evaluation', 'direct');
   edit('modulation.pattern-scale', 32);
   edit('modulation.modulation-evaluation', 'baked-cube');
   assert.equal(savedValues(harness)['modulation.pattern-scale'], 8);
-  assert.equal(displayedParameter(harness, 'colorize', 'modulation.pattern-scale'), '8');
+  assert.equal(displayedParameter(harness, 'modulation', 'modulation.pattern-scale'), '8');
   harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
   const values = savedValues(harness);
   assert.equal(values['modulation.pattern-scale'], 32);

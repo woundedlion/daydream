@@ -60,7 +60,7 @@ test('socket choices prefer the narrowest span and stop collapse at an endomorph
 });
 
 
-test('terminal Color endomorphisms form an ordered modulation band after Color', () => {
+test('terminal color endomorphisms form an ordered band after the palette', () => {
   const field = op('color.modulate.v1', 'color');
   const hue = op('color.modulate.v1', 'color');
   const extended = {...catalog, operators: [...catalog.operators, field, hue]};

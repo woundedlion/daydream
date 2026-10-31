@@ -11,7 +11,7 @@ beforeEach((t) => {
   const capture = installConsoleCapture('log');
   t.after(capture.restore);
 });
-import { runWorkbenchSections, probeColorCard, probePaletteAndModulations, probeNoiseScaleDrag, probeDocumentActions, probeSnapshotImport, probeParity, probeStartupPersistence, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
+import { runWorkbenchSections, probeColorStageDrag, probeColorCard, probePaletteAndModulations, probeNoiseScaleDrag, probeDocumentActions, probeSnapshotImport, probeParity, probeStartupPersistence, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
 import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
 import {
   probeKeyboardEdits, probeMobilePanel, probePanel, probePresetName, probeSidebar, probeSliderDrag,
@@ -22,6 +22,7 @@ import { probePad } from '../scripts/mobius-probe.mjs';
 import { scratchDir } from './helpers/fixture_repo.js';
 
 const PROBES = [
+  ['workbench-probe.mjs', 'probeColorStageDrag', probeColorStageDrag],
   ['workbench-probe.mjs', 'probeColorCard', probeColorCard],
   ['workbench-probe.mjs', 'probePaletteAndModulations', probePaletteAndModulations],
   ['workbench-probe.mjs', 'probeNoiseScaleDrag', probeNoiseScaleDrag],
@@ -386,17 +387,17 @@ test('palette and modulation probe reports a family whose controls fail to appea
       $: async (selector) => selector.includes('colorize') || stages.some((entry) => selector.includes(entry.label)) ? {} : null,
       async $eval(selector, callback, ...args) {
         if (selector === '#shader-document-status') return callback({dataset: {status: 'ok'}});
-        if (selector.includes('.chain-modulation-move')) {
+        if (selector.endsWith(']') && selector.includes('data-label="stage')) {
           stages = [stages[1], stages[0], stages[2]];
           return;
         }
-        if (selector.includes('.chain-modulation-add')) {
+        if (selector.includes('.chain-palette-entry')) {
           stages.push({label: `stage${stages.length + 1}`, operator: 'color.modulate.v1'});
           return;
         }
         const label = selector.match(/data-label="([^"]+)"/)?.[1];
         if (selector.includes('.chain-modulation-enabled')) bypassed = label;
-        if (selector.includes('.chain-modulation-remove')) stages = stages.filter((entry) => entry.label !== label);
+        if (selector.includes('.chain-chip-remove')) stages = stages.filter((entry) => entry.label !== label);
         const field = selector.match(/data-parameter="colorize.([^"]+)"/)?.[1];
         const visible = {
           generated: ['palette-harmony'], procedural: ['palette-name'], gradient: ['gradient-start-r'],
