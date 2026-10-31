@@ -413,7 +413,7 @@ test('a completed recording save failure preserves the current recording control
   const recorder = rig.attach(fakeRecorder());
   rig.button.object.record();
   recorder.onSaveError(new Error('file commit failed'), 'previous.webm');
-  assert.match(rig.notices.at(-1), /Recording save failed for previous.webm: .*file commit failed/);
+  assert.equal(rig.notices.at(-1), 'Recording save failed for previous.webm: file commit failed');
   assert.equal(recorder.isRecording, true);
   assert.equal(rig.canvasEl.classList.contains('recording'), true);
   assert.equal(rig.button.label, '\u25a0 Stop');

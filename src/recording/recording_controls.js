@@ -168,7 +168,7 @@ export function createRecordingControls({
         showNotice(recorderReason(err));
       };
       recorder.onSaveError = (err, filename) => {
-        showNotice(`Recording save failed for ${filename}: ${errorDetail(err)}`);
+        showNotice(`Recording save failed for ${filename}: ${recorderReason(err)}`);
       };
       driver.recorder = recorder;
       recordCtrl.enable();
