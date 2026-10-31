@@ -190,7 +190,7 @@ export function start({
     displayAliasesDiverged: (view) => displayAliasesDiverged(daydream, view),
     statsView: new SegmentStatsView(doc),
     onFault: () => host.recorder?.abort(
-      "Recording stopped because the segmented rendering engine failed."),
+      'the segmented rendering engine failed.'),
   });
 
   ///////////////////////////////////////////////////////////////////////////////
