@@ -105,6 +105,8 @@ describe(
     beforeEach(() => {
       rmSync(tokenPath(), { force: true });
       rmSync(logPath(), { force: true });
+      rmSync(join(repo, '.git', 'packed-refs'), { force: true });
+      rmSync(join(repo, '.git', 'packed-refs.lock'), { force: true });
     });
 
     after(() => {
@@ -123,6 +125,21 @@ describe(
       assert.equal(status, 1);
       assert.match(stderr, /REFUSED deletion of master/);
       assert.match(readLog(), new RegExp(`REFUSED deletion master ${mid}`));
+    });
+
+    test('allows pruning a master already preserved in packed refs', { skip: SKIP }, () => {
+      writeFileSync(join(repo, '.git', 'packed-refs'), `${mid} refs/heads/master\n`);
+      assert.equal(runHook([`${mid} ${ZERO} refs/heads/master`]).status, 0);
+      assert.equal(readLog(), '');
+    });
+
+    test('refuses deletion while packed refs are locked or do not preserve master', { skip: SKIP }, () => {
+      writeFileSync(join(repo, '.git', 'packed-refs'), `${mid} refs/heads/master\n`);
+      writeFileSync(join(repo, '.git', 'packed-refs.lock'), '');
+      assert.equal(runHook([`${mid} ${ZERO} refs/heads/master`]).status, 1);
+      rmSync(join(repo, '.git', 'packed-refs.lock'));
+      writeFileSync(join(repo, '.git', 'packed-refs'), `${old} refs/heads/master\n`);
+      assert.equal(runHook([`${mid} ${ZERO} refs/heads/master`]).status, 1);
     });
 
     test('a refused deletion leaves the authorization token unconsumed', { skip: SKIP }, () => {

@@ -27,7 +27,10 @@ while read -r _old new ref; do
   cur=$(git rev-parse --verify -q "$ref" 2>/dev/null) || cur=''
   [ -z "$cur" ] && continue                                # creation
   case "$new" in
-        "$z") kind='deletion'; target=$cur ;;
+        "$z")
+      [ ! -e "$gitdir/packed-refs.lock" ] &&
+        grep -qxF "$cur $ref" "$gitdir/packed-refs" 2>/dev/null && continue
+      kind='deletion'; target=$cur ;;
     *)
       git merge-base --is-ancestor "$cur" "$new" 2>/dev/null && continue
       kind='rewind'; target=$new ;;
