@@ -25,8 +25,8 @@ beforeEach(() => { frames = installAnimationFrames(); });
 afterEach(() => { frames.restore(); });
 const runFrame = () => frames.flush();
 
-// kaleidoscope_hex_bright chain: camera, lens (sphere endos), project (crossing), warp2
-// (plane endo), sample (crossing), colorize (exit).
+// kaleidoscope_hex_bright chain: camera, lens, project, warp2, sample,
+// colorize, modulation.
 const PROJECT = 2;
 
 restoreDocumentAfterEach();

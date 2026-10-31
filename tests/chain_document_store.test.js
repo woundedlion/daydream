@@ -28,8 +28,7 @@ const STAINED_GLASS = compiler.compileShaderDocument(readFileSync(
 assert.equal(STAINED_GLASS.status, 'VALID');
 
 // kaleidoscope_hex_bright chain order: camera, lens, project, warp2, sample,
-// colorize — sphere endos, a sphere->plane crossing, a plane endo, a
-// plane->field crossing, the field->color exit.
+// colorize, modulation.
 const PROJECT = 2;
 const WARP = 3;
 const SAMPLE = 4;
@@ -674,16 +673,16 @@ test('legality lists every operator with reasons for the illegal', async () => {
   assert.throws(() => store.legalInsertions(99), RangeError);
 });
 
-test('the last entry is replaceable only by operators that exit on the color carrier', async () => {
+test('the palette socket is replaceable only by operators that exit on the color carrier', async () => {
   const store = await makeStore();
-  const last = store.chain().findIndex((entry) => entry.operator === 'colorize.generated-palette.v4');
+  const palette = store.chain().findIndex((entry) => entry.operator === 'colorize.generated-palette.v4');
   const exits = CATALOG.operators
     .filter((operator) => operator.input === 'field' && operator.output === 'color')
     .map((operator) => operator.id);
   assert.ok(exits.length > 0);
-  assert.deepEqual(store.legalReplacements(last, 1)
+  assert.deepEqual(store.legalReplacements(palette, 1)
     .filter((entry) => entry.legal).map((entry) => entry.operator.id), exits);
-  const transfer = store.legalReplacements(last, 1)
+  const transfer = store.legalReplacements(palette, 1)
     .find((entry) => entry.operator.id === 'field.transfer.ridge.v2');
   assert.equal(transfer.legal, false);
   assert.match(transfer.reason, /the chain needs color here/);
