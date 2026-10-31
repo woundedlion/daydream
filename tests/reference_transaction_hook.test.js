@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { hookUnderTest, isolatedGitEnv } from './helpers/fixture_repo.js';
 
 const {
@@ -178,6 +178,15 @@ describe(
       assert.equal(status, 1);
       assert.match(stderr, /REFUSED non-fast-forward update of master/);
       assert.match(readLog(), new RegExp(`REFUSED rewind master ${mid} -> ${old}`));
+    });
+
+    test('refusals from git -C name an absolute token path', { skip: SKIP }, () => {
+      const result = spawnSync('git', ['-C', repo, '-c', `core.hooksPath=${dirname(HOOK)}`,
+        'update-ref', 'refs/heads/master', old], {cwd: root, env, encoding: 'utf8'});
+      assert.notEqual(result.status, 0);
+      assert.ok(result.stderr.replaceAll('\\', '/').includes(
+        `git rev-parse ${old} > "${tokenPath().replaceAll('\\', '/')}"`));
+      assert.equal(git(repo, 'rev-parse', 'refs/heads/master'), mid);
     });
 
     test('the target OID authorizes a rewind and is consumed', { skip: SKIP }, () => {

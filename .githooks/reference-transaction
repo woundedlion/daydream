@@ -4,7 +4,7 @@
 # from the ref.
 #
 # A rewind or deletion needs a deliberate, one-shot, target-scoped token:
-#   git rev-parse <target> > "$(git rev-parse --git-common-dir)/hs-allow-nonff"
+#   git rev-parse <target> > "$(git rev-parse --path-format=absolute --git-common-dir)/hs-allow-nonff"
 # The target is the new commit for a rewind and the doomed commit for a
 # deletion. The token authorizes only that one value and is consumed on use.
 # Write the literal ANY instead of a SHA for a blind override. Every refusal and
@@ -12,7 +12,7 @@
 [ "$1" = "prepared" ] || exit 0
 
 z='0000000000000000000000000000000000000000'
-gitdir=$(git rev-parse --git-common-dir 2>/dev/null) || gitdir=.git
+gitdir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 1
 tokfile="$gitdir/hs-allow-nonff"
 logfile="$gitdir/hs-nonff.log"
 
