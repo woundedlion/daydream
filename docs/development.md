@@ -64,7 +64,7 @@ and spatial recipes migrate into independent layers, retaining their clocks.
 `runtime` and `paletteBank` are optional. Runtime entries identify their instance and stable
 state kind. Omit runtime to initialize fresh state; when present, it must include
 every stateful instance exactly once. `ChainRuntimeState` in the module declarations
-defines the walk, source, noise, affine, phase, ring, color and modulation state shapes.
+defines the supported state shapes.
 The engine validates a replacement before applying it, so refusal commits no
 snapshot state. Caller-accessor side effects during WASM payload cloning are
 not rolled back.
