@@ -1891,6 +1891,26 @@ test('every catalog operator exposes its parameter controls without declarations
   }
 });
 
+test('modulation toggles keep a stable name and announce baked controls', async () => {
+  let live = true;
+  const h = await makeStrip({writeThrough: true,
+    parameterLive: (id) => id !== 'modulation.modulation-enabled' || live});
+  const toggle = () => chipByLabel(h, 'modulation').querySelector('.chain-modulation-enabled');
+  const label = `Bypass ${CATALOG.operators.find(({id}) => id === 'color.modulate.v1').name} \u00b7 modulation`;
+  assert.equal(toggle().getAttribute('aria-label'), label);
+  chipByLabel(h, 'modulation').dispatch('keydown', {key: 'b'});
+  assert.equal(toggle().getAttribute('aria-pressed'), 'true');
+  assert.equal(toggle().getAttribute('aria-label'), label);
+  live = false;
+  h.strip.render();
+  assert.equal(toggle().disabled, true);
+  assert.equal(toggle().getAttribute('title'), 'This parameter is baked into the compiled build');
+  const edits = h.edits.length;
+  chipByLabel(h, 'modulation').dispatch('keydown', {key: 'b'});
+  assert.equal(h.edits.length, edits);
+  assert.equal(lastAnnounced(h), toggle().getAttribute('title'));
+});
+
 test('parameters baked into the active build cannot commit edits', async () => {
   const h = await makeStrip({ parameterLive: (id) => id !== 'sample.coverage-mode' });
   const row = rowFor(h, 'sample', 'sample.coverage-mode');

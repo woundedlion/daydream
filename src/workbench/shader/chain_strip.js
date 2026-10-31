@@ -63,6 +63,7 @@ const PALETTE_GAP = 4;
 
 const DEACTIVATED_REASON = 'Deactivated by the current topology selection';
 
+const BAKED_PARAMETER_REASON = 'This parameter is baked into the compiled build';
 const BYPASS_UNAVAILABLE = 'Bypass applies to the interpreter only: '
   + 'the compiled build renders the whole chain.';
 
@@ -388,6 +389,10 @@ export function createChainStrip({
   const toggleStage = (label) => {
     if (store.chain().find((entry) => entry.label === label)?.operator === MODULATION_OPERATOR) {
       const id = `${label}.modulation-enabled`;
+      if (!parameterLive(id)) {
+        announce(BAKED_PARAMETER_REASON);
+        return;
+      }
       editParameter(id, values[id] === 'disabled' ? 'enabled' : 'disabled');
       store.endValueRun();
       onCommitParameter();
@@ -694,10 +699,8 @@ export function createChainStrip({
     for (const control of container.querySelectorAll('.chain-modulation-enabled')) {
       const id = `${control.dataset.label}.modulation-enabled`;
       const disabled = values[id] === 'disabled';
-      const action = disabled ? 'Enable' : 'Disable';
       control.setAttribute('aria-pressed', String(disabled));
-      control.setAttribute('aria-label', `${action} Modulation · ${control.dataset.label}`);
-      control.setAttribute('title', action);
+      control.setAttribute('title', parameterLive(id) ? 'Bypass' : BAKED_PARAMETER_REASON);
       control.disabled = !parameterLive(id);
     }
     for (const control of container.querySelectorAll('.chain-palette-type')) {
@@ -735,7 +738,7 @@ export function createChainStrip({
       const shown = row.querySelector('.chain-param-note');
       const live = parameterLive(id);
       for (const control of row.querySelectorAll('input, select')) control.disabled = !live;
-      const reason = live ? DEACTIVATED_REASON : 'This parameter is baked into the compiled build';
+      const reason = live ? DEACTIVATED_REASON : BAKED_PARAMETER_REASON;
       if (!row.hidden && (!live || off.has(id))) {
         row.dataset.deactivated = 'true';
         if (shown !== null) { shown.textContent = reason; continue; }
@@ -1102,7 +1105,8 @@ export function createChainStrip({
       toggle.disabled = !bypassable;
       toggle.setAttribute('aria-pressed', String(isBypassed));
       toggle.setAttribute('aria-label', `Bypass ${op.name} · ${entry.label}`);
-      toggle.setAttribute('title', bypassable ? 'Bypass' : BYPASS_UNAVAILABLE);
+      toggle.setAttribute('title', bypassable ? 'Bypass'
+        : modulation ? BAKED_PARAMETER_REASON : BYPASS_UNAVAILABLE);
       toggle.textContent = '◉';
       toggle.addEventListener('click', (/** @type {*} */ event) => {
         event.stopPropagation();
