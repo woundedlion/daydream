@@ -81,9 +81,9 @@ export const COLOR_PARAMETER_NAMES = {
 };
 
 /**
- * @param {string} field - Palette field id.
- * @param {(field: string) => *} value - Current palette values.
- * @returns {boolean} Whether the selected modulation uses this field.
+ * @param {string} field - Modulation field id.
+ * @param {(field: string) => *} value - Current modulation values.
+ * @returns {boolean} Whether the field is hidden.
  */
 export function modulationParameterHidden(field, value) {
   const group = MODULATION_PARAMETER_GROUPS.find((group) => group.fields.includes(field));
