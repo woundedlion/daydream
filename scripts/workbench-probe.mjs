@@ -1063,8 +1063,7 @@ export async function probePaletteAndModulations(tab) {
   check((await tab.$$eval(`${stack} .chain-chip`, (nodes) => nodes.map((node) => node.dataset.label))).join()
     === [second, first, hue].join(), 'independent modulation stages reorder inside the Color container');
   await tab.$eval(`${layer(first)} .chain-modulation-enabled`, (node) => {
-    node.checked = false;
-    node.dispatchEvent(new Event('change', {bubbles: true}));
+    node.click();
   });
   const document = await savedDocument(tab);
   const snapshot = (await decodeShaderStateHash(await tab.evaluate(() => location.hash)))?.chainSnapshot;

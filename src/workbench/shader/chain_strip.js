@@ -693,7 +693,11 @@ export function createChainStrip({
     const off = deactivatedParameterIds(declarations, values, chain, catalog);
     for (const control of container.querySelectorAll('.chain-modulation-enabled')) {
       const id = `${control.dataset.label}.modulation-enabled`;
-      control.checked = values[id] !== 'disabled';
+      const disabled = values[id] === 'disabled';
+      const action = disabled ? 'Enable' : 'Disable';
+      control.setAttribute('aria-pressed', String(disabled));
+      control.setAttribute('aria-label', `${action} Modulation · ${control.dataset.label}`);
+      control.setAttribute('title', action);
       control.disabled = !parameterLive(id);
     }
     for (const control of container.querySelectorAll('.chain-palette-type')) {
@@ -1085,34 +1089,26 @@ export function createChainStrip({
       const name = el('span', 'chain-chip-name');
       name.textContent = op.name;
       header.appendChild(name);
-      if (entry.operator === MODULATION_OPERATOR) {
-        const enabled = el('input', 'chain-modulation-enabled');
-        enabled.type = 'checkbox';
-        enabled.dataset.label = entry.label;
-        enabled.setAttribute('tabindex', '0');
-        enabled.setAttribute('aria-keyshortcuts', 'b');
-        enabled.setAttribute('aria-label', `Enable ${op.name} · ${entry.label}`);
-        enabled.setAttribute('title', 'Enabled');
-        enabled.addEventListener('click', (/** @type {*} */ event) => event.stopPropagation());
-        enabled.addEventListener('change', () => toggleStage(entry.label));
-        header.appendChild(enabled);
-      } else {
-        const toggle = el('button', 'chain-chip-bypass');
-        const bypassable = bypassAvailable();
-        toggle.type = 'button';
-        toggle.setAttribute('tabindex', '0');
-        toggle.setAttribute('aria-keyshortcuts', 'b');
-        toggle.disabled = !bypassable;
-        toggle.setAttribute('aria-pressed', String(isBypassed));
-        toggle.setAttribute('aria-label', `Bypass ${op.name} · ${entry.label}`);
-        toggle.setAttribute('title', bypassable ? 'Bypass' : BYPASS_UNAVAILABLE);
-        toggle.textContent = '◉';
-        toggle.addEventListener('click', (/** @type {*} */ event) => {
-          event.stopPropagation();
-          toggleStage(entry.label);
-        });
-        header.appendChild(toggle);
+      const toggle = el('button', 'chain-chip-bypass');
+      const modulation = entry.operator === MODULATION_OPERATOR;
+      const bypassable = modulation ? parameterLive(`${entry.label}.modulation-enabled`) : bypassAvailable();
+      if (modulation) {
+        toggle.classList.add('chain-modulation-enabled');
+        toggle.dataset.label = entry.label;
       }
+      toggle.type = 'button';
+      toggle.setAttribute('tabindex', '0');
+      toggle.setAttribute('aria-keyshortcuts', 'b');
+      toggle.disabled = !bypassable;
+      toggle.setAttribute('aria-pressed', String(isBypassed));
+      toggle.setAttribute('aria-label', `Bypass ${op.name} · ${entry.label}`);
+      toggle.setAttribute('title', bypassable ? 'Bypass' : BYPASS_UNAVAILABLE);
+      toggle.textContent = '◉';
+      toggle.addEventListener('click', (/** @type {*} */ event) => {
+        event.stopPropagation();
+        toggleStage(entry.label);
+      });
+      header.appendChild(toggle);
     }
 
     const pin = el('button', 'chain-chip-pin');

@@ -540,10 +540,6 @@
   display: none;
 }
 
-.chain-modulation-enabled {
-  flex: 0 0 auto;
-}
-
 /* Topology-deactivated fields stay editable; baked fields are disabled. */
 .chain-param[data-deactivated="true"] > :not(.chain-param-note) {
   color: var(--muted-text);

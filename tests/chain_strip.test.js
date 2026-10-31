@@ -773,7 +773,8 @@ test('bypass toggles the program shape without touching the document', async () 
 test('a bypass unavailable to the render is disabled, with the reason in text', async () => {
   let compiledSide = false;
   const h = await makeStrip({ bypassAvailable: () => !compiledSide });
-  const bypasses = () => h.container.querySelectorAll('.chain-chip-bypass');
+  const bypasses = () => h.container.querySelectorAll('.chain-chip-bypass')
+    .filter((node) => !node.classList.contains('chain-modulation-enabled'));
   assert.ok(bypasses().length >= 3);
   assert.deepEqual([...new Set(bypasses().map((node) => node.disabled))], [false]);
   assert.equal(h.container.querySelector('.chain-strip-note'), null);
@@ -1521,14 +1522,19 @@ test('Color stages reveal their selected source and retain settings while disabl
   const edit = (field, value) => {
     if (field === 'modulation-enabled') {
       const control = h.container.querySelectorAll('.chain-modulation-enabled').find((node) => node.dataset.label === 'modulation');
-      control.checked = value === 'enabled';
-      control.dispatch('change');
+      if ((control.getAttribute('aria-pressed') === 'false') !== (value === 'enabled'))
+        control.dispatch('click');
       return;
     }
     const control = controlIn(rowFor(h, 'modulation', `modulation.${field}`));
     control.value = value;
     control.dispatch('change');
   };
+  const enabled = chipByLabel(h, 'modulation').querySelector('.chain-modulation-enabled');
+  assert.equal(enabled.tagName, 'BUTTON');
+  assert.equal(enabled.classList.contains('chain-chip-bypass'), true);
+  assert.equal(enabled.textContent, chipByLabel(h, 'lens').querySelector('.chain-chip-bypass').textContent);
+  assert.equal(enabled.getAttribute('aria-pressed'), 'false');
   const noiseScale = controlIn(rowFor(h, 'modulation', 'modulation.pattern-scale')).value;
   for (const [source, shown, hidden] of [
     ['directional-sine', 'sine-frequency', 'interference-frequency'],
@@ -1543,7 +1549,7 @@ test('Color stages reveal their selected source and retain settings while disabl
   assert.equal(controlIn(rowFor(h, 'modulation', 'modulation.pattern-scale')).value, noiseScale);
   edit('modulation-enabled', 'disabled');
   assert.equal(rowFor(h, 'modulation', 'modulation.modulation-enabled'), undefined);
-  assert.equal(h.container.querySelector('.chain-modulation-enabled').checked, false);
+  assert.equal(h.container.querySelector('.chain-modulation-enabled').getAttribute('aria-pressed'), 'true');
   assert.equal(rowFor(h, 'modulation', 'modulation.modulation-source').hidden, true);
   assert.equal(rowFor(h, 'modulation', 'modulation.pattern-scale').hidden, true);
   assert.equal(h.store.undo(), true);
@@ -1552,10 +1558,10 @@ test('Color stages reveal their selected source and retain settings while disabl
   assert.equal(controlIn(rowFor(h, 'modulation', 'modulation.pattern-scale')).value, noiseScale);
   chipByLabel(h, 'modulation').dispatch('keydown', {key: 'b'});
   assert.equal(h.store.document().preset_bank.presets[0].values['modulation.modulation-enabled'], 'disabled');
-  assert.equal(h.container.querySelector('.chain-modulation-enabled').checked, false);
+  assert.equal(h.container.querySelector('.chain-modulation-enabled').getAttribute('aria-pressed'), 'true');
   assert.equal(h.store.bypassedLabels().includes('modulation'), false);
   chipByLabel(h, 'modulation').dispatch('keydown', {key: 'b'});
-  assert.equal(h.container.querySelector('.chain-modulation-enabled').checked, true);
+  assert.equal(h.container.querySelector('.chain-modulation-enabled').getAttribute('aria-pressed'), 'false');
   edit('pattern-noise-variant', 'octave-contour');
   assert.equal(rowFor(h, 'modulation', 'modulation.pattern-contrast').hidden, false);
   assert.equal(rowFor(h, 'modulation', 'modulation.pattern-noise-basis').hidden, false);
