@@ -1043,7 +1043,6 @@ export async function probePaletteAndModulations(tab) {
   const layer = (label) => `${stack} .chain-chip[data-label="${label}"]`;
   const add = async () => {
     await tab.$eval(`${stack} .chain-band-add`, (node) => node.click());
-    await tab.$eval('.chain-palette-entry[data-operator="color.modulate.v1"]', (node) => node.click());
     const label = await tab.$$eval(`${stack} .chain-chip`, (nodes) => nodes.at(-1).dataset.label);
     await tab.$eval(`${layer(label)} .chain-chip-header`, (node) => node.click());
     return label;
@@ -1082,7 +1081,6 @@ export async function probeColorStageDrag(tab) {
   const band = '.chain-band[data-carrier="color"]';
   for (let index = 0; index < 2; index += 1) {
     await tab.$eval(`${band} .chain-band-add`, (node) => node.click());
-    await tab.$eval('.chain-palette-entry[data-operator="color.modulate.v1"]', (node) => node.click());
     await tab.$eval(`${band} .chain-chip:last-of-type .chain-chip-pin`, (node) => node.click());
   }
   const labels = () => tab.$$eval(`${band} .chain-chip`, (nodes) => nodes.map((node) => node.dataset.label));

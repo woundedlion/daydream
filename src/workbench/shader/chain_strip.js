@@ -1174,14 +1174,26 @@ export function createChainStrip({
   const bandAddButton = (band) => {
     const title = titleCase(band.carrier);
     const gap = appendGap(band);
-    if (gap === null || !store.legalInsertions(gap).some((entry) => entry.legal))
-      return null;
+    if (gap === null) return null;
+    const choices = store.legalInsertions(gap).filter((entry) => entry.legal);
+    if (choices.length === 0) return null;
     const add = el('button', 'chain-band-add');
     add.type = 'button';
-    add.setAttribute('aria-haspopup', 'listbox');
-    add.setAttribute('aria-expanded', 'false');
     add.setAttribute('aria-label', `Add a ${title} stage`);
     add.textContent = '+';
+    if (choices.length === 1) {
+      add.addEventListener('click', () => {
+        const result = store.replaceSpan(gap, 0, [{operator: choices[0].operator.id}]);
+        if (!result.ok) { report(result); return; }
+        const label = store.chain()[gap].label;
+        store.setSelectedLabel(label);
+        pinnedLabels.add(label);
+        commit(label);
+      });
+      return add;
+    }
+    add.setAttribute('aria-haspopup', 'listbox');
+    add.setAttribute('aria-expanded', 'false');
     /** @type {boolean|null} */
     let openOnPointerDown = null;
     add.addEventListener('pointerdown', () => { openOnPointerDown = palette?.anchor === add; });

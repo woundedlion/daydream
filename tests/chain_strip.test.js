@@ -1615,8 +1615,17 @@ test('the Color container adds, reorders, and removes modulation stages with und
   const h = await makeStrip({source});
   const stages = () => bandFor(h, 'color').querySelectorAll('.chain-chip');
   const add = () => {
-    bandFor(h, 'color').querySelector('.chain-band-add').dispatch('click');
-    paletteEntries(h).find((entry) => entry.dataset.operator === 'color.modulate.v1').dispatch('click');
+    const button = bandFor(h, 'color').querySelector('.chain-band-add');
+    assert.equal(button.getAttribute('aria-haspopup'), null);
+    const before = stages().length;
+    button.dispatch('click');
+    assert.equal(stages().length, before + 1);
+    assert.equal(paletteOf(h), null);
+    const added = h.store.chain().at(-1);
+    assert.equal(added.operator, 'color.modulate.v1');
+    assert.equal(h.store.selectedLabel(), added.label);
+    assert.equal(h.doc.activeElement.dataset.label, added.label);
+    assert.equal(chipByLabel(h, added.label).classList.contains('chain-chip--expanded'), true);
   };
   assert.equal(bandFor(h, 'color').querySelector('.chain-band-title').textContent, 'Color');
   assert.equal(stages().length, 0);
@@ -1659,7 +1668,6 @@ test('the Color container adds, reorders, and removes modulation stages with und
 test('Color stage headers click to toggle panels and drag to reorder within Color', async () => {
   const h = await makeStrip();
   bandFor(h, 'color').querySelector('.chain-band-add').dispatch('click');
-  paletteEntries(h).find((entry) => entry.dataset.operator === 'color.modulate.v1').dispatch('click');
   const [first, second] = h.store.chain().slice(-2);
   chipByLabel(h, first.label).querySelector('.chain-chip-header').dispatch('click');
   assert.equal(chipByLabel(h, first.label).classList.contains('chain-chip--expanded'), true);

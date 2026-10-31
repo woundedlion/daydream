@@ -391,7 +391,7 @@ test('palette and modulation probe reports a family whose controls fail to appea
           stages = [stages[1], stages[0], stages[2]];
           return;
         }
-        if (selector.includes('.chain-palette-entry')) {
+        if (selector.includes('.chain-band-add')) {
           stages.push({label: `stage${stages.length + 1}`, operator: 'color.modulate.v1'});
           return;
         }
