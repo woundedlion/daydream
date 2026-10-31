@@ -9,7 +9,7 @@ import { shaderWorkbenchUrl, start } from '../src/app/daydream.js';
 import { WORKBENCH_EFFECTS } from '../src/effects/effect_roster.js';
 import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
-import { scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
+import { documentFromChainSnapshot, scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
 import {
   decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash, migrateLegacyChainSnapshot,
 } from '../src/workbench/shader/shader_deeplink.js';
@@ -2706,24 +2706,63 @@ for (const route of ['link', 'query']) {
     const presetId = compiled.document.preset_bank.presets[0].preset_id;
     assert.equal(applyChainDocument({engine: legacy, module: MODULE, compiled, presetId,
       syncEffectGui() {}, invalidate() {}}), null);
-    const snapshot = callWorkbenchBinding(legacy, 'getSnapshot', [], null);
-    const clock = snapshot.runtime.find((entry) => entry.instance === 'colorize');
-    clock.state.oscillationPhase = 0.37;
-    snapshot.runtime.find((entry) => entry.instance === 'modulation').state.phaseTurns = 0.63;
+    const current = callWorkbenchBinding(legacy, 'getSnapshot', [], null);
+    const recipe = {...current.modulation.find(({instance}) => instance === 'modulation').recipe,
+      mechanic: {kind: 0, amount: 0.5}};
+    const snapshot = {
+      ...current, schemaVersion: 3,
+      chain: current.chain.filter(({operator}) => operator !== 'color.modulate.v1')
+        .map((entry) => entry.instance === 'colorize'
+          ? {...entry, operator: 'colorize.generated-palette.v3'} : entry),
+      modulation: [{instance: 'colorize', recipe}],
+      runtime: current.runtime.filter(({kind}) => kind !== 'modulation-clock-v1')
+        .map((entry) => entry.instance === 'colorize' ? {...entry, kind: 'color-clock-v2',
+          state: {oscillationPhase: 0.37,
+            modulation: {source: recipe.source, version: 1, phaseTurns: 0.63, initialized: true}}} : entry),
+      parameters: current.parameters.filter(({name}) => {
+        const field = name.split('.')[1];
+        return !name.startsWith('colorize.') || (!field.startsWith('gradient-')
+          && (!field.startsWith('palette-') || ['palette-mode', 'palette-mapping', 'palette-chroma'].includes(field)));
+      }).concat([{name: 'colorize.hue-shift-mode', value: 1},
+        {name: 'colorize.hue-shift-amount', value: -2}]),
+      animationsPaused: true,
+    };
     snapshot.paletteBank.chroma = 0.23;
-    snapshot.parameters = snapshot.parameters.filter(({name}) => {
-      const field = name.split('.')[1];
-      return !name.startsWith('colorize.') || (!field.startsWith('gradient-')
-        && (!field.startsWith('palette-') || ['palette-mode', 'palette-mapping', 'palette-chroma'].includes(field)));
-    });
-    snapshot.animationsPaused = true;
-    const hash = route === 'link' ? await encodeShaderStateHash({document: compiled.document,
-      preset: presetId, bypassed: [], paused: true, chainSnapshot: snapshot}) : '';
+    const linkDocument = documentFromChainSnapshot(snapshot, JSON.parse(ENGINE_CATALOG));
+    const payload = gzipSync(JSON.stringify({d: linkDocument,
+      p: linkDocument.preset_bank.presets[0].preset_id,
+      b: [], a: true, s: snapshot})).toString('base64url');
+    const hash = route === 'link' ? `#shader=v2.${payload}` : '';
     const search = route === 'query' ? `?fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(snapshot))}`
       : '?effect=ShaderChain';
-    const harness = await editorWorkbench({source: null, hash, search, pausedFromEngine: true});
+    const restores = [];
+    const harness = await editorWorkbench({source: null, hash, search, pausedFromEngine: true,
+      prepare: (target) => {
+        const bindings = target.getShaderChainBindings.bind(target);
+        target.getShaderChainBindings = () => {
+          const live = bindings();
+          if (!live) return live;
+          const restore = live.restoreSnapshot;
+          live.restoreSnapshot = (value) => {
+            restores.push(structuredClone(value));
+            return restore(value);
+          };
+          return live;
+        };
+      }});
+    if (route === 'query') {
+      assert.equal(restores.length, 1);
+      assert.equal(restores[0].schemaVersion, 4);
+      assert.ok(restores[0].chain.some(({operator}) => operator === 'color.modulate.v1'));
+      assert.equal(restores[0].runtime.find(({instance}) => instance === 'modulation').kind,
+        'modulation-clock-v1');
+      assert.equal(restores[0].runtime.find(({instance}) => instance === 'modulation').state.phaseTurns, 0.63);
+      assert.ok(restores[0].parameters.some(({name}) => name === 'colorize.palette-type'));
+      assert.ok(restores[0].parameters.some(({name}) => name === 'colorize.gradient-start-r'));
+    }
     const restored = callWorkbenchBinding(harness.engine, 'getSnapshot', [], null);
     assert.equal(restored.chain.at(-1).operator, 'color.modulate.v1', harness.elements.get('shader-document-status').textContent);
+    assert.equal(restored.runtime.find((entry) => entry.instance === 'modulation').kind, 'modulation-clock-v1');
     assert.equal(restored.runtime.find((entry) => entry.instance === 'modulation').state.phaseTurns, 0.63);
     assert.equal(restored.runtime.find((entry) => entry.instance === 'colorize').state.oscillationPhase, 0.37);
     assert.deepEqual(restored.paletteBank, snapshot.paletteBank);
