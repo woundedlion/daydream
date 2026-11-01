@@ -156,7 +156,7 @@ async function smokeTwistParameters(tab) {
     .textContent.startsWith('Twist parameter smoke'), { timeout: READY_TIMEOUT_MS });
   const chip = '.chain-chip[data-label="twist"]';
   await tab.click(`${chip} .chain-chip-header`);
-  const input = `${chip} [data-parameter="twist.twist-rate"] .chain-param-value`;
+  const input = `${chip} [data-parameter="twist.twist-angle"] .chain-param-value`;
   await tab.waitForSelector(input, { visible: true, timeout: READY_TIMEOUT_MS });
   const digest = await tab.$eval('#shader-document-digest', (element) => element.dataset.digest);
   await tab.$eval(input, (element) => {
@@ -166,7 +166,7 @@ async function smokeTwistParameters(tab) {
   await tab.waitForFunction(async () => {
     const { decodeShaderStateHash } = await import('../src/workbench/shader/shader_deeplink.js');
     const state = await decodeShaderStateHash(location.hash);
-    return state?.document.preset_bank.presets[0].values['twist.twist-rate'] === 2;
+    return state?.document.preset_bank.presets[0].values['twist.twist-angle'] === 2;
   }, { timeout: READY_TIMEOUT_MS });
   const error = await tab.$eval('#shader-document-status', (element) =>
     element.dataset.status === 'error' ? element.textContent : null);
