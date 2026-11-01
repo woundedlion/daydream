@@ -472,8 +472,10 @@ test('the fixed path skips the ids the compiled build bakes in as constants', ()
 
 // Ash Cloud carries a baked constant: AshCloud registers no Camera Spin Speed
 // because CAMERA_SPIN_RATE is a constant.
-test('the fixed apply skips the Ash Cloud baked topology and constant ids and writes the rest in document order', () => {
+test('the fixed apply writes Ash Cloud active controls in document order', () => {
   const ashCloud = promotedDocument(PROMOTED['ash-cloud']);
+  assert.equal(ashCloud.preset_bank.presets[0].values['modulate.modulation-source'], 'displacement');
+  const dormant = new Set(['modulate.pattern-scale', 'modulate.pattern-speed', 'modulate.pattern-contrast']);
   const ids = Object.keys(ashCloud.preset_bank.presets[0].values);
   const definitions = ids
     .filter((id) => !BAKED.has(id.slice(id.indexOf('.') + 1)))
@@ -491,9 +493,33 @@ test('the fixed apply skips the Ash Cloud baked topology and constant ids and wr
     engine, MODULE, { document: ashCloud }, 'ash-cloud', ['ash-cloud'], BAKED, fixedDerivedBinding), null);
   assert.equal(engine.writes.some(([name]) => name === 'Camera Spin Speed'), false);
   const expectedWrites = Object.entries(ashCloud.preset_bank.presets[0].values)
+    .filter(([id]) => !dormant.has(id))
     .map(([id, value]) => [primaryName(id, ashCloud.descriptor), typeof value === 'string' ? 0 : value])
     .filter(([name]) => definitions.some((definition) => definition.name === name));
   assert.deepEqual(engine.writes, expectedWrites);
+});
+
+test('the GridWorms compiled preset preserves dormant noise settings without noise controls', () => {
+  const document = promotedDocument(PROMOTED['grid-worms']);
+  const before = structuredClone(document);
+  const preset = document.preset_bank.presets[0];
+  assert.equal(preset.values['modulation.modulation-source'], 'directional-sine');
+  const dormant = new Set(['modulation.pattern-scale', 'modulation.pattern-speed']);
+  for (const id of dormant) assert.ok(Number.isFinite(preset.values[id]), id);
+  const definitions = Object.entries(preset.values)
+    .filter(([id]) => !dormant.has(id) && id !== 'sample.edge-width'
+      && !BAKED_CONSTANT_IDS.has(id) && !BAKED.has(id.slice(id.indexOf('.') + 1)))
+    .map(([id, value]) => ({name: primaryName(id, document.descriptor),
+      ...(typeof value === 'string' ? {options: [value], optionValues: [0]} : {})}));
+  assert.equal(definitions.some(({name}) => /^Pattern (Scale|Speed)$/.test(name)), false);
+  const engine = fixedEngine(() => true);
+  engine.getParameterDefinitions = () => definitions;
+  assert.equal(applyFixedShaderDocument(engine, MODULE, {document}, preset.preset_id,
+    [preset.preset_id], BAKED, fixedDerivedBinding), null);
+  assert.deepEqual(engine.writes.filter(([name]) => name.startsWith('Pattern ')), [['Pattern Frequency', 1]]);
+  assert.ok(engine.writes.some(([name, value]) => name === 'lens1.Twist Angle (rad)'
+    && value === preset.values['lens1.twist-angle']));
+  assert.deepEqual(document, before);
 });
 
 const derivedPeriodDocument = (period, scale = 2) => ({ document: {
