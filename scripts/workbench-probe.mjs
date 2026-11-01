@@ -4,7 +4,7 @@
  *
  *   node scripts/workbench-probe.mjs
  */
-import { boxOf, centre, checks, dragBetween, isMain, runProbe } from './probe_harness.mjs';
+import { boxOf, centre, checks, describeProbeFailure, dragBetween, isMain, runProbe } from './probe_harness.mjs';
 import { decodeShaderStateHash } from '../src/workbench/shader/shader_deeplink.js';
 
 const PAGE = 'tools/shader.html';
@@ -1114,6 +1114,7 @@ export async function runWorkbenchSections(open, sections = [
   const failures = [];
   for (const section of sections) {
     let tab;
+    let phase = 'navigation';
     let releaseCatalog = () => {};
     const catalogReady = new Promise((resolve) => { releaseCatalog = () => resolve(undefined); });
     let signalHeld = () => {};
@@ -1131,11 +1132,16 @@ export async function runWorkbenchSections(open, sections = [
           });
         }} : {}),
       });
+      phase = 'engine overlay';
       await tab.waitForFunction(() => !document.getElementById('loading-overlay'));
-      if (section !== probeStartupPersistence) await tab.waitForSelector('.chain-chip');
+      if (section !== probeStartupPersistence) {
+        phase = 'document chips';
+        await tab.waitForSelector('.chain-chip');
+      }
+      phase = 'interaction';
       failures.push(...await (section === probeStartupPersistence ? section(tab, releaseCatalog, heldCatalog) : section(tab)));
     } catch (error) {
-      failures.push(`${section.name}: ${error instanceof Error ? error.message : error}`);
+      failures.push(`${section.name}: ${await describeProbeFailure(tab, phase, error)}`);
     } finally {
       releaseCatalog();
       if (tab) {

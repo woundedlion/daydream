@@ -19,6 +19,52 @@ import { serveStagedSite } from './vendor-stage.mjs';
 const reason = (error) => (error instanceof Error ? error.message : String(error));
 
 /**
+ * Reports the failed phase and a bounded snapshot of the page.
+ * @param {import('puppeteer-core').Page|undefined} tab
+ * @param {string} phase
+ * @param {unknown} error
+ * @returns {Promise<string>}
+ */
+export async function describeProbeFailure(tab, phase, error) {
+  let timer;
+  let state;
+  try {
+    if (!tab) throw new Error('page was not opened');
+    state = await Promise.race([
+      tab.evaluate(() => {
+        const text = (id) => document.getElementById(id)?.textContent?.slice(0, 240) ?? null;
+        return {
+          path: location.pathname,
+          ready: document.readyState,
+          visibility: document.visibilityState,
+          focused: document.hasFocus(),
+          overlay: text('loading-overlay'),
+          status: text('shader-document-status'),
+          statusKind: document.getElementById('shader-document-status')?.dataset.status ?? null,
+          error: text('shader-document-error'),
+          chips: [...document.querySelectorAll('.chain-chip')].slice(0, 16)
+            .map((chip) => chip.dataset.label),
+          undoDisabled: document.querySelector('.chain-undo')?.disabled ?? null,
+          hash: location.hash.slice(0, 24),
+          hashLength: location.hash.length,
+          draws: window.daydreamSmokeDraws ?? null,
+          glDraws: window.daydreamSmokeGlDraws ?? null,
+          glPixels: window.daydreamSmokeGlPixels ?? null,
+        };
+      }),
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve('page state timed out after 1000ms'), 1000);
+      }),
+    ]);
+  } catch (captureError) {
+    state = `page state unavailable: ${reason(captureError).slice(0, 240)}`;
+  } finally {
+    clearTimeout(timer);
+  }
+  return `${phase}: ${reason(error)}; state=${JSON.stringify(state)}`;
+}
+
+/**
  * @param {string} url - The calling module's import.meta.url.
  * @returns {boolean} Whether node was pointed at that module.
  * @details A probe is a script and a module at once: run directly it drives a

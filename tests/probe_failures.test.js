@@ -1,4 +1,4 @@
-import { closeProbeResources, checks, isMain, measureChecks } from '../scripts/probe_harness.mjs';
+import { closeProbeResources, checks, describeProbeFailure, isMain, measureChecks } from '../scripts/probe_harness.mjs';
 import { encodeShaderStateHash } from '../src/workbench/shader/shader_deeplink.js';
 import { feedbackAtClick, probeColorStrip, probeHueWheel, rgbMovedTogether } from '../scripts/palettes-probe.mjs';
 import { readdirSync, readFileSync, symlinkSync } from 'node:fs';
@@ -20,6 +20,7 @@ import {
 import { probeChain, probeNumericInputs } from '../scripts/solids-probe.mjs';
 import { probePad } from '../scripts/mobius-probe.mjs';
 import { scratchDir } from './helpers/fixture_repo.js';
+import { stashGlobals } from './helpers/fake_dom.js';
 
 const PROBES = [
   ['workbench-probe.mjs', 'probeColorStageDrag', probeColorStageDrag],
@@ -97,6 +98,74 @@ test('checks() keeps the misses and drops the passes', () => {
   check(false, 'a miss is kept verbatim');
   check(false, 'and so is the next one');
   assert.deepEqual(failures, ['a miss is kept verbatim', 'and so is the next one']);
+});
+
+test('probe diagnostics retain the failure phase and compact page state', async (t) => {
+  t.after(stashGlobals('document', 'location', 'window'));
+  const elements = new Map([
+    ['loading-overlay', {textContent: 'Loading engine'}],
+    ['shader-document-status', {textContent: 'Source catalog failed', dataset: {status: 'error'}}],
+    ['shader-document-error', {textContent: 'x'.repeat(400)}],
+  ]);
+  Object.assign(globalThis, {
+    document: {
+      readyState: 'complete', visibilityState: 'hidden', hasFocus: () => false,
+      getElementById: (id) => elements.get(id),
+      querySelectorAll: () => Array.from({length: 20}, (_, index) => ({dataset: {label: `stage${index}`}})),
+      querySelector: () => ({disabled: true}),
+    },
+    location: {pathname: '/tools/shader.html', hash: '#shader=v2.' + 'a'.repeat(500)},
+    window: {daydreamSmokeDraws: 2, daydreamSmokeGlDraws: 1, daydreamSmokeGlPixels: false},
+  });
+  const tab = {evaluate: async (capture) => capture()};
+  const message = await describeProbeFailure(tab, 'document chips', new Error('Waiting failed: 90000ms'));
+  assert.match(message, /^document chips: Waiting failed: 90000ms; state=/);
+  const state = JSON.parse(message.split('; state=')[1]);
+  assert.equal(state.path, '/tools/shader.html');
+  assert.equal(state.visibility, 'hidden');
+  assert.equal(state.overlay, 'Loading engine');
+  assert.equal(state.statusKind, 'error');
+  assert.equal(state.error.length, 240);
+  assert.equal(state.chips.length, 16);
+  assert.equal(state.undoDisabled, true);
+  assert.equal(state.hash.length, 24);
+  assert.equal(state.hashLength, 511);
+  assert.equal(state.draws, 2);
+  assert.equal(state.glPixels, false);
+});
+
+test('probe diagnostics preserve the original failure when page capture rejects', async () => {
+  const tab = {evaluate: async () => {throw new Error('Target closed');}};
+  assert.match(await describeProbeFailure(tab, 'Twist angle undo digest', 'Waiting failed'),
+    /Twist angle undo digest: Waiting failed; state="page state unavailable: Target closed"/);
+});
+
+test('probe diagnostics handle a page with no mounted controls or draw probe', async (t) => {
+  t.after(stashGlobals('document', 'location', 'window'));
+  Object.assign(globalThis, {
+    document: {
+      readyState: 'loading', visibilityState: 'visible', hasFocus: () => true,
+      getElementById: () => null, querySelectorAll: () => [], querySelector: () => null,
+    },
+    location: {pathname: '/tools/shader.html', hash: ''}, window: {},
+  });
+  const message = await describeProbeFailure({evaluate: async (capture) => capture()},
+    'engine overlay', new Error('Waiting failed'));
+  const state = JSON.parse(message.split('; state=')[1]);
+  assert.equal(state.ready, 'loading');
+  for (const key of ['overlay', 'status', 'statusKind', 'error', 'undoDisabled', 'draws', 'glDraws', 'glPixels'])
+    assert.equal(state[key], null, key);
+  assert.deepEqual(state.chips, []);
+  assert.match(await describeProbeFailure(undefined, 'navigation', 'Navigation failed'),
+    /navigation: Navigation failed; state="page state unavailable: page was not opened"/);
+});
+
+test('probe diagnostics finish when the renderer does not answer', async (t) => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  const tab = {evaluate: () => new Promise(() => {})};
+  const pending = describeProbeFailure(tab, 'canvas draw', new Error('Waiting failed'));
+  t.mock.timers.tick(1000);
+  assert.match(await pending, /canvas draw: Waiting failed; state="page state timed out after 1000ms"/);
 });
 
 test('the solids probe rejects an incomplete operation chain', async () => {
@@ -318,9 +387,27 @@ test('workbench sections continue after interaction and close failures', async (
   assert.deepEqual(visited, ['first', 'second']);
   assert.equal(closed, 2);
   assert.equal(failures.length, 3);
-  assert.match(failures[0], /first: timed out/);
+  assert.match(failures[0], /first: interaction: timed out/);
   assert.match(failures[1], /first close:.*close failed/);
   assert.equal(failures[2], 'assertion failed');
+});
+
+test('workbench readiness failures identify overlay and document stages before interactions', async () => {
+  for (const phase of ['engine overlay', 'document chips']) {
+    let interacted = false;
+    let closed = false;
+    const fail = async () => {throw new Error('Waiting failed');};
+    const failures = await runWorkbenchSections(async () => ({
+      waitForFunction: phase === 'engine overlay' ? fail : async () => {},
+      waitForSelector: fail,
+      evaluate: async () => ({overlay: phase === 'engine overlay' ? 'Loading' : null}),
+      close: async () => {closed = true;},
+    }), [async function documentActions() {interacted = true; return [];}]);
+    assert.equal(interacted, false);
+    assert.equal(closed, true);
+    assert.equal(failures.length, 1);
+    assert.match(failures[0], new RegExp(`documentActions: ${phase}: Waiting failed; state=`));
+  }
 });
 
 test('workbench startup holds only the catalog request and releases it before teardown', async () => {

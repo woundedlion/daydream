@@ -11,7 +11,7 @@ import puppeteer from 'puppeteer-core';
 
 import { servedPages } from './site-pages.mjs';
 import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
-import { collectProblems, closeProbeResources } from './probe_harness.mjs';
+import { collectProblems, closeProbeResources, describeProbeFailure } from './probe_harness.mjs';
 import { serveStagedSite } from './vendor-stage.mjs';
 
 const VIEWPORT = { width: 1280, height: 900 };
@@ -127,8 +127,9 @@ function installSegmentProbe() {
   };
 }
 
-/** @param {import('puppeteer-core').Page} tab */
-async function smokeTwistParameters(tab) {
+/** @param {import('puppeteer-core').Page} tab @param {(phase: string) => void} setPhase */
+async function smokeTwistParameters(tab, setPhase) {
+  setPhase('Twist document import');
   await tab.evaluate(async () => {
     const { scratchChainDocument } = await import('../src/workbench/shader/chain_document_store.js');
     const catalog = await (await fetch('../generated/shader/engine_catalog.json')).json();
@@ -154,6 +155,7 @@ async function smokeTwistParameters(tab) {
   });
   await tab.waitForFunction(() => document.getElementById('shader-document-status')
     .textContent.startsWith('Twist parameter smoke'), { timeout: READY_TIMEOUT_MS });
+  setPhase('Twist angle control');
   const chip = '.chain-chip[data-label="twist"]';
   await tab.click(`${chip} .chain-chip-header`);
   const input = `${chip} [data-parameter="twist.twist-angle"] .chain-param-value`;
@@ -163,6 +165,7 @@ async function smokeTwistParameters(tab) {
     element.value = '2';
     element.dispatchEvent(new Event('change', { bubbles: true }));
   });
+  setPhase('Twist angle edit hash');
   await tab.waitForFunction(async () => {
     const { decodeShaderStateHash } = await import('../src/workbench/shader/shader_deeplink.js');
     const state = await decodeShaderStateHash(location.hash);
@@ -171,6 +174,7 @@ async function smokeTwistParameters(tab) {
   const error = await tab.$eval('#shader-document-status', (element) =>
     element.dataset.status === 'error' ? element.textContent : null);
   if (error) throw new Error(error);
+  setPhase('Twist angle undo digest');
   await tab.click('.chain-undo');
   await tab.waitForFunction((before) =>
     document.getElementById('shader-document-digest').dataset.digest === before,
@@ -192,13 +196,17 @@ async function smokePage(browser, origin, page) {
   collectProblems(tab, origin, problems);
 
   await tab.evaluateOnNewDocument(installDrawProbe);
+  let phase = 'navigation';
   try {
     await tab.goto(`${origin}/${page}`, { timeout: LOAD_TIMEOUT_MS });
     const ready = PAGE_READY[page];
+    phase = 'page readiness';
     if (ready) await tab.waitForFunction(ready, { timeout: READY_TIMEOUT_MS });
+    phase = 'canvas draw';
     await tab.waitForFunction(
       () => window.daydreamSmokeDraws > 0, { timeout: READY_TIMEOUT_MS });
     if (page !== 'tools/palettes.html') {
+      phase = 'WebGL pixels';
       await tab.waitForFunction(() => window.daydreamSmokeGlDraws > 0 &&
         window.daydreamSmokeGlPixels, { timeout: READY_TIMEOUT_MS });
     }
@@ -211,8 +219,9 @@ async function smokePage(browser, origin, page) {
           `${NETWORK_IDLE_TIMEOUT_MS}ms`);
     }
     const draws = await tab.evaluate(() => window.daydreamSmokeDraws);
-    if (page === 'tools/shader.html') await smokeTwistParameters(tab);
+    if (page === 'tools/shader.html') await smokeTwistParameters(tab, (value) => { phase = value; });
     if (page === 'index.html') {
+      phase = 'canvas recording';
       await tab.evaluate(async () => {
         const { selectMimeType } = await import('./src/recording/recorder.js');
         const canvas = document.createElement('canvas');
@@ -250,7 +259,7 @@ async function smokePage(browser, origin, page) {
     }
     console.log(`  ${page}: ${draws} draw calls`);
   } catch (error) {
-    problems.push(error instanceof Error ? error.message : String(error));
+    problems.push(await describeProbeFailure(tab, phase, error));
   }
   await tab.close();
   return problems;
@@ -273,11 +282,15 @@ async function smokeSegmentedMode(browser, origin) {
   const url = new URL(`${origin}/index.html`);
   url.searchParams.set('view.Segmented POV.segmented', 'true');
   url.searchParams.set('view.Segmented POV.segments', '2');
+  let phase = 'navigation';
   try {
     await tab.goto(url.href, { timeout: LOAD_TIMEOUT_MS });
+    phase = 'engine overlay';
     await tab.waitForFunction(enginePainted, { timeout: READY_TIMEOUT_MS });
+    phase = 'WebGL pixels';
     await tab.waitForFunction(() => window.daydreamSmokeGlDraws > 0 &&
       window.daydreamSmokeGlPixels, { timeout: READY_TIMEOUT_MS });
+    phase = 'segmented worker telemetry';
     await tab.waitForFunction(() => {
       const overlay = document.getElementById('segment-stats');
       if (!overlay) return false;
@@ -295,7 +308,7 @@ async function smokeSegmentedMode(browser, origin) {
     console.log(`  index.html segmented: ${probe.modulePosts} module clones, `
       + `${probe.transferPosts} transferable posts`);
   } catch (error) {
-    problems.push(error instanceof Error ? error.message : String(error));
+    problems.push(await describeProbeFailure(tab, phase, error));
   }
   await tab.close();
   return problems;
