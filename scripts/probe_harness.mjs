@@ -17,6 +17,7 @@ import { serveStagedSite } from './vendor-stage.mjs';
  * @returns {string} Its message.
  */
 const reason = (error) => (error instanceof Error ? error.message : String(error));
+const pendingRequests = new WeakMap();
 
 /**
  * Reports the failed phase and a bounded snapshot of the page.
@@ -42,6 +43,11 @@ export async function describeProbeFailure(tab, phase, error) {
           status: text('shader-document-status'),
           statusKind: document.getElementById('shader-document-status')?.dataset.status ?? null,
           error: text('shader-document-error'),
+          guiChildren: document.getElementById('gui-container')?.children.length ?? 0,
+          globalGuiChildren: document.querySelector('.global-gui')?.children.length ?? 0,
+          canvases: [...document.querySelectorAll('canvas')].slice(0, 4)
+            .map((canvas) => ({width: canvas.width, height: canvas.height,
+              clientWidth: canvas.clientWidth, clientHeight: canvas.clientHeight})),
           chips: [...document.querySelectorAll('.chain-chip')].slice(0, 16)
             .map((chip) => chip.dataset.label),
           undoDisabled: document.querySelector('.chain-undo')?.disabled ?? null,
@@ -50,6 +56,10 @@ export async function describeProbeFailure(tab, phase, error) {
           draws: window.daydreamSmokeDraws ?? null,
           glDraws: window.daydreamSmokeGlDraws ?? null,
           glPixels: window.daydreamSmokeGlPixels ?? null,
+          resources: performance.getEntriesByType('resource').slice(-20)
+            .map((entry) => ({path: new URL(entry.name).pathname.slice(0, 160),
+              duration: Math.round(entry.duration), transfer: entry.transferSize,
+              type: entry.initiatorType})),
         };
       }),
       new Promise((resolve) => {
@@ -61,7 +71,9 @@ export async function describeProbeFailure(tab, phase, error) {
   } finally {
     clearTimeout(timer);
   }
-  return `${phase}: ${reason(error)}; state=${JSON.stringify(state)}`;
+  const snapshot = typeof state === 'object' ? state : {capture: state};
+  snapshot.pendingRequests = [...(pendingRequests.get(tab)?.values() ?? [])].slice(0, 20);
+  return `${phase}: ${reason(error)}; state=${JSON.stringify(snapshot)}`;
 }
 
 /**
@@ -225,6 +237,12 @@ const ABSENT_ORIGINS = new Set([
  */
 export function collectProblems(tab, origin, problems) {
   const base = new URL(origin.endsWith('/') ? origin : `${origin}/`);
+  const pending = new Map();
+  pendingRequests.set(tab, pending);
+  tab.on('request', (request) => {
+    pending.set(request, new URL(request.url(), base).pathname.slice(0, 160));
+  });
+  tab.on('requestfinished', (request) => pending.delete(request));
   const absentPaths = new Set([
     '/favicon.ico', ...ABSENT_PATHS.map((path) => new URL(path, base).pathname),
   ]);
@@ -241,6 +259,7 @@ export function collectProblems(tab, origin, problems) {
   });
   tab.on('pageerror', (error) => problems.push(`uncaught: ${error.message}`));
   tab.on('requestfailed', (request) => {
+    pending.delete(request);
     if (absent(request.url())) return;
     problems.push(`request failed: ${request.url()} (${request.failure()?.errorText})`);
   });

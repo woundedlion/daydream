@@ -110,7 +110,7 @@ test('console errors, uncaught exceptions and error responses are problems', () 
   const origin = 'http://127.0.0.1:8000';
   collectProblems(tab, origin, problems);
   assert.deepEqual([...listeners.keys()].sort(),
-    ['console', 'pageerror', 'requestfailed', 'response']);
+    ['console', 'pageerror', 'request', 'requestfailed', 'requestfinished', 'response']);
 
   const message = (type, text, url) =>
     ({ type: () => type, text: () => text, location: () => url && { url } });

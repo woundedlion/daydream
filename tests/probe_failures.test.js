@@ -1,4 +1,4 @@
-import { closeProbeResources, checks, describeProbeFailure, isMain, measureChecks } from '../scripts/probe_harness.mjs';
+import { closeProbeResources, checks, collectProblems, describeProbeFailure, isMain, measureChecks } from '../scripts/probe_harness.mjs';
 import { encodeShaderStateHash } from '../src/workbench/shader/shader_deeplink.js';
 import { feedbackAtClick, probeColorStrip, probeHueWheel, rgbMovedTogether } from '../scripts/palettes-probe.mjs';
 import { readdirSync, readFileSync, symlinkSync } from 'node:fs';
@@ -101,21 +101,28 @@ test('checks() keeps the misses and drops the passes', () => {
 });
 
 test('probe diagnostics retain the failure phase and compact page state', async (t) => {
-  t.after(stashGlobals('document', 'location', 'window'));
+  t.after(stashGlobals('document', 'location', 'window', 'performance'));
   const elements = new Map([
     ['loading-overlay', {textContent: 'Loading engine'}],
     ['shader-document-status', {textContent: 'Source catalog failed', dataset: {status: 'error'}}],
     ['shader-document-error', {textContent: 'x'.repeat(400)}],
+    ['gui-container', {children: [{}]}],
   ]);
   Object.assign(globalThis, {
     document: {
       readyState: 'complete', visibilityState: 'hidden', hasFocus: () => false,
       getElementById: (id) => elements.get(id),
-      querySelectorAll: () => Array.from({length: 20}, (_, index) => ({dataset: {label: `stage${index}`}})),
-      querySelector: () => ({disabled: true}),
+      querySelectorAll: (selector) => selector === 'canvas'
+        ? [{width: 960, height: 540, clientWidth: 480, clientHeight: 270}]
+        : Array.from({length: 20}, (_, index) => ({dataset: {label: `stage${index}`}})),
+      querySelector: (selector) => selector === '.global-gui' ? {children: [{}, {}]} : {disabled: true},
     },
     location: {pathname: '/tools/shader.html', hash: '#shader=v2.' + 'a'.repeat(500)},
     window: {daydreamSmokeDraws: 2, daydreamSmokeGlDraws: 1, daydreamSmokeGlPixels: false},
+    performance: {getEntriesByType: () => Array.from({length: 24}, (_, index) => ({
+      name: `http://localhost/generated/module${index}.js?hash=secret#fragment`,
+      duration: 3.6, transferSize: 120, initiatorType: 'script',
+    }))},
   });
   const tab = {evaluate: async (capture) => capture()};
   const message = await describeProbeFailure(tab, 'document chips', new Error('Waiting failed: 90000ms'));
@@ -132,12 +139,18 @@ test('probe diagnostics retain the failure phase and compact page state', async 
   assert.equal(state.hashLength, 511);
   assert.equal(state.draws, 2);
   assert.equal(state.glPixels, false);
+  assert.equal(state.guiChildren, 1);
+  assert.equal(state.globalGuiChildren, 2);
+  assert.deepEqual(state.canvases, [{width: 960, height: 540, clientWidth: 480, clientHeight: 270}]);
+  assert.equal(state.resources.length, 20);
+  assert.deepEqual(state.resources[0], {path: '/generated/module4.js', duration: 4, transfer: 120, type: 'script'});
+  assert.doesNotMatch(message, /secret|localhost/);
 });
 
 test('probe diagnostics preserve the original failure when page capture rejects', async () => {
   const tab = {evaluate: async () => {throw new Error('Target closed');}};
   assert.match(await describeProbeFailure(tab, 'Twist angle undo digest', 'Waiting failed'),
-    /Twist angle undo digest: Waiting failed; state="page state unavailable: Target closed"/);
+    /Twist angle undo digest: Waiting failed; state=\{"capture":"page state unavailable: Target closed"/);
 });
 
 test('probe diagnostics handle a page with no mounted controls or draw probe', async (t) => {
@@ -157,7 +170,7 @@ test('probe diagnostics handle a page with no mounted controls or draw probe', a
     assert.equal(state[key], null, key);
   assert.deepEqual(state.chips, []);
   assert.match(await describeProbeFailure(undefined, 'navigation', 'Navigation failed'),
-    /navigation: Navigation failed; state="page state unavailable: page was not opened"/);
+    /navigation: Navigation failed; state=\{"capture":"page state unavailable: page was not opened"/);
 });
 
 test('probe diagnostics finish when the renderer does not answer', async (t) => {
@@ -165,7 +178,32 @@ test('probe diagnostics finish when the renderer does not answer', async (t) => 
   const tab = {evaluate: () => new Promise(() => {})};
   const pending = describeProbeFailure(tab, 'canvas draw', new Error('Waiting failed'));
   t.mock.timers.tick(1000);
-  assert.match(await pending, /canvas draw: Waiting failed; state="page state timed out after 1000ms"/);
+  assert.match(await pending, /canvas draw: Waiting failed; state=\{"capture":"page state timed out after 1000ms"/);
+});
+
+test('probe diagnostics track pending requests by identity and clear completed and failed requests', async () => {
+  const listeners = new Map();
+  const tab = {on: (name, handler) => listeners.set(name, handler), evaluate: async () => ({})};
+  const problems = [];
+  collectProblems(tab, 'http://localhost/daydream', problems);
+  const request = () => ({url: () => 'http://localhost/daydream/app.js?token=secret',
+    failure: () => ({errorText: 'aborted'})});
+  const first = request();
+  const second = request();
+  listeners.get('request')(first);
+  listeners.get('request')(second);
+  listeners.get('requestfinished')(first);
+  const state = async () => JSON.parse((await describeProbeFailure(tab, 'engine overlay', 'Waiting failed'))
+    .split('; state=')[1]);
+  assert.deepEqual((await state()).pendingRequests, ['/daydream/app.js']);
+  listeners.get('requestfailed')(second);
+  assert.deepEqual((await state()).pendingRequests, []);
+  assert.equal(problems.length, 1);
+  for (let index = 0; index < 24; index++) listeners.get('request')(request());
+  assert.equal((await state()).pendingRequests.length, 20);
+  const other = {evaluate: async () => ({})};
+  assert.deepEqual(JSON.parse((await describeProbeFailure(other, 'engine overlay', 'Waiting failed'))
+    .split('; state=')[1]).pendingRequests, []);
 });
 
 test('the solids probe rejects an incomplete operation chain', async () => {
