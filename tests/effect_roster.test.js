@@ -24,6 +24,14 @@ test('unknown resolutions use the high-resolution favorites', (t) => {
   assert.equal(messages.length, 1);
 });
 
+test('GridWorms is offered at both display resolutions', () => {
+  for (const resolution of ['Holosphere (96x20)', 'Phantasm (288x144)']) {
+    const favorites = favoritesFor(resolution);
+    assert.ok(favorites.includes('GridWorms'), resolution);
+    assert.equal(resolveActiveEffect(favorites, 'GridWorms'), 'GridWorms');
+  }
+});
+
 const RESO_EFFECTS = ['Voronoi', 'Comets', 'MobiusGrid'];
 
 test('resolveActiveEffect keeps an effect the resolution offers', () => {
