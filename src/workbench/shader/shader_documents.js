@@ -86,12 +86,13 @@ function writeEngineValue(engine, module, definitions, name, value) {
  * @param {string} parameterId
  * @param {ParameterDefinition[]} definitions
  * @param {Set<string>} baked
+ * @param {*} descriptor
  * @returns {{name: string|null, refusal: string|null}} Compiled control or refusal.
  */
-function compiledControlFor(parameterId, definitions, baked) {
+function compiledControlFor(parameterId, definitions, baked, descriptor) {
   if (BAKED_CONSTANT_IDS.has(parameterId) || baked.has(fieldSegment(parameterId)))
     return { name: null, refusal: null };
-  const name = engineControlNames(parameterId)
+  const name = engineControlNames(parameterId, descriptor)
     .find((candidate) => definitions.some((definition) => definition.name === candidate));
   return name ? { name, refusal: null }
     : { name: null, refusal: `no engine parameter matches "${parameterId}"` };
@@ -114,7 +115,7 @@ function applyDocumentValues(engine, module, compiled, presetId, baked, derived)
   const writes = [];
   for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
     if (derived.has(parameterId)) continue;
-    const { name, refusal } = compiledControlFor(parameterId, definitions, baked);
+    const { name, refusal } = compiledControlFor(parameterId, definitions, baked, compiled.document.descriptor);
     if (refusal) return refusal;
     if (name === null) continue;
     const write = resolveParameterWrite(definitions, name, value);
@@ -449,7 +450,7 @@ export function createShaderDocumentController({
       return { name: chainUi?.store.bypassedLabels().includes(label) ? null : parameterId,
         refusal: null };
     }
-    return compiledControlFor(parameterId, definitions, bakedFields);
+    return compiledControlFor(parameterId, definitions, bakedFields, active.compiled.document.descriptor);
   };
 
   /** @param {string} parameterId @returns {boolean} */

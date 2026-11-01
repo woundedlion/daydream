@@ -27,7 +27,7 @@ import {
   restoreDocumentAfterEach,
 } from './helpers/fake_dom.js';
 
-const primaryName = (id) => engineControlNames(id)[0];
+const primaryName = (id, descriptor) => engineControlNames(id, descriptor)[0];
 
 const ownedEditors = new Set();
 afterEach(async () => {
@@ -479,7 +479,7 @@ test('the fixed apply skips the Ash Cloud baked topology and constant ids and wr
     .filter((id) => !BAKED.has(id.slice(id.indexOf('.') + 1)))
     .map((id) => {
       const value = ashCloud.preset_bank.presets[0].values[id];
-      return {name: primaryName(id), ...(typeof value === 'string'
+      return {name: primaryName(id, ashCloud.descriptor), ...(typeof value === 'string'
         ? {options: [value], optionValues: [0]} : {})};
     })
     .filter((definition) => definition.name !== 'Camera Spin Speed');
@@ -491,7 +491,7 @@ test('the fixed apply skips the Ash Cloud baked topology and constant ids and wr
     engine, MODULE, { document: ashCloud }, 'ash-cloud', ['ash-cloud'], BAKED, fixedDerivedBinding), null);
   assert.equal(engine.writes.some(([name]) => name === 'Camera Spin Speed'), false);
   const expectedWrites = Object.entries(ashCloud.preset_bank.presets[0].values)
-    .map(([id, value]) => [primaryName(id), typeof value === 'string' ? 0 : value])
+    .map(([id, value]) => [primaryName(id, ashCloud.descriptor), typeof value === 'string' ? 0 : value])
     .filter(([name]) => definitions.some((definition) => definition.name === name));
   assert.deepEqual(engine.writes, expectedWrites);
 });
@@ -1163,8 +1163,9 @@ const HEX_PATTERN_CATALOG = JSON.stringify({
  * @returns {Object} The engine.
  */
 function compiledBuildEngine(source = KALEIDOSCOPE_HEX_BRIGHT) {
-  const definitions = JSON.parse(source).descriptor.parameters.map((parameter) => ({
-    name: primaryName(parameter.id),
+  const document = JSON.parse(source);
+  const definitions = document.descriptor.parameters.map((parameter) => ({
+    name: primaryName(parameter.id, document.descriptor),
     ...(parameter.storage === 'enum8' ? { options: [...parameter.domain.values] } : {}),
   }));
   const selected = [];
@@ -1825,6 +1826,31 @@ test('compiled stage edits reach stages bypassed in the interpreter', async () =
   harness.compiledEngine.writes.length = 0;
   stageEditor(harness, 'warp2')('warp2.speed', 0.01);
   assert.deepEqual(harness.compiledEngine.writes, [['Planar Warp 2 Speed', 0.01]]);
+});
+
+test('compiled Twist stage edits resolve an arbitrary instance label', async () => {
+  const document = scratchChainDocument(JSON.parse(ENGINE_CATALOG), [
+    {label: 'whorl', operator: 'sphere.lens.twist.v2'}, ...SCRATCH.descriptor.chain,
+  ]);
+  const source = JSON.stringify(document);
+  const harness = await editorWorkbench({source, sourceFiles: {'twist_study.shader.json': source},
+    patternCatalog: JSON.stringify({source_documents: {'twist-study': 'twist_study.shader.json'},
+      product_group: {children: [{effect_id: 'twist-study', display_name: 'Twist Study'}]}})});
+  const toggle = harness.elements.get('shader-parity-toggle');
+  assert.equal(toggle.disabled, false);
+  toggle.dispatch('click');
+  assert.equal(toggle.getAttribute('aria-pressed'), 'true');
+  harness.compiledEngine.writes.length = 0;
+  const edit = stageEditor(harness, 'whorl');
+  edit('whorl.twist-angle', 7.25);
+  edit('whorl.twist-distribution', 0.625);
+  edit('whorl.speed', 0.035);
+  edit('whorl.drift', 0.006);
+  assert.deepEqual(harness.compiledEngine.writes, [
+    ['whorl.Twist Angle (rad)', 7.25], ['whorl.Twist Distribution', 0.625],
+    ['whorl.Speed', 0.035], ['whorl.Drift', 0.006],
+  ]);
+  assert.equal(savedValues(harness)['whorl.twist-angle'], 7.25);
 });
 
 test('a compiled edit refuses an unregistered control', async () => {
@@ -2700,6 +2726,26 @@ test('fixed apply resolves a registered secondary compiled control name', () => 
   assert.equal(applyFixedShaderDocument(engine, MODULE, compiled, 'noon', ['noon'],
     BAKED, fixedDerivedBinding), null);
   assert.deepEqual(engine.writes, [['Affine Scale X', 2.5]]);
+});
+
+test('fixed Twist presets use descriptor resource identities for arbitrary labels', () => {
+  for (const [label, resource, prefix] of [
+    ['lens', undefined, ''], ['whorl', undefined, 'whorl.'], ['whorl', 'lens', ''],
+    ['whorl', 'coil', 'coil.'],
+  ]) {
+    const fields = [['twist-angle', 'Twist Angle (rad)', 7.25],
+      ['twist-distribution', 'Twist Distribution', 0.625], ['speed', 'Speed', 0.035], ['drift', 'Drift', 0.006]];
+    const engine = fixedEngine(() => true);
+    engine.getParameterDefinitions = () => fields.map(([, name]) => ({name: prefix + name}));
+    const compiled = fixedDocument();
+    compiled.document.descriptor = {chain: [{label, operator: 'sphere.lens.twist.v2',
+      ...(resource ? {resource_key: resource} : {})}]};
+    compiled.document.preset_bank.presets[0].values = Object.fromEntries(
+      fields.map(([field, , value]) => [`${label}.${field}`, value]));
+    assert.equal(applyFixedShaderDocument(engine, MODULE, compiled, 'noon', ['noon'],
+      BAKED, fixedDerivedBinding), null);
+    assert.deepEqual(engine.writes, fields.map(([, name, value]) => [prefix + name, value]));
+  }
 });
 
 for (const failure of ['editor', 'runtime']) {
