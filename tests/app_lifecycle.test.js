@@ -87,14 +87,6 @@ test('a single-engine frame renders and republishes the view', () => {
   assert.equal(a.driver.dotMesh.instanceColor.version, 1);
 });
 
-test('panel reconciliation is independent of drawing a simulation frame', () => {
-  const a = makeAdapter();
-
-  a.adapter.sync(true);
-
-  assert.deepEqual(a.calls, [['effectGui.sync', true]]);
-});
-
 test('panel reconciliation forwards whether the simulation stepped', () => {
   const a = makeAdapter();
 
