@@ -181,7 +181,7 @@ export function createChainPresentation({ catalog, chain: readChain, legalSequen
    * Decomposes the chain into its editable carrier bands: each band's gap range
    * is the chain indices whose carrier is that band's, and the crossing that
    * leaves the band sits after it. The catalog's terminal carrier is the output
-   * type and has no band.
+   * type and has a band only when the catalog declares an endomorphism on it.
    * @returns {BandLayout[]} One entry per editable carrier the chain stops in,
    *   in catalog order; a carrier it passes over has no band.
    */
