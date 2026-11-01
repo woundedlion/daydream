@@ -21,7 +21,7 @@
     "branches": 81.48
   },
   "src/workbench/shader/shader_documents.js": {
-    "reason": "Halt paths are covered by shader_documents.test.js. Remaining gaps include default browser fetch/download callbacks, missing catalog selections, and optional UI mounts; these are partial unit coverage, not a claim that they are unreachable.",
+    "reason": "Halt paths are covered by shader_documents.test.js. Remaining gaps include the default browser download callback, missing catalog selections, and optional UI mounts; these are partial unit coverage, not a claim that they are unreachable.",
     "branches": 83.7
   },
   "src/ui/effect_panel_view.js": {
