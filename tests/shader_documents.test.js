@@ -668,11 +668,11 @@ function workbenchMounts() {
  * @param {string} [patternCatalog] - The pattern catalog.
  * @returns {(url: string) => Promise<string>} The router.
  */
-function patternFetch(files, patternCatalog = PATTERN_CATALOG) {
+function patternFetch(files, patternCatalog = PATTERN_CATALOG, engineCatalog = ENGINE_CATALOG) {
   return async (url) => {
     const name = String(url).split('/').pop();
     if (name === 'catalog.json') return patternCatalog;
-    if (name === 'engine_catalog.json') return ENGINE_CATALOG;
+    if (name === 'engine_catalog.json') return engineCatalog;
     const source = files[name];
     if (source === undefined) throw new Error(`404 ${name}`);
     return source;
@@ -1194,6 +1194,7 @@ function compiledBuildEngine(source = KALEIDOSCOPE_HEX_BRIGHT) {
  */
 async function editorWorkbench({
   source = KALEIDOSCOPE_HEX_BRIGHT, sourceFiles = {}, patternCatalog = EMPTY_PATTERN_CATALOG, hash = '', search = '?effect=ShaderChain', initialEffect = null, paused = false,
+  engineCatalog = ENGINE_CATALOG,
   selectEffect = () => true,
   onOriginalLinkReleased = () => {},
   pausedFromEngine = false,
@@ -1201,6 +1202,9 @@ async function editorWorkbench({
   importCompiler = () => import('../generated/shader/shader_workbench.mjs'),
 } = {}) {
   const engine = new FakeChainEngine();
+  engine.catalog = JSON.parse(engineCatalog);
+  const module = engineCatalog === ENGINE_CATALOG ? MODULE
+    : {...MODULE, ShaderChainBindings: {getShaderChainCatalog: () => engineCatalog}};
   prepare(engine);
   const compiledEngine = compiledBuildEngine(source ?? KALEIDOSCOPE_HEX_BRIGHT);
   let animationsPaused = paused;
@@ -1250,7 +1254,7 @@ async function editorWorkbench({
     doc,
     onOriginalLinkReleased,
     getEngine: () => current,
-    getModule: () => MODULE,
+    getModule: () => module,
     selectEffect: (effect) => {
       selections.push(effect);
       if (!selectEffect(effect)) return false;
@@ -1272,7 +1276,7 @@ async function editorWorkbench({
     fetchText: patternFetch(
       { 'kaleidoscope_hex_bright.shader.json': KALEIDOSCOPE_HEX_BRIGHT,
         'alien_core.shader.json': JSON.stringify(promotedDocument('alien_core.shader.json')),
-        'grid_space.shader.json': JSON.stringify(promotedDocument('grid_space.shader.json')), ...sourceFiles }, patternCatalog),
+        'grid_space.shader.json': JSON.stringify(promotedDocument('grid_space.shader.json')), ...sourceFiles }, patternCatalog, engineCatalog),
     importCompiler,
     download: (filename, source) => downloads.push([filename, source]),
     win,
@@ -2427,6 +2431,56 @@ test('a chain snapshot restores its program and accepted parameters into the edi
   assert.equal(linked.paused, snapshot.animationsPaused);
   assert.equal(harness.controller.preservesOriginalLink(), false);
 });
+
+for (const route of ['link', 'query']) {
+  for (const schemaVersion of [3, 4]) {
+    test(`schema ${schemaVersion} ${route} Twist snapshots restore total angles and runtime`, async () => {
+      const catalog = JSON.parse(ENGINE_CATALOG);
+      const twist = catalog.operators.find((operator) => operator.id === 'sphere.lens.twist.v2');
+      Object.assign(twist.params[0], {id: 'twist-angle', name: 'Twist Angle (rad)', min: -96, max: 96, default: Math.PI * 2});
+      const document = scratchChainDocument(catalog, [
+        {label: 'lens', operator: twist.id}, ...SCRATCH.descriptor.chain,
+      ]);
+      const rate = -4.5;
+      const distribution = Math.fround(0.7);
+      const a = 0.999 * distribution;
+      const angle = Math.fround(2 * rate * Math.atanh(a) / a);
+      Object.assign(document.preset_bank.presets[0].values,
+        {'lens.twist-angle': angle, 'lens.twist-distribution': distribution});
+      const engine = new FakeChainEngine();
+      engine.catalog = catalog;
+      engine.setEffect('shader-chain');
+      const compiled = compileShaderDocument(document, {catalog});
+      assert.equal(compiled.status, 'VALID');
+      assert.equal(applyChainDocument({engine, module: MODULE, compiled, presetId: 'catalog-defaults',
+        syncEffectGui() {}, invalidate() {}}), null);
+      const snapshot = callWorkbenchBinding(engine, 'getSnapshot', []);
+      snapshot.schemaVersion = schemaVersion;
+      Object.assign(snapshot.parameters.find(({name}) => name === 'lens.twist-angle'),
+        {name: 'lens.twist-rate', value: rate});
+      Object.assign(snapshot.runtime.find(({instance}) => instance === 'lens').state,
+        {primary: 0.375, secondary: -0.625, angle: 1.25});
+      snapshot.animationsPaused = true;
+      const before = structuredClone(snapshot);
+      const payload = gzipSync(JSON.stringify({d: document, p: 'catalog-defaults', b: [], a: true, s: snapshot})).toString('base64url');
+      const hash = route === 'link' ? `#shader=v2.${payload}` : '';
+      const search = route === 'query' ? `?fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(snapshot))}`
+        : '?effect=ShaderChain';
+      const harness = await editorWorkbench({source: null, hash, search,
+        engineCatalog: JSON.stringify(catalog), pausedFromEngine: true});
+      assert.equal(harness.controller.preservesOriginalLink(), false,
+        harness.elements.get('shader-document-status').textContent);
+      const restored = callWorkbenchBinding(harness.engine, 'getSnapshot', []);
+      assert.equal(restored.parameters.find(({name}) => name === 'lens.twist-angle')?.value, angle);
+      assert.equal(restored.parameters.some(({name}) => name === 'lens.twist-rate'), false);
+      assert.deepEqual(restored.runtime, snapshot.runtime);
+      assert.deepEqual(restored.paletteBank, snapshot.paletteBank);
+      assert.equal(restored.animationsPaused, true);
+      assert.equal(savedValues(harness)['lens.twist-angle'], angle);
+      assert.deepEqual(snapshot, before);
+    });
+  }
+}
 
 test('a refused chain snapshot rolls the engine back and keeps the link', async () => {
   const engine = new FakeChainEngine();

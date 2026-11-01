@@ -302,6 +302,7 @@ export class FakeChainEngine {
           return ChainSnapshotRestoreResult.INVALID_VALUE;
         if (snapshot.chain.length === 0) return ChainSnapshotRestoreResult.INVALID_LENGTH;
         const candidate = new FakeChainEngine();
+        candidate.catalog = this.catalog;
         candidate.effect = 'ShaderChain';
         if (candidate.#setShaderChain(snapshot.chain).code !== 'APPLIED')
           return ChainSnapshotRestoreResult.INVALID_CHAIN;

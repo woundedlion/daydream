@@ -1219,6 +1219,24 @@ test('a chain snapshot imports its chain and maps enum indices to option ids', (
   assert.equal(values['rotate.wander'], 0.25);
 });
 
+test('a chain snapshot imports legacy Twist rates as fixed total angles', () => {
+  const catalog = structuredClone(CATALOG);
+  const twist = catalog.operators.find((operator) => operator.id === 'sphere.lens.twist.v2');
+  Object.assign(twist.params[0], {id: 'twist-angle', name: 'Twist Angle (rad)', min: -96, max: 96, default: Math.PI * 2});
+  const snapshot = {schemaVersion: 4, modulation: [],
+    chain: [{instance: 'lens', operator: twist.id}, ...SNAPSHOT_CHAIN],
+    parameters: [{name: 'lens.twist-rate', value: -4}, {name: 'lens.twist-distribution', value: 0.5}],
+  };
+  const before = structuredClone(snapshot);
+  const document = documentFromChainSnapshot(snapshot, catalog);
+  const values = document.preset_bank.presets[0].values;
+  assert.equal(values['lens.twist-angle'], Math.fround(-8 * Math.atanh(0.4995) / 0.4995));
+  assert.equal(values['lens.twist-rate'], undefined);
+  assert.equal(values['lens.twist-distribution'], 0.5);
+  assert.deepEqual(compiler.validateShaderDocument(document, {catalog}), []);
+  assert.deepEqual(snapshot, before);
+});
+
 test('a chain snapshot import refuses unknown parameters and unsupported shapes', () => {
   assert.throws(() => documentFromChainSnapshot({ schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION,
     chain: SNAPSHOT_CHAIN, modulation: [], parameters: [{ name: 'missing.parameter', value: 0 }] }, CATALOG),
