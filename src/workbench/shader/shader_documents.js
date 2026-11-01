@@ -5,7 +5,7 @@
 
 import { canonicalEffectId, effectDisplayName } from "../../effects/effect_identity.js";
 import { engineHalted } from '../../shared/engine_halt.js';
-import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot, shaderChainCatalog, upgradeTwistSnapshot } from '../../engine/workbench_bindings.js';
+import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot, shaderChainCatalog } from '../../engine/workbench_bindings.js';
 import { enumConstantName } from '../../effects/param_sync.js';
 import { fieldOf as fieldSegment, MODULATION_OPERATOR } from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
@@ -623,8 +623,8 @@ export function createShaderDocumentController({
       return false;
     }
     if (session?.chainSnapshot) session = { ...session,
-      chainSnapshot: upgradePaletteSnapshot(upgradeTwistSnapshot(
-        migrateLegacyChainSnapshot(session.chainSnapshot), operatorCatalog), operatorCatalog) };
+      chainSnapshot: upgradePaletteSnapshot(
+        migrateLegacyChainSnapshot(session.chainSnapshot), operatorCatalog) };
     // Resolved before anything is built: the strip renders the active preset's values.
     const presetId = session?.preset
       ?? compiled.document.preset_bank.presets[0]?.preset_id;
@@ -947,7 +947,7 @@ export function createShaderDocumentController({
     const chainText = query.get(`fx.${CHAIN_SNAPSHOT_STORAGE_KEY}`);
     if (!linked && !linkError && chainText !== null) {
       try {
-        let snapshot = upgradeTwistSnapshot(migrateLegacyChainSnapshot(JSON.parse(chainText)), operatorCatalog);
+        let snapshot = migrateLegacyChainSnapshot(JSON.parse(chainText));
         const imported = documentFromChainSnapshot(snapshot, operatorCatalog);
         snapshot = upgradePaletteSnapshot(snapshot, operatorCatalog);
         const previous = getChainSnapshot(getEngine());

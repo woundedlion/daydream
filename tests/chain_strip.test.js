@@ -2076,7 +2076,7 @@ test('loaded twist and glitch stages expose omitted controls and persist slider 
     { label: 'color', operator: 'colorize.generated-palette.v4' },
   ]);
   const twist = CATALOG.operators.find((operator) => operator.id === 'sphere.lens.twist.v2');
-  const angle = twist.params.find((field) => field.id === 'twist-angle' || field.id === 'twist-rate');
+  const angle = twist.params.find((field) => field.id === 'twist-angle');
   const controls = [
     ['twist', angle.id, angle.default, 4.5],
     ['twist', 'speed', 0.02, 0.035],

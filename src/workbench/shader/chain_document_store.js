@@ -7,7 +7,6 @@
 import { LABEL_PATTERN, declarationFromCatalogField as parameterFromField }
   from '../../../generated/shader/shader_workbench.mjs';
 import { CHAIN_SNAPSHOT_SCHEMA_VERSION, migrateLegacyChainSnapshot } from './shader_deeplink.js';
-import { upgradeTwistSnapshot } from '../../engine/workbench_bindings.js';
 import { PALETTE_OPERATOR } from './chain_presentation.js';
 
 /** @typedef {{id: string, name: string|null, min: number, max: number, default: *, curve?: string, topology?: false}} CatalogNumericField */
@@ -802,7 +801,7 @@ export async function createChainDocumentStore({
  * @throws {Error} If the snapshot schema is unsupported or a parameter is unknown.
  */
 export function documentFromChainSnapshot(snapshot, catalog) {
-  snapshot = upgradeTwistSnapshot(migrateLegacyChainSnapshot(snapshot), catalog);
+  snapshot = migrateLegacyChainSnapshot(snapshot);
   if (snapshot?.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION || !Array.isArray(snapshot.chain)
       || !Array.isArray(snapshot.parameters) || !Array.isArray(snapshot.modulation))
     throw new Error('unsupported chain snapshot');

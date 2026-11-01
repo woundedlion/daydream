@@ -2485,7 +2485,7 @@ test('a chain snapshot restores its program and accepted parameters into the edi
 });
 
 for (const route of ['link', 'query']) {
-  for (const schemaVersion of [3, 4]) {
+  for (const schemaVersion of [4]) {
     test(`schema ${schemaVersion} ${route} Twist snapshots restore total angles and runtime`, async () => {
       const catalog = JSON.parse(ENGINE_CATALOG);
       const twist = catalog.operators.find((operator) => operator.id === 'sphere.lens.twist.v2');
@@ -2493,10 +2493,8 @@ for (const route of ['link', 'query']) {
       const document = scratchChainDocument(catalog, [
         {label: 'lens', operator: twist.id}, ...SCRATCH.descriptor.chain,
       ]);
-      const rate = -4.5;
       const distribution = Math.fround(0.7);
-      const a = 0.999 * distribution;
-      const angle = Math.fround(2 * rate * Math.atanh(a) / a);
+      const angle = -9;
       Object.assign(document.preset_bank.presets[0].values,
         {'lens.twist-angle': angle, 'lens.twist-distribution': distribution});
       const engine = new FakeChainEngine();
@@ -2508,8 +2506,6 @@ for (const route of ['link', 'query']) {
         syncEffectGui() {}, invalidate() {}}), null);
       const snapshot = callWorkbenchBinding(engine, 'getSnapshot', []);
       snapshot.schemaVersion = schemaVersion;
-      Object.assign(snapshot.parameters.find(({name}) => name === 'lens.twist-angle'),
-        {name: 'lens.twist-rate', value: rate});
       Object.assign(snapshot.runtime.find(({instance}) => instance === 'lens').state,
         {primary: 0.375, secondary: -0.625, angle: 1.25});
       snapshot.animationsPaused = true;
@@ -2524,7 +2520,6 @@ for (const route of ['link', 'query']) {
         harness.elements.get('shader-document-status').textContent);
       const restored = callWorkbenchBinding(harness.engine, 'getSnapshot', []);
       assert.equal(restored.parameters.find(({name}) => name === 'lens.twist-angle')?.value, angle);
-      assert.equal(restored.parameters.some(({name}) => name === 'lens.twist-rate'), false);
       assert.deepEqual(restored.runtime, snapshot.runtime);
       assert.deepEqual(restored.paletteBank, snapshot.paletteBank);
       assert.equal(restored.animationsPaused, true);
