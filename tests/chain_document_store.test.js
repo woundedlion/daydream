@@ -515,6 +515,17 @@ test('a crossing gets no bypass toggle', async () => {
   assert.equal(store.programShape().length, store.chain().length);
 });
 
+test('modulation uses its enabled parameter and refuses session bypass', async () => {
+  const store = await makeStore();
+  assert.equal(store.setBypassed('modulation', true).diagnostics[0].code, 'BYPASS_MODULATION');
+  assert.deepEqual(store.bypassedLabels(), []);
+  assert.ok(store.programShape().some((entry) => entry.instance === 'modulation'));
+  assert.equal(store.setPresetValue('hex-twin-wave', 'modulation.modulation-enabled', 'disabled').ok, true);
+  assert.equal(presetValue(store, 'hex-twin-wave', 'modulation.modulation-enabled'), 'disabled');
+  assert.equal(store.setPresetValue('hex-twin-wave', 'modulation.modulation-enabled', 'enabled').ok, true);
+  assert.equal(presetValue(store, 'hex-twin-wave', 'modulation.modulation-enabled'), 'enabled');
+});
+
 test('bypass is pruned by removal and not restored by undo', async () => {
   const store = await makeStore();
   assert.equal(store.setBypassed('lens', true).ok, true);

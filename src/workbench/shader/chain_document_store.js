@@ -7,7 +7,7 @@
 import { LABEL_PATTERN, declarationFromCatalogField as parameterFromField }
   from '../../../generated/shader/shader_workbench.mjs';
 import { CHAIN_SNAPSHOT_SCHEMA_VERSION, migrateLegacyChainSnapshot } from './shader_deeplink.js';
-import { PALETTE_OPERATOR } from './chain_presentation.js';
+import { MODULATION_OPERATOR, PALETTE_OPERATOR } from './chain_presentation.js';
 
 /** @typedef {{id: string, name: string|null, min: number, max: number, default: *, curve?: string, topology?: false}} CatalogNumericField */
 /** @typedef {{id: string, topology: true, values: string[], default: *}} CatalogTopologyField */
@@ -709,7 +709,7 @@ export async function createChainDocumentStore({
      * document and its digest are untouched.
      * @param {string} label - A live chain label.
      * @param {boolean} on - Whether the instance is bypassed.
-     * @returns {EditResult} A refusal for an unknown label or a crossing.
+     * @returns {EditResult} A refusal for an unknown label, crossing or modulation stage.
      */
     setBypassed: (label, on) => {
       const entry = chain().find((candidate) => candidate.label === label);
@@ -717,6 +717,9 @@ export async function createChainDocumentStore({
         return refusal('UNKNOWN_LABEL', '$.descriptor.chain',
           `no chain entry is labeled "${label}"`);
       const op = operatorOf(entry);
+      if (on && entry.operator === MODULATION_OPERATOR)
+        return refusal('BYPASS_MODULATION', '$.descriptor.chain',
+          `"${label}" uses its modulation-enabled parameter instead of session bypass`);
       if (on && !isEndomorphism(op))
         return refusal('BYPASS_CROSSING', '$.descriptor.chain',
           `"${label}" crosses ${op.input} to ${op.output}; only an endomorphism can be bypassed`);

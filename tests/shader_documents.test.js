@@ -1518,6 +1518,36 @@ test('a shader state link restores its document, preset, bypasses, and pause', a
     .querySelector('.chain-chip-bypass').getAttribute('aria-pressed'), 'true');
 });
 
+test('a modulation bypass link is refused without adopting a stuck stage', async () => {
+  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const harness = await editorWorkbench();
+  const chips = stripChips(harness);
+  const programs = harness.engine.chainCalls.length;
+  assert.equal(await harness.controller.loadSource(document, 'modulation.shader.json', null,
+    {preset: document.preset_bank.presets[0].preset_id, bypassed: ['modulation'], paused: false}), false);
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /uses its modulation-enabled parameter/);
+  assert.deepEqual(stripChips(harness), chips);
+  assert.equal(harness.engine.chainCalls.length, programs);
+});
+
+test('a disabled modulation link restores a stage that its toggle can enable', async () => {
+  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const preset = document.preset_bank.presets[0];
+  preset.values['modulation.modulation-enabled'] = 'disabled';
+  const hash = await encodeShaderStateHash({document, preset: preset.preset_id,
+    bypassed: [], paused: false});
+  const harness = await editorWorkbench({source: null, hash});
+  const chip = stripChips(harness).find((entry) => entry.dataset.label === 'modulation');
+  assert.equal(chip.classList.contains('chain-chip--bypassed'), false);
+  assert.equal(chip.querySelector('.chain-modulation-enabled').getAttribute('aria-pressed'), 'true');
+  chip.querySelector('.chain-modulation-enabled').dispatch('click');
+  await harness.controller.flushDeepLink();
+  const restored = await decodeShaderStateHash(harness.win.location.hash);
+  assert.equal(restored.document.preset_bank.presets[0].values['modulation.modulation-enabled'], 'enabled');
+  assert.deepEqual(restored.bypassed, []);
+});
+
 test('an oversized document clears the previous shader state hash', async () => {
   const harness = await editorWorkbench({ source: null });
   assert.match(harness.win.location.hash, /^#shader=/);
