@@ -100,15 +100,15 @@ test('an enum8 value is written as its option index from the fresh definitions',
   const { engine, run } = harness();
 
   assert.equal(run(compiledDocument({
-    'sample.coverage-mode': 'weight-squared',
+    'sample.coverage-mode': 'edge-fade-squared',
     'colorize.palette-mode': 'analogous',
   })), null);
   const options = engine.getParameterDefinitions()
     .find((definition) => definition.name === 'sample.coverage-mode').options;
-  assert.deepEqual(options, ['none', 'weight', 'weight-squared', 'edge-fade'],
+  assert.deepEqual(options, ['none', 'weight', 'weight-squared', 'edge-fade', 'edge-fade-squared'],
     'the catalog enum values are the option roster, in order');
   assert.deepEqual(engine.writes,
-    [['sample.coverage-mode', 2], ['colorize.palette-mode', 2]]);
+    [['sample.coverage-mode', 4], ['colorize.palette-mode', 2]]);
 });
 
 test('the named preset is the one applied', () => {
