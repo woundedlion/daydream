@@ -21,6 +21,7 @@ import { copyToClipboard } from '../../shared/copy_text.js';
 import { downloadBlob } from '../../shared/download_file.js';
 import {
   decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash, migrateLegacyChainSnapshot,
+  migrateLegacyMobiusDocument,
 } from './shader_deeplink.js';
 
 const PATTERN_CATALOG_URL = '../../../generated/shader/patterns/catalog.json';
@@ -611,6 +612,11 @@ export function createShaderDocumentController({
     if (compiled === null) {
       // A malformed document yields diagnostics; a throw is a compiler failure.
       try {
+        let candidate = source;
+        if (typeof source === 'string') {
+          try { candidate = compiler.parseShaderDocument(source); } catch { /* compiler reports malformed input */ }
+        }
+        source = migrateLegacyMobiusDocument(candidate);
         compiled = compiler.compileShaderDocument(source, { catalog: operatorCatalog });
       } catch (error) {
         const detail = errorDetail(error);

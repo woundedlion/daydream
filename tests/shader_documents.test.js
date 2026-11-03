@@ -162,6 +162,30 @@ test('Mobius documents migrate defaults, presets and serialization together', ()
   assert.equal(original.descriptor.chain[0].operator, 'sphere.lens.mobius.v2');
 });
 
+test('importing a v2 Mobius document installs its generator controls', async () => {
+  const legacy = JSON.parse(readFileSync(new URL('../generated/shader/patterns/mobius_grid.shader.json', import.meta.url), 'utf8'));
+  legacy.descriptor.chain.find(({label}) => label === 'lens').operator = 'sphere.lens.mobius.v2';
+  legacy.descriptor.parameters = legacy.descriptor.parameters.filter(({id}) => !id.startsWith('lens.'));
+  for (const key of ['a', 'b', 'c', 'd'])
+    for (const channel of ['re', 'im'])
+      legacy.descriptor.parameters.push({id: `lens.mobius-${key}-${channel}`, classification: 'preset',
+        storage: 'binary32', unit: 'ratio', domain: {minimum: -4, maximum: 4},
+        interpolation: {kind: 'SNAP'}, default: channel === 're' && ['a', 'd'].includes(key) ? Math.SQRT1_2 : 0});
+  legacy.descriptor.serialization.fields = legacy.descriptor.parameters.map(({id}) => id);
+  for (const preset of legacy.preset_bank.presets) {
+    preset.values = Object.fromEntries(Object.entries(preset.values).filter(([id]) => !id.startsWith('lens.')));
+    Object.assign(preset.values, {'lens.mobius-a-re': -1.072, 'lens.mobius-a-im': 0.304,
+      'lens.mobius-b-re': 0.416});
+  }
+  const harness = await editorWorkbench({source: null});
+  assert.equal(await harness.controller.loadSource(JSON.stringify(legacy)), true,
+    harness.elements.get('shader-document-status').textContent);
+  const snapshot = callWorkbenchBinding(harness.engine, 'getSnapshot', [], null);
+  assert.equal(snapshot.chain.find(({instance}) => instance === 'lens').operator, 'sphere.lens.mobius.v3');
+  assert.ok(snapshot.parameters.some(({name, value}) => name === 'lens.push-z' && Math.abs(value + 0.6686195) < 1e-6));
+  assert.ok(snapshot.parameters.every(({name}) => !name.startsWith('lens.mobius-')));
+});
+
 test('legacy snapshot migration preserves malformed values for rejection', async () => {
   const legacy = {schemaVersion: 3,
     chain: [{instance: 'ink', operator: 'colorize.generated-palette.v3'}],
