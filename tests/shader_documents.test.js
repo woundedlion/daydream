@@ -2999,6 +2999,20 @@ test('authored native controls preserve resource identities and live topology re
   assert.equal(definitions[0].value, 0);
 });
 
+test('a live affine period remains independent when its sampler has no lattice cells', () => {
+  const engine = fixedEngine(() => true);
+  engine.getParameterDefinitions = () => [{name: 'plane.Lattice Period'}];
+  const descriptor = {chain: [
+    {label: 'slide', resource_key: 'plane', operator: 'warp.affine.v3'},
+    {label: 'sample', operator: 'sample.grid.v3'},
+  ]};
+  const values = {'slide.lattice-period': 2.5};
+  assert.equal(applyFixedShaderDocument(engine, MODULE,
+    {document: {descriptor, preset_bank: {presets: [{preset_id: 'live', values}]}}},
+    'live', ['live'], BAKED, fixedDerivedBinding), null);
+  assert.deepEqual(engine.writes, [['plane.Lattice Period', 2.5]]);
+});
+
 test('potential nested native fields retain term identities across colliding resource names', () => {
   const catalog = JSON.parse(ENGINE_CATALOG);
   const fields = catalog.operators.find((entry) => entry.id === 'sphere.displace.potential.v1')

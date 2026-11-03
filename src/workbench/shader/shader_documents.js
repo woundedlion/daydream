@@ -119,7 +119,7 @@ function compiledControlFor(parameterId, definitions, baked, descriptor, catalog
 /** @param {*} binding @param {string} id @param {*} control @param {ParameterDefinition[]} definitions */
 function liveDerivedControl(binding, id, control, definitions) {
   if (control.name === null) return false;
-  if (binding.sourceId !== null) return true;
+  if (binding.sourceId !== null || fieldSegment(id) === 'lattice-period') return true;
   const label = id.slice(0, id.indexOf('.'));
   const resource = control.name.slice(0, control.name.lastIndexOf('.'));
   return control.name === fieldSegment(id) || control.name.endsWith('.' + fieldSegment(id))
