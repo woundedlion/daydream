@@ -2277,10 +2277,9 @@ test('Potential Lens groups overall controls and names each independent term', a
   assert.deepEqual(potentialGroup(h, 'Overall').querySelectorAll('.chain-param')
     .map((row) => row.dataset.parameter), ['potential.strength', 'potential.integrator',
     'potential.orientation-azimuth', 'potential.orientation-polar', 'potential.drift']);
-  assert.equal(potentialGroup(h, 'Overall').querySelector('.chain-param-note').textContent,
-    'Strength scales the combined motion');
+  assert.equal(paramsOf(h, 'potential').querySelector('.chain-param-note'), null);
   assert.equal(rowFor(h, 'potential', 'potential.drift').querySelector('.chain-param-name')
-    .getAttribute('title'), 'Drift rotates around the field axis; Order 0 modes stay still.');
+    .getAttribute('title'), null);
   for (let term = 1; term <= 4; term += 1) {
     const group = potentialGroup(h, `Term ${term}`);
     assert.equal(group.getAttribute('role'), 'group');
@@ -2288,7 +2287,6 @@ test('Potential Lens groups overall controls and names each independent term', a
       ['Type', 'Kind', 'Degree', 'Order', 'Amplitude', 'Phase']);
     assert.deepEqual(group.querySelectorAll('.chain-param').map((row) => row.dataset.parameter),
       ['type', 'kind', 'l', 'm', 'amplitude', 'phase'].map((field) => `potential.term-${term}-${field}`));
-    assert.equal(group.querySelector('.chain-param-note').textContent, 'Amplitude 0 disables this term');
     const toggle = potentialToggle(h, term);
     assert.equal(toggle.tagName, 'BUTTON');
     assert.equal(toggle.type, 'button');
@@ -2463,8 +2461,6 @@ test('Potential Lens prevents invalid Degree and Order selections without changi
   assert.equal(values['potential.term-1-l'], 'two');
   assert.equal(values['potential.term-1-m'], 'two');
   assert.equal(values['potential.term-2-l'], source.preset_bank.presets[0].values['potential.term-2-l']);
-  assert.match(potentialGroup(h, 'Term 1').querySelector('.chain-param-mode-note').textContent,
-    /0 \u2264 Order \u2264 Degree \u2264 8.*Lower Order/);
 });
 
 test('Potential Lens hides non-Mode choices and respects Mode admission metadata', async () => {
@@ -2483,7 +2479,6 @@ test('Potential Lens hides non-Mode choices and respects Mode admission metadata
   assert.equal(degree.disabled, false);
   assert.ok(degree.options.every((option) => !option.disabled));
   assert.ok(order.options.every((option) => !option.disabled));
-  assert.equal(potentialGroup(h, 'Term 1').querySelector('.chain-param-mode-note').hidden, true);
   modeAllowed = false;
   h.strip.syncParameterValues({'potential.term-1-l': 'two'});
   const type = controlIn(rowFor(h, 'potential', 'potential.term-1-type'));

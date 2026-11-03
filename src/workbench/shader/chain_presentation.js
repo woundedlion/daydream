@@ -18,7 +18,7 @@ import { float32Decimal } from '../../shared/cpp_format.js';
  * @typedef {{start: number, deleteCount: number, operators: CatalogOperator[]}} SpanChoice
  */
 /** @typedef {{id: string, storage: string, domain: *}} ParameterDeclaration */
-/** @typedef {{name: string, fields: string[], source?: string, term?: number, note?: string}} ParameterGroup */
+/** @typedef {{name: string, fields: string[], source?: string, term?: number}} ParameterGroup */
 /**
  * One carrier's run of the chain: the gap indices that fall inside it, the chain
  * indices of its endomorphism chips, and the crossing that closes it.
@@ -67,10 +67,9 @@ export const MODULATION_PARAMETER_GROUPS = [
 /** @type {ParameterGroup[]} */
 export const POTENTIAL_PARAMETER_GROUPS = [
   { name: 'Overall', fields: ['strength', 'integrator', 'orientation-azimuth',
-    'orientation-polar', 'drift'], note: 'Strength scales the combined motion' },
+    'orientation-polar', 'drift'] },
   ...[1, 2, 3, 4].map((term) => ({ name: `Term ${term}`, term,
-    fields: ['type', 'kind', 'l', 'm', 'amplitude', 'phase'].map((field) => `term-${term}-${field}`),
-    note: 'Amplitude 0 disables this term' })),
+    fields: ['type', 'kind', 'l', 'm', 'amplitude', 'phase'].map((field) => `term-${term}-${field}`) })),
 ];
 
 /** @type {Record<string, string>} */

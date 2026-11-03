@@ -796,8 +796,6 @@ export function createChainStrip({
     for (const group of container.querySelectorAll('.chain-param-group')) {
       group.hidden = [...group.querySelectorAll('.chain-param')].every((row) => row.hidden);
     }
-    for (const note of container.querySelectorAll('.chain-param-mode-note'))
-      note.hidden = values[note.dataset.potentialType] !== 'mode';
   };
 
   /**
@@ -1025,17 +1023,6 @@ export function createChainStrip({
             });
             group.appendChild(content);
           }
-          if (definition?.note) {
-            const note = el('p', 'chain-param-note');
-            note.textContent = definition.note;
-            content.appendChild(note);
-          }
-          if (term !== undefined) {
-            const note = el('p', 'chain-param-note chain-param-mode-note');
-            note.dataset.potentialType = `${entry.label}.term-${term}-type`;
-            note.textContent = '0 \u2264 Order \u2264 Degree \u2264 8. Lower Order before reducing Degree.';
-            content.appendChild(note);
-          }
           region.appendChild(group);
           groups.set(groupName, content);
         }
@@ -1049,8 +1036,6 @@ export function createChainStrip({
         label.setAttribute('title', 'Higher values produce finer noise; lower values produce broader patches.');
       if (color && field === 'pattern-speed')
         label.setAttribute('title', 'Animation rate. Zero freezes the noise; negative values reverse it.');
-      if (potential && field === 'drift')
-        label.setAttribute('title', 'Drift rotates around the field axis; Order 0 modes stay still.');
       row.appendChild(label);
       if (declaration.storage === 'enum8') {
         const control = enumControl(declaration);

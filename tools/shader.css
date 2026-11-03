@@ -581,8 +581,7 @@
 
 .chain-param[hidden],
 .chain-param-group[hidden],
-.chain-param-group-fields[hidden],
-.chain-param-mode-note[hidden] {
+.chain-param-group-fields[hidden] {
   display: none;
 }
 
