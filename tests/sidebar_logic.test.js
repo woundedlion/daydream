@@ -8,16 +8,16 @@ import {
 } from '../src/ui/sidebar_logic.js';
 
 const items = () => [
-  { name: 'Voronoi', size: 3000 },
+  { name: 'ShapeShifter', size: 3000 },
   { name: 'Comets', size: 1000 },
   { name: 'MobiusGrid', size: 2000 },
 ];
 
 test('sortItems orders by name ascending and descending', () => {
   assert.deepEqual(sortItems(items(), 'name', 'asc').map(i => i.name),
-    ['Comets', 'MobiusGrid', 'Voronoi']);
+    ['Comets', 'MobiusGrid', 'ShapeShifter']);
   assert.deepEqual(sortItems(items(), 'name', 'desc').map(i => i.name),
-    ['Voronoi', 'MobiusGrid', 'Comets']);
+    ['ShapeShifter', 'MobiusGrid', 'Comets']);
 });
 
 test('sortItems orders by size numerically', () => {

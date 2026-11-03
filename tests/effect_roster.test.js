@@ -32,17 +32,17 @@ test('GridWorms is offered at both display resolutions', () => {
   }
 });
 
-const RESO_EFFECTS = ['Voronoi', 'Comets', 'MobiusGrid'];
+const RESO_EFFECTS = ['ShapeShifter', 'Comets', 'MobiusGrid'];
 
 test('resolveActiveEffect keeps an effect the resolution offers', () => {
   assert.equal(resolveActiveEffect(RESO_EFFECTS, 'Comets'), 'Comets');
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'Voronoi'), 'Voronoi');
+  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'ShapeShifter'), 'ShapeShifter');
 });
 
 test('resolveActiveEffect falls back to the first effect for an off-list request', () => {
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'NotHere'), 'Voronoi');
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'GARBAGE_FROM_URL'), 'Voronoi');
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, undefined), 'Voronoi');
+  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'NotHere'), 'ShapeShifter');
+  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'GARBAGE_FROM_URL'), 'ShapeShifter');
+  assert.equal(resolveActiveEffect(RESO_EFFECTS, undefined), 'ShapeShifter');
 });
 
 test('a preset reports its own effect list', () => {

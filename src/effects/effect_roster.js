@@ -42,6 +42,8 @@ const HiResFavorites = [
   "GridSpace",
   "GridWorms",
   "Millefiori",
+  "WarpFest",
+  "GlitchLace",
   "HyperLattice",
   "AshCloud",
   "KaleidoscopeMelt",
@@ -70,7 +72,6 @@ const HiResFavorites = [
   "SphericalHarmonics",
   "DisplacementField",
   "ShapeShifter",
-  "Voronoi",
 ];
 
 const LoResFavorites = [
@@ -85,6 +86,8 @@ const LoResFavorites = [
   "GridSpace",
   "GridWorms",
   "Millefiori",
+  "WarpFest",
+  "GlitchLace",
   "HyperLattice",
   "AshCloud",
   "KaleidoscopeMelt",
@@ -112,7 +115,6 @@ const LoResFavorites = [
   "DisplacementField",
   "ShapeShifter",
   "Thrusters",
-  "Voronoi",
 ];
 
 // The effect the simulator seeds when the URL names none.

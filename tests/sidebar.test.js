@@ -95,17 +95,17 @@ test('a document with no defaultView falls back to the ambient window', () => {
 test('setEffects builds one button per name with its preset count and optional size', () => {
   const { sidebar } = makeSidebar();
   sidebar.setEffects(
-    ['Voronoi', 'Comets'], { Voronoi: 2048, Comets: 0 },
-    { Voronoi: 0, Comets: 12 });
+    ['ShapeShifter', 'Comets'], { ShapeShifter: 2048, Comets: 0 },
+    { ShapeShifter: 0, Comets: 12 });
   assert.equal(sidebar.buttons.size, 2);
   assert.equal(sidebar.listEl.children.length, 2);
   assert.equal(sidebar.items.length, 2);
-  // Voronoi (size>0): name span + size span; Comets (size 0): name span only.
-  assert.equal(sidebar.buttons.get('Voronoi').children.length, 2);
+  // ShapeShifter (size>0): name span + size span; Comets (size 0): name span only.
+  assert.equal(sidebar.buttons.get('ShapeShifter').children.length, 2);
   assert.equal(sidebar.buttons.get('Comets').children.length, 1);
-  assert.equal(sidebar.buttons.get('Voronoi').children[0].textContent, 'Voronoi (1)');
+  assert.equal(sidebar.buttons.get('ShapeShifter').children[0].textContent, 'ShapeShifter (1)');
   assert.equal(sidebar.buttons.get('Comets').children[0].textContent, 'Comets (12)');
-  assert.match(sidebar.buttons.get('Voronoi').getAttribute('aria-label'), /^Voronoi, 1 preset, object size 2(?:\.0+)? KiB$/);
+  assert.match(sidebar.buttons.get('ShapeShifter').getAttribute('aria-label'), /^ShapeShifter, 1 preset, object size 2(?:\.0+)? KiB$/);
   assert.equal(sidebar.buttons.get('Comets').getAttribute('aria-label'), 'Comets, 12 presets');
   // No active effect yet: roving tab stop falls to the first option.
   assert.equal(sidebar.tabbableBtn, sidebar.listEl.children[0]);
