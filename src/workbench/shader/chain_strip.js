@@ -1448,6 +1448,7 @@ export function createChainStrip({
 
   return {
     render,
+    syncParameterRanges: markDeactivated,
 
     /** @param {Record<string, *>} updates - Committed parameter values. */
     syncParameterValues(updates) {

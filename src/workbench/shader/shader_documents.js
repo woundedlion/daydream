@@ -414,6 +414,7 @@ export function createShaderDocumentController({
         return false;
       }
       active.presetId = presetId;
+      chainUi?.strip.syncParameterRanges();
       const title = active.compiled.document.effect_metadata?.display_name
         ?? active.compiled.document.document_id;
       const preset = presetSelect.selectedOptions[0]?.textContent ?? presetId;

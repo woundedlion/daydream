@@ -42,6 +42,25 @@ assert.equal(M.HolosphereEngine.isLive(), true);
 const initialDisplayAngles = [engine.getDisplayNorthPhi(), engine.getDisplaySouthPhi()];
 const initialPoleLod = engine.getPoleLod();
 
+test('chain numeric ranges expose finite bounds without changing the live snapshot', () => {
+  engine.setEffect('ShaderChain');
+  const bindings = engine.getShaderChainBindings();
+  const before = bindings.getSnapshot();
+  const ranges = bindings.getShaderChainParameterRanges();
+  assert.ok(ranges.length > 0);
+  assert.ok(ranges.some(({name}) => name === 'sample.pattern-freq'));
+  for (const range of ranges) {
+    assert.deepEqual(Object.keys(range).sort(), ['max', 'min', 'name']);
+    assert.equal(typeof range.name, 'string');
+    assert.ok(Number.isFinite(range.min) && Number.isFinite(range.max));
+    assert.ok(range.min <= range.max);
+    const value = before.parameters.find(({name}) => name === range.name).value;
+    assert.ok(value >= range.min && value <= range.max);
+  }
+  assert.deepEqual(bindings.getSnapshot(), before);
+  bindings.delete();
+});
+
 test('typed authoring handles track effect incarnations and reject unsupported effects', () => {
   engine.setEffect('Comets');
   assert.equal(engine.getShaderChainBindings(), null);
