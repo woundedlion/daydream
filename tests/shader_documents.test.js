@@ -1109,7 +1109,10 @@ const HEX_PATTERN_CATALOG = JSON.stringify({
  */
 function compiledBuildEngine(source = KALEIDOSCOPE_HEX_BRIGHT) {
   const document = JSON.parse(source);
-  const definitions = document.descriptor.parameters.map((parameter) => ({
+  const definitions = document.descriptor.parameters.filter((parameter) =>
+    !BAKED_CONSTANT_IDS.has(parameter.id) && !BAKED.has(parameter.id.slice(parameter.id.indexOf('.') + 1))
+    && !fixedDerivedBinding(document.descriptor, parameter.id, document.preset_bank.presets[0].values))
+    .map((parameter) => ({
     name: primaryName(parameter.id, document.descriptor),
     ...(parameter.storage === 'enum8' ? { options: [...parameter.domain.values] } : {}),
   }));
@@ -2952,6 +2955,119 @@ test('generic affine retains an independently editable period in the interpreter
   assert.equal(savedValues(harness)['warp.lattice-period'], 1);
   stageEditor(harness, 'warp')('warp.lattice-period', 0.75);
   assert.equal(savedValues(harness)['warp.lattice-period'], 0.75);
+});
+
+test('authored native controls preserve resource identities and live topology readbacks', () => {
+  const values = {'camera.wander': 0.3, 'camera.spin-speed': 0.02,
+    'second.wander': 0.7, 'second.spin-speed': 0.04, 'slide.lattice-period': 0.413,
+    'cells.lattice-cell-scale': 2, 'flow.basis': 'ridged3',
+    'cells.coverage-mode': 'edge-fade-squared', 'flow.edge-width': 0.4};
+  const descriptor = {chain: [
+    {label: 'camera', operator: 'sphere.rotate.v2'},
+    {label: 'second', resource_key: 'world', operator: 'sphere.rotate.v2'},
+    {label: 'slide', resource_key: 'plane', operator: 'warp.affine.v3'},
+    {label: 'flow', resource_key: 'velocity', operator: 'warp.vector-noise.v2'},
+    {label: 'cells', operator: 'sample.lattice.v2'},
+  ]};
+  const definitions = [
+    {name: 'Camera Wander', value: 0},
+    ...['camera.Wander', 'camera.Spin Speed', 'world.Wander', 'world.Spin Speed',
+      'plane.Lattice Period', 'Lattice Cell Scale', 'velocity.Warp Edge Width']
+      .map((name) => ({name, value: 0})),
+    {name: 'velocity.basis', options: ['Simplex', 'Fbm3', 'Ridged3'], optionValues: [2, 4, 9], value: 2},
+    {name: 'coverage-mode', options: ['None', 'Weight', 'Weight Squared', 'Edge Fade', 'Edge Fade Squared'], value: 0},
+  ];
+  const engine = fixedEngine(() => true);
+  engine.getParameterDefinitions = () => definitions;
+  engine.setParameter = (name, value) => {
+    const definition = definitions.find((entry) => entry.name === name);
+    assert.ok(definition);
+    definition.value = Math.fround(value);
+    engine.writes.push([name, value]);
+    return ParamSetResult.APPLIED;
+  };
+  assert.equal(applyFixedShaderDocument(engine, MODULE,
+    {document: {descriptor, preset_bank: {presets: [{preset_id: 'live', values}]}}},
+    'live', ['live'], BAKED, fixedDerivedBinding, JSON.parse(ENGINE_CATALOG)), null);
+  assert.deepEqual(engine.writes, [
+    ['camera.Wander', 0.3], ['camera.Spin Speed', 0.02], ['world.Wander', 0.7],
+    ['world.Spin Speed', 0.04], ['plane.Lattice Period', 0.413], ['Lattice Cell Scale', 2],
+    ['velocity.basis', 9], ['coverage-mode', 4], ['velocity.Warp Edge Width', 0.4],
+  ]);
+  for (const [name, value] of engine.writes)
+    assert.equal(engine.getParameterDefinitions().find((entry) => entry.name === name).value, Math.fround(value));
+  assert.equal(definitions[0].value, 0);
+});
+
+test('authored compiled stage edits keep camera spin, coverage and independent affine period live', async () => {
+  const source = JSON.stringify(scratchChainDocument(JSON.parse(ENGINE_CATALOG),
+    promotedDocument('grid_space.shader.json').descriptor.chain.filter((entry) => entry.operator !== 'color.modulate.v1')));
+  const harness = await editorWorkbench({source, sourceFiles: {'grid_space.shader.json': source},
+    patternCatalog: JSON.stringify({source_documents: {'grid-space': 'grid_space.shader.json'},
+      product_group: {children: [{effect_id: 'grid-space', display_name: 'Grid Space'}]}})});
+  const definitions = harness.compiledEngine.getParameterDefinitions();
+  definitions.push({name: 'camera.Wander'}, {name: 'camera.Spin Speed'},
+    {name: 'outer_warp.Lattice Period'},
+    {name: 'coverage-mode', options: ['None', 'Weight', 'Weight Squared', 'Edge Fade']});
+  harness.elements.get('shader-parity-toggle').dispatch('click');
+  harness.compiledEngine.writes.length = 0;
+  stageEditor(harness, 'camera')('camera.wander', 0.4);
+  stageEditor(harness, 'camera')('camera.spin-speed', 0.03);
+  stageEditor(harness, 'warp1')('warp1.lattice-period', 0.413);
+  stageEditor(harness, 'sample')('sample.lattice-cell-scale', 3.1);
+  stageEditor(harness, 'sample')('sample.coverage-mode', 'edge-fade');
+  assert.deepEqual(harness.compiledEngine.writes, [
+    ['camera.Wander', 0.4], ['camera.Spin Speed', 0.03],
+    ['outer_warp.Lattice Period', 0.413], ['Lattice Cell Scale', 3.1], ['coverage-mode', 3],
+  ]);
+  const saved = savedValues(harness);
+  assert.equal(saved['warp1.lattice-period'], Math.fround(0.413));
+  assert.equal(saved['camera.spin-speed'], Math.fround(0.03));
+  assert.equal(saved['sample.coverage-mode'], 'edge-fade');
+});
+
+test('authored compiled modulation edits replay coupled source and amount writes after admission dependencies', async () => {
+  const source = JSON.stringify(promotedDocument('grid_space.shader.json'));
+  const harness = await editorWorkbench({source, sourceFiles: {'grid_space.shader.json': source},
+    patternCatalog: JSON.stringify({source_documents: {'grid-space': 'grid_space.shader.json'},
+      product_group: {children: [{effect_id: 'grid-space', display_name: 'Grid Space'}]}})});
+  const definitions = harness.compiledEngine.getParameterDefinitions();
+  const modulation = JSON.parse(ENGINE_CATALOG).operators.find((entry) => entry.id === 'color.modulate.v1');
+  for (const field of modulation.params.filter((field) => field.topology))
+    definitions.push({name: field.id, options: field.values});
+  harness.elements.get('shader-parity-toggle').dispatch('click');
+  assert.equal(harness.elements.get('shader-parity-toggle').getAttribute('aria-pressed'), 'true');
+  const native = {'modulation-source': 0, 'modulation-evaluation': 1,
+    'modulation-mechanic': 0, 'Modulation Amount': 2};
+  const attempts = [];
+  harness.compiledEngine.setParameter = (name, value) => {
+    attempts.push([name, value]);
+    if (name === 'modulation-source' && value !== 0 && native['modulation-evaluation'] !== 0)
+      return ParamSetResult.INADMISSIBLE;
+    if (name === 'modulation-mechanic' && value !== 0 && native['Modulation Amount'] > 1)
+      return ParamSetResult.INADMISSIBLE;
+    native[name] = value;
+    return ParamSetResult.APPLIED;
+  };
+  const edit = stageEditor(harness, 'modulation');
+  edit('modulation.modulation-source', 'sphere-interference');
+  assert.deepEqual(attempts, [
+    ['modulation-source', 2], ['modulation-evaluation', 0], ['modulation-source', 2],
+  ]);
+  attempts.length = 0;
+  edit('modulation.modulation-amount', 2);
+  attempts.length = 0;
+  edit('modulation.modulation-mechanic', 'positive-lightness-lift');
+  assert.deepEqual(attempts, [
+    ['modulation-mechanic', 1], ['Modulation Amount', 1], ['modulation-mechanic', 1],
+  ]);
+  const saved = savedValues(harness);
+  assert.equal(saved['modulation.modulation-source'], 'sphere-interference');
+  assert.equal(saved['modulation.modulation-evaluation'], 'direct');
+  assert.equal(saved['modulation.modulation-mechanic'], 'positive-lightness-lift');
+  assert.equal(saved['modulation.modulation-amount'], 1);
+  assert.equal(native['modulation-source'], 2);
+  assert.equal(native['modulation-mechanic'], 1);
 });
 
 test('fixed Twist presets use descriptor resource identities for arbitrary labels', () => {

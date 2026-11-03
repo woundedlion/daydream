@@ -6,7 +6,7 @@
 import { canonicalEffectId, effectDisplayName } from "../../effects/effect_identity.js";
 import { engineHalted } from '../../shared/engine_halt.js';
 import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot, shaderChainCatalog } from '../../engine/workbench_bindings.js';
-import { enumConstantName } from '../../effects/param_sync.js';
+import { enumConstantName, replayParameterWrites } from '../../effects/param_sync.js';
 import { fieldOf as fieldSegment, MODULATION_OPERATOR } from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
 import { applyChainDocument, resolveParameterWrite } from './chain_apply.js';
@@ -87,15 +87,54 @@ function writeEngineValue(engine, module, definitions, name, value) {
  * @param {ParameterDefinition[]} definitions
  * @param {Set<string>} baked
  * @param {*} descriptor
+ * @param {*} catalog
  * @returns {{name: string|null, refusal: string|null}} Compiled control or refusal.
  */
-function compiledControlFor(parameterId, definitions, baked, descriptor) {
+function compiledControlFor(parameterId, definitions, baked, descriptor, catalog = null) {
+  const split = parameterId.indexOf('.');
+  const label = parameterId.slice(0, split);
+  const field = parameterId.slice(split + 1);
+  const slot = descriptor?.chain?.find((/** @type {*} */ entry) => entry.label === label);
+  const operator = catalog?.operators?.find((/** @type {*} */ entry) => entry.id === slot?.operator);
+  const schema = operator?.params?.find((/** @type {*} */ entry) => entry.id === field);
+  const key = slot?.resource_key ?? (slot?.operator?.startsWith('sample.') ? 'source'
+    : slot?.operator?.startsWith('project.') ? 'projection'
+      : slot?.operator?.startsWith('colorize.') ? 'color'
+        : slot?.operator?.startsWith('warp.') && ['warp', 'warp1', 'warp2'].includes(label)
+          ? label === 'warp2' ? 'inner_warp' : 'outer_warp' : label);
+  const title = field.split('-').map((part) => part[0]?.toUpperCase() + part.slice(1)).join(' ');
+  const human = [schema?.name, title];
+  if (field === 'edge-width' && slot?.operator?.startsWith('warp.')) human.unshift('Warp Edge Width');
+  const candidates = [`${key}.${field}`,
+    ...human.filter(Boolean).map((name) => `${key}.${name}`),
+    ...engineControlNames(parameterId, descriptor), parameterId, field, ...human.filter(Boolean)];
+  const name = candidates.find((candidate) => definitions.some((definition) =>
+    definition.name === candidate && !definition.readonly));
+  if (name) return { name, refusal: null };
   if (BAKED_CONSTANT_IDS.has(parameterId) || baked.has(fieldSegment(parameterId)))
     return { name: null, refusal: null };
-  const name = engineControlNames(parameterId, descriptor)
-    .find((candidate) => definitions.some((definition) => definition.name === candidate));
-  return name ? { name, refusal: null }
-    : { name: null, refusal: `no engine parameter matches "${parameterId}"` };
+  return { name: null, refusal: `no engine parameter matches "${parameterId}"` };
+}
+
+/** @param {*} binding @param {string} id @param {*} control @param {ParameterDefinition[]} definitions */
+function liveDerivedControl(binding, id, control, definitions) {
+  if (control.name === null) return false;
+  if (binding.sourceId !== null) return true;
+  const label = id.slice(0, id.indexOf('.'));
+  const resource = control.name.slice(0, control.name.lastIndexOf('.'));
+  return control.name === fieldSegment(id) || control.name.endsWith('.' + fieldSegment(id))
+    || definitions.some((definition) => !definition.readonly
+      && [label + '.modulation-source', resource + '.modulation-source', 'modulation-source',
+        label + '.coverage-mode', resource + '.coverage-mode', 'coverage-mode']
+        .includes(definition.name));
+}
+
+/** @param {*} engine @param {*} module @param {Array<{name: string, stored: number}>} writes */
+function performEngineWrites(engine, module, writes) {
+  const rejected = replayParameterWrites(writes.map(({name, stored}) => ({name, value: stored})),
+    (name, value) => engine.setParameter(name, value), module.ParamSetResult);
+  const refusal = rejected[0];
+  return refusal ? `"${refusal.name}" was refused: ${enumConstantName(module.ParamSetResult, refusal.result)}` : null;
 }
 
 /**
@@ -103,10 +142,11 @@ function compiledControlFor(parameterId, definitions, baked, descriptor) {
  * @param {string} presetId
  * @param {Set<string>} baked - The topology fields the effect bakes in.
  * @param {Set<string>} derived - Validated fields computed by the fixed effect.
+ * @param {*} catalog
  * @returns {string|null} Refusal reason, or null once every writable value is written.
  *   Baked and derived values are skipped; an unregistered id refuses before any write.
  */
-function applyDocumentValues(engine, module, compiled, presetId, baked, derived) {
+function applyDocumentValues(engine, module, compiled, presetId, baked, derived, catalog) {
   const preset = compiled.document.preset_bank.presets
     .find((/** @type {*} */ candidate) => candidate.preset_id === presetId)
     ?? compiled.document.preset_bank.presets[0];
@@ -115,18 +155,14 @@ function applyDocumentValues(engine, module, compiled, presetId, baked, derived)
   const writes = [];
   for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
     if (derived.has(parameterId)) continue;
-    const { name, refusal } = compiledControlFor(parameterId, definitions, baked, compiled.document.descriptor);
+    const { name, refusal } = compiledControlFor(parameterId, definitions, baked, compiled.document.descriptor, catalog);
     if (refusal) return refusal;
     if (name === null) continue;
     const write = resolveParameterWrite(definitions, name, value);
     if (typeof write === 'string') return write;
     writes.push(write);
   }
-  for (const write of writes) {
-    const refusal = performEngineWrite(engine, module, write);
-    if (refusal) return refusal;
-  }
-  return null;
+  return performEngineWrites(engine, module, writes);
 }
 
 /**
@@ -138,10 +174,11 @@ function applyDocumentValues(engine, module, compiled, presetId, baked, derived)
  * @param {string[]} referencePresetIds
  * @param {Set<string>} baked - The topology fields the effect bakes in.
  * @param {(descriptor: *, parameterId: string, values: *) => *} deriveBinding - Compiler binding resolver.
+ * @param {*} [catalog] - Operator fields used by the native controls.
  * @returns {string|null} Refusal reason, or null once applied.
  */
 export function applyFixedShaderDocument(engine, module, compiled, presetId,
-                                         referencePresetIds, baked, deriveBinding) {
+                                         referencePresetIds, baked, deriveBinding, catalog = null) {
   const referenceId = referencePresetIds.includes(presetId)
     ? presetId : referencePresetIds[0];
   if (typeof referenceId !== 'string') return 'the effect has no reference preset';
@@ -150,16 +187,19 @@ export function applyFixedShaderDocument(engine, module, compiled, presetId,
     ?? compiled.document.preset_bank.presets[0];
   const values = preset?.values ?? {};
   const derived = new Set();
+  const definitions = engine.getParameterDefinitions();
   for (const parameterId of Object.keys(values)) {
     const binding = deriveBinding(compiled.document.descriptor, parameterId, values);
     if (!binding) continue;
+    const control = compiledControlFor(parameterId, definitions, baked, compiled.document.descriptor, catalog);
+    if (liveDerivedControl(binding, parameterId, control, definitions)) continue;
     if (!binding.valid)
       return `"${parameterId}" must match the fixed build's derived value ${binding.expected}`;
     derived.add(parameterId);
   }
   if (engine.selectPresetById?.(referenceId) !== true)
     return `the engine refused reference preset "${referenceId}"`;
-  return applyDocumentValues(engine, module, compiled, presetId, baked, derived);
+  return applyDocumentValues(engine, module, compiled, presetId, baked, derived, catalog);
 }
 
 /**
@@ -392,7 +432,7 @@ export function createShaderDocumentController({
       const refusal = active.compiledSide
         ? applyFixedShaderDocument(
           engine, module, store ? { document: store.document() } : active.compiled,
-          presetId, active.referencePresetIds, bakedFields, compiler.fixedDerivedBinding)
+          presetId, active.referencePresetIds, bakedFields, compiler.fixedDerivedBinding, operatorCatalog)
         : applyChainDocument({
           engine, module,
           compiled: store ? { document: store.document() } : active.compiled,
@@ -438,9 +478,7 @@ export function createShaderDocumentController({
   };
 
   /**
-   * The live preview's control name for a document parameter: the interpreter
-   * registers each id verbatim; the compiled build bakes topology fields and
-   * constant ids in.
+   * Resolves document ids against the active engine's registered controls.
    * @param {string} parameterId - A chain parameter id.
    * @param {ParameterDefinition[]} definitions - The engine's definitions.
    * @returns {{name: string|null, refusal: string|null}} The control or refusal.
@@ -451,7 +489,7 @@ export function createShaderDocumentController({
       return { name: chainUi?.store.bypassedLabels().includes(label) ? null : parameterId,
         refusal: null };
     }
-    return compiledControlFor(parameterId, definitions, bakedFields, active.compiled.document.descriptor);
+    return compiledControlFor(parameterId, definitions, bakedFields, active.compiled.document.descriptor, operatorCatalog);
   };
 
   /** @param {string} parameterId @returns {boolean} */
@@ -459,11 +497,10 @@ export function createShaderDocumentController({
     const descriptor = { chain: chainUi?.store.chainView()
       ?? active?.compiled.document.descriptor.chain ?? [] };
     if (periodicAffineBindings(descriptor).some(({ id }) => id === parameterId)) return false;
-    return active?.compiledSide !== true
-      || (!BAKED_CONSTANT_IDS.has(parameterId) && !bakedFields.has(fieldSegment(parameterId))
-      && !compiler.fixedDerivedBinding?.(
-        descriptor,
-        parameterId, {}));
+    if (active?.compiledSide !== true) return true;
+    if (engineControlName(parameterId, getEngine()?.getParameterDefinitions() ?? []).name !== null) return true;
+    return !BAKED_CONSTANT_IDS.has(parameterId) && !bakedFields.has(fieldSegment(parameterId))
+      && !compiler.fixedDerivedBinding?.(descriptor, parameterId, {});
   };
 
   /**
@@ -496,9 +533,12 @@ export function createShaderDocumentController({
           && Number(presetValues[`${label}.pattern-scale`] ?? 1) > 8)
         values[`${label}.pattern-scale`] = 8;
       if (active.compiledSide) {
+        const definitions = getEngine()?.getParameterDefinitions() ?? [];
         const editedPresetValues = { ...presetValues, [parameterId]: value };
         for (const id of Object.keys(presetValues)) {
           const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, editedPresetValues);
+          if (binding && liveDerivedControl(binding, id,
+            engineControlName(id, definitions), definitions)) continue;
           if (binding?.sourceId === parameterId)
             values[id] = binding.expected;
         }
@@ -538,6 +578,19 @@ export function createShaderDocumentController({
               if (written !== module.ParamSetResult.APPLIED)
                 refusal = `"${parameterId}" was refused: ${enumConstantName(module.ParamSetResult, written)}`;
             }
+          } else if (active.compiledSide) {
+            const writes = [];
+            for (const [id, next] of Object.entries(values)) {
+              const resolved = engineControlName(id, definitions);
+              const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, {...presetValues, ...values});
+              if (binding && !liveDerivedControl(binding, id, resolved, definitions)) continue;
+              if (resolved.refusal) { refusal = resolved.refusal; break; }
+              if (resolved.name === null) continue;
+              const write = resolveParameterWrite(definitions, resolved.name, next);
+              if (typeof write === 'string') { refusal = write; break; }
+              writes.push(write);
+            }
+            if (refusal === null) refusal = performEngineWrites(engine, module, writes);
           } else refusal = writeEngineValue(engine, module, definitions, control.name, value);
         }
         if (paused !== null) {
