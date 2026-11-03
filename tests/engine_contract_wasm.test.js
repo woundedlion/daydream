@@ -806,7 +806,7 @@ test('field fold estimates track amplitudes without refusing strengths beyond th
       { instance: 'field', operator: 'sphere.displace.symmetric.v1' },
       { instance: 'project', operator: 'project.stereographic.v2' },
       { instance: 'sample', operator: 'sample.grid.v3' },
-      { instance: 'colorize', operator: 'colorize.generated-palette.v3' },
+      { instance: 'colorize', operator: 'colorize.generated-palette.v4' },
     ]).code, 'APPLIED');
     const initial = engine.getParameterAdvisories();
     assert.equal(initial.length, 1);

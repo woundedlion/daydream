@@ -53,6 +53,24 @@ test('positive strength ranges shade only values above the estimate', () => {
   assert.equal(controller.domElement.querySelector('.param-fold-note'), null);
 });
 
+test('empty, zero and invalid estimates leave unrelated controls usable', () => {
+  const gui = fakePanelGui();
+  const strength = addParamControl(gui, { 'flow.strength': 0.7 }, STRENGTH);
+  const mode = addParamControl(gui, { mode: 0 }, { name: 'mode', value: 0, options: ['A', 'B'] });
+  const controls = new Map([[STRENGTH.name, strength], ['mode', mode]]);
+  syncParamAdvisories(controls, []);
+  assert.equal(strength.domElement.querySelector('.param-fold-note'), null);
+  syncParamAdvisories(controls, [{ name: STRENGTH.name, foldStrength: 0 }]);
+  assert.equal(strength.domElement.style.getPropertyValue('--param-fold-low'), '50%');
+  assert.equal(strength.domElement.style.getPropertyValue('--param-fold-high'), '50%');
+  assert.equal(mode.domElement.querySelector('.param-fold-note'), null);
+  syncParamAdvisories(controls, [{ name: STRENGTH.name, foldStrength: -0.2 }]);
+  assert.equal(strength.domElement.querySelector('.param-fold-note'), null);
+  syncParamAdvisories(controls, []);
+  assert.equal(strength.$input.getAttribute('aria-describedby'), null);
+  assert.equal(strength.getValue(), 0.7);
+});
+
 test('panel polls changed field estimates while paused without writing strength', () => {
   const h = makeHarness({ params: [STRENGTH], engineValues: [0.7] });
   h.state.advisories = [{ name: STRENGTH.name, foldStrength: 0.2 }];
