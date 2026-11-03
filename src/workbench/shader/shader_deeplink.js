@@ -14,10 +14,10 @@ const MAX_PAYLOAD_CHARS = 65536;
 const MAX_STATE_BYTES = 524288;
 
 /** Chain snapshot schema the engine's ChainSnapshot encodes and accepts. */
-export const CHAIN_SNAPSHOT_SCHEMA_VERSION = 4;
+export const CHAIN_SNAPSHOT_SCHEMA_VERSION = 5;
 
 /** @param {*} snapshot @returns {*} Snapshot with independent color modulation nodes. */
-export function migrateLegacyChainSnapshot(snapshot) {
+function migrateModulationSnapshot(snapshot) {
   if (snapshot?.schemaVersion !== 3 || !Array.isArray(snapshot.chain)
       || !Array.isArray(snapshot.parameters) || !Array.isArray(snapshot.modulation)) return snapshot;
   if (snapshot.chain.some((/** @type {*} */ entry) => !entry || typeof entry.instance !== 'string'
@@ -110,9 +110,130 @@ export function migrateLegacyChainSnapshot(snapshot) {
         removed.add(parameter.name);
   }
   if (recipes.size > 0) return snapshot;
-  return {...result, schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain, modulation,
+  return {...result, schemaVersion: 4, chain, modulation,
     parameters: result.parameters.filter((/** @type {*} */ parameter) => !removed.has(parameter.name)),
     ...(result.runtime === undefined ? {} : {runtime})};
+}
+
+/** @param {number[]} a @param {number[]} b @returns {number[]} */
+const complexMultiply = (a, b) => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
+/** @param {number[]} a @param {number[]} b @returns {number[]} */
+const complexDivide = (a, b) => {
+  const d = b[0] ** 2 + b[1] ** 2;
+  return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d];
+};
+/** @param {number[]} a @returns {number[]} */
+const complexSqrt = (a) => {
+  const r = Math.hypot(...a);
+  const re = Math.sqrt(Math.max(0, (r + a[0]) / 2));
+  const im = Math.sqrt(Math.max(0, (r - a[0]) / 2)) * (a[1] < 0 ? -1 : 1);
+  return [re, im];
+};
+
+/** @param {*} fields @param {string} lens @returns {Object<string, number>} */
+export function migrateMobiusCoefficients(fields, lens) {
+  if (Object.entries(fields).some(([key, value]) => !/^mobius-[abcd]-(re|im)$/.test(key)
+      || typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) > 4))
+    throw new Error(`Cannot migrate Mobius lens "${lens}": invalid coefficient parameter.`);
+  const defaults = {a: [Math.SQRT1_2, 0], b: [0, 0], c: [0, 0], d: [Math.SQRT1_2, 0]};
+  const matrix = ['a', 'b', 'c', 'd'].map((key) => ['re', 'im'].map((channel, index) =>
+    fields[`mobius-${key}-${channel}`] ?? defaults[/** @type {keyof typeof defaults} */ (key)][index]));
+  const [a, b, c, d] = matrix;
+  const ad = complexMultiply(a, d);
+  const bc = complexMultiply(b, c);
+  const determinant = [ad[0] - bc[0], ad[1] - bc[1]];
+  if (Math.hypot(...determinant) < 0.001 || matrix.flat().some((value) => !Number.isFinite(value)))
+    throw new Error(`Cannot migrate Mobius lens "${lens}": degenerate coefficients.`);
+  const root = complexSqrt(determinant);
+  let normalized = matrix.map((value) => complexDivide(value, root));
+  let trace = [normalized[0][0] + normalized[3][0], normalized[0][1] + normalized[3][1]];
+  if (trace[0] < 0 || (trace[0] === 0 && trace[1] < 0)) {
+    normalized = normalized.map((value) => value.map((part) => -part));
+    trace = trace.map((part) => -part);
+  }
+  const z = trace.map((part) => part / 2);
+  const zz = complexMultiply(z, z);
+  const sinh = complexSqrt([zz[0] - 1, zz[1]]);
+  // acosh(z) = log(z + sqrt(z - 1) sqrt(z + 1)), with principal square roots.
+  const branch = complexMultiply(complexSqrt([z[0] - 1, z[1]]), complexSqrt([z[0] + 1, z[1]]));
+  const logArg = [z[0] + branch[0], z[1] + branch[1]];
+  const delta = [Math.log(Math.hypot(...logArg)), Math.atan2(logArg[1], logArg[0])];
+  const sinhDelta = [Math.sinh(delta[0]) * Math.cos(delta[1]), Math.cosh(delta[0]) * Math.sin(delta[1])];
+  const ratio = Math.hypot(...sinh) < 1e-8 ? [1, 0] : complexDivide(delta, sinhDelta);
+  const alpha = complexMultiply(ratio, [normalized[0][0] - z[0], normalized[0][1] - z[1]]);
+  const beta = complexMultiply(ratio, normalized[1]);
+  const gamma = complexMultiply(ratio, normalized[2]);
+  const values = {
+    'spin-x': -beta[1] - gamma[1], 'spin-y': -2 * alpha[1], 'spin-z': beta[0] - gamma[0],
+    'push-x': beta[0] + gamma[0], 'push-y': 2 * alpha[0], 'push-z': beta[1] - gamma[1],
+  };
+  if (Object.entries(values).some(([id, value]) => !Number.isFinite(value)
+      || Math.abs(value) > (id.startsWith('spin') ? 2 * Math.PI : 6)))
+    throw new Error(`Cannot migrate Mobius lens "${lens}": generator is outside the v3 ranges.`);
+  return Object.fromEntries(Object.entries(values).map(([id, value]) => [id, Math.fround(value)]));
+}
+
+/** @param {*} snapshot @returns {*} Snapshot with generator-form Mobius lenses. */
+export function migrateLegacyChainSnapshot(snapshot) {
+  snapshot = migrateModulationSnapshot(snapshot);
+  if (snapshot?.schemaVersion !== 4 || !Array.isArray(snapshot.chain)
+      || !Array.isArray(snapshot.parameters) || !Array.isArray(snapshot.modulation)) return snapshot;
+  if (snapshot.chain.some((/** @type {*} */ entry) => !entry || typeof entry.instance !== 'string'
+      || typeof entry.operator !== 'string')
+      || snapshot.parameters.some((/** @type {*} */ entry) => !entry || typeof entry.name !== 'string'
+        || typeof entry.value !== 'number' || !Number.isFinite(entry.value))
+      || new Set(snapshot.parameters.map((/** @type {*} */ entry) => entry.name)).size !== snapshot.parameters.length)
+    return snapshot;
+  const result = structuredClone(snapshot);
+  for (const entry of result.chain) {
+    if (entry.operator !== 'sphere.lens.mobius.v2') continue;
+    const prefix = `${entry.instance}.`;
+    const fields = Object.fromEntries(result.parameters.filter((/** @type {*} */ parameter) =>
+      parameter.name.startsWith(prefix)).map((/** @type {*} */ parameter) => [parameter.name.slice(prefix.length), parameter.value]));
+    const values = migrateMobiusCoefficients(fields, entry.instance);
+    result.parameters = result.parameters.filter((/** @type {*} */ parameter) => !parameter.name.startsWith(prefix));
+    result.parameters.push(...Object.entries(values).map(([id, value]) => ({name: `${prefix}${id}`, value})));
+    entry.operator = 'sphere.lens.mobius.v3';
+  }
+  result.schemaVersion = CHAIN_SNAPSHOT_SCHEMA_VERSION;
+  return result;
+}
+
+/** @param {*} document @returns {*} Document with generator-form Mobius lenses. */
+export function migrateLegacyMobiusDocument(document) {
+  if (!Array.isArray(document?.descriptor?.chain)
+      || !document.descriptor.chain.some((/** @type {*} */ entry) => entry?.operator === 'sphere.lens.mobius.v2'))
+    return document;
+  const result = structuredClone(document);
+  const descriptor = result.descriptor;
+  if (!Array.isArray(descriptor.parameters) || !Array.isArray(descriptor.serialization?.fields)
+      || !Array.isArray(result.preset_bank?.presets))
+    throw new Error('Cannot migrate Mobius document: invalid parameter structure.');
+  for (const slot of descriptor.chain) {
+    if (slot.operator !== 'sphere.lens.mobius.v2') continue;
+    const prefix = `${slot.label}.`;
+    const controls = descriptor.parameters.filter((/** @type {*} */ parameter) => parameter.id.startsWith(prefix));
+    const defaults = Object.fromEntries(controls.map((/** @type {*} */ parameter) => [parameter.id.slice(prefix.length), parameter.default]));
+    const converted = migrateMobiusCoefficients(defaults, slot.label);
+    descriptor.parameters = descriptor.parameters.filter((/** @type {*} */ parameter) => !parameter.id.startsWith(prefix));
+    for (const [id, value] of Object.entries(converted)) {
+      const limit = id.startsWith('spin') ? Math.fround(2 * Math.PI) : 6;
+      descriptor.parameters.push({classification: 'preset', default: value,
+        domain: {minimum: -limit, maximum: limit}, id: `${prefix}${id}`,
+        interpolation: {kind: 'LINEAR'}, storage: 'binary32', unit: 'ratio'});
+    }
+    descriptor.serialization.fields = descriptor.serialization.fields.filter((/** @type {*} */ id) => !id.startsWith(prefix));
+    descriptor.serialization.fields.push(...Object.keys(converted).map((id) => `${prefix}${id}`));
+    for (const preset of result.preset_bank.presets) {
+      const values = Object.fromEntries(Object.entries(preset.values).filter(([id]) => id.startsWith(prefix))
+        .map(([id, value]) => [id.slice(prefix.length), value]));
+      const migrated = migrateMobiusCoefficients({...defaults, ...values}, slot.label);
+      preset.values = Object.fromEntries(Object.entries(preset.values).filter(([id]) => !id.startsWith(prefix)));
+      Object.assign(preset.values, Object.fromEntries(Object.entries(migrated).map(([id, value]) => [`${prefix}${id}`, value])));
+    }
+    slot.operator = 'sphere.lens.mobius.v3';
+  }
+  return result;
 }
 
 /** @param {*} value @returns {*} */
@@ -138,7 +259,7 @@ function normalizedState(value) {
         || snapshot.parameters.some((/** @type {*} */ entry) => !entry || typeof entry !== 'object' || Array.isArray(entry) || typeof entry.name !== 'string')))
     throw new Error('invalid shader link snapshot');
   return {
-    document: value.document,
+    document: migrateLegacyMobiusDocument(value.document),
     preset: value.preset,
     bypassed: [...value.bypassed],
     paused: value.paused,

@@ -144,7 +144,7 @@ test('legacy standalone modulation stages restore as unified layers with the sam
   });
   assert.equal(restore(legacy), module.ChainSnapshotRestoreResult.APPLIED);
   const native = capture();
-  assert.equal(native.schemaVersion, 4);
+  assert.equal(native.schemaVersion, 5);
   assert.deepEqual(native.chain.slice(-2), [
     {instance: 'modulation', operator: 'color.modulate.v1'},
     {instance: 'old-hue', operator: 'color.modulate.v1'},

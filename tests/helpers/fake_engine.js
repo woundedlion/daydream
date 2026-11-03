@@ -227,7 +227,7 @@ export class FakeChainEngine {
       isValid,
       getProgram: () => isValid() ? structuredClone(this.program) : null,
       getSnapshot: () => isValid() ? {
-        schemaVersion: 4, chain: structuredClone(this.program),
+        schemaVersion: 5, chain: structuredClone(this.program),
         parameters: this.definitions.filter((d) => !this.modulation.some((entry) =>
           d.name.startsWith(`${entry.instance}.`) && MODULATION_PATHS[d.name.split('.')[1]]))
           .map((d) => ({name: d.name, value: d.acceptedValue})),
@@ -242,7 +242,7 @@ export class FakeChainEngine {
         if (snapshot === null || typeof snapshot !== 'object' || Array.isArray(snapshot)
             || !Number.isInteger(snapshot.schemaVersion) || snapshot.schemaVersion < 0
             || snapshot.schemaVersion > 0xffffffff) return ChainSnapshotRestoreResult.INVALID_VALUE;
-        if (snapshot.schemaVersion !== 4) return snapshot.schemaVersion === 3
+        if (snapshot.schemaVersion !== 5) return snapshot.schemaVersion === 3
           ? ChainSnapshotRestoreResult.INVALID_VALUE : ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
         if (typeof snapshot.animationsPaused !== 'boolean') return ChainSnapshotRestoreResult.INVALID_VALUE;
         if (!Array.isArray(snapshot.chain) || !Array.isArray(snapshot.parameters) || !Array.isArray(snapshot.modulation))

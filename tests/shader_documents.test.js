@@ -12,6 +12,7 @@ import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 import { documentFromChainSnapshot, scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
 import {
   decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash, migrateLegacyChainSnapshot,
+  migrateMobiusCoefficients, migrateLegacyMobiusDocument,
 } from '../src/workbench/shader/shader_deeplink.js';
 import {
   applyFixedShaderDocument,
@@ -70,7 +71,7 @@ test('v2 shader links retain typed runtime and palette state', async () => {
     document: {descriptor: {chain: [{label: 'source'}]}},
     preset: 'night', bypassed: [], paused: true,
     chainSnapshot: {
-      schemaVersion: 4, chain: [{instance: 'source', operator: 'sample.grid.v3'}],
+      schemaVersion: 5, chain: [{instance: 'source', operator: 'sample.grid.v3'}],
       modulation: [], parameters: [{name: 'source.pattern-freq', value: 1}], animationsPaused: true,
       runtime: [{instance: 'source', kind: 'source-clock-v1',
         state: {primary: 1.25, secondary: 0.5, angle: 2}}],
@@ -103,7 +104,7 @@ test('legacy snapshots split displacement and spatial modulation without losing 
     runtime: [{instance: 'ink', kind: 'color-clock-v2', state: {oscillationPhase: 0.75, modulation: clock}}],
     animationsPaused: true};
   const snapshot = migrateLegacyChainSnapshot(legacy);
-  assert.equal(snapshot.schemaVersion, 4);
+  assert.equal(snapshot.schemaVersion, 5);
   assert.deepEqual(snapshot.chain.slice(1), [
     {instance: 'ink', operator: 'colorize.generated-palette.v4'},
     {instance: 'displacement-2', operator: 'color.modulate.v1'},
@@ -123,6 +124,42 @@ test('legacy snapshots split displacement and spatial modulation without losing 
   ]);
   assert.equal(legacy.schemaVersion, 3);
   assert.equal(migrateLegacyChainSnapshot(snapshot), snapshot);
+});
+
+test('Mobius v2 snapshots migrate to the same generator without mutating the source', () => {
+  const values = {'mobius-a-re': -1.072, 'mobius-a-im': 0.304, 'mobius-b-re': 0.416};
+  const original = {schemaVersion: 4, chain: [{instance: 'warp-lens', operator: 'sphere.lens.mobius.v2'}],
+    parameters: Object.entries(values).map(([id, value]) => ({name: `warp-lens.${id}`, value})), modulation: []};
+  const result = migrateLegacyChainSnapshot(original);
+  assert.equal(result.schemaVersion, 5);
+  assert.equal(result.chain[0].operator, 'sphere.lens.mobius.v3');
+  const fields = Object.fromEntries(result.parameters.map(({name, value}) => [name.slice('warp-lens.'.length), value]));
+  for (const [id, expected] of Object.entries({'spin-x': 0.6686195, 'spin-y': -2.8652654,
+    'spin-z': 0.007910899, 'push-x': 0.007910899, 'push-y': 0.45477402, 'push-z': -0.6686195}))
+    assert.ok(Math.abs(fields[id] - expected) < 1e-6, id);
+  assert.equal(original.schemaVersion, 4);
+  assert.equal(original.chain[0].operator, 'sphere.lens.mobius.v2');
+  const translation = migrateMobiusCoefficients({'mobius-a-re': 1, 'mobius-d-re': 1,
+    'mobius-b-re': 2, 'mobius-b-im': -1}, 'pan');
+  assert.deepEqual(translation, {'spin-x': 1, 'spin-y': -0, 'spin-z': 2, 'push-x': 2, 'push-y': 0, 'push-z': -1});
+  assert.throws(() => migrateMobiusCoefficients({'mobius-a-re': 0.001,
+    'mobius-d-re': 1, 'mobius-b-re': 4}, 'too-strong'), /too-strong.*outside the v3 ranges/);
+  assert.throws(() => migrateMobiusCoefficients({'mobius-a-re': 0, 'mobius-d-re': 0}, 'singular'), /singular.*degenerate/);
+});
+
+test('Mobius documents migrate defaults, presets and serialization together', () => {
+  const parameters = Object.entries({'mobius-a-re': 1, 'mobius-d-re': 1, 'mobius-b-re': 0})
+    .map(([id, value]) => ({id: `lens.${id}`, default: value}));
+  const original = {descriptor: {chain: [{label: 'lens', operator: 'sphere.lens.mobius.v2'}],
+    parameters, serialization: {schema_version: 1, fields: parameters.map(({id}) => id)}},
+  preset_bank: {presets: [{preset_id: 'pan', values: {'lens.mobius-b-re': 2}}]}};
+  const migrated = migrateLegacyMobiusDocument(original);
+  assert.equal(migrated.descriptor.chain[0].operator, 'sphere.lens.mobius.v3');
+  assert.equal(migrated.descriptor.parameters.length, 6);
+  assert.equal(migrated.descriptor.serialization.fields.length, 6);
+  assert.equal(migrated.preset_bank.presets[0].values['lens.spin-z'], 2);
+  assert.equal(migrated.preset_bank.presets[0].values['lens.push-x'], 2);
+  assert.equal(original.descriptor.chain[0].operator, 'sphere.lens.mobius.v2');
 });
 
 test('legacy snapshot migration preserves malformed values for rejection', async () => {
@@ -2515,7 +2552,7 @@ test('a chain snapshot restores its program and accepted parameters into the edi
 });
 
 for (const route of ['link', 'query']) {
-  for (const schemaVersion of [4]) {
+  for (const schemaVersion of [5]) {
     test(`schema ${schemaVersion} ${route} Twist snapshots restore total angles and runtime`, async () => {
       const catalog = JSON.parse(ENGINE_CATALOG);
       const twist = catalog.operators.find((operator) => operator.id === 'sphere.lens.twist.v2');
@@ -2688,7 +2725,7 @@ test('shader links refuse null snapshot entries before initializing a candidate'
     [[], [], [null]], [[], [], [[]]], [[], [], [3]],
   ]) {
     const compact = {d: {descriptor: {chain: []}}, p: 'night', b: [], a: true,
-      s: {schemaVersion: 4, chain, parameters, modulation}};
+      s: {schemaVersion: 5, chain, parameters, modulation}};
     const payload = gzipSync(JSON.stringify(compact)).toString('base64url');
     await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`), /invalid shader link snapshot/);
     await assert.rejects(encodeShaderStateHash({document: compact.d, preset: compact.p,
@@ -2907,7 +2944,7 @@ for (const route of ['link', 'query']) {
       }});
     if (route === 'query') {
       assert.equal(restores.length, 1);
-      assert.equal(restores[0].schemaVersion, 4);
+      assert.equal(restores[0].schemaVersion, 5);
       assert.ok(restores[0].chain.some(({operator}) => operator === 'color.modulate.v1'));
       assert.equal(restores[0].runtime.find(({instance}) => instance === 'modulation').kind,
         'modulation-clock-v1');
