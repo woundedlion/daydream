@@ -530,6 +530,8 @@ const CONTRAST_EXEMPT = {
       'lil-gui supplies its own background in its vendored stylesheet',
     '.gui-container .effect-gui .param-warning-note':
       'lil-gui supplies its own background in its vendored stylesheet',
+    '.gui-container .effect-gui .param-fold-note':
+      'lil-gui supplies its own background in its vendored stylesheet',
     'div.label': 'text over the live canvas',
     '.segment-stats': 'translucent readout over the live canvas',
     '.segment-stats th': 'translucent readout over the live canvas',
