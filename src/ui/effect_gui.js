@@ -59,6 +59,8 @@ import { formatExportParams } from "../shared/export_params.js";
  * @property {boolean} animationPauseApplied - Whether pause transitions reach
  *   the engine.
  * @property {boolean} warningsDirty - Whether the warnings must be re-read.
+ * @property {boolean} advisoriesDirty - Whether an accepted edit needs new fold estimates.
+ * @property {number[]|null} advisoryValues - Parameter values used for the displayed fold estimates.
  */
 
 const RESERVED_CONTROL_NAMES = new Set(['pause']);
@@ -297,7 +299,23 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       activeEffect.actions.showPreset(getPresetCount(), getPresetIndex());
     }
     valueSync.syncValues(activeEffect, { advanced, presetAdvanced });
-    syncParamAdvisories(activeEffect.controllerByName, getParameterAdvisories());
+    syncAdvisories(activeEffect);
+  }
+
+  /**
+   * Refresh fold estimates when the engine's parameters change.
+   * @param {EffectRecord} fx - The displayed effect record.
+   * @returns {void}
+   */
+  function syncAdvisories(fx) {
+    const values = engineParamValues();
+    let changed = values !== null && fx.advisoryValues?.length !== values.length;
+    for (let index = 0; values && !changed && index < values.length; index += 1)
+      changed = !Object.is(values[index], fx.advisoryValues?.[index]);
+    if (!fx.advisoriesDirty && !changed) return;
+    syncParamAdvisories(fx.controllerByName, getParameterAdvisories());
+    fx.advisoryValues = values ? Array.from(values) : null;
+    fx.advisoriesDirty = false;
   }
 
   /**
@@ -341,6 +359,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    */
   function adoptPresetChange(fx, count, index) {
     fx.warningsDirty = true;
+    fx.advisoriesDirty = true;
     if (!usesChainSnapshot()) {
       for (const parameter of getParameterDefinitions()) {
         if (!parameter.readonly) fx.gui.writeStoredValue(parameter.name, null);
@@ -550,7 +569,10 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
           controller.updateDisplay();
         }
         if (accepted) acceptedControlValue = v;
-        if (accepted) setWorkerParam(p.name, value);
+        if (accepted) {
+          setWorkerParam(p.name, value);
+          fx.advisoriesDirty = true;
+        }
         if (!fx.hydrating) adoptEnginePause(pause, p);
         fx.warningsDirty = true;
         return accepted;
@@ -597,6 +619,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       animationPauseApplied: false,
       hydrating: true,
       warningsDirty: false,
+      advisoriesDirty: true,
+      advisoryValues: null,
     }));
 
     fx.edits = new EffectPanelEdits(dragTarget, (edited) => persistence.persist(fx.gui, { edited }));
@@ -617,7 +641,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       const pause = addPauseToggle(fx, { initialPause, hydrate: hydratePause });
       addParamControllers(fx, params, pause, previousParamNames);
       fx.pause = pause;
-      syncParamAdvisories(fx.controllerByName, getParameterAdvisories());
+      syncAdvisories(fx);
       fx.hydrating = false;
       return fx;
     } catch (error) {

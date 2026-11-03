@@ -71,7 +71,7 @@ test('empty, zero and invalid estimates leave unrelated controls usable', () => 
   assert.equal(strength.getValue(), 0.7);
 });
 
-test('panel polls changed field estimates while paused without writing strength', () => {
+test('panel refreshes changed parameters while paused without writing strength', () => {
   const h = makeHarness({ params: [STRENGTH], engineValues: [0.7] });
   h.state.advisories = [{ name: STRENGTH.name, foldStrength: 0.2 }];
   h.panel.build();
@@ -79,9 +79,46 @@ test('panel polls changed field estimates while paused without writing strength'
   assert.equal(controller.domElement.style.getPropertyValue('--param-fold-high'), '60%');
   const writes = [...h.writes];
   h.state.advisories = [{ name: STRENGTH.name, foldStrength: 0.5 }];
+  h.state.engineValues[0] = 0.8;
   h.panel.sync(false);
   assert.equal(controller.domElement.style.getPropertyValue('--param-fold-high'), '75%');
   assert.deepEqual(h.writes, writes);
-  assert.equal(controller.getValue(), 0.7);
+  assert.equal(controller.getValue(), 0.8);
+  h.panel.destroy();
+});
+
+
+test('unchanged frames reuse estimates without querying parameter controls', () => {
+  const h = makeHarness({ params: [STRENGTH], engineValues: [0.7] });
+  h.state.advisories = [{ name: STRENGTH.name, foldStrength: 0.2 }];
+  h.panel.build();
+  const controller = h.panel.active().controllerByName.get(STRENGTH.name);
+  const query = controller.domElement.querySelector.bind(controller.domElement);
+  let queries = 0;
+  controller.domElement.querySelector = (...args) => { queries += 1; return query(...args); };
+  for (let frame = 0; frame < 5; frame += 1) h.panel.sync();
+  assert.equal(h.state.advisoryReads, 1);
+  assert.equal(queries, 0);
+  h.state.engineValues[0] = 0.8;
+  h.panel.sync();
+  assert.equal(h.state.advisoryReads, 2);
+  assert.ok(queries > 0);
+  h.panel.sync();
+  assert.equal(h.state.advisoryReads, 2);
+  h.panel.destroy();
+});
+
+test('accepted edits refresh estimates before the live value stream advances', () => {
+  const h = makeHarness({ params: [STRENGTH], engineValues: [0.7] });
+  h.state.advisories = [{ name: STRENGTH.name, foldStrength: 0.2 }];
+  h.panel.build();
+  const controller = h.panel.active().controllerByName.get(STRENGTH.name);
+  h.state.advisories = [{ name: STRENGTH.name, foldStrength: 0.5 }];
+  controller.setValue(0.8);
+  h.panel.sync(false);
+  assert.equal(h.state.advisoryReads, 2);
+  assert.equal(controller.domElement.style.getPropertyValue('--param-fold-high'), '75%');
+  h.panel.sync(false);
+  assert.equal(h.state.advisoryReads, 2);
   h.panel.destroy();
 });

@@ -178,6 +178,7 @@ export function makeHarness({
   installDocument({ body: fakeElement('body', { connected: true }), activeElement: null });
   const state = {
     advisories: [],
+    advisoryReads: 0,
     params,
     focused: null,
     paramFilter: null,
@@ -207,7 +208,7 @@ export function makeHarness({
   const panel = createEffectGui({
     engine: {
       getParameterDefinitions: () => { paramDefinitionReads += 1; return state.params; },
-      getParameterAdvisories: () => state.advisories,
+      getParameterAdvisories: () => { state.advisoryReads += 1; return state.advisories; },
       paramGeneration: () => state.generation,
       paramValues: () => state.engineValues,
       setParam: (name, value) => {
