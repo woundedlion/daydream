@@ -832,11 +832,38 @@ export async function probeDocumentActions(tab) {
   check(exported.descriptor.chain[0].label === 'camera-rotate', 'rename reaches the saved chain');
   check(exported.preset_bank.presets[0].values[topology.id] === topology.value,
     'a topology select edit reaches the saved preset');
+  await tab.evaluate(() => {
+    Object.assign(window, { saveAsFile: { suggestedName: '', source: '', closed: false } });
+    Object.defineProperty(window, 'showSaveFilePicker', { configurable: true,
+      value: async ({ suggestedName }) => {
+        window.saveAsFile.suggestedName = suggestedName;
+        return { name: 'chosen-study.shader.json', createWritable: async () => ({
+          write: async (source) => { window.saveAsFile.source = source; },
+          close: async () => { window.saveAsFile.closed = true; },
+          abort: async () => {},
+        }) };
+      } });
+  });
+  await tab.click('#shader-document-save-as');
+  await tab.waitForFunction(() => window.saveAsFile.closed);
+  const savedAs = await tab.evaluate(() => window.saveAsFile);
+  const copy = JSON.parse(savedAs.source);
+  check(copy.document_id !== exported.document_id, 'Save As creates a distinct document id');
+  check(savedAs.suggestedName === `${copy.document_id}.shader.json`,
+    'the file picker suggests the copy filename');
+  check(await tab.$eval('#shader-document-status', (node) => node.textContent)
+    === 'Saved chosen-study.shader.json.', 'Save As reports the selected filename');
+  check((await savedDocument(tab)).document_id === exported.document_id,
+    'Save after Save As retains the original document id');
+  await tab.evaluate(() => {
+    Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: undefined });
+    window.prompt = () => 'fallback-study';
+  });
   const exportsBefore = await tab.evaluate(() => window.exported.length);
   await tab.click('#shader-document-save-as');
   await tab.waitForFunction((count) => window.exported.length > count, {}, exportsBefore);
-  const copy = await tab.evaluate(async () => JSON.parse((await Promise.all(window.exported)).at(-1)));
-  check(copy.document_id !== exported.document_id, 'Save As creates a distinct document id');
+  check(await tab.$eval('#shader-document-status', (node) => node.textContent)
+    === 'Saved fallback-study.shader.json.', 'the fallback prompt accepts a filename');
   await tab.evaluate(() => {
     window.copiedDigest = '';
     Object.defineProperty(navigator, 'clipboard', { configurable: true,
