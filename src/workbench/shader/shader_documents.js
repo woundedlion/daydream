@@ -21,7 +21,7 @@ import { copyToClipboard } from '../../shared/copy_text.js';
 import { downloadBlob } from '../../shared/download_file.js';
 import {
   decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash, migrateLegacyChainSnapshot,
-  migrateLegacyMobiusDocument,
+  migrateLegacyMobiusDocument, migrateLegacySymmetricDocument,
 } from './shader_deeplink.js';
 
 const PATTERN_CATALOG_URL = '../../../generated/shader/patterns/catalog.json';
@@ -619,7 +619,7 @@ export function createShaderDocumentController({
         if (typeof source === 'string') {
           try { candidate = compiler.parseShaderDocument(source); } catch { /* compiler reports malformed input */ }
         }
-        source = migrateLegacyMobiusDocument(candidate);
+        source = migrateLegacySymmetricDocument(migrateLegacyMobiusDocument(candidate));
         compiled = compiler.compileShaderDocument(source, { catalog: operatorCatalog });
       } catch (error) {
         const detail = errorDetail(error);

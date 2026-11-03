@@ -174,7 +174,7 @@ export function migrateMobiusCoefficients(fields, lens) {
 }
 
 /** @param {*} snapshot @returns {*} Snapshot with generator-form Mobius lenses. */
-export function migrateLegacyChainSnapshot(snapshot) {
+function migrateMobiusSnapshot(snapshot) {
   snapshot = migrateModulationSnapshot(snapshot);
   if (snapshot?.schemaVersion !== 4 || !Array.isArray(snapshot.chain)
       || !Array.isArray(snapshot.parameters) || !Array.isArray(snapshot.modulation)) return snapshot;
@@ -196,6 +196,107 @@ export function migrateLegacyChainSnapshot(snapshot) {
     entry.operator = 'sphere.lens.mobius.v3';
   }
   result.schemaVersion = CHAIN_SNAPSHOT_SCHEMA_VERSION;
+  return result;
+}
+
+const SYMMETRIC_V1 = 'sphere.displace.symmetric.v1';
+const SYMMETRIC_V2 = 'sphere.displace.symmetric.v2';
+const SYMMETRIC_STRENGTH_LIMIT = Math.fround(4 * Math.PI);
+
+/** @param {*} strength @param {*} amplitude @param {string} lens @returns {number} */
+function symmetricStrength(strength, amplitude, lens) {
+  if (typeof strength !== 'number' || !Number.isFinite(Math.fround(strength))
+      || Math.abs(Math.fround(strength)) > Math.fround(Math.PI)
+      || typeof amplitude !== 'number' || !Number.isFinite(Math.fround(amplitude))
+      || Math.abs(Math.fround(amplitude)) > 4)
+    throw new Error(`Cannot migrate Symmetric lens "${lens}": invalid strength or amplitude.`);
+  const combined = Math.fround(Math.fround(strength) * Math.fround(amplitude));
+  if (!Number.isFinite(combined) || Math.abs(combined) > SYMMETRIC_STRENGTH_LIMIT)
+    throw new Error(`Cannot migrate Symmetric lens "${lens}": effective strength is outside the v2 range.`);
+  return combined;
+}
+
+/** @param {*} snapshot @returns {*} Snapshot with one effective Symmetric strength. */
+function migrateSymmetricSnapshot(snapshot) {
+  if (!Array.isArray(snapshot?.chain)
+      || !snapshot.chain.some((/** @type {*} */ entry) => entry?.operator === SYMMETRIC_V1))
+    return snapshot;
+  if (snapshot.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION) return snapshot;
+  if (!Array.isArray(snapshot.parameters)
+      || snapshot.parameters.some((/** @type {*} */ entry) => !entry || typeof entry.name !== 'string'))
+    throw new Error('Cannot migrate Symmetric snapshot: invalid parameter structure.');
+  const result = structuredClone(snapshot);
+  for (const slot of result.chain) {
+    if (slot.operator !== SYMMETRIC_V1) continue;
+    const strengthId = `${slot.instance}.strength`;
+    const amplitudeId = `${slot.instance}.amplitude`;
+    const strengths = result.parameters.filter((/** @type {*} */ entry) => entry.name === strengthId);
+    const amplitudes = result.parameters.filter((/** @type {*} */ entry) => entry.name === amplitudeId);
+    if (strengths.length > 1 || amplitudes.length > 1)
+      throw new Error(`Cannot migrate Symmetric lens "${slot.instance}": duplicate parameter.`);
+    const value = symmetricStrength(strengths.length ? strengths[0].value : 0.05,
+      amplitudes.length ? amplitudes[0].value : 1, slot.instance);
+    result.parameters = result.parameters.filter((/** @type {*} */ entry) => entry.name !== amplitudeId);
+    if (strengths.length) strengths[0].value = value;
+    else result.parameters.push({name: strengthId, value});
+    const hadSpeed = result.parameters.some((/** @type {*} */ entry) => entry.name === `${slot.instance}.speed`);
+    if (!hadSpeed) result.parameters.push({name: `${slot.instance}.speed`, value: 0});
+    if (!hadSpeed && Array.isArray(result.runtime)
+        && !result.runtime.some((/** @type {*} */ entry) => entry?.instance === slot.instance))
+      result.runtime.push({instance: slot.instance, kind: 'source-clock-v1',
+        state: {primary: 0, secondary: 0, angle: 0}});
+    slot.operator = SYMMETRIC_V2;
+  }
+  return result;
+}
+
+/** @param {*} snapshot @returns {*} Snapshot with current operator controls. */
+export function migrateLegacyChainSnapshot(snapshot) {
+  return migrateSymmetricSnapshot(migrateMobiusSnapshot(snapshot));
+}
+
+/** @param {*} document @returns {*} Document with one effective Symmetric strength. */
+export function migrateLegacySymmetricDocument(document) {
+  if (!Array.isArray(document?.descriptor?.chain)
+      || !document.descriptor.chain.some((/** @type {*} */ entry) => entry?.operator === SYMMETRIC_V1))
+    return document;
+  const result = structuredClone(document);
+  const descriptor = result.descriptor;
+  if (!Array.isArray(descriptor.parameters)
+      || descriptor.parameters.some((/** @type {*} */ parameter) => !parameter || typeof parameter.id !== 'string')
+      || !Array.isArray(descriptor.serialization?.fields)
+      || !Array.isArray(result.preset_bank?.presets))
+    throw new Error('Cannot migrate Symmetric document: invalid parameter structure.');
+  for (const slot of descriptor.chain) {
+    if (slot.operator !== SYMMETRIC_V1) continue;
+    const strengthId = `${slot.label}.strength`;
+    const amplitudeId = `${slot.label}.amplitude`;
+    const strengths = descriptor.parameters.filter((/** @type {*} */ parameter) => parameter.id === strengthId);
+    const amplitudes = descriptor.parameters.filter((/** @type {*} */ parameter) => parameter.id === amplitudeId);
+    if (strengths.length > 1 || amplitudes.length > 1)
+      throw new Error(`Cannot migrate Symmetric lens "${slot.label}": duplicate parameter.`);
+    const strength = strengths.length ? strengths[0].default : 0.05;
+    const amplitude = amplitudes.length ? amplitudes[0].default : 1;
+    const combined = symmetricStrength(strength, amplitude, slot.label);
+    descriptor.parameters = descriptor.parameters.filter((/** @type {*} */ parameter) => parameter.id !== amplitudeId);
+    if (strengths.length) {
+      strengths[0].default = combined;
+      strengths[0].domain = {minimum: -SYMMETRIC_STRENGTH_LIMIT, maximum: SYMMETRIC_STRENGTH_LIMIT};
+    } else descriptor.parameters.push({id: strengthId, classification: 'preset', storage: 'binary32',
+      unit: 'ratio', domain: {minimum: -SYMMETRIC_STRENGTH_LIMIT, maximum: SYMMETRIC_STRENGTH_LIMIT},
+      interpolation: {kind: 'SNAP'}, default: combined});
+    descriptor.serialization.fields = descriptor.serialization.fields.filter((/** @type {*} */ id) => id !== amplitudeId);
+    if (!descriptor.serialization.fields.includes(strengthId)) descriptor.serialization.fields.push(strengthId);
+    for (const preset of result.preset_bank.presets) {
+      if (!preset?.values || typeof preset.values !== 'object' || Array.isArray(preset.values))
+        throw new Error('Cannot migrate Symmetric document: invalid preset values.');
+      preset.values[strengthId] = symmetricStrength(
+        Object.hasOwn(preset.values, strengthId) ? preset.values[strengthId] : strength,
+        Object.hasOwn(preset.values, amplitudeId) ? preset.values[amplitudeId] : amplitude, slot.label);
+      delete preset.values[amplitudeId];
+    }
+    slot.operator = SYMMETRIC_V2;
+  }
   return result;
 }
 
@@ -259,7 +360,7 @@ function normalizedState(value) {
         || snapshot.parameters.some((/** @type {*} */ entry) => !entry || typeof entry !== 'object' || Array.isArray(entry) || typeof entry.name !== 'string')))
     throw new Error('invalid shader link snapshot');
   return {
-    document: migrateLegacyMobiusDocument(value.document),
+    document: migrateLegacySymmetricDocument(migrateLegacyMobiusDocument(value.document)),
     preset: value.preset,
     bypassed: [...value.bypassed],
     paused: value.paused,

@@ -172,7 +172,7 @@ test('the fake chain engine advances generations after repeated application', ()
 
 test('field snapshot fakes preserve their drift clocks', () => {
   for (const operator of ['sphere.displace.potential.v1',
-    'sphere.displace.rossby-haurwitz.v1', 'sphere.displace.symmetric.v1']) {
+    'sphere.displace.rossby-haurwitz.v1', 'sphere.displace.symmetric.v2']) {
     const engine = new FakeChainEngine();
     engine.setEffect('ShaderChain');
     const bindings = engine.getShaderChainBindings();

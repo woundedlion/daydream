@@ -206,7 +206,7 @@ export class FakeChainEngine {
       } else if (operator.startsWith('sample.') || operator === 'sphere.lens.twist.v2'
           || operator === 'sphere.displace.potential.v1'
           || operator === 'sphere.displace.rossby-haurwitz.v1'
-          || operator === 'sphere.displace.symmetric.v1') {
+          || operator === 'sphere.displace.symmetric.v2') {
         kind = 'source-clock-v1';
         state = { primary: 0, secondary: 0, angle: 0 };
       } else {

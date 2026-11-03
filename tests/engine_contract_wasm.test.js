@@ -10,6 +10,7 @@ import createHolosphereModule from '../generated/holosphere_wasm.js';
 import { validateRegistryFaces } from '../src/workbench/solids/solid_registry_codegen.js';
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
+import { migrateLegacyChainSnapshot } from '../src/workbench/shader/shader_deeplink.js';
 import { createChainValidator } from '../src/workbench/solids/solid_validation.js';
 import {
   KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
@@ -865,12 +866,12 @@ test('a rejected parameter write names its reason', () => {
     'setParameter must report NON_FINITE for a NaN value');
 });
 
-test('field fold estimates track amplitudes without refusing strengths beyond the estimate', () => {
+test('Symmetric Strength spans its full range without changing the unit-field fold estimate', () => {
   engine.setEffect('ShaderChain');
   const bindings = engine.getShaderChainBindings();
   try {
     assert.equal(bindings.setShaderChain([
-      { instance: 'field', operator: 'sphere.displace.symmetric.v1' },
+      { instance: 'field', operator: 'sphere.displace.symmetric.v2' },
       { instance: 'project', operator: 'project.stereographic.v2' },
       { instance: 'sample', operator: 'sample.grid.v3' },
       { instance: 'colorize', operator: 'colorize.generated-palette.v4' },
@@ -884,10 +885,33 @@ test('field fold estimates track amplitudes without refusing strengths beyond th
     const current = () => engine.getParameterDefinitions().find((p) => p.name === 'field.strength');
     assert.ok(Math.abs(current().acceptedValue - strength) < 1e-6);
     assert.equal(current().warning, undefined);
-    assert.equal(engine.setParameter('field.strength', 0.05), M.ParamSetResult.APPLIED);
-    assert.equal(engine.setParameter('field.amplitude', 2), M.ParamSetResult.APPLIED);
-    assert.ok(Math.abs(engine.getParameterAdvisories()[0].foldStrength * 2
-      - initial[0].foldStrength) < 1e-5);
+    assert.equal(engine.setParameter('field.strength', -Math.fround(4 * Math.PI)), M.ParamSetResult.APPLIED);
+    assert.equal(engine.setParameter('field.amplitude', 2), M.ParamSetResult.UNKNOWN_PARAM);
+    assert.equal(engine.getParameterDefinitions().some(({name}) => name === 'field.amplitude'), false);
+    assert.equal(engine.getParameterAdvisories()[0].foldStrength, initial[0].foldStrength);
+  } finally { bindings.delete(); }
+});
+
+test('legacy Symmetric snapshots restore effective Strength and rotation in WASM', () => {
+  engine.setEffect('ShaderChain');
+  const bindings = engine.getShaderChainBindings();
+  try {
+    assert.equal(bindings.setShaderChain([
+      {instance: 'field', operator: 'sphere.displace.symmetric.v2'},
+      {instance: 'project', operator: 'project.stereographic.v2'},
+      {instance: 'sample', operator: 'sample.grid.v3'},
+      {instance: 'colorize', operator: 'colorize.generated-palette.v4'},
+    ]).code, 'APPLIED');
+    const snapshot = bindings.getSnapshot();
+    snapshot.chain[0].operator = 'sphere.displace.symmetric.v1';
+    snapshot.parameters.find(({name}) => name === 'field.strength').value = 0.25;
+    snapshot.parameters.push({name: 'field.amplitude', value: -2});
+    snapshot.runtime.find(({instance}) => instance === 'field').state.primary = -1.25;
+    const migrated = migrateLegacyChainSnapshot(snapshot);
+    assert.equal(bindings.restoreSnapshot(migrated), M.ChainSnapshotRestoreResult.APPLIED);
+    const restored = bindings.getSnapshot();
+    assert.equal(restored.parameters.find(({name}) => name === 'field.strength').value, -0.5);
+    assert.equal(restored.runtime.find(({instance}) => instance === 'field').state.primary, -1.25);
   } finally { bindings.delete(); }
 });
 

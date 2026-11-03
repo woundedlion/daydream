@@ -186,6 +186,92 @@ test('importing a v2 Mobius document installs its generator controls', async () 
   assert.ok(snapshot.parameters.every(({name}) => !name.startsWith('lens.mobius-')));
 });
 
+function legacySymmetricStudy({stateless = false} = {}) {
+  const catalog = JSON.parse(ENGINE_CATALOG);
+  const operator = catalog.operators.find(({id}) => /^sphere\.displace\.symmetric\.v[12]$/.test(id));
+  operator.id = 'sphere.displace.symmetric.v2';
+  operator.params = operator.params.filter(({id}) => id !== 'amplitude');
+  Object.assign(operator.params.find(({id}) => id === 'strength'),
+    {min: -Math.fround(4 * Math.PI), max: Math.fround(4 * Math.PI)});
+  const document = scratchChainDocument(catalog, [
+    {label: 'flow', operator: operator.id},
+    {label: 'project', operator: 'project.stereographic.v2'},
+    {label: 'sample', operator: 'sample.grid.v3'},
+    {label: 'colorize', operator: 'colorize.generated-palette.v4'},
+  ]);
+  document.descriptor.chain[0].operator = 'sphere.displace.symmetric.v1';
+  const strength = document.descriptor.parameters.find(({id}) => id === 'flow.strength');
+  strength.default = 0.25;
+  strength.domain = {minimum: -Math.fround(Math.PI), maximum: Math.fround(Math.PI)};
+  document.descriptor.parameters.push({...structuredClone(strength), id: 'flow.amplitude',
+    default: -2, domain: {minimum: -4, maximum: 4}});
+  Object.assign(document.preset_bank.presets[0].values,
+    {'flow.strength': 0.25, 'flow.amplitude': -2, 'flow.speed': 0.02});
+  if (stateless) {
+    document.descriptor.parameters = document.descriptor.parameters.filter(({id}) => id !== 'flow.speed');
+    delete document.preset_bank.presets[0].values['flow.speed'];
+  }
+  document.descriptor.serialization.fields = document.descriptor.parameters.map(({id}) => id);
+  return {document, catalog: JSON.stringify(catalog)};
+}
+
+test('opening a legacy Symmetric file saves one effective Strength control', async () => {
+  const {document, catalog} = legacySymmetricStudy();
+  const before = structuredClone(document);
+  const harness = await editorWorkbench({source: null, engineCatalog: catalog});
+  const file = harness.elements.get('shader-document-file');
+  file.files = [{name: 'symmetric.shader.json', size: 1000, text: async () => JSON.stringify(document)}];
+  await onChange(file)();
+  assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok',
+    harness.elements.get('shader-document-status').textContent);
+  assert.equal(harness.controller.save(), true);
+  const saved = JSON.parse(harness.downloads.at(-1)[1]);
+  assert.equal(saved.descriptor.chain[0].operator, 'sphere.displace.symmetric.v2');
+  assert.equal(saved.preset_bank.presets[0].values['flow.strength'], -0.5);
+  assert.equal(saved.preset_bank.presets[0].values['flow.speed'], Math.fround(0.02));
+  assert.ok(saved.descriptor.parameters.every(({id}) => id !== 'flow.amplitude'));
+  assert.deepEqual(document, before);
+});
+
+for (const stateless of [false, true]) {
+  test(`legacy Symmetric v2 links restore ${stateless ? 'zero' : 'accumulated'} rotation`, async () => {
+    const {document, catalog} = legacySymmetricStudy({stateless});
+    const loaded = await editorWorkbench({source: null, engineCatalog: catalog});
+    assert.equal(await loaded.controller.loadSource(document), true);
+    const snapshot = callWorkbenchBinding(loaded.engine, 'getSnapshot', [], null);
+    snapshot.chain[0].operator = 'sphere.displace.symmetric.v1';
+    snapshot.parameters.find(({name}) => name === 'flow.strength').value = 0.25;
+    snapshot.parameters.push({name: 'flow.amplitude', value: -2});
+    if (stateless) {
+      snapshot.parameters = snapshot.parameters.filter(({name}) => name !== 'flow.speed');
+      snapshot.runtime = snapshot.runtime.filter(({instance}) => instance !== 'flow');
+    } else snapshot.runtime.find(({instance}) => instance === 'flow').state.primary = -1.25;
+    const raw = {d: document, p: document.preset_bank.presets[0].preset_id,
+      b: [], a: false, s: snapshot};
+    const hash = '#shader=v2.' + gzipSync(JSON.stringify(raw)).toString('base64url');
+    const restored = await editorWorkbench({source: null, engineCatalog: catalog, hash});
+    assert.equal(restored.elements.get('shader-document-status').dataset.status, 'ok',
+      restored.elements.get('shader-document-status').textContent);
+    const current = callWorkbenchBinding(restored.engine, 'getSnapshot', [], null);
+    assert.equal(current.chain[0].operator, 'sphere.displace.symmetric.v2');
+    assert.equal(current.parameters.find(({name}) => name === 'flow.strength').value, -0.5);
+    assert.equal(current.runtime.find(({instance}) => instance === 'flow').state.primary,
+      stateless ? 0 : -1.25);
+    assert.ok(current.parameters.every(({name}) => name !== 'flow.amplitude'));
+  });
+}
+
+test('a legacy Symmetric file outside its source range is refused without clamping', async () => {
+  const {document, catalog} = legacySymmetricStudy();
+  document.preset_bank.presets[0].values['flow.amplitude'] = 5;
+  const harness = await editorWorkbench({source: null, engineCatalog: catalog});
+  const original = callWorkbenchBinding(harness.engine, 'getSnapshot', [], null);
+  assert.equal(await harness.controller.loadSource(document), false);
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /Cannot migrate Symmetric lens.*invalid strength or amplitude/);
+  assert.deepEqual(callWorkbenchBinding(harness.engine, 'getSnapshot', [], null), original);
+});
+
 test('legacy snapshot migration preserves malformed values for rejection', async () => {
   const legacy = {schemaVersion: 3,
     chain: [{instance: 'ink', operator: 'colorize.generated-palette.v3'}],
