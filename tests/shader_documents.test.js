@@ -3013,6 +3013,23 @@ test('a live affine period remains independent when its sampler has no lattice c
   assert.deepEqual(engine.writes, [['plane.Lattice Period', 2.5]]);
 });
 
+test('native warp speed names follow resource keys across instance labels and repetition', () => {
+  for (const [label, key, name] of [
+    ['warp', undefined, 'Planar Warp 1 Speed'],
+    ['spin', 'inner_warp', 'Planar Warp 2 Speed'],
+    ['drift', 'velocity', 'velocity.Planar Warp Speed'],
+  ]) {
+    const descriptor = {chain: [{label, resource_key: key, operator: 'warp.affine.v3'}]};
+    const engine = fixedEngine(() => true);
+    engine.getParameterDefinitions = () => [{name}, {name: 'Speed'}];
+    const values = {[`${label}.speed`]: 0.007};
+    assert.equal(applyFixedShaderDocument(engine, MODULE,
+      {document: {descriptor, preset_bank: {presets: [{preset_id: 'one', values}]}}},
+      'one', ['one'], BAKED, fixedDerivedBinding), null);
+    assert.deepEqual(engine.writes, [[name, 0.007]]);
+  }
+});
+
 test('potential nested native fields retain term identities across colliding resource names', () => {
   const catalog = JSON.parse(ENGINE_CATALOG);
   const fields = catalog.operators.find((entry) => entry.id === 'sphere.displace.potential.v1')
