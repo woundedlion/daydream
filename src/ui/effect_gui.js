@@ -29,6 +29,7 @@ import {
   stageGrouping,
 } from './effect_param_controls.js';
 import { createParamValueSync } from './effect_param_values.js';
+import { syncParamAdvisories } from './effect_param_advisories.js';
 import { createEffectActions } from './effect_actions.js';
 import { formatExportParams } from "../shared/export_params.js";
 
@@ -68,6 +69,7 @@ const ENGINE_MEMBERS = [
   'synchronizePreset', 'selectPreset',
 ];
 const SEGMENT_MEMBERS = ['ownsDisplay', 'paramValues', 'setParam'];
+const ENGINE_DEFAULTS = { getParameterAdvisories: () => [] };
 const HOST_MEMBERS = ['createGui', 'container', 'isMobile', 'applyEffect'];
 const CONFIG_DEFAULTS = {
   inUse: () => false,
@@ -118,6 +120,7 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  * @param {Object} deps.engine - The main engine the panel reads and writes.
  * @param {() => Array<ParameterDefinition>} deps.engine.getParameterDefinitions - Reads the
  *   parameter definitions for the effect the engine currently has loaded.
+ * @param {() => Array<{name: string, foldStrength: number}>} [deps.engine.getParameterAdvisories] - Current fold estimates for field-strength sliders.
  * @param {() => number|undefined} deps.engine.paramGeneration - Reads the
  *   effect-load generation, stamped onto each definitions snapshot.
  * @param {() => ArrayLike<number>|null} deps.engine.paramValues - The engine's
@@ -190,11 +193,11 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  */
 export function createEffectGui({ engine, segments, config, host, moduleDead = () => false }) {
   const {
-    getParameterDefinitions, paramGeneration, setAnimationsPaused, getPresetCount,
+    getParameterDefinitions, getParameterAdvisories, paramGeneration, setAnimationsPaused, getPresetCount,
     getPresetIndex, synchronizePreset, selectPreset,
     paramValues: engineParamValues, setParam: setEngineParam,
     animationsPaused: engineAnimationsPaused,
-  } = checkedGroup('engine', engine, ENGINE_MEMBERS);
+  } = checkedGroup('engine', engine, ENGINE_MEMBERS, ENGINE_DEFAULTS);
   const {
     ownsDisplay: segmentsOwnDisplay, paramValues: segmentParamValues,
     setParam: setWorkerParam,
@@ -294,6 +297,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       activeEffect.actions.showPreset(getPresetCount(), getPresetIndex());
     }
     valueSync.syncValues(activeEffect, { advanced, presetAdvanced });
+    syncParamAdvisories(activeEffect.controllerByName, getParameterAdvisories());
   }
 
   /**
@@ -613,6 +617,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       const pause = addPauseToggle(fx, { initialPause, hydrate: hydratePause });
       addParamControllers(fx, params, pause, previousParamNames);
       fx.pause = pause;
+      syncParamAdvisories(fx.controllerByName, getParameterAdvisories());
       fx.hydrating = false;
       return fx;
     } catch (error) {

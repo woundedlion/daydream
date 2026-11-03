@@ -97,6 +97,10 @@ export function addParamControl(
   controller.enumOptions = p.options;
   controller.enumOptionValues = p.optionValues;
   controller.isContinuous = (kind === 'number' || kind === 'integer');
+  if (controller.isContinuous && Number.isFinite(p.min) && Number.isFinite(p.max)
+      && /** @type {number} */ (p.min) < /** @type {number} */ (p.max)) {
+    controller.paramRange = [p.min, p.max];
+  }
   if (p.warning) {
     const widget = focusWidget(controller) ?? controller.domElement;
     const note = controller.domElement.ownerDocument.createElement('span');

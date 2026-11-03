@@ -894,6 +894,35 @@
   padding: 2px 0 4px;
 }
 
+.gui-container .effect-gui .lil-controller.param-fold-advisory {
+  flex-wrap: wrap;
+}
+
+.gui-container .effect-gui .param-fold-advisory .lil-slider {
+  position: relative;
+}
+
+.gui-container .effect-gui .param-fold-advisory .lil-slider::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to right,
+    color-mix(in srgb, var(--warning-text) 35%, transparent) 0 var(--param-fold-low),
+    transparent var(--param-fold-low) var(--param-fold-high),
+    color-mix(in srgb, var(--warning-text) 35%, transparent) var(--param-fold-high) 100%);
+}
+
+.gui-container .effect-gui .param-fold-note {
+  grid-column: 1 / -1;
+  width: 100%;
+  color: var(--warning-text);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: normal;
+  padding: 2px 0 4px;
+}
+
 div.labelLayer {
   pointer-events: none;
   position: absolute;

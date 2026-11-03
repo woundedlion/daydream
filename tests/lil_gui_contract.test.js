@@ -7,6 +7,8 @@
 import { enumChoices } from '../src/effects/param_sync.js';
 import { GUI as DeepLinkGUI } from '../src/ui/gui.js';
 import { createEffectGui } from '../src/ui/effect_gui.js';
+import { addParamControl } from '../src/ui/effect_param_controls.js';
+import { syncParamAdvisories } from '../src/ui/effect_param_advisories.js';
 import { installConsoleCapture } from './helpers/fake_console.js';
 import { fakePanelGui } from './helpers/fake_app.js';
 import { test } from 'node:test';
@@ -44,6 +46,24 @@ async function realGUI() {
   const { GUI } = await import('lil-gui');
   return new GUI({ container, autoPlace: false, injectStyles: false });
 }
+
+test('fold band decorates a real lil-gui slider without changing its range or value', async () => {
+  const gui = await realGUI();
+  try {
+    const state = { strength: 0.7 };
+    const controller = addParamControl(gui, state,
+      { name: 'strength', value: 0.7, min: -1, max: 1 });
+    syncParamAdvisories(new Map([['strength', controller]]),
+      [{ name: 'strength', foldStrength: 0.2 }]);
+    assert.ok(controller.domElement.querySelector('.lil-slider'));
+    assert.equal(controller.domElement.classList.contains('param-fold-advisory'), true);
+    assert.equal(controller.domElement.style.getPropertyValue('--param-fold-high'), '60%');
+    assert.equal(controller.$input.value, '0.700');
+    assert.equal(controller.getValue(), 0.7);
+    controller.setValue(0.9);
+    assert.equal(state.strength, 0.9);
+  } finally { gui.destroy(); }
+});
 
 for (const ownsDisplay of [false, true]) {
   test(`readonly numeric text refreshes during lil-gui focus (worker=${ownsDisplay})`, async () => {

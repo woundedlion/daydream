@@ -440,6 +440,7 @@ export function start({
     moduleDead: (error) => host.moduleDead(error),
     engine: {
       getParameterDefinitions: () => host.engine.getParameterDefinitions(),
+      getParameterAdvisories: () => host.engine.getParameterAdvisories(),
       paramGeneration: () => host.paramGeneration(),
       paramValues: () => host.engine.getParamValues(),
       setParam: setEngineParam,

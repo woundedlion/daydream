@@ -798,6 +798,32 @@ test('a rejected parameter write names its reason', () => {
     'setParameter must report NON_FINITE for a NaN value');
 });
 
+test('field fold estimates track amplitudes without refusing strengths beyond the estimate', () => {
+  engine.setEffect('ShaderChain');
+  const bindings = engine.getShaderChainBindings();
+  try {
+    assert.equal(bindings.setShaderChain([
+      { instance: 'field', operator: 'sphere.displace.symmetric.v1' },
+      { instance: 'project', operator: 'project.stereographic.v2' },
+      { instance: 'sample', operator: 'sample.grid.v3' },
+      { instance: 'colorize', operator: 'colorize.generated-palette.v3' },
+    ]).code, 'APPLIED');
+    const initial = engine.getParameterAdvisories();
+    assert.equal(initial.length, 1);
+    assert.equal(initial[0].name, 'field.strength');
+    assert.ok(initial[0].foldStrength > 0 && initial[0].foldStrength < Math.PI);
+    const strength = (initial[0].foldStrength + Math.PI) / 2;
+    assert.equal(engine.setParameter('field.strength', strength), M.ParamSetResult.APPLIED);
+    const current = () => engine.getParameterDefinitions().find((p) => p.name === 'field.strength');
+    assert.ok(Math.abs(current().acceptedValue - strength) < 1e-6);
+    assert.equal(current().warning, undefined);
+    assert.equal(engine.setParameter('field.strength', 0.05), M.ParamSetResult.APPLIED);
+    assert.equal(engine.setParameter('field.amplitude', 2), M.ParamSetResult.APPLIED);
+    assert.ok(Math.abs(engine.getParameterAdvisories()[0].foldStrength * 2
+      - initial[0].foldStrength) < 1e-5);
+  } finally { bindings.delete(); }
+});
+
 test('live composed groups cover every parameter and both planar-warp slots', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(Object.hasOwn(engine.getEffectSizes(), 'Shader'), false,

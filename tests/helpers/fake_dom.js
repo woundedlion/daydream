@@ -249,14 +249,22 @@ function balancedParens(text) {
  * property does not accept is dropped so the previous one stands: STYLE_VALUES
  * grammars where one exists, and for every property a check that the value
  * carries no STYLE_REJECTED token and closes its parentheses. The fake models camelCase
- * property names only and throws on dashed ones. An undeclared property reads back as
+ * property names and custom properties through setProperty/getPropertyValue.
+ * Direct dashed writes throw. An undeclared property reads back as
  * the empty string.
  * @returns {Object} The style view.
  */
 function fakeStyle() {
+  const custom = new Map();
   return new Proxy({}, {
-    get: (declared, key) => (
-      typeof key === 'symbol' || key in declared ? declared[key] : ''),
+    get: (declared, key) => {
+      if (key === 'setProperty') return (name, value) => {
+        if (!name.startsWith('--')) throw new Error(`unsupported style property ${name}`);
+        custom.set(name, String(value));
+      };
+      if (key === 'getPropertyValue') return (name) => custom.get(name) ?? '';
+      return typeof key === 'symbol' || key in declared ? declared[key] : '';
+    },
     set: (declared, key, value) => {
       const name = String(key);
       if (name.includes('-')) {
