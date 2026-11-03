@@ -140,7 +140,7 @@ export const fieldOf = (id) => id.slice(id.indexOf('.') + 1);
 
 /**
  * The parameter ids deactivated by the catalog's topology-field gates.
- * Deactivated controls render dimmed; their values remain in the document.
+ * Gated controls are hidden; their values remain in the document.
  * @param {ParameterDeclaration[]} parameters - The document's declarations.
  * @param {Object<string, *>} values - The active preset's values.
  * @param {ChainEntry[]} chain - The document's operator instances.

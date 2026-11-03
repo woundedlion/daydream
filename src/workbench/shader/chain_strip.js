@@ -64,8 +64,6 @@ const PALETTE_MARGIN = 8;
 // Separates a palette from the control it opened from.
 const PALETTE_GAP = 4;
 
-const DEACTIVATED_REASON = 'Deactivated by the current topology selection';
-
 const BAKED_PARAMETER_REASON = 'This parameter is baked into the compiled build';
 const BYPASS_UNAVAILABLE = 'Bypass applies to the interpreter only: '
   + 'the compiled build renders the whole chain.';
@@ -695,7 +693,7 @@ export function createChainStrip({
   };
 
   /**
-   * @param {string} parameterId - The deactivated parameter.
+   * @param {string} parameterId - The read-only parameter.
    * @returns {string} The id its reason node is published under, for the row's
    *   controls to describe themselves by.
    */
@@ -717,8 +715,7 @@ export function createChainStrip({
   };
 
   /**
-   * Repaints each parameter row's deactivated controls and the reason node
-   * beside them.
+   * Updates admitted ranges, topology visibility and read-only diagnostics.
    */
   const markDeactivated = () => {
     const chain = store.chain();
@@ -741,7 +738,6 @@ export function createChainStrip({
       const operator = chain.find((entry) => entry.label === label)?.operator;
       const color = operator === PALETTE_OPERATOR;
       const modulation = operator === MODULATION_OPERATOR;
-      const ripple = operator === 'sphere.displace.ripple.v2';
       const field = fieldOf(id);
       const declaration = declarations.find((parameter) => parameter.id === id);
       if (declaration?.storage === 'enum8') {
@@ -776,21 +772,18 @@ export function createChainStrip({
           control.max = String(maximum);
         }
       }
-      row.hidden = (color && (off.has(id)
-        || colorParameterHidden(field, (field) => values[`${label}.${field}`])))
-        || (modulation && (off.has(id)
-          || modulationParameterHidden(field, (field) => values[`${label}.${field}`])))
-        || (ripple && off.has(id) && ['center-azimuth', 'center-polar'].includes(field));
+      row.hidden = off.has(id)
+        || (color && colorParameterHidden(field, (field) => values[`${label}.${field}`]))
+        || (modulation && modulationParameterHidden(field, (field) => values[`${label}.${field}`]));
       const shown = row.querySelector('.chain-param-note');
       const live = parameterLive(id);
       for (const control of row.querySelectorAll('input, select')) control.disabled = !live;
-      const reason = live ? DEACTIVATED_REASON : BAKED_PARAMETER_REASON;
-      if (!row.hidden && (!live || off.has(id))) {
+      if (!row.hidden && !live) {
         row.dataset.deactivated = 'true';
-        if (shown !== null) { shown.textContent = reason; continue; }
+        if (shown !== null) { shown.textContent = BAKED_PARAMETER_REASON; continue; }
         const note = el('span', 'chain-param-note');
         note.setAttribute('id', reasonId(id));
-        note.textContent = reason;
+        note.textContent = BAKED_PARAMETER_REASON;
         row.appendChild(note);
         describeControls(row, reasonId(id));
       } else {
@@ -804,13 +797,13 @@ export function createChainStrip({
       group.hidden = [...group.querySelectorAll('.chain-param')].every((row) => row.hidden);
     }
     for (const note of container.querySelectorAll('.chain-param-mode-note'))
-      note.hidden = values[note.dataset.parameter] !== 'mode';
+      note.hidden = values[note.dataset.potentialType] !== 'mode';
   };
 
   /**
    * Takes one inline control edit: the document write is the caller's, and the
    * strip keeps the value it now shows so a topology edit re-dims what the new
-   * selection deactivates.
+   * selection hides.
    * @param {string} parameterId - The edited parameter.
    * @param {*} value - The document value.
    * @returns {boolean}
@@ -1039,7 +1032,7 @@ export function createChainStrip({
           }
           if (term !== undefined) {
             const note = el('p', 'chain-param-note chain-param-mode-note');
-            note.dataset.parameter = `${entry.label}.term-${term}-type`;
+            note.dataset.potentialType = `${entry.label}.term-${term}-type`;
             note.textContent = '0 \u2264 Order \u2264 Degree \u2264 8. Lower Order before reducing Degree.';
             content.appendChild(note);
           }

@@ -586,13 +586,12 @@
   display: none;
 }
 
-/* Topology-deactivated fields stay editable; baked fields are disabled. */
+/* Baked fields are disabled. */
 .chain-param[data-deactivated="true"] > :not(.chain-param-note) {
   color: var(--muted-text);
 }
 
-/* The row generates no box, so its reason is a node of its own, on a line
-   under the deactivated control. */
+/* The row generates no box; the reason occupies a line under the read-only control. */
 .chain-param-note {
   grid-column: 1 / -1;
   max-width: 12rem;

@@ -1557,9 +1557,7 @@ test('a chosen option and an entered value each close the coalesced value run', 
     'one Undo reverts one entered value');
 });
 
-// The union schema survives — a field the topology deactivates is
-// dimmed, but present and editable, because the document still carries it.
-test('a deactivated field renders dimmed but editable', async () => {
+test('topology-gated controls hide and retain their values when revealed', async () => {
   const h = await makeStrip();
   bandFor(h, 'plane').querySelector('.chain-band-add').dispatch('click');
   paletteEntries(h).find((entry) => entry.dataset.operator === 'warp.wave-shear.v2')
@@ -1569,22 +1567,20 @@ test('a deactivated field renders dimmed but editable', async () => {
   chipByLabel(h, label).dispatch('click');
 
   const edge = rowFor(h, label, `${label}.edge-width`);
-  assert.equal(edge.dataset.deactivated, 'true',
+  const initial = controlIn(edge).value;
+  assert.equal(edge.hidden, true,
     'the envelope gate opens on flat, which reads no edge width');
-  // A `display: contents` row hangs no tooltip, so the reason is a node the
-  // control describes itself by.
-  const note = edge.querySelector('.chain-param-note');
-  assert.equal(note.textContent, 'Deactivated by the current topology selection');
-  assert.equal(controlIn(edge).getAttribute('aria-describedby'), note.id);
-  assert.equal(controlIn(edge).disabled, false, 'dimmed, not disabled');
+  assert.equal(edge.querySelector('.chain-param-note'), null);
+  assert.equal(controlIn(edge).getAttribute('aria-describedby'), null);
+  assert.equal(controlIn(edge).disabled, false);
   assert.equal(rowFor(h, label, `${label}.strength`).dataset.deactivated, undefined);
 
   const envelope = controlIn(rowFor(h, label, `${label}.envelope`));
   envelope.value = 'edge-fade';
   envelope.dispatch('change');
 
-  assert.equal(edge.dataset.deactivated, undefined,
-    'the gate moving onto edge-fade re-activates the field in place');
+  assert.equal(edge.hidden, false);
+  assert.equal(controlIn(edge).value, initial);
   assert.equal(edge.querySelector('.chain-param-note'), null);
   assert.equal(controlIn(edge).getAttribute('aria-describedby'), null);
 
@@ -2389,9 +2385,10 @@ test('Potential Lens term edits retain typed input ranges topology gates and und
   type.dispatch('change');
   for (const field of ['l', 'm', 'phase']) {
     const inactive = rowFor(h, 'potential', `potential.term-2-${field}`);
-    assert.equal(inactive.dataset.deactivated, 'true');
+    assert.equal(inactive.hidden, true);
+    assert.equal(inactive.querySelector('.chain-param-note'), null);
     assert.equal(controlIn(inactive).disabled, false);
-    assert.equal(rowFor(h, 'potential', `potential.term-1-${field}`).dataset.deactivated, undefined);
+    assert.equal(rowFor(h, 'potential', `potential.term-1-${field}`).hidden, false);
   }
   assert.equal(potentialFields(h, 2).hidden, false);
   assert.equal(h.store.compile().status, 'VALID');
@@ -2470,7 +2467,7 @@ test('Potential Lens prevents invalid Degree and Order selections without changi
     /0 \u2264 Order \u2264 Degree \u2264 8.*Lower Order/);
 });
 
-test('Potential Lens keeps non-Mode choices latent and respects Mode admission metadata', async () => {
+test('Potential Lens hides non-Mode choices and respects Mode admission metadata', async () => {
   const source = potentialDocument({'potential.term-1-type': 'tetrahedral',
     'potential.term-1-l': 'four', 'potential.term-1-m': 'three'});
   let modeAllowed = true;
@@ -2482,21 +2479,66 @@ test('Potential Lens keeps non-Mode choices latent and respects Mode admission m
   const degreeRow = rowFor(h, 'potential', 'potential.term-1-l');
   const degree = controlIn(degreeRow);
   const order = controlIn(rowFor(h, 'potential', 'potential.term-1-m'));
-  assert.equal(degreeRow.dataset.deactivated, 'true');
+  assert.equal(degreeRow.hidden, true);
   assert.equal(degree.disabled, false);
   assert.ok(degree.options.every((option) => !option.disabled));
   assert.ok(order.options.every((option) => !option.disabled));
   assert.equal(potentialGroup(h, 'Term 1').querySelector('.chain-param-mode-note').hidden, true);
   modeAllowed = false;
-  degree.value = 'two';
-  degree.dispatch('change');
+  h.strip.syncParameterValues({'potential.term-1-l': 'two'});
   const type = controlIn(rowFor(h, 'potential', 'potential.term-1-type'));
   assert.equal(type.options[0].disabled, true);
   assert.equal(order.value, 'three');
   type.value = 'mode';
   type.dispatch('change');
   assert.equal(type.value, 'tetrahedral');
-  assert.deepEqual(h.edits, [['potential.term-1-l', 'two']]);
+  assert.deepEqual(h.edits, []);
+  modeAllowed = true;
+  h.strip.syncParameterValues({'potential.term-1-m': 'one'});
+  type.value = 'mode';
+  type.dispatch('change');
+  assert.equal(degreeRow.hidden, false);
+  assert.equal(degree.value, 'two');
+  assert.equal(order.value, 'one');
+  assert.deepEqual(h.edits, [['potential.term-1-type', 'mode']]);
+});
+
+test('Potential Lens hides only each non-Mode term mode controls and keeps later terms independent', async () => {
+  const source = potentialDocument(Object.fromEntries([1, 2, 3, 4].flatMap((term) => [
+    [`potential.term-${term}-amplitude`, 0.1],
+    [`potential.term-${term}-l`, 'four'], [`potential.term-${term}-m`, 'two'],
+    [`potential.term-${term}-phase`, 0.7],
+  ])));
+  const h = await makeStrip({source, writeThrough: true});
+  const selectType = (term, value) => {
+    const select = controlIn(rowFor(h, 'potential', `potential.term-${term}-type`));
+    select.value = value;
+    select.dispatch('change');
+  };
+  selectType(1, 'dodecahedral');
+  selectType(3, 'octahedral');
+  for (const term of [1, 2, 3, 4]) {
+    const group = potentialGroup(h, `Term ${term}`);
+    assert.equal(group.hidden, false);
+    const visible = group.querySelectorAll('.chain-param').filter((row) => !row.hidden)
+      .map((row) => row.dataset.parameter);
+    assert.deepEqual(visible, (term === 1 || term === 3 ? ['type', 'kind', 'amplitude']
+      : ['type', 'kind', 'l', 'm', 'amplitude', 'phase']).map((field) => `potential.term-${term}-${field}`));
+    assert.ok(group.querySelectorAll('.chain-param').every((row) => row.querySelector('.chain-param-note') === null));
+    assert.ok(group.querySelectorAll('.chain-param-control').every((control) => !control.disabled));
+  }
+  const amplitude = rowFor(h, 'potential', 'potential.term-2-amplitude').querySelector('.chain-param-value');
+  amplitude.value = '0.2';
+  amplitude.dispatch('change');
+  assert.equal(h.store.document().preset_bank.presets[0].values['potential.term-2-amplitude'], 0.2);
+  selectType(1, 'mode');
+  for (const [field, value] of [['l', 'four'], ['m', 'two'], ['phase', '0.7']]) {
+    const row = rowFor(h, 'potential', `potential.term-1-${field}`);
+    assert.equal(row.hidden, false);
+    assert.equal(controlIn(row).value, value);
+  }
+  assert.equal(rowFor(h, 'potential', 'potential.term-3-l').hidden, true);
+  assert.equal(rowFor(h, 'potential', 'potential.term-4-l').hidden, false);
 });
 
 
