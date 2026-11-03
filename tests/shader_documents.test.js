@@ -2999,6 +2999,54 @@ test('authored native controls preserve resource identities and live topology re
   assert.equal(definitions[0].value, 0);
 });
 
+test('potential nested native fields retain term identities across colliding resource names', () => {
+  const catalog = JSON.parse(ENGINE_CATALOG);
+  const fields = catalog.operators.find((entry) => entry.id === 'sphere.displace.potential.v1')
+    .params.filter((field) => field.id.startsWith('term-'));
+  assert.equal(fields.length, 24);
+  const descriptor = {chain: [
+    {label: 'bend', resource_key: 'surface', operator: 'sphere.displace.potential.v1'},
+    {label: 'flow', resource_key: 'vector', operator: 'sphere.displace.curl.v2'},
+    {label: 'warp', operator: 'warp.vector-noise.v2'},
+    {label: 'sample', operator: 'sample.grid.v3'},
+  ]};
+  const values = {};
+  const definitions = [];
+  const expected = [];
+  for (const field of fields) {
+    const value = field.values?.at(-1) ?? (field.id.endsWith('phase') ? 2.7 : -1.25);
+    const stored = field.values ? field.values.length - 1 : value;
+    values[`bend.${field.id}`] = value;
+    definitions.push({name: `surface.${field.id}`, value: 0,
+      ...(field.values ? {options: field.values} : {})});
+    expected.push([`surface.${field.id}`, stored]);
+  }
+  Object.assign(values, {'bend.drift': 0.01, 'sample.drift': 0.75,
+    'flow.basis': 'fbm3', 'warp.basis': 'ridged3'});
+  definitions.push({name: 'surface.Drift', value: 0}, {name: 'source.Drift', value: 0},
+    {name: 'vector.basis', options: ['simplex', 'fbm3', 'ridged3'], value: 0},
+    {name: 'outer_warp.basis', options: ['simplex', 'fbm3', 'ridged3'], value: 0});
+  expected.push(['surface.Drift', 0.01], ['source.Drift', 0.75],
+    ['vector.basis', 1], ['outer_warp.basis', 2]);
+  const decoys = ['Amplitude', 'Phase', 'surface.Amplitude', 'surface.Phase', 'Drift', 'basis']
+    .map((name) => ({name, value: 123}));
+  definitions.push(...decoys);
+  const engine = fixedEngine(() => true);
+  engine.getParameterDefinitions = () => definitions;
+  engine.setParameter = (name, value) => {
+    definitions.find((definition) => definition.name === name).value = Math.fround(value);
+    engine.writes.push([name, value]);
+    return ParamSetResult.APPLIED;
+  };
+  assert.equal(applyFixedShaderDocument(engine, MODULE,
+    {document: {descriptor, preset_bank: {presets: [{preset_id: 'nested', values}]}}},
+    'nested', ['nested'], BAKED, fixedDerivedBinding, catalog), null);
+  assert.deepEqual(engine.writes, expected);
+  for (const [name, value] of expected)
+    assert.equal(definitions.find((definition) => definition.name === name).value, Math.fround(value));
+  assert.ok(decoys.every((definition) => definition.value === 123));
+});
+
 test('authored compiled stage edits keep camera spin, coverage and independent affine period live', async () => {
   const source = JSON.stringify(scratchChainDocument(JSON.parse(ENGINE_CATALOG),
     promotedDocument('grid_space.shader.json').descriptor.chain.filter((entry) => entry.operator !== 'color.modulate.v1')));
