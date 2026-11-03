@@ -201,7 +201,9 @@ export class FakeChainEngine {
         kind = 'spherical-rings-v2';
         state = { walk: { noiseSeed: 1337, walkTime: 0, position: [0, 1, 0], direction: [1, 0, 0],
           wander: [1, 0, 0, 0], angularVelocity: 0, spinPhase: 0 }, phase: 0 };
-      } else if (operator.startsWith('sample.') || operator === 'sphere.lens.twist.v2') {
+      } else if (operator.startsWith('sample.') || operator === 'sphere.lens.twist.v2'
+          || operator === 'sphere.displace.potential.v1'
+          || operator === 'sphere.displace.rossby-haurwitz.v1') {
         kind = 'source-clock-v1';
         state = { primary: 0, secondary: 0, angle: 0 };
       } else {

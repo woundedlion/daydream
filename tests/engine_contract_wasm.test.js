@@ -23,6 +23,8 @@ import { DEFAULT_EFFECT, resolutionPresets } from '../src/effects/effect_roster.
 import { paletteControlsFromRecipe, paletteRecipeFromControls, PaletteV4 } from '../src/workbench/palettes/palette_controls.js';
 import { paletteAdjustmentSummary } from '../src/workbench/palettes/palette_math.js';
 import { stageGrouping } from '../src/effects/shader_stages.js';
+import { deactivatedParameterIds } from '../src/workbench/shader/chain_presentation.js';
+import { declarationFromCatalogField } from '../generated/shader/shader_workbench.mjs';
 
 // Capture the bridge's diagnostics for clamped MeshOps arguments.
 const moduleLogs = [];
@@ -513,6 +515,48 @@ test('every catalog operator matches fake snapshot runtime kinds and state keys'
     };
     assert.deepEqual(shape(fake), shape(engine), operator.id);
   }
+});
+
+test('field integer dropdowns and mode gates follow the real engine catalog', () => {
+  engine.setEffect('ShaderChain');
+  const bindings = engine.getShaderChainBindings();
+  try {
+    assert.equal(bindings.setShaderChain([
+      {instance: 'field', operator: 'sphere.displace.potential.v1'},
+      {instance: 'wave', operator: 'sphere.displace.rossby-haurwitz.v1'},
+      ...DEFAULT_CHAIN.slice(1),
+    ]).code, 'APPLIED');
+    const definitions = () => engine.getParameterDefinitions();
+    for (const name of ['field.term-1-l', 'field.term-1-m']) {
+      const control = definitions().find((entry) => entry.name === name);
+      assert.deepEqual(control.options, ['zero', 'one', 'two', 'three', 'four',
+        'five', 'six', 'seven', 'eight']);
+      assert.equal(control.step, 1);
+    }
+    const order = definitions().find((entry) => entry.name === 'wave.order');
+    assert.deepEqual(order.options, ['one', 'two', 'three', 'four', 'five', 'six', 'seven']);
+    assert.equal(order.step, 1);
+    assert.equal(order.requestedValue, 3);
+    assert.equal(engine.setParameter('field.term-1-l', 2), M.ParamSetResult.APPLIED);
+    assert.equal(engine.setParameter('field.term-1-m', 3), M.ParamSetResult.INADMISSIBLE);
+    assert.equal(definitions().find((entry) => entry.name === 'field.term-1-m').requestedValue, 0);
+
+    const catalog = JSON.parse(M.ShaderChainBindings.getShaderChainCatalog());
+    const operator = catalog.operators.find((entry) => entry.id === 'sphere.displace.potential.v1');
+    const declarations = operator.params.map((field) => declarationFromCatalogField('field', field, operator.id));
+    const chain = [{label: 'field', operator: operator.id}];
+    const inactive = () => deactivatedParameterIds(declarations,
+      Object.fromEntries(definitions().map((definition) => [definition.name,
+        definition.options ? definition.options[definition.requestedValue] : definition.requestedValue])),
+      chain, catalog);
+    for (const field of ['l', 'm', 'phase']) assert.equal(inactive().has(`field.term-1-${field}`), false);
+    assert.equal(engine.setParameter('field.term-1-type', 2), M.ParamSetResult.APPLIED);
+    for (const field of ['l', 'm', 'phase']) assert.equal(inactive().has(`field.term-1-${field}`), true);
+    assert.equal(inactive().has('field.term-1-amplitude'), false);
+    assert.equal(inactive().has('field.term-1-kind'), false);
+    assert.equal(engine.setParameter('field.term-1-type', 0), M.ParamSetResult.APPLIED);
+    for (const field of ['l', 'm', 'phase']) assert.equal(inactive().has(`field.term-1-${field}`), false);
+  } finally { bindings.delete(); }
 });
 
 test('chain preset batches restore cross-field values and refuse singular edits without storing them', () => {
