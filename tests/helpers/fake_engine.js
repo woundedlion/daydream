@@ -79,9 +79,7 @@ function validModulationRecipe(recipe, definitions, instance) {
   if (!source || !axisValid(source.axis)) return false;
   if (recipe.source === 1) return true;
   if (!axisValid(source.axisB)) return false;
-  if (recipe.source === 2) return true;
-  const dot = source.axis.reduce((sum, value, index) => sum + value * source.axisB[index], 0);
-  return Math.abs(dot / Math.sqrt(squaredLength(source.axis) * squaredLength(source.axisB))) <= 1e-5;
+  return true;
 }
 
 /**

@@ -2430,6 +2430,17 @@ test('chip ranges refresh from the engine after edits and undo', async () => {
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
 });
 
+test('smooth-grid axes can be edited independently without an orthogonality refusal', async () => {
+  const harness = await editorWorkbench();
+  const edit = stageEditor(harness, 'modulation');
+  edit('modulation.modulation-source', 'sphere-smooth-grid');
+  edit('modulation.grid-axis-b-y', 0.5);
+  assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
+  assert.equal(savedValues(harness)['modulation.grid-axis-b-y'], 0.5);
+  assert.ok(harness.engine.writes.some(([name, value]) =>
+    name === 'modulation.grid-axis-b-y' && value === 0.5));
+});
+
 test('a native refusal preserves saved values, links and coalesced undo history', async () => {
   const harness = await editorWorkbench();
   const before = savedValues(harness)['sample.pattern-freq'];
