@@ -400,7 +400,7 @@ export function createChainStrip({
       }
       editParameter(id, values[id] === 'disabled' ? 'enabled' : 'disabled');
       store.endValueRun();
-      onCommitParameter();
+      commitParameter();
       return;
     }
     if (!bypassAvailable()) {
@@ -440,7 +440,7 @@ export function createChainStrip({
       return;
     }
     commit(label, '.chain-chip-reset');
-    onCommitParameter();
+    commitParameter();
   };
 
   const redo = () => {
@@ -714,12 +714,17 @@ export function createChainStrip({
     }
   };
 
+  /** @type {Map<string, ParameterRange>} */
+  let admittedRanges = new Map();
   /**
    * Updates admitted ranges, topology visibility and read-only diagnostics.
+   * @param {boolean} [refreshRanges] - Recompute limits after committed edits.
    */
-  const markDeactivated = () => {
+  const markDeactivated = (refreshRanges = true) => {
     const chain = store.chain();
-    const ranges = new Map(parameterRanges().map((range) => [range.name, range]));
+    if (refreshRanges)
+      admittedRanges = new Map(parameterRanges().map((range) => [range.name, range]));
+    const ranges = admittedRanges;
     const off = deactivatedParameterIds(declarations, values, chain, catalog);
     for (const control of container.querySelectorAll('.chain-modulation-enabled')) {
       const id = `${control.dataset.label}.modulation-enabled`;
@@ -798,6 +803,11 @@ export function createChainStrip({
     }
   };
 
+  const commitParameter = () => {
+    onCommitParameter();
+    markDeactivated();
+  };
+
   /**
    * Takes one inline control edit: the document write is the caller's, and the
    * strip keeps the value it now shows so a topology edit re-dims what the new
@@ -829,7 +839,7 @@ export function createChainStrip({
       return false;
     }
     values[parameterId] = value;
-    markDeactivated();
+    markDeactivated(false);
     return true;
   };
   /** @type {{parameterId: string, value: number}|null} */
@@ -861,7 +871,7 @@ export function createChainStrip({
         toggle.checked = values[declaration.id] === 'on';
         if (accepted) {
           store.endValueRun();
-          onCommitParameter();
+          commitParameter();
         }
       });
       return toggle;
@@ -877,7 +887,7 @@ export function createChainStrip({
     select.addEventListener('change', (/** @type {*} */ event) => {
       if (!editParameter(declaration.id, event.target.value)) return;
       store.endValueRun();
-      onCommitParameter();
+      commitParameter();
     });
     return select;
   };
@@ -907,7 +917,7 @@ export function createChainStrip({
     slider.addEventListener('change', () => {
       commitSliderEdit();
       store.endValueRun();
-      onCommitParameter();
+      commitParameter();
     });
     return slider;
   };
@@ -1069,7 +1079,7 @@ export function createChainStrip({
         readout.addEventListener('change', (/** @type {*} */ event) => {
           enterValue(String(event.target.value ?? ''));
           store.endValueRun();
-          onCommitParameter();
+          commitParameter();
         });
         readout.addEventListener('keydown', (/** @type {*} */ event) => {
           const direction = event.key === 'ArrowUp' ? 1
@@ -1080,7 +1090,7 @@ export function createChainStrip({
           const from = Number.isFinite(shown) ? shown : Number(values[declaration.id]);
           enterValue(String(from + direction * nudgeStep(declaration)));
           store.endValueRun();
-          onCommitParameter();
+          commitParameter();
         });
         row.appendChild(slider);
         row.appendChild(readout);

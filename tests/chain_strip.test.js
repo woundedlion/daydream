@@ -1334,6 +1334,31 @@ test('live ranges bound sliders and typed values and expand without replacing co
   assert.deepEqual(h.edits.at(-1), ['sample.pattern-freq', 1]);
 });
 
+test('slider drags retain admitted limits until the edit is committed', async () => {
+  let queries = 0;
+  let maximum = 12;
+  const h = await makeStrip({
+    parameterRanges: () => {
+      ++queries;
+      return [{name: 'sample.pattern-freq', min: 1, max: maximum}];
+    },
+  });
+  const slider = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
+  const initialQueries = queries;
+  for (const value of [4, 5, 6]) {
+    slider.value = String(value);
+    slider.dispatch('input');
+    runFrame();
+  }
+  assert.equal(queries, initialQueries);
+  assert.deepEqual(h.edits.map((edit) => edit[1]), [4, 5, 6]);
+  maximum = 8;
+  slider.dispatch('change');
+  assert.equal(queries, initialQueries + 1);
+  assert.equal(Number(slider.max), 8);
+  assert.deepEqual(h.commits, [3]);
+});
+
 test('queued slider values respect a range tightened before the frame flush', async () => {
   let maximum = 12;
   const h = await makeStrip({
