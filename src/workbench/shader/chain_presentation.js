@@ -18,6 +18,7 @@ import { float32Decimal } from '../../shared/cpp_format.js';
  * @typedef {{start: number, deleteCount: number, operators: CatalogOperator[]}} SpanChoice
  */
 /** @typedef {{id: string, storage: string, domain: *}} ParameterDeclaration */
+/** @typedef {{name: string, fields: string[], source?: string, term?: number, note?: string}} ParameterGroup */
 /**
  * One carrier's run of the chain: the gap indices that fall inside it, the chain
  * indices of its endomorphism chips, and the crossing that closes it.
@@ -28,8 +29,9 @@ const READOUT_STEPS = 1000;
 
 export const PALETTE_OPERATOR = 'colorize.generated-palette.v4';
 export const MODULATION_OPERATOR = 'color.modulate.v1';
+export const POTENTIAL_OPERATOR = 'sphere.displace.potential.v1';
 
-/** @type {{name: string, fields: string[], source?: string}[]} */
+/** @type {ParameterGroup[]} */
 export const COLOR_PARAMETER_GROUPS = [
   { name: 'Palette', fields: ['palette-type', 'palette-mode', 'palette-harmony',
     'palette-name', 'palette-name-b', 'palette-mutation', 'palette-hue', 'palette-spread',
@@ -42,7 +44,7 @@ export const COLOR_PARAMETER_GROUPS = [
     'brightness-top', 'value-opacity-low', 'value-opacity-high'] },
 ];
 
-/** @type {{name: string, fields: string[], source?: string}[]} */
+/** @type {ParameterGroup[]} */
 export const MODULATION_PARAMETER_GROUPS = [
   { name: 'Modulation', fields: ['modulation-enabled', 'modulation-source',
     'modulation-mechanic', 'modulation-amount', 'modulation-evaluation'] },
@@ -60,6 +62,15 @@ export const MODULATION_PARAMETER_GROUPS = [
     'grid-speed', 'grid-offset', 'grid-axis-x', 'grid-axis-y', 'grid-axis-z'] },
   { name: 'Grid · wave B', source: 'sphere-smooth-grid', fields: ['grid-frequency-b',
     'grid-offset-b', 'grid-axis-b-x', 'grid-axis-b-y', 'grid-axis-b-z'] },
+];
+
+/** @type {ParameterGroup[]} */
+export const POTENTIAL_PARAMETER_GROUPS = [
+  { name: 'Overall', fields: ['strength', 'integrator', 'orientation-azimuth',
+    'orientation-polar', 'drift'], note: 'Strength scales the combined motion' },
+  ...[1, 2, 3, 4].map((term) => ({ name: `Term ${term}`, term,
+    fields: ['type', 'kind', 'l', 'm', 'amplitude', 'phase'].map((field) => `term-${term}-${field}`),
+    note: 'Amplitude 0 disables this term' })),
 ];
 
 /** @type {Record<string, string>} */

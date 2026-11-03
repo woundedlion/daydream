@@ -8,6 +8,7 @@ import { titleCase } from '../../shared/labels.js';
 import {
   createChainPresentation, deactivatedParameterIds, formatNumericValue, nudgeStep, fieldOf,
   COLOR_PARAMETER_GROUPS, MODULATION_PARAMETER_GROUPS, COLOR_PARAMETER_NAMES,
+  POTENTIAL_OPERATOR, POTENTIAL_PARAMETER_GROUPS,
   colorParameterHidden, modulationParameterHidden, PALETTE_OPERATOR, MODULATION_OPERATOR,
 } from './chain_presentation.js';
 
@@ -110,7 +111,7 @@ const SOCKET_FUNCTIONS = {
  * @param {() => boolean} [options.bypassAvailable] - Whether a bypass reaches
  *   what is rendering. False disables the toggles and states why.
  * @param {(parameterId: string) => boolean} [options.parameterLive] - Whether a parameter reaches the active build.
- * @param {() => ParameterRange[]} [options.parameterRanges] - Current numeric limits from the preview engine.
+ * @param {() => ParameterRange[]} [options.parameterRanges] - Current scalar and enum-index limits from the preview engine.
  * @returns {Object} The strip.
  */
 export function createChainStrip({
@@ -142,6 +143,8 @@ export function createChainStrip({
   const rows = new Map();
   /** @type {Set<string>} */
   const pinnedLabels = new Set();
+  /** @type {Map<string, Map<number, boolean>>} */
+  const potentialSectionChoices = new Map();
   /** @type {Array<{remove: () => void}>} */
   const drags = [];
 
@@ -741,6 +744,16 @@ export function createChainStrip({
       const ripple = operator === 'sphere.displace.ripple.v2';
       const field = fieldOf(id);
       const declaration = declarations.find((parameter) => parameter.id === id);
+      if (declaration?.storage === 'enum8') {
+        const select = row.querySelector('select');
+        const range = ranges.get(id);
+        const bounded = range && Number.isFinite(range.min) && Number.isFinite(range.max);
+        for (const option of select?.options ?? []) {
+          const index = declaration.domain?.values?.indexOf(option.value) ?? -1;
+          option.disabled = Boolean(bounded
+            && (index < Math.fround(range.min) || index > Math.fround(range.max)));
+        }
+      }
       if (declaration?.storage === 'binary32') {
         const domain = declaration.domain;
         let minimum = Number(domain?.minimum);
@@ -790,6 +803,8 @@ export function createChainStrip({
     for (const group of container.querySelectorAll('.chain-param-group')) {
       group.hidden = [...group.querySelectorAll('.chain-param')].every((row) => row.hidden);
     }
+    for (const note of container.querySelectorAll('.chain-param-mode-note'))
+      note.hidden = values[note.dataset.parameter] !== 'mode';
   };
 
   /**
@@ -802,8 +817,13 @@ export function createChainStrip({
    */
   const editParameter = (parameterId, value) => {
     if (!parameterLive(parameterId)) return false;
+    const control = rows.get(parameterId)?.querySelector('.chain-param-control');
+    if (control?.tagName === 'SELECT'
+        && [...control.options].some((option) => option.value === value && option.disabled)) {
+      control.value = String(values[parameterId]);
+      return false;
+    }
     if (typeof value === 'number') {
-      const control = rows.get(parameterId)?.querySelector('.chain-param-control');
       if (control?.type === 'range') {
         value = Math.min(Number(control.max), Math.max(Number(control.min), value));
         control.value = String(value);
@@ -864,7 +884,7 @@ export function createChainStrip({
       select.appendChild(option);
     }
     select.addEventListener('change', (/** @type {*} */ event) => {
-      editParameter(declaration.id, event.target.value);
+      if (!editParameter(declaration.id, event.target.value)) return;
       store.endValueRun();
       onCommitParameter();
     });
@@ -926,6 +946,8 @@ export function createChainStrip({
         return;
       }
       if (pinnedLabels.delete(entry.label)) pinnedLabels.add(next);
+      const sections = potentialSectionChoices.get(entry.label);
+      if (sections) potentialSectionChoices.set(next, sections);
       commit(next);
     });
     row.appendChild(field);
@@ -943,8 +965,11 @@ export function createChainStrip({
   const paramsElement = (entry, declared) => {
     const palette = entry.operator === PALETTE_OPERATOR;
     const modulation = entry.operator === MODULATION_OPERATOR;
+    const potential = entry.operator === POTENTIAL_OPERATOR;
     const color = palette || modulation;
-    const parameterGroups = modulation ? MODULATION_PARAMETER_GROUPS : COLOR_PARAMETER_GROUPS;
+    const grouped = color || potential;
+    const parameterGroups = potential ? POTENTIAL_PARAMETER_GROUPS
+      : modulation ? MODULATION_PARAMETER_GROUPS : COLOR_PARAMETER_GROUPS;
     const region = el('div', 'chain-chip-params');
     region.dataset.label = entry.label;
     region.setAttribute('role', 'group');
@@ -957,29 +982,69 @@ export function createChainStrip({
     }
     /** @type {Map<string, *>} */
     const groups = new Map();
-    const ordered = color ? parameterGroups.flatMap((group) => group.fields.flatMap(
+    const ordered = grouped ? parameterGroups.flatMap((group) => group.fields.flatMap(
       (field) => declared.filter((parameter) => fieldOf(parameter.id) === field))) : declared;
     for (const declaration of [...ordered, ...declared.filter((parameter) => !ordered.includes(parameter))]) {
       const field = fieldOf(declaration.id);
       if (modulation && field === 'modulation-enabled') continue;
       if (palette && field === 'palette-type') continue;
+      const localField = potential ? field.replace(/^term-[1-4]-/, '') : field;
       const name = color ? COLOR_PARAMETER_NAMES[field]
         ?? titleCase(field.replace(/^(interference|grid)-(.+)-b(?=-|$)/, '$1-$2')
           .replace(/^(sine|interference|grid)-/, ''))
-        : titleCase(field);
+        : potential && localField === 'l' ? 'Degree'
+          : potential && localField === 'm' ? 'Order' : titleCase(localField);
       let parent = region;
-      if (color) {
-        const groupName = parameterGroups.find((group) => group.fields.includes(field))?.name
-          ?? 'Other';
+      if (grouped) {
+        const definition = parameterGroups.find((group) => group.fields.includes(field));
+        const groupName = definition?.name ?? 'Other';
         if (!groups.has(groupName)) {
           const group = el('div', 'chain-param-group');
           group.setAttribute('role', 'group');
           group.setAttribute('aria-label', groupName);
-          const heading = el('div', 'chain-param-group-title');
+          const term = potential ? definition?.term : undefined;
+          const heading = el(term === undefined ? 'div' : 'button',
+            'chain-param-group-title' + (term === undefined ? '' : ' chain-param-group-toggle'));
           heading.textContent = groupName;
           group.appendChild(heading);
+          let content = group;
+          if (term !== undefined) {
+            content = el('div', 'chain-param-group-fields');
+            const contentId = `chain-potential-${encodeURIComponent(entry.label)}-term-${term}`;
+            content.setAttribute('id', contentId);
+            content.hidden = !(potentialSectionChoices.get(entry.label)?.get(term)
+              ?? (term === 1 || Number(values[`${entry.label}.term-${term}-amplitude`] ?? 0) !== 0));
+            heading.type = 'button';
+            heading.setAttribute('aria-label', groupName);
+            heading.setAttribute('aria-controls', contentId);
+            heading.setAttribute('aria-expanded', String(!content.hidden));
+            const chevron = el('span', 'chain-param-group-chevron');
+            chevron.setAttribute('aria-hidden', 'true');
+            chevron.textContent = '\u25b8';
+            heading.appendChild(chevron);
+            heading.addEventListener('click', () => {
+              const open = content.hidden;
+              content.hidden = !open;
+              heading.setAttribute('aria-expanded', String(open));
+              if (!potentialSectionChoices.has(entry.label))
+                potentialSectionChoices.set(entry.label, new Map());
+              potentialSectionChoices.get(entry.label)?.set(term, open);
+            });
+            group.appendChild(content);
+          }
+          if (definition?.note) {
+            const note = el('p', 'chain-param-note');
+            note.textContent = definition.note;
+            content.appendChild(note);
+          }
+          if (term !== undefined) {
+            const note = el('p', 'chain-param-note chain-param-mode-note');
+            note.dataset.parameter = `${entry.label}.term-${term}-type`;
+            note.textContent = '0 \u2264 Order \u2264 Degree \u2264 8. Lower Order before reducing Degree.';
+            content.appendChild(note);
+          }
           region.appendChild(group);
-          groups.set(groupName, group);
+          groups.set(groupName, content);
         }
         parent = groups.get(groupName);
       }
@@ -991,6 +1056,8 @@ export function createChainStrip({
         label.setAttribute('title', 'Higher values produce finer noise; lower values produce broader patches.');
       if (color && field === 'pattern-speed')
         label.setAttribute('title', 'Animation rate. Zero freezes the noise; negative values reverse it.');
+      if (potential && field === 'drift')
+        label.setAttribute('title', 'Drift rotates around the field axis; Order 0 modes stay still.');
       row.appendChild(label);
       if (declaration.storage === 'enum8') {
         const control = enumControl(declaration);
