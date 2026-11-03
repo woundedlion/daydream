@@ -55,6 +55,64 @@ export const DEFAULT_SCRATCH_CHAIN = Object.freeze([
 const SCRATCH_PRESET_ID = 'catalog-defaults';
 
 /**
+ * Reciprocal cell-period bindings of adjacent periodic affine and sampler pairs.
+ * @param {*} descriptor - Chain descriptor.
+ * @returns {{id: string, sourceId: string}[]} Derived periods and their cell scales.
+ */
+export function periodicAffineBindings(descriptor) {
+  return descriptor.chain.flatMap((/** @type {ChainEntry} */ entry, /** @type {number} */ index) => {
+    const source = descriptor.chain[index + 1];
+    return entry.operator === 'warp.affine-periodic.v1'
+      && source?.operator === 'sample.lattice.v2'
+      ? [{ id: `${entry.label}.lattice-period`, sourceId: `${source.label}.lattice-cell-scale` }]
+      : [];
+  });
+}
+
+/**
+ * Synchronizes periodic affine periods in place from their adjacent sampler.
+ * @param {*} document - Shader document.
+ * @param {*} catalog - Engine operator catalog.
+ * @returns {boolean} Whether any declarations or values changed.
+ */
+export function synchronizePeriodicAffinePeriods(document, catalog) {
+  let changed = false;
+  for (const { id, sourceId } of periodicAffineBindings(document.descriptor)) {
+    const scaleDefault = document.descriptor.parameters.find(
+      (/** @type {ParameterDeclaration} */ parameter) => parameter.id === sourceId)?.default
+      ?? catalog.operators.find((/** @type {CatalogOperator} */ operator) =>
+        operator.id === 'sample.lattice.v2')?.params.find(
+        (/** @type {CatalogField} */ field) => field.id === 'lattice-cell-scale')?.default;
+    if (!document.descriptor.parameters.some(
+      (/** @type {ParameterDeclaration} */ parameter) => parameter.id === id)) {
+      const field = catalog.operators.find((/** @type {CatalogOperator} */ operator) =>
+        operator.id === 'warp.affine-periodic.v1')?.params.find(
+        (/** @type {CatalogField} */ field) => field.id === 'lattice-period');
+      if (!field) continue;
+      const parameter = parameterFromField(
+        id.slice(0, id.indexOf('.')), field, 'warp.affine-periodic.v1');
+      document.descriptor.parameters.push(parameter);
+      document.descriptor.serialization.fields.push(id);
+      const group = parameter.interpolation.group ?? id;
+      for (const policy of document.descriptor.path_policies) {
+        if (policy.kind === 'STAGGERED_ORDERED' && !policy.groups.includes(group))
+          policy.groups.push(group);
+      }
+      changed = true;
+    }
+    for (const preset of document.preset_bank.presets) {
+      const scale = Math.fround(preset.values[sourceId] ?? scaleDefault);
+      if (!Number.isFinite(scale) || scale <= 0) continue;
+      const period = Math.fround(1 / scale);
+      if (preset.values[id] === period) continue;
+      preset.values[id] = period;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+/**
  * Builds the workbench's scratch document: the given chain over catalog
  * operators carrying one preset of the catalog's own defaults. The parameter
  * declarations come from the same catalog-field mapping a structural insert
@@ -182,6 +240,7 @@ export async function createChainDocumentStore({
   };
 
   let doc = structuredClone(document);
+  synchronizePeriodicAffinePeriods(doc, catalog);
   {
     const diagnostics = diagnosticsOf(doc);
     if (diagnostics.length > 0) {
@@ -255,6 +314,7 @@ export async function createChainDocumentStore({
    * entries only ever come off the undo stack, so the pair stays within it.
    */
   const commit = (candidate, coalesce = null, admit = null) => {
+    synchronizePeriodicAffinePeriods(candidate, catalog);
     const diagnostics = diagnosticsOf(candidate);
     if (diagnostics.length > 0) return { ok: false, diagnostics };
     const admission = admit?.();

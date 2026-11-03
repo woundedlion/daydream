@@ -2882,6 +2882,78 @@ test('fixed apply resolves a registered secondary compiled control name', () => 
   assert.deepEqual(engine.writes, [['Affine Scale X', 2.5]]);
 });
 
+const periodicAffineStudy = (operatorId = 'warp.affine-periodic.v1') => {
+  const catalog = JSON.parse(ENGINE_CATALOG);
+  const document = scratchChainDocument(catalog, [
+    { label: 'project', operator: 'project.stereographic.v2' },
+    { label: 'warp', operator: operatorId },
+    { label: 'sample', operator: 'sample.lattice.v2' },
+    { label: 'colorize', operator: 'colorize.generated-palette.v4' },
+  ]);
+  document.preset_bank.presets[0].values['sample.lattice-cell-scale'] = 4;
+  document.preset_bank.presets[0].values['warp.lattice-period'] = 1;
+  return { source: JSON.stringify(document), engineCatalog: JSON.stringify(catalog) };
+};
+
+test('periodic affine loading normalizes its period before any engine write', async () => {
+  const harness = await editorWorkbench(periodicAffineStudy());
+  assert.equal(savedValues(harness)['warp.lattice-period'], 0.25);
+  assert.ok(harness.engine.writes.some(([id]) => id === 'warp.lattice-period'));
+  assert.ok(harness.engine.writes.filter(([id]) => id === 'warp.lattice-period')
+    .every(([, value]) => value === 0.25));
+  stageEditor(harness, 'warp');
+  const row = stripChips(harness).find((chip) => chip.dataset.label === 'warp')
+    .querySelectorAll('.chain-param').find((row) => row.dataset.parameter === 'warp.lattice-period');
+  assert.equal(row.querySelector('.chain-param-control').disabled, true);
+  assert.equal(row.querySelector('.chain-param-note').textContent,
+    'Derived from the following lattice cell size');
+});
+
+test('periodic affine cell-scale edits batch the reciprocal period with history and links', async () => {
+  const harness = await editorWorkbench(periodicAffineStudy());
+  const original = savedValues(harness);
+  const batches = [];
+  const apply = harness.engine.bindings.setShaderChainParameters;
+  harness.engine.bindings.setShaderChainParameters = (writes) => {
+    batches.push(writes);
+    return apply(writes);
+  };
+  stageEditor(harness, 'sample')('sample.lattice-cell-scale', 2.7);
+  const reciprocal = Math.fround(1 / Math.fround(2.7));
+  assert.deepEqual(batches, [[
+    { name: 'sample.lattice-cell-scale', value: 2.7 },
+    { name: 'warp.lattice-period', value: reciprocal },
+  ]]);
+  const values = savedValues(harness);
+  assert.equal(values['warp.lattice-period'], reciprocal);
+  await harness.controller.flushDeepLink();
+  const linked = await decodeShaderStateHash(harness.win.location.hash);
+  assert.equal(linked.document.preset_bank.presets[0].values['warp.lattice-period'], reciprocal);
+  harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
+  assert.deepEqual(savedValues(harness), original);
+  harness.elements.get('chain-strip').querySelector('.chain-redo').dispatch('click');
+  assert.deepEqual(savedValues(harness), values);
+});
+
+test('a refused periodic affine scale batch keeps both values and history unchanged', async () => {
+  const harness = await editorWorkbench(periodicAffineStudy());
+  const original = savedValues(harness);
+  harness.engine.bindings.setShaderChainParameters = () => ParamSetResult.INADMISSIBLE;
+  stageEditor(harness, 'sample')('sample.lattice-cell-scale', 2.7);
+  assert.match(harness.elements.get('shader-document-status').textContent, /INADMISSIBLE/);
+  assert.deepEqual(savedValues(harness), original);
+  assert.equal(harness.elements.get('chain-strip').querySelector('.chain-undo').disabled, true);
+});
+
+test('generic affine retains an independently editable period in the interpreter', async () => {
+  const harness = await editorWorkbench(periodicAffineStudy('warp.affine.v3'));
+  assert.equal(savedValues(harness)['warp.lattice-period'], 1);
+  stageEditor(harness, 'sample')('sample.lattice-cell-scale', 2.7);
+  assert.equal(savedValues(harness)['warp.lattice-period'], 1);
+  stageEditor(harness, 'warp')('warp.lattice-period', 0.75);
+  assert.equal(savedValues(harness)['warp.lattice-period'], 0.75);
+});
+
 test('fixed Twist presets use descriptor resource identities for arbitrary labels', () => {
   for (const [label, resource, prefix] of [
     ['lens', undefined, ''], ['whorl', undefined, 'whorl.'], ['whorl', 'lens', ''],
