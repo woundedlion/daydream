@@ -79,7 +79,6 @@ export const COLOR_PARAMETER_NAMES = {
   'palette-mutation': 'Blend', 'palette-hue': 'Hue', 'palette-spread': 'Spread',
   'palette-lightness': 'Lightness', 'palette-lightness-range': 'Lightness range',
   'palette-lightness-curve': 'Lightness curve',
-  'hue-shift-mode': 'Mode', 'hue-shift-amount': 'Amount',
   'palette-mapping': 'Shape', 'mapping-frequency': 'Repeats', 'mapping-phase': 'Phase',
   'phase-oscillation-depth': 'Phase motion depth', 'phase-oscillation-speed': 'Phase motion speed',
   'modulation-enabled': 'Enabled', 'modulation-source': 'Source',
@@ -108,7 +107,7 @@ export function modulationParameterHidden(field, value) {
 
 /** @param {string} field @param {(field: string) => *} value @returns {boolean} */
 export function colorParameterHidden(field, value) {
-  if (field.startsWith('hue-shift-') || MODULATION_PARAMETER_GROUPS.some(
+  if (MODULATION_PARAMETER_GROUPS.some(
     (group) => group.fields.includes(field))) return true;
   const type = value('palette-type') ?? 'cycling-generated';
   if (field === 'palette-mode') return type !== 'cycling-generated';

@@ -10,7 +10,6 @@ import createHolosphereModule from '../generated/holosphere_wasm.js';
 import { validateRegistryFaces } from '../src/workbench/solids/solid_registry_codegen.js';
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
-import { migrateLegacyChainSnapshot } from '../src/workbench/shader/shader_deeplink.js';
 import { createChainValidator } from '../src/workbench/solids/solid_validation.js';
 import {
   KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
@@ -892,7 +891,7 @@ test('Symmetric Strength spans its full range without changing the unit-field fo
   } finally { bindings.delete(); }
 });
 
-test('legacy Symmetric snapshots restore effective Strength and rotation in WASM', () => {
+test('Symmetric snapshot restore requires current controls and rotation state in WASM', () => {
   engine.setEffect('ShaderChain');
   const bindings = engine.getShaderChainBindings();
   try {
@@ -902,16 +901,20 @@ test('legacy Symmetric snapshots restore effective Strength and rotation in WASM
       {instance: 'sample', operator: 'sample.grid.v3'},
       {instance: 'colorize', operator: 'colorize.generated-palette.v4'},
     ]).code, 'APPLIED');
-    const snapshot = bindings.getSnapshot();
-    snapshot.chain[0].operator = 'sphere.displace.symmetric.v1';
-    snapshot.parameters.find(({name}) => name === 'field.strength').value = 0.25;
-    snapshot.parameters.push({name: 'field.amplitude', value: -2});
-    snapshot.runtime.find(({instance}) => instance === 'field').state.primary = -1.25;
-    const migrated = migrateLegacyChainSnapshot(snapshot);
-    assert.equal(bindings.restoreSnapshot(migrated), M.ChainSnapshotRestoreResult.APPLIED);
-    const restored = bindings.getSnapshot();
-    assert.equal(restored.parameters.find(({name}) => name === 'field.strength').value, -0.5);
-    assert.equal(restored.runtime.find(({instance}) => instance === 'field').state.primary, -1.25);
+    const current = bindings.getSnapshot();
+    current.parameters.find(({name}) => name === 'field.strength').value = -0.5;
+    current.runtime.find(({instance}) => instance === 'field').state.primary = -1.25;
+    assert.equal(bindings.restoreSnapshot(current), M.ChainSnapshotRestoreResult.APPLIED);
+    assert.deepEqual(bindings.getSnapshot(), current);
+    const withoutClock = structuredClone(current);
+    withoutClock.parameters = withoutClock.parameters.filter(({name}) => name !== 'field.speed');
+    withoutClock.runtime = withoutClock.runtime.filter(({instance}) => instance !== 'field');
+    assert.equal(bindings.restoreSnapshot(withoutClock), M.ChainSnapshotRestoreResult.INVALID_VALUE);
+    assert.deepEqual(bindings.getSnapshot(), current);
+    const retired = structuredClone(current);
+    retired.chain[0].operator = 'sphere.displace.symmetric.v1';
+    assert.equal(bindings.restoreSnapshot(retired), M.ChainSnapshotRestoreResult.INVALID_CHAIN);
+    assert.deepEqual(bindings.getSnapshot(), current);
   } finally { bindings.delete(); }
 });
 

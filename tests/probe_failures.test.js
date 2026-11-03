@@ -538,7 +538,7 @@ test('palette and modulation probe reports a family whose controls fail to appea
       async evaluate(callback) {
         const document = {descriptor: {chain: stages}};
         if (String(callback).includes('location.hash')) return encodeShaderStateHash({document,
-          preset: 'p', bypassed: [], paused: false, chainSnapshot: {schemaVersion: 4,
+          preset: 'p', bypassed: [], paused: false, chainSnapshot: {schemaVersion: 5,
             chain: stages.map(({label, operator}) => ({instance: label, operator})),
             parameters: [], modulation: stages.map((entry) => ({instance: entry.label, recipe: {enabled: entry.label !== bypassed}})), animationsPaused: false}});
         if (String(callback).includes('Promise.all')) return JSON.stringify(document);

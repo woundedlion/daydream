@@ -12,7 +12,6 @@ import { errorDetail } from '../../shared/banner.js';
 import { applyChainDocument, resolveParameterWrite } from './chain_apply.js';
 import {
   createChainDocumentStore, documentFromChainSnapshot, scratchChainDocument,
-  upgradePaletteSnapshot,
 } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
 import { BAKED_CONSTANT_IDS, bakedTopologyFields, engineControlNames } from '../../../generated/shader/shader_workbench.mjs';
@@ -20,8 +19,7 @@ import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../../effects/effect_persistence.js'
 import { copyToClipboard } from '../../shared/copy_text.js';
 import { downloadBlob } from '../../shared/download_file.js';
 import {
-  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash, migrateLegacyChainSnapshot,
-  migrateLegacyMobiusDocument, migrateLegacySymmetricDocument,
+  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
 } from './shader_deeplink.js';
 
 const PATTERN_CATALOG_URL = '../../../generated/shader/patterns/catalog.json';
@@ -615,11 +613,6 @@ export function createShaderDocumentController({
     if (compiled === null) {
       // A malformed document yields diagnostics; a throw is a compiler failure.
       try {
-        let candidate = source;
-        if (typeof source === 'string') {
-          try { candidate = compiler.parseShaderDocument(source); } catch { /* compiler reports malformed input */ }
-        }
-        source = migrateLegacySymmetricDocument(migrateLegacyMobiusDocument(candidate));
         compiled = compiler.compileShaderDocument(source, { catalog: operatorCatalog });
       } catch (error) {
         const detail = errorDetail(error);
@@ -631,9 +624,6 @@ export function createShaderDocumentController({
       showError(diagnosticText(compiled));
       return false;
     }
-    if (session?.chainSnapshot) session = { ...session,
-      chainSnapshot: upgradePaletteSnapshot(
-        migrateLegacyChainSnapshot(session.chainSnapshot), operatorCatalog) };
     // Resolved before anything is built: the strip renders the active preset's values.
     const presetId = session?.preset
       ?? compiled.document.preset_bank.presets[0]?.preset_id;
@@ -995,9 +985,8 @@ export function createShaderDocumentController({
     const chainText = query.get(`fx.${CHAIN_SNAPSHOT_STORAGE_KEY}`);
     if (!linked && !linkError && chainText !== null) {
       try {
-        let snapshot = migrateLegacyChainSnapshot(JSON.parse(chainText));
+        const snapshot = JSON.parse(chainText);
         const imported = documentFromChainSnapshot(snapshot, operatorCatalog);
-        snapshot = upgradePaletteSnapshot(snapshot, operatorCatalog);
         const previous = getChainSnapshot(getEngine());
         if (!await loadSource(imported, 'imported.shader.json'))
           throw new Error(status.textContent || 'the imported chain could not be adopted');

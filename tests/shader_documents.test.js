@@ -9,10 +9,9 @@ import { shaderWorkbenchUrl, start } from '../src/app/daydream.js';
 import { WORKBENCH_EFFECTS } from '../src/effects/effect_roster.js';
 import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
-import { documentFromChainSnapshot, scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
+import { scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
 import {
-  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash, migrateLegacyChainSnapshot,
-  migrateMobiusCoefficients, migrateLegacyMobiusDocument,
+  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
 } from '../src/workbench/shader/shader_deeplink.js';
 import {
   applyFixedShaderDocument,
@@ -82,223 +81,14 @@ test('v2 shader links retain typed runtime and palette state', async () => {
   assert.deepEqual(JSON.parse(JSON.stringify(
     await decodeShaderStateHash(await encodeShaderStateHash(state)))), state);
   await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: {schemaVersion: 1}}),
-    /invalid shader link snapshot/);
-  const legacySnapshot = {...state.chainSnapshot, schemaVersion: 2};
-  await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: legacySnapshot}),
-    /invalid shader link snapshot/);
+    /unsupported shader snapshot version/);
+  const unsupportedSnapshot = {...state.chainSnapshot, schemaVersion: 2};
+  await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: unsupportedSnapshot}),
+    /unsupported shader snapshot version/);
   const missingModulation = structuredClone(state.chainSnapshot);
   delete missingModulation.modulation;
   await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: missingModulation}),
     /invalid shader link snapshot/);
-});
-
-test('legacy snapshots split displacement and spatial modulation without losing runtime', () => {
-  const recipe = {enabled: false, source: 2, version: 1, seed: 123, mechanic: {kind: 1, amount: 0.5}};
-  const clock = {source: 2, version: 1, phaseTurns: 0.25, initialized: true};
-  const legacy = {schemaVersion: 3,
-    chain: [{instance: 'displacement', operator: 'sphere.rotate.v2'},
-      {instance: 'ink', operator: 'colorize.generated-palette.v3'}],
-    parameters: [{name: 'ink.hue-shift-mode', value: 1},
-      {name: 'ink.hue-shift-amount', value: -2}, {name: 'ink.palette-chroma', value: 0.7}],
-    modulation: [{instance: 'ink', recipe}],
-    runtime: [{instance: 'ink', kind: 'color-clock-v2', state: {oscillationPhase: 0.75, modulation: clock}}],
-    animationsPaused: true};
-  const snapshot = migrateLegacyChainSnapshot(legacy);
-  assert.equal(snapshot.schemaVersion, 5);
-  assert.deepEqual(snapshot.chain.slice(1), [
-    {instance: 'ink', operator: 'colorize.generated-palette.v4'},
-    {instance: 'displacement-2', operator: 'color.modulate.v1'},
-    {instance: 'modulation', operator: 'color.modulate.v1'},
-  ]);
-  assert.deepEqual(snapshot.parameters, [{name: 'ink.palette-chroma', value: 0.7}]);
-  assert.deepEqual(snapshot.modulation[0].recipe.mechanic, {kind: 0, amount: -2});
-  assert.equal(snapshot.modulation[0].recipe.source, 4);
-  assert.equal(snapshot.modulation[0].recipe.evaluation, 0);
-  assert.equal(snapshot.modulation[0].recipe.enabled, true);
-  assert.deepEqual(snapshot.modulation[1].recipe, recipe);
-  assert.deepEqual(snapshot.runtime, [
-    {instance: 'ink', kind: 'color-clock-v3', state: {oscillationPhase: 0.75}},
-    {instance: 'displacement-2', kind: 'modulation-clock-v1',
-      state: {source: 4, version: 1, phaseTurns: 0, initialized: true}},
-    {instance: 'modulation', kind: 'modulation-clock-v1', state: clock},
-  ]);
-  assert.equal(legacy.schemaVersion, 3);
-  assert.equal(migrateLegacyChainSnapshot(snapshot), snapshot);
-});
-
-test('Mobius v2 snapshots migrate to the same generator without mutating the source', () => {
-  const values = {'mobius-a-re': -1.072, 'mobius-a-im': 0.304, 'mobius-b-re': 0.416};
-  const original = {schemaVersion: 4, chain: [{instance: 'warp-lens', operator: 'sphere.lens.mobius.v2'}],
-    parameters: Object.entries(values).map(([id, value]) => ({name: `warp-lens.${id}`, value})), modulation: []};
-  const result = migrateLegacyChainSnapshot(original);
-  assert.equal(result.schemaVersion, 5);
-  assert.equal(result.chain[0].operator, 'sphere.lens.mobius.v3');
-  const fields = Object.fromEntries(result.parameters.map(({name, value}) => [name.slice('warp-lens.'.length), value]));
-  for (const [id, expected] of Object.entries({'spin-x': 0.6686195, 'spin-y': -2.8652654,
-    'spin-z': 0.007910899, 'push-x': 0.007910899, 'push-y': 0.45477402, 'push-z': -0.6686195}))
-    assert.ok(Math.abs(fields[id] - expected) < 1e-6, id);
-  assert.equal(original.schemaVersion, 4);
-  assert.equal(original.chain[0].operator, 'sphere.lens.mobius.v2');
-  const translation = migrateMobiusCoefficients({'mobius-a-re': 1, 'mobius-d-re': 1,
-    'mobius-b-re': 2, 'mobius-b-im': -1}, 'pan');
-  assert.deepEqual(translation, {'spin-x': 1, 'spin-y': -0, 'spin-z': 2, 'push-x': 2, 'push-y': 0, 'push-z': -1});
-  assert.throws(() => migrateMobiusCoefficients({'mobius-a-re': 0.001,
-    'mobius-d-re': 1, 'mobius-b-re': 4}, 'too-strong'), /too-strong.*outside the v3 ranges/);
-  assert.throws(() => migrateMobiusCoefficients({'mobius-a-re': 0, 'mobius-d-re': 0}, 'singular'), /singular.*degenerate/);
-});
-
-test('Mobius documents migrate defaults, presets and serialization together', () => {
-  const parameters = Object.entries({'mobius-a-re': 1, 'mobius-d-re': 1, 'mobius-b-re': 0})
-    .map(([id, value]) => ({id: `lens.${id}`, default: value}));
-  const original = {descriptor: {chain: [{label: 'lens', operator: 'sphere.lens.mobius.v2'}],
-    parameters, serialization: {schema_version: 1, fields: parameters.map(({id}) => id)}},
-  preset_bank: {presets: [{preset_id: 'pan', values: {'lens.mobius-b-re': 2}}]}};
-  const migrated = migrateLegacyMobiusDocument(original);
-  assert.equal(migrated.descriptor.chain[0].operator, 'sphere.lens.mobius.v3');
-  assert.equal(migrated.descriptor.parameters.length, 6);
-  assert.equal(migrated.descriptor.serialization.fields.length, 6);
-  assert.equal(migrated.preset_bank.presets[0].values['lens.spin-z'], 2);
-  assert.equal(migrated.preset_bank.presets[0].values['lens.push-x'], 2);
-  assert.equal(original.descriptor.chain[0].operator, 'sphere.lens.mobius.v2');
-});
-
-test('importing a v2 Mobius document installs its generator controls', async () => {
-  const legacy = JSON.parse(readFileSync(new URL('../generated/shader/patterns/mobius_grid.shader.json', import.meta.url), 'utf8'));
-  legacy.descriptor.chain.find(({label}) => label === 'lens').operator = 'sphere.lens.mobius.v2';
-  legacy.descriptor.parameters = legacy.descriptor.parameters.filter(({id}) => !id.startsWith('lens.'));
-  for (const key of ['a', 'b', 'c', 'd'])
-    for (const channel of ['re', 'im'])
-      legacy.descriptor.parameters.push({id: `lens.mobius-${key}-${channel}`, classification: 'preset',
-        storage: 'binary32', unit: 'ratio', domain: {minimum: -4, maximum: 4},
-        interpolation: {kind: 'SNAP'}, default: channel === 're' && ['a', 'd'].includes(key) ? Math.SQRT1_2 : 0});
-  legacy.descriptor.serialization.fields = legacy.descriptor.parameters.map(({id}) => id);
-  for (const preset of legacy.preset_bank.presets) {
-    preset.values = Object.fromEntries(Object.entries(preset.values).filter(([id]) => !id.startsWith('lens.')));
-    Object.assign(preset.values, {'lens.mobius-a-re': -1.072, 'lens.mobius-a-im': 0.304,
-      'lens.mobius-b-re': 0.416});
-  }
-  const harness = await editorWorkbench({source: null});
-  assert.equal(await harness.controller.loadSource(JSON.stringify(legacy)), true,
-    harness.elements.get('shader-document-status').textContent);
-  const snapshot = callWorkbenchBinding(harness.engine, 'getSnapshot', [], null);
-  assert.equal(snapshot.chain.find(({instance}) => instance === 'lens').operator, 'sphere.lens.mobius.v3');
-  assert.ok(snapshot.parameters.some(({name, value}) => name === 'lens.push-z' && Math.abs(value + 0.6686195) < 1e-6));
-  assert.ok(snapshot.parameters.every(({name}) => !name.startsWith('lens.mobius-')));
-});
-
-function legacySymmetricStudy({stateless = false} = {}) {
-  const catalog = JSON.parse(ENGINE_CATALOG);
-  const operator = catalog.operators.find(({id}) => /^sphere\.displace\.symmetric\.v[12]$/.test(id));
-  operator.id = 'sphere.displace.symmetric.v2';
-  operator.params = operator.params.filter(({id}) => id !== 'amplitude');
-  Object.assign(operator.params.find(({id}) => id === 'strength'),
-    {min: -Math.fround(4 * Math.PI), max: Math.fround(4 * Math.PI)});
-  const document = scratchChainDocument(catalog, [
-    {label: 'flow', operator: operator.id},
-    {label: 'project', operator: 'project.stereographic.v2'},
-    {label: 'sample', operator: 'sample.grid.v3'},
-    {label: 'colorize', operator: 'colorize.generated-palette.v4'},
-  ]);
-  document.descriptor.chain[0].operator = 'sphere.displace.symmetric.v1';
-  const strength = document.descriptor.parameters.find(({id}) => id === 'flow.strength');
-  strength.default = 0.25;
-  strength.domain = {minimum: -Math.fround(Math.PI), maximum: Math.fround(Math.PI)};
-  document.descriptor.parameters.push({...structuredClone(strength), id: 'flow.amplitude',
-    default: -2, domain: {minimum: -4, maximum: 4}});
-  Object.assign(document.preset_bank.presets[0].values,
-    {'flow.strength': 0.25, 'flow.amplitude': -2, 'flow.speed': 0.02});
-  if (stateless) {
-    document.descriptor.parameters = document.descriptor.parameters.filter(({id}) => id !== 'flow.speed');
-    delete document.preset_bank.presets[0].values['flow.speed'];
-  }
-  document.descriptor.serialization.fields = document.descriptor.parameters.map(({id}) => id);
-  return {document, catalog: JSON.stringify(catalog)};
-}
-
-test('opening a legacy Symmetric file saves one effective Strength control', async () => {
-  const {document, catalog} = legacySymmetricStudy();
-  const before = structuredClone(document);
-  const harness = await editorWorkbench({source: null, engineCatalog: catalog});
-  const file = harness.elements.get('shader-document-file');
-  file.files = [{name: 'symmetric.shader.json', size: 1000, text: async () => JSON.stringify(document)}];
-  await onChange(file)();
-  assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok',
-    harness.elements.get('shader-document-status').textContent);
-  assert.equal(harness.controller.save(), true);
-  const saved = JSON.parse(harness.downloads.at(-1)[1]);
-  assert.equal(saved.descriptor.chain[0].operator, 'sphere.displace.symmetric.v2');
-  assert.equal(saved.preset_bank.presets[0].values['flow.strength'], -0.5);
-  assert.equal(saved.preset_bank.presets[0].values['flow.speed'], Math.fround(0.02));
-  assert.ok(saved.descriptor.parameters.every(({id}) => id !== 'flow.amplitude'));
-  assert.deepEqual(document, before);
-});
-
-for (const stateless of [false, true]) {
-  test(`legacy Symmetric v2 links restore ${stateless ? 'zero' : 'accumulated'} rotation`, async () => {
-    const {document, catalog} = legacySymmetricStudy({stateless});
-    const loaded = await editorWorkbench({source: null, engineCatalog: catalog});
-    assert.equal(await loaded.controller.loadSource(document), true);
-    const snapshot = callWorkbenchBinding(loaded.engine, 'getSnapshot', [], null);
-    snapshot.chain[0].operator = 'sphere.displace.symmetric.v1';
-    snapshot.parameters.find(({name}) => name === 'flow.strength').value = 0.25;
-    snapshot.parameters.push({name: 'flow.amplitude', value: -2});
-    if (stateless) {
-      snapshot.parameters = snapshot.parameters.filter(({name}) => name !== 'flow.speed');
-      snapshot.runtime = snapshot.runtime.filter(({instance}) => instance !== 'flow');
-    } else snapshot.runtime.find(({instance}) => instance === 'flow').state.primary = -1.25;
-    const raw = {d: document, p: document.preset_bank.presets[0].preset_id,
-      b: [], a: false, s: snapshot};
-    const hash = '#shader=v2.' + gzipSync(JSON.stringify(raw)).toString('base64url');
-    const restored = await editorWorkbench({source: null, engineCatalog: catalog, hash});
-    assert.equal(restored.elements.get('shader-document-status').dataset.status, 'ok',
-      restored.elements.get('shader-document-status').textContent);
-    const current = callWorkbenchBinding(restored.engine, 'getSnapshot', [], null);
-    assert.equal(current.chain[0].operator, 'sphere.displace.symmetric.v2');
-    assert.equal(current.parameters.find(({name}) => name === 'flow.strength').value, -0.5);
-    assert.equal(current.runtime.find(({instance}) => instance === 'flow').state.primary,
-      stateless ? 0 : -1.25);
-    assert.ok(current.parameters.every(({name}) => name !== 'flow.amplitude'));
-  });
-}
-
-test('a legacy Symmetric file outside its source range is refused without clamping', async () => {
-  const {document, catalog} = legacySymmetricStudy();
-  document.preset_bank.presets[0].values['flow.amplitude'] = 5;
-  const harness = await editorWorkbench({source: null, engineCatalog: catalog});
-  const original = callWorkbenchBinding(harness.engine, 'getSnapshot', [], null);
-  assert.equal(await harness.controller.loadSource(document), false);
-  assert.match(harness.elements.get('shader-document-status').textContent,
-    /Cannot migrate Symmetric lens.*invalid strength or amplitude/);
-  assert.deepEqual(callWorkbenchBinding(harness.engine, 'getSnapshot', [], null), original);
-});
-
-test('legacy snapshot migration preserves malformed values for rejection', async () => {
-  const legacy = {schemaVersion: 3,
-    chain: [{instance: 'ink', operator: 'colorize.generated-palette.v3'}],
-    parameters: [{name: 'ink.hue-shift-mode', value: 1},
-      {name: 'ink.hue-shift-amount', value: 0.5}],
-    modulation: [{instance: 'ink', recipe: {source: 0}}],
-    runtime: [{instance: 'ink', kind: 'color-clock-v2', state: {oscillationPhase: 0,
-      modulation: {source: 0, version: 1, phaseTurns: 0, initialized: true}}}],
-    animationsPaused: false};
-  for (const change of [
-    (snapshot) => { snapshot.parameters[0].value = 2; },
-    (snapshot) => { snapshot.parameters[0].value = '1'; },
-    (snapshot) => { snapshot.parameters[1].value = 5; },
-    (snapshot) => { snapshot.parameters[1].value = NaN; },
-    (snapshot) => { snapshot.parameters.push({...snapshot.parameters[0]}); },
-    (snapshot) => { snapshot.parameters.push({...snapshot.parameters[1]}); },
-    (snapshot) => { snapshot.modulation[0].recipe.source = 4; },
-    (snapshot) => { snapshot.runtime[0].state.modulation.source = 4; },
-    (snapshot) => { snapshot.runtime[0].kind = 'color-clock-v3'; },
-  ]) {
-    const snapshot = structuredClone(legacy);
-    change(snapshot);
-    assert.equal(migrateLegacyChainSnapshot(snapshot), snapshot);
-    await assert.rejects(encodeShaderStateHash({document: {descriptor: {chain: []}},
-      preset: 'test', bypassed: [], paused: false, chainSnapshot: snapshot}),
-    /invalid shader link snapshot/);
-  }
 });
 
 test('shader links bound the expanded UTF-8 state including its wrapper', async () => {
@@ -1284,33 +1074,15 @@ test('returning to the scratch source reopens the default chain', async () => {
 
 const CANONICAL_KALEIDOSCOPE_HEX_BRIGHT = readFileSync(
   new URL('../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8');
-function embeddedLegacySource(source) {
-  const document = JSON.parse(source);
-  const modulation = document.descriptor.chain.find((entry) => entry.operator === 'color.modulate.v1');
-  if (!modulation) return source;
-  const prefix = `${modulation.label}.`;
-  const remap = (id) => id.startsWith(prefix) ? `colorize.${id.slice(prefix.length)}` : id;
-  document.descriptor.chain = document.descriptor.chain.filter((entry) => entry !== modulation);
-  document.descriptor.chain.find((entry) => entry.label === 'colorize').operator = 'colorize.generated-palette.v3';
-  for (const parameter of document.descriptor.parameters) {
-    parameter.id = remap(parameter.id);
-    if (parameter.interpolation.group) parameter.interpolation.group = remap(parameter.interpolation.group);
-  }
-  document.descriptor.serialization.fields = document.descriptor.serialization.fields.map(remap);
-  for (const preset of document.preset_bank.presets)
-    preset.values = Object.fromEntries(Object.entries(preset.values).map(([id, value]) => [remap(id), value]));
-  return exportShaderDocumentJson(document);
-}
-const LEGACY_KALEIDOSCOPE_HEX_BRIGHT = embeddedLegacySource(CANONICAL_KALEIDOSCOPE_HEX_BRIGHT);
 function withoutEmbeddedModulation(source) {
   const document = JSON.parse(source);
   for (const parameter of document.descriptor.parameters) {
-    if (parameter.id.endsWith('.modulation-amount') || parameter.id.endsWith('.hue-shift-amount'))
+    if (parameter.id.endsWith('.modulation-amount'))
       parameter.default = 0;
   }
   for (const preset of document.preset_bank.presets) {
     for (const id of Object.keys(preset.values)) {
-      if (id.endsWith('.modulation-amount') || id.endsWith('.hue-shift-amount')) preset.values[id] = 0;
+      if (id.endsWith('.modulation-amount')) preset.values[id] = 0;
     }
   }
   return exportShaderDocumentJson(document);
@@ -3167,92 +2939,32 @@ for (const failure of ['editor', 'runtime']) {
 }
 
 
-test('loading a legacy source previews the same expanded stages that Save records', async () => {
-  const harness = await editorWorkbench({source: LEGACY_KALEIDOSCOPE_HEX_BRIGHT});
-  const expected = compileShaderDocument(LEGACY_KALEIDOSCOPE_HEX_BRIGHT,
-    {catalog: JSON.parse(ENGINE_CATALOG)}).document;
-  assert.deepEqual(harness.engine.chainCalls.at(-1), expected.descriptor.chain.map(({label, operator}) =>
-    ({instance: label, operator})));
-  assert.equal(harness.controller.save(), true);
-  const saved = JSON.parse(harness.downloads.at(-1)[1]);
-  assert.deepEqual(saved.descriptor.chain, expected.descriptor.chain);
-  assert.equal(saved.preset_bank.presets[0].values['colorize.modulation-enabled'], undefined);
-  assert.equal(saved.preset_bank.presets[0].values['colorize.modulation-amount'], undefined);
-  assert.equal(saved.preset_bank.presets[0].values['modulation.modulation-amount'],
-    JSON.parse(LEGACY_KALEIDOSCOPE_HEX_BRIGHT).preset_bank.presets[0].values['colorize.modulation-amount']);
-});
 
-for (const route of ['link', 'query']) {
-  test(`legacy ${route} snapshots migrate Field source clocks and preserve their palette`, async () => {
-    const compiled = compileShaderDocument(LEGACY_KALEIDOSCOPE_HEX_BRIGHT, {catalog: JSON.parse(ENGINE_CATALOG)});
-    const legacy = new FakeChainEngine();
-    legacy.setEffect('shader-chain');
-    const presetId = compiled.document.preset_bank.presets[0].preset_id;
-    assert.equal(applyChainDocument({engine: legacy, module: MODULE, compiled, presetId,
-      syncEffectGui() {}, invalidate() {}}), null);
-    const current = callWorkbenchBinding(legacy, 'getSnapshot', [], null);
-    const recipe = {...current.modulation.find(({instance}) => instance === 'modulation').recipe,
-      mechanic: {kind: 0, amount: 0.5}};
-    const snapshot = {
-      ...current, schemaVersion: 3,
-      chain: current.chain.filter(({operator}) => operator !== 'color.modulate.v1')
-        .map((entry) => entry.instance === 'colorize'
-          ? {...entry, operator: 'colorize.generated-palette.v3'} : entry),
-      modulation: [{instance: 'colorize', recipe}],
-      runtime: current.runtime.filter(({kind}) => kind !== 'modulation-clock-v1')
-        .map((entry) => entry.instance === 'colorize' ? {...entry, kind: 'color-clock-v2',
-          state: {oscillationPhase: 0.37,
-            modulation: {source: recipe.source, version: 1, phaseTurns: 0.63, initialized: true}}} : entry),
-      parameters: current.parameters.filter(({name}) => {
-        const field = name.split('.')[1];
-        return !name.startsWith('colorize.') || (!field.startsWith('gradient-')
-          && (!field.startsWith('palette-') || ['palette-mode', 'palette-mapping', 'palette-chroma'].includes(field)));
-      }).concat([{name: 'colorize.hue-shift-mode', value: 1},
-        {name: 'colorize.hue-shift-amount', value: -2}]),
-      animationsPaused: true,
-    };
-    snapshot.paletteBank.chroma = 0.23;
-    const linkDocument = documentFromChainSnapshot(snapshot, JSON.parse(ENGINE_CATALOG));
-    const payload = gzipSync(JSON.stringify({d: linkDocument,
-      p: linkDocument.preset_bank.presets[0].preset_id,
-      b: [], a: true, s: snapshot})).toString('base64url');
-    const hash = route === 'link' ? `#shader=v2.${payload}` : '';
-    const search = route === 'query' ? `?fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(snapshot))}`
-      : '?effect=ShaderChain';
-    const restores = [];
-    const harness = await editorWorkbench({source: null, hash, search, pausedFromEngine: true,
-      prepare: (target) => {
-        const bindings = target.getShaderChainBindings.bind(target);
-        target.getShaderChainBindings = () => {
-          const live = bindings();
-          if (!live) return live;
-          const restore = live.restoreSnapshot;
-          live.restoreSnapshot = (value) => {
-            restores.push(structuredClone(value));
-            return restore(value);
-          };
-          return live;
-        };
-      }});
-    if (route === 'query') {
-      assert.equal(restores.length, 1);
-      assert.equal(restores[0].schemaVersion, 5);
-      assert.ok(restores[0].chain.some(({operator}) => operator === 'color.modulate.v1'));
-      assert.equal(restores[0].runtime.find(({instance}) => instance === 'modulation').kind,
-        'modulation-clock-v1');
-      assert.equal(restores[0].runtime.find(({instance}) => instance === 'modulation').state.phaseTurns, 0.63);
-      assert.ok(restores[0].parameters.some(({name}) => name === 'colorize.palette-type'));
-      assert.ok(restores[0].parameters.some(({name}) => name === 'colorize.gradient-start-r'));
-    }
-    const restored = callWorkbenchBinding(harness.engine, 'getSnapshot', [], null);
-    assert.equal(restored.chain.at(-1).operator, 'color.modulate.v1', harness.elements.get('shader-document-status').textContent);
-    assert.equal(restored.runtime.find((entry) => entry.instance === 'modulation').kind, 'modulation-clock-v1');
-    assert.equal(restored.runtime.find((entry) => entry.instance === 'modulation').state.phaseTurns, 0.63);
-    assert.equal(restored.runtime.find((entry) => entry.instance === 'colorize').state.oscillationPhase, 0.37);
-    assert.deepEqual(restored.paletteBank, snapshot.paletteBank);
-    assert.equal(restored.animationsPaused, true);
-    const saved = savedValues(harness);
-    assert.equal(saved['colorize.modulation-amount'], undefined);
-    assert.ok(saved['modulation.modulation-amount'] > 0);
+for (const operator of ['sphere.lens.mobius.v2', 'sphere.displace.symmetric.v1',
+  'colorize.generated-palette.v3', 'modulate.field.v1', 'modulate.hue-shift.v1']) {
+  test(`opening retired operator ${operator} preserves the current document`, async () => {
+    const harness = await editorWorkbench();
+    const before = callWorkbenchBinding(harness.engine, 'getSnapshot', [], null);
+    const retired = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+    retired.descriptor.chain[0].operator = operator;
+    assert.equal(await harness.controller.loadSource(retired), false);
+    assert.equal(harness.elements.get('shader-document-status').dataset.status, 'error');
+    assert.deepEqual(callWorkbenchBinding(harness.engine, 'getSnapshot', [], null), before);
+    assert.equal(await harness.controller.loadSource(KALEIDOSCOPE_HEX_BRIGHT), true);
+  });
+}
+
+for (const schemaVersion of [3, 4]) {
+  test(`stored snapshot version ${schemaVersion} is refused before engine restore`, async () => {
+    const loaded = await editorWorkbench();
+    const snapshot = callWorkbenchBinding(loaded.engine, 'getSnapshot', [], null);
+    const current = structuredClone(snapshot);
+    snapshot.schemaVersion = schemaVersion;
+    const search = `?fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(snapshot))}`;
+    const refused = await editorWorkbench({source: null, search});
+    assert.match(refused.elements.get('shader-document-status').textContent, /unsupported chain snapshot/);
+    const accepted = await editorWorkbench({source: null,
+      search: `?fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(current))}`});
+    assert.match(accepted.elements.get('shader-document-status').textContent, /Restored the chain snapshot/);
   });
 }

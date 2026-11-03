@@ -6,7 +6,7 @@
 
 import { LABEL_PATTERN, declarationFromCatalogField as parameterFromField }
   from '../../../generated/shader/shader_workbench.mjs';
-import { CHAIN_SNAPSHOT_SCHEMA_VERSION, migrateLegacyChainSnapshot } from './shader_deeplink.js';
+import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from './shader_deeplink.js';
 import { MODULATION_OPERATOR, PALETTE_OPERATOR } from './chain_presentation.js';
 
 /** @typedef {{id: string, name: string|null, min: number, max: number, default: *, curve?: string, topology?: false}} CatalogNumericField */
@@ -124,25 +124,6 @@ export function scratchChainDocument(catalog, chain = DEFAULT_SCRATCH_CHAIN) {
   };
 }
 
-/** @param {*} snapshot @param {*} catalog @returns {*} A legacy snapshot with palette-family defaults. */
-export function upgradePaletteSnapshot(snapshot, catalog) {
-  const schema = catalog?.operators?.find((/** @type {*} */ operator) => operator.id === PALETTE_OPERATOR);
-  if (!schema?.params.some((/** @type {*} */ field) => field.id === 'palette-type')) return snapshot;
-  const result = structuredClone(snapshot);
-  const names = new Set(result.parameters.map((/** @type {*} */ parameter) => parameter.name));
-  for (const entry of result.chain) {
-    if (entry.operator !== PALETTE_OPERATOR || names.has(`${entry.instance}.palette-type`)) continue;
-    for (const field of schema.params) {
-      if ((!field.id.startsWith('palette-') && !field.id.startsWith('gradient-'))
-          || ['palette-mode', 'palette-chroma', 'palette-mapping'].includes(field.id)) continue;
-      const name = `${entry.instance}.${field.id}`;
-      if (!names.has(name)) result.parameters.push({name, value: field.topology
-        ? field.values.indexOf(field.default) : field.default});
-    }
-  }
-  return result;
-}
-
 /**
  * Creates the chain editor's document state machine: a validated chain
  * document, a selection, a session bypass set and an undo history. Every
@@ -200,7 +181,7 @@ export async function createChainDocumentStore({
     }
   };
 
-  let doc = structuredClone(compiler.migrateLegacyShaderDocument?.(document, catalog) ?? document);
+  let doc = structuredClone(document);
   {
     const diagnostics = diagnosticsOf(doc);
     if (diagnostics.length > 0) {
@@ -804,7 +785,6 @@ export async function createChainDocumentStore({
  * @throws {Error} If the snapshot schema is unsupported or a parameter is unknown.
  */
 export function documentFromChainSnapshot(snapshot, catalog) {
-  snapshot = migrateLegacyChainSnapshot(snapshot);
   if (snapshot?.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION || !Array.isArray(snapshot.chain)
       || !Array.isArray(snapshot.parameters) || !Array.isArray(snapshot.modulation))
     throw new Error('unsupported chain snapshot');

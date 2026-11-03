@@ -8,7 +8,6 @@ import { readFileSync } from 'node:fs';
 
 import {
   DEFAULT_SCRATCH_CHAIN,
-  upgradePaletteSnapshot,
   UNDO_DEPTH,
   createChainDocumentStore,
   documentFromChainSnapshot,
@@ -1234,7 +1233,7 @@ test('a chain snapshot imports current Twist angles unchanged', () => {
   const catalog = structuredClone(CATALOG);
   const twist = catalog.operators.find((operator) => operator.id === 'sphere.lens.twist.v2');
   Object.assign(twist.params[0], {id: 'twist-angle', name: 'Twist Angle (rad)', min: -96, max: 96, default: Math.PI * 2});
-  const snapshot = {schemaVersion: 4, modulation: [],
+  const snapshot = {schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, modulation: [],
     chain: [{instance: 'lens', operator: twist.id}, ...SNAPSHOT_CHAIN],
     parameters: [{name: 'lens.twist-angle', value: -8}, {name: 'lens.twist-distribution', value: 0.5}],
   };
@@ -1248,7 +1247,7 @@ test('a chain snapshot imports current Twist angles unchanged', () => {
 });
 
 test('a chain snapshot refuses retired Twist rate parameters', () => {
-  const snapshot = {schemaVersion: 4, modulation: [],
+  const snapshot = {schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, modulation: [],
     chain: [{instance: 'lens', operator: 'sphere.lens.twist.v2'}, ...SNAPSHOT_CHAIN],
     parameters: [{name: 'lens.twist-rate', value: -4}],
   };
@@ -1278,7 +1277,7 @@ test('a chain snapshot imports every modulation field under its instance label',
     if (source !== 'sine') Object.assign(recipe[source], {axisB: [-3, -2, -1], frequencyB: 7, offsetB: 8});
   }
   const chain = [...SNAPSHOT_CHAIN, {instance: 'ink', operator: 'color.modulate.v1'}];
-  const document = documentFromChainSnapshot({schemaVersion: 4, chain, parameters: [],
+  const document = documentFromChainSnapshot({schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain, parameters: [],
     modulation: [{instance: 'ink', recipe}]}, CATALOG);
   const expected = {
     'modulation-enabled': 'disabled', 'modulation-source': 'sphere-smooth-grid',
@@ -1297,19 +1296,4 @@ test('a chain snapshot imports every modulation field under its instance label',
   }
   const values = document.preset_bank.presets[0].values;
   for (const [field, value] of Object.entries(expected)) assert.equal(values[`ink.${field}`], value, field);
-});
-
-test('legacy snapshots gain palette-family defaults without filling missing existing controls', () => {
-  const catalog = structuredClone(CATALOG);
-  const color = catalog.operators.find((operator) => operator.id === 'colorize.generated-palette.v4');
-  const snapshot = {schemaVersion: 3, chain: SNAPSHOT_CHAIN, parameters: [], modulation: []};
-  const upgraded = upgradePaletteSnapshot(snapshot, catalog);
-  assert.equal(upgraded.parameters.find((parameter) => parameter.name === 'colorize.palette-type').value, 0);
-  const hue = color.params.find((field) => field.id === 'palette-hue');
-  assert.equal(upgraded.parameters.find((parameter) => parameter.name === 'colorize.palette-hue').value, hue.default);
-  assert.equal(upgraded.parameters.some((parameter) => parameter.name === 'colorize.palette-chroma'), false);
-  assert.equal(upgraded.parameters.some((parameter) => parameter.name === 'colorize.palette-mapping'), false);
-  const current = {...snapshot, parameters: [{name: 'colorize.palette-type', value: 1}]};
-  assert.deepEqual(upgradePaletteSnapshot(current, catalog), current);
-  assert.deepEqual(snapshot.parameters, []);
 });

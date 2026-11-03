@@ -4,7 +4,6 @@ import { canonicalEffectId } from "../../src/effects/effect_identity.js";
 import { readFileSync } from 'node:fs';
 
 import { CLASS_METHODS } from '../../generated/engine_contract.mjs';
-import { migrateLegacyChainSnapshot } from '../../src/workbench/shader/shader_deeplink.js';
 
 export const SHADER_CHAIN_BINDING_METHODS = CLASS_METHODS.ShaderChainBindings;
 
@@ -243,12 +242,10 @@ export class FakeChainEngine {
       } : null,
       restoreSnapshot: (snapshot) => {
         if (!isValid()) return ChainSnapshotRestoreResult.NOT_SHADER_CHAIN;
-        snapshot = migrateLegacyChainSnapshot(snapshot);
         if (snapshot === null || typeof snapshot !== 'object' || Array.isArray(snapshot)
             || !Number.isInteger(snapshot.schemaVersion) || snapshot.schemaVersion < 0
             || snapshot.schemaVersion > 0xffffffff) return ChainSnapshotRestoreResult.INVALID_VALUE;
-        if (snapshot.schemaVersion !== 5) return snapshot.schemaVersion === 3
-          ? ChainSnapshotRestoreResult.INVALID_VALUE : ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
+        if (snapshot.schemaVersion !== 5) return ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
         if (typeof snapshot.animationsPaused !== 'boolean') return ChainSnapshotRestoreResult.INVALID_VALUE;
         if (!Array.isArray(snapshot.chain) || !Array.isArray(snapshot.parameters) || !Array.isArray(snapshot.modulation))
           return ChainSnapshotRestoreResult.INVALID_VALUE;
