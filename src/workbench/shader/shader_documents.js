@@ -589,6 +589,8 @@ export function createShaderDocumentController({
       presetId: () => active?.presetId ?? null,
       onEditParameter: writeStageEdit,
       parameterLive,
+      parameterRanges: () => chainUi?.store === store && active?.compiledSide !== true
+        ? callWorkbenchBinding(getEngine(), 'getShaderChainParameterRanges', [], []) : [],
       onCommitParameter: () => { void flushDeepLink(); },
       bypassAvailable: () => active?.compiledSide !== true,
     }));

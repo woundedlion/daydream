@@ -18,6 +18,7 @@ import {
 /** @typedef {import('./chain_presentation.js').SequenceEntry} SequenceEntry */
 /** @typedef {import('./chain_presentation.js').SpanChoice} SpanChoice */
 /** @typedef {import('./chain_document_store.js').ParameterDeclaration} ParameterDeclaration */
+/** @typedef {{name: string, min: number, max: number}} ParameterRange */
 /** @typedef {import('./chain_presentation.js').BandLayout} BandLayout */
 
 import { createFrameScheduler } from '../../shared/page_lifecycle.js';
@@ -109,12 +110,14 @@ const SOCKET_FUNCTIONS = {
  * @param {() => boolean} [options.bypassAvailable] - Whether a bypass reaches
  *   what is rendering. False disables the toggles and states why.
  * @param {(parameterId: string) => boolean} [options.parameterLive] - Whether a parameter reaches the active build.
+ * @param {() => ParameterRange[]} [options.parameterRanges] - Current numeric limits from the preview engine.
  * @returns {Object} The strip.
  */
 export function createChainStrip({
   doc, container, store, catalog, announce, onApply, onSelect = () => {},
   presetId = () => null, onEditParameter = () => {}, onCommitParameter = () => {},
   bypassAvailable = () => true, parameterLive = () => true,
+  parameterRanges = () => [],
 }) {
   const { opOf, bandLayout, appendGap, choiceEntries, choiceKey, socketChoices, sharesBand } = createChainPresentation({
     catalog, chain: store.chain, legalSequences: store.legalSequences,
@@ -716,6 +719,7 @@ export function createChainStrip({
    */
   const markDeactivated = () => {
     const chain = store.chain();
+    const ranges = new Map(parameterRanges().map((range) => [range.name, range]));
     const off = deactivatedParameterIds(declarations, values, chain, catalog);
     for (const control of container.querySelectorAll('.chain-modulation-enabled')) {
       const id = `${control.dataset.label}.modulation-enabled`;
@@ -736,13 +740,21 @@ export function createChainStrip({
       const modulation = operator === MODULATION_OPERATOR;
       const ripple = operator === 'sphere.displace.ripple.v2';
       const field = fieldOf(id);
-      if ((color || modulation) && ['pattern-scale', 'modulation-amount'].includes(field)) {
-        const domain = declarations.find((parameter) => parameter.id === id)?.domain;
+      const declaration = declarations.find((parameter) => parameter.id === id);
+      if (declaration?.storage === 'binary32') {
+        const domain = declaration.domain;
         let minimum = Number(domain?.minimum);
         let maximum = Number(domain?.maximum);
-        if (field === 'pattern-scale' && values[`${label}.modulation-evaluation`] === 'baked-cube')
+        const range = ranges.get(id);
+        if (range && Number.isFinite(range.min) && Number.isFinite(range.max)) {
+          minimum = Math.max(minimum, range.min);
+          maximum = Math.min(maximum, range.max);
+        }
+        if ((color || modulation) && field === 'pattern-scale'
+            && values[`${label}.modulation-evaluation`] === 'baked-cube')
           maximum = Math.min(maximum, 8);
-        if (field === 'modulation-amount' && values[`${label}.modulation-mechanic`] !== 'hue-rotation') {
+        if ((color || modulation) && field === 'modulation-amount'
+            && values[`${label}.modulation-mechanic`] !== 'hue-rotation') {
           minimum = Math.max(minimum, 0);
           maximum = Math.min(maximum, 1);
         }
@@ -790,6 +802,14 @@ export function createChainStrip({
    */
   const editParameter = (parameterId, value) => {
     if (!parameterLive(parameterId)) return false;
+    if (typeof value === 'number') {
+      const control = rows.get(parameterId)?.querySelector('.chain-param-control');
+      if (control?.type === 'range') {
+        value = Math.min(Number(control.max), Math.max(Number(control.min), value));
+        control.value = String(value);
+        rows.get(parameterId).querySelector('.chain-param-value').value = formatNumericValue(value);
+      }
+    }
     if (onEditParameter(parameterId, value) === false) {
       scheduleSliderEdit.cancel();
       pendingSliderEdit = null;
@@ -867,7 +887,8 @@ export function createChainStrip({
     slider.step = 'any';
     slider.value = String(values[declaration.id]);
     slider.addEventListener('input', (/** @type {*} */ event) => {
-      const value = Number(event.target.value);
+      const value = Math.min(Number(slider.max), Math.max(Number(slider.min), Number(event.target.value)));
+      slider.value = String(value);
       readout.value = formatNumericValue(value);
       pendingSliderEdit = { parameterId: declaration.id, value };
       scheduleSliderEdit();

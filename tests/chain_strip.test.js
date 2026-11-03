@@ -46,6 +46,7 @@ restoreDocumentAfterEach();
 async function makeStrip({
   presetId = null, bypassAvailable = () => true, writeThrough = false, parameterLive = () => true,
   acceptParameter = () => true,
+  parameterRanges = () => [],
   source = structuredClone(BASE.document), catalog = CATALOG,
 } = {}) {
   const store = await createChainDocumentStore({
@@ -80,6 +81,7 @@ async function makeStrip({
     },
     onCommitParameter: () => commits.push(edits.length),
     bypassAvailable, parameterLive,
+    parameterRanges,
   });
   return {
     store, container, doc, strip, applied, selections, announced, edits, commits,
@@ -1296,6 +1298,65 @@ test('a slider edit calls back with the parameter and its value', async () => {
   assert.deepEqual(h.applied, [], 'a value edit is no structural edit');
   assert.equal(controlIn(rowFor(h, 'sample', 'sample.pattern-freq')), slider,
     'the strip is not rebuilt under the pointer');
+});
+
+test('live ranges bound sliders and typed values and expand without replacing controls', async () => {
+  let maximum = 6;
+  const h = await makeStrip({
+    parameterRanges: () => [{name: 'sample.pattern-freq', min: 1, max: maximum}],
+  });
+  const row = rowFor(h, 'sample', 'sample.pattern-freq');
+  const slider = controlIn(row);
+  const readout = row.querySelector('.chain-param-value');
+  assert.equal(Number(slider.min), 1);
+  assert.equal(Number(slider.max), 6);
+  assert.equal(readout.min, slider.min);
+  assert.equal(readout.max, slider.max);
+  slider.focus();
+  slider.value = '20';
+  slider.dispatch('input');
+  runFrame();
+  assert.deepEqual(h.edits, [['sample.pattern-freq', 6]]);
+  assert.equal(Number(slider.value), 6);
+  assert.equal(Number(readout.value), 6);
+  maximum = 12;
+  h.strip.syncParameterValues({'sample.pattern-freq': 6});
+  assert.equal(Number(slider.max), 12);
+  assert.equal(Number(readout.max), 12);
+  assert.equal(controlIn(rowFor(h, 'sample', 'sample.pattern-freq')), slider);
+  assert.equal(h.doc.activeElement, slider);
+  assert.equal(h.edits.length, 1, 'changing limits writes no value');
+  readout.value = '20';
+  readout.dispatch('change');
+  assert.deepEqual(h.edits.at(-1), ['sample.pattern-freq', 12]);
+  readout.value = '-1';
+  readout.dispatch('change');
+  assert.deepEqual(h.edits.at(-1), ['sample.pattern-freq', 1]);
+});
+
+test('queued slider values respect a range tightened before the frame flush', async () => {
+  let maximum = 12;
+  const h = await makeStrip({
+    parameterRanges: () => [{name: 'sample.pattern-freq', min: 1, max: maximum}],
+  });
+  const slider = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
+  slider.value = '10';
+  slider.dispatch('input');
+  maximum = 6;
+  h.strip.syncParameterValues({});
+  runFrame();
+  assert.deepEqual(h.edits, [['sample.pattern-freq', 6]]);
+  assert.equal(Number(slider.value), 6);
+});
+
+test('live limits stay inside the document-authored numeric domain', async () => {
+  const h = await makeStrip({
+    parameterRanges: () => [{name: 'sample.pattern-freq', min: -1e6, max: 1e6}],
+  });
+  const domain = h.store.parameterDeclarations().find((p) => p.id === 'sample.pattern-freq').domain;
+  const slider = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
+  assert.equal(Number(slider.min), domain.minimum);
+  assert.equal(Number(slider.max), domain.maximum);
 });
 
 test('slider input coalesces to the latest value in each frame', async () => {

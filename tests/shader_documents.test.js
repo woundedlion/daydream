@@ -2392,16 +2392,42 @@ test('a chip control writes the active preset and survives Save without an engin
     'the document stores the option id');
 });
 
-test('a chip control edit outside the parameter domain is announced, not stored', async () => {
+test('a chip slider stops at its domain limit without a rejection', async () => {
   const harness = await editorWorkbench();
-  const before = savedValues(harness)['sample.pattern-freq'];
+  const maximum = harness.engine.getParameterDefinitions()
+    .find((parameter) => parameter.name === 'sample.pattern-freq').max;
 
   stageEditor(harness, 'sample')('sample.pattern-freq', 500);
 
   const status = harness.elements.get('shader-document-status');
-  assert.equal(status.dataset.status, 'error');
-  assert.match(status.textContent, /sample\.pattern-freq.*bounds/);
-  assert.equal(savedValues(harness)['sample.pattern-freq'], before);
+  assert.equal(status.dataset.status, 'ok');
+  assert.equal(savedValues(harness)['sample.pattern-freq'], maximum);
+});
+
+test('chip ranges refresh from the engine after edits and undo', async () => {
+  const harness = await editorWorkbench();
+  let maximum = 6;
+  harness.engine.bindings.getShaderChainParameterRanges = () => [
+    {name: 'sample.pattern-freq', min: 1, max: maximum},
+  ];
+  const edit = stageEditor(harness, 'sample');
+  const slider = stripChips(harness).find((chip) => chip.dataset.label === 'sample')
+    .querySelectorAll('.chain-param').find((row) => row.dataset.parameter === 'sample.pattern-freq')
+    .querySelector('.chain-param-control');
+  assert.equal(Number(slider.max), 6);
+  edit('sample.pattern-freq', 20);
+  assert.equal(savedValues(harness)['sample.pattern-freq'], 6);
+  maximum = 12;
+  edit('sample.pattern-freq', 5);
+  assert.equal(Number(slider.max), 12);
+  edit('sample.pattern-freq', 10);
+  assert.equal(savedValues(harness)['sample.pattern-freq'], 10);
+  harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
+  const restored = stripChips(harness).find((chip) => chip.dataset.label === 'sample')
+    .querySelectorAll('.chain-param').find((row) => row.dataset.parameter === 'sample.pattern-freq')
+    .querySelector('.chain-param-control');
+  assert.equal(Number(restored.max), 12);
+  assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
 });
 
 test('a native refusal preserves saved values, links and coalesced undo history', async () => {

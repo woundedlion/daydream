@@ -96,6 +96,10 @@ export class FakeChainEngine {
     this.bindings = {
       setShaderChain: (entries) => this.#setShaderChain(entries),
       setShaderChainParameters: (writes) => this.#setShaderChainParameters(writes),
+      getShaderChainParameterRanges: () => this.definitions
+        .filter((definition) => !definition.options && !definition.readonly
+          && Number.isFinite(definition.min) && Number.isFinite(definition.max))
+        .map(({name, min, max}) => ({name, min, max})),
     };
     this.effect = null;
     this.generation = 1;
@@ -362,6 +366,7 @@ export class FakeChainEngine {
         : { code: 'NOT_CHAIN_EFFECT', status: ChainStatus.NOT_CHAIN_EFFECT, entryIndex: -1 },
       setShaderChainParameters: (writes) => isValid() ? this.bindings.setShaderChainParameters(writes)
         : ParamSetResult.NO_EFFECT,
+      getShaderChainParameterRanges: () => isValid() ? this.bindings.getShaderChainParameterRanges() : [],
       delete: () => { released = true; },
     };
   }
