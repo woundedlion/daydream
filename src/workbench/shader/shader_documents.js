@@ -840,15 +840,54 @@ export function createShaderDocumentController({
   /**
    * Writes a copy under a fresh document id. The loaded document keeps its own
    * id and download name, so a following Save still re-exports the original.
-   * @returns {boolean} Whether a document was written.
+   * @returns {Promise<boolean>} Whether a document was written.
    */
-  const saveAs = () => {
+  const saveAs = async () => {
     if (!active) return false;
     void flushDeepLink();
     const document = currentDocument();
+    const savedActive = active;
+    const savedDocument = JSON.stringify(document);
     copies += 1;
     document.document_id = `${document.document_id}-copy${copies}`;
-    return exportDocument(document, `${document.document_id}.shader.json`);
+    let filename = `${document.document_id}.shader.json`;
+    try {
+      const source = compiler.exportShaderDocumentJson(document);
+      if (typeof win.showSaveFilePicker === 'function') {
+        const file = await win.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ description: 'Shader document', accept: { 'application/json': ['.json'] } }],
+        });
+        const writable = await file.createWritable();
+        try {
+          await writable.write(source);
+          await writable.close();
+        } catch (error) {
+          await writable.abort().catch(() => {});
+          throw error;
+        }
+        filename = file.name;
+      } else {
+        const entered = win.prompt('Save shader as:', filename);
+        if (entered === null) return false;
+        filename = entered.trim();
+        if (!filename) {
+          showError('Enter a filename for the shader document.');
+          return false;
+        }
+        if (!filename.toLowerCase().endsWith('.json')) filename += '.shader.json';
+        download(filename, source);
+      }
+      if (active === savedActive) {
+        active.savedDocument = savedDocument;
+        showStatus(`Saved ${filename}.`);
+      }
+      return true;
+    } catch (error) {
+      if (!(error instanceof Error && error.name === 'AbortError'))
+        showError(`The shader document could not be saved: ${errorDetail(error)}.`);
+      return false;
+    }
   };
 
   /**
