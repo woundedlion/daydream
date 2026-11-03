@@ -170,7 +170,7 @@ test('the fake chain engine advances generations after repeated application', ()
 });
 
 
-test('field snapshot fakes preserve drift clocks and omit stateless invariant state', () => {
+test('field snapshot fakes preserve their drift clocks', () => {
   for (const operator of ['sphere.displace.potential.v1',
     'sphere.displace.rossby-haurwitz.v1', 'sphere.displace.symmetric.v1']) {
     const engine = new FakeChainEngine();
@@ -181,21 +181,16 @@ test('field snapshot fakes preserve drift clocks and omit stateless invariant st
     assert.equal(bindings.setShaderChain(chain).code, 'APPLIED');
     const saved = bindings.getSnapshot();
     const clock = saved.runtime.find(({instance}) => instance === 'field');
-    if (operator === 'sphere.displace.symmetric.v1') {
-      assert.equal(clock, undefined);
-      const invalid = structuredClone(saved);
-      invalid.runtime.push({instance: 'field', kind: 'source-clock-v1',
-        state: {primary: 0, secondary: 0, angle: 0}});
-      assert.equal(bindings.restoreSnapshot(invalid), ChainSnapshotRestoreResult.INVALID_VALUE);
-      assert.deepEqual(bindings.getSnapshot(), saved);
-    } else {
-      assert.deepEqual(clock, {instance: 'field', kind: 'source-clock-v1',
-        state: {primary: 0, secondary: 0, angle: 0}});
-      clock.state.primary = 1.25;
-      assert.equal(bindings.restoreSnapshot(saved), ChainSnapshotRestoreResult.APPLIED);
-      assert.equal(bindings.getSnapshot().runtime.find(({instance}) => instance === 'field')
-        .state.primary, 1.25);
-    }
+    assert.deepEqual(clock, {instance: 'field', kind: 'source-clock-v1',
+      state: {primary: 0, secondary: 0, angle: 0}});
+    clock.state.primary = 1.25;
+    assert.equal(bindings.restoreSnapshot(saved), ChainSnapshotRestoreResult.APPLIED);
+    assert.equal(bindings.getSnapshot().runtime.find(({instance}) => instance === 'field')
+      .state.primary, 1.25);
+    const invalid = structuredClone(saved);
+    invalid.runtime = invalid.runtime.filter(({instance}) => instance !== 'field');
+    assert.equal(bindings.restoreSnapshot(invalid), ChainSnapshotRestoreResult.INVALID_VALUE);
+    assert.deepEqual(bindings.getSnapshot(), saved);
     bindings.delete();
   }
 });

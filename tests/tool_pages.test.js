@@ -480,8 +480,9 @@ const CONTRAST_SURFACES = {
     '.chain-chip:hover, .chain-chip:focus-visible': '.chain-chip',
     '.chain-chip[aria-current="true"]': '.chain-chip[aria-current="true"]',
     '.chain-chip--bypassed .chain-chip-name': '.chain-chip',
-    '.chain-chip-pin, .chain-chip-remove, .chain-chip-bypass': '.chain-chip',
-    ['.chain-chip-pin:hover, .chain-chip-pin:focus-visible, .chain-chip-remove:hover, .chain-chip-remove:focus-visible,'
+    '.chain-chip-pin, .chain-chip-reset, .chain-chip-remove, .chain-chip-bypass': '.chain-chip',
+    ['.chain-chip-pin:hover, .chain-chip-pin:focus-visible, .chain-chip-reset:hover:not(:disabled), .chain-chip-reset:focus-visible,'
+      + ' .chain-chip-remove:hover, .chain-chip-remove:focus-visible,'
       + ' .chain-chip-bypass:hover:not(:disabled), .chain-chip-bypass:focus-visible']: '.chain-chip',
     '.chain-chip-pin[aria-pressed="true"], .chain-chip-bypass[aria-pressed="true"]': '.chain-chip',
     '.chain-chip-function-label': '.chain-chip',
@@ -550,7 +551,7 @@ const CONTRAST_EXEMPT = {
       'inactive control, which SC 1.4.3 exempts from the contrast floor',
     '.chain-band-title': 'band tint is 10% carrier over the live canvas',
     '.chain-band-add': 'band tint is 10% carrier over the live canvas',
-    '.chain-chip-bypass:disabled':
+    '.chain-chip-bypass:disabled, .chain-chip-reset:disabled':
       'inactive controls, which SC 1.4.3 exempts from the contrast floor',
     '.chain-chip-bypass:disabled[aria-pressed="true"]':
       'inactive control, which SC 1.4.3 exempts from the contrast floor',
