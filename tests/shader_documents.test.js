@@ -2262,7 +2262,7 @@ test('a chip slider stops at its domain limit without a rejection', async () => 
   assert.equal(savedValues(harness)['sample.pattern-freq'], maximum);
 });
 
-test('chip ranges refresh from the engine after edits and undo', async () => {
+test('chip ranges remain fixed during edits and refresh on commit and undo', async () => {
   let maximum = 6;
   const harness = await editorWorkbench({prepare(engine) {
     engine.bindings.getShaderChainParameterRanges = () => [
@@ -2279,6 +2279,8 @@ test('chip ranges refresh from the engine after edits and undo', async () => {
   assert.equal(savedValues(harness)['sample.pattern-freq'], 6);
   maximum = 12;
   edit('sample.pattern-freq', 5);
+  assert.equal(Number(slider.max), 6);
+  slider.dispatch('change');
   assert.equal(Number(slider.max), 12);
   edit('sample.pattern-freq', 10);
   assert.equal(savedValues(harness)['sample.pattern-freq'], 10);
