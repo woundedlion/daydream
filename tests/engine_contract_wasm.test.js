@@ -559,32 +559,36 @@ test('field integer dropdowns and mode gates follow the real engine catalog', ()
   } finally { bindings.delete(); }
 });
 
-test('chain preset batches restore cross-field values and refuse singular edits without storing them', () => {
+test('chain preset batches restore Mobius generators and refuse nonfinite edits transactionally', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)));
   assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
   const chain = [DEFAULT_CHAIN[0],
-    { instance: 'lens', operator: 'sphere.lens.mobius.v2' }, ...DEFAULT_CHAIN.slice(1)];
-  const values = Object.fromEntries(['a', 'b', 'c', 'd'].flatMap((part) => [
-    [`lens.mobius-${part}-re`, part === 'b' || part === 'c' ? 1 : 0],
-    [`lens.mobius-${part}-im`, 0],
-  ]));
-  const compiled = { document: {
-    descriptor: { chain: chain.map(({ instance, operator }) => ({ label: instance, operator })) },
-    preset_bank: { presets: [{ preset_id: 'swap', values }] },
-  } };
-  const apply = () => applyChainDocument({ engine, module: M, compiled, presetId: 'swap',
-    syncEffectGui() {}, invalidate() {} });
+    {instance: 'lens', operator: 'sphere.lens.mobius.v3'}, ...DEFAULT_CHAIN.slice(1)];
+  const values = {'lens.spin-x': 1, 'lens.spin-y': 0, 'lens.spin-z': -1,
+    'lens.push-x': 0.5, 'lens.push-y': -0.25, 'lens.push-z': 0};
+  const compiled = {document: {
+    descriptor: {chain: chain.map(({instance, operator}) => ({label: instance, operator}))},
+    preset_bank: {presets: [{preset_id: 'generator', values}]},
+  }};
+  const apply = () => applyChainDocument({engine, module: M, compiled, presetId: 'generator',
+    syncEffectGui() {}, invalidate() {}});
   assert.equal(apply(), null);
   const snapshot = () => Object.fromEntries(engine.getParameterDefinitions()
-    .filter(({ name }) => name.startsWith('lens.')).map(({ name, value }) => [name, value]));
+    .filter(({name}) => name.startsWith('lens.')).map(({name, value}) => [name, value]));
   assert.deepEqual(snapshot(), values);
-  assert.equal(engine.setParameter('lens.mobius-b-re', 0), M.ParamSetResult.INADMISSIBLE);
+  assert.equal(engine.setParameter('lens.spin-x', NaN), M.ParamSetResult.NON_FINITE);
   assert.deepEqual(snapshot(), values);
   assert.equal(chainCall(engine, 'setShaderChainParameters', [
-    { name: 'lens.mobius-a-re', value: 2 },
-    { name: 'lens.mobius-b-re', value: 0 },
-  ]), M.ParamSetResult.INADMISSIBLE);
+    {name: 'lens.spin-x', value: 2}, {name: 'lens.push-x', value: NaN},
+  ]), M.ParamSetResult.NON_FINITE);
   assert.deepEqual(snapshot(), values);
+  const invalid = chainCall(engine, 'getSnapshot');
+  invalid.parameters.find(({name}) => name === 'lens.push-x').value = 7;
+  assert.equal(chainCall(engine, 'restoreSnapshot', invalid), M.ChainSnapshotRestoreResult.INVALID_VALUE);
+  assert.deepEqual(snapshot(), values);
+  assert.equal(chainCall(engine, 'setShaderChainParameters',
+    Object.keys(values).map((name) => ({name, value: 0}))), M.ParamSetResult.APPLIED);
+  assert.deepEqual(snapshot(), Object.fromEntries(Object.keys(values).map((name) => [name, 0])));
   assert.equal(apply(), null);
   assert.deepEqual(snapshot(), values);
 });
@@ -1725,7 +1729,7 @@ test('retired chain operators are absent and refuse without changing the live pr
   for (const operator of [
     'colorize.generated-palette.v2', 'project.airocean.v2', 'project.bonne.v2',
     'project.peirce-square-fast.v2', 'project.peirce.v2', 'sample.grid.v2',
-    'sample.twin-wave.v2', 'warp.affine.v2',
+    'sample.twin-wave.v2', 'warp.affine.v2', 'sphere.lens.mobius.v2',
   ]) {
     assert.equal(catalog.operators.some((entry) => entry.id === operator), false);
     const result = chainCall(engine, 'setShaderChain', [{instance: 'retired', operator}]);

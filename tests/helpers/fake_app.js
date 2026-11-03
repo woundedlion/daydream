@@ -376,6 +376,7 @@ export function fakeWasmModule({
         return true;
       }
       getParameterDefinitions() { return definitions.map((d) => ({ ...d })); }
+      getParameterAdvisories() { return []; }
       getParamValues() { return new Float32Array(0); }
       getParamGeneration() { return 1; }
       getEffectSizes() {

@@ -1001,7 +1001,7 @@ test('the store adopts the scratch document and edits it', async () => {
   });
   assert.deepEqual(labels(store), ['rotate', 'project', 'sample', 'colorize']);
 
-  assert.equal(store.replaceSpan(1, 0, [{ operator: 'sphere.lens.mobius.v2' }]).ok, true);
+  assert.equal(store.replaceSpan(1, 0, [{ operator: 'sphere.lens.mobius.v3' }]).ok, true);
   assertGreen(store);
   assert.deepEqual(labels(store),
     ['rotate', 'lens', 'project', 'sample', 'colorize']);
@@ -1042,7 +1042,7 @@ test('an injected compiler handles store validation', async () => {
   assert.equal(imports, 1);
   assert.ok(validations > 0);
   const constructionValidations = validations;
-  assert.equal(store.replaceSpan(1, 0, [{ operator: 'sphere.lens.mobius.v2' }]).ok, true);
+  assert.equal(store.replaceSpan(1, 0, [{ operator: 'sphere.lens.mobius.v3' }]).ok, true);
   assert.ok(validations > constructionValidations);
   assertGreen(store);
 });

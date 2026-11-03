@@ -34,37 +34,32 @@ function realEngineDeps(module, engine, win, { onWrite = () => {}, warnings }) {
   };
 }
 
-const COUPLED_SCENARIOS = [
-  { name: 'raw', raw: true, accepted: false, singular: false },
-  { name: 'companions', raw: true, accepted: true, singular: false },
-  { name: 'accepted', raw: false, accepted: true, singular: false },
-  { name: 'singular', raw: true, accepted: false, singular: true },
-  { name: 'singular accepted', raw: false, accepted: true, singular: true },
+const GENERATOR_SCENARIOS = [
+  {name: 'raw', raw: true, accepted: false, identity: false},
+  {name: 'companions', raw: true, accepted: true, identity: false},
+  {name: 'accepted', raw: false, accepted: true, identity: false},
+  {name: 'identity raw', raw: true, accepted: false, identity: true},
+  {name: 'identity accepted', raw: false, accepted: true, identity: true},
 ];
 
-for (const scenario of COUPLED_SCENARIOS) {
-  test(`coupled Mobius URL hydration settles before canonicalization (${scenario.name})`, async () => {
-    const { default: createModule } = await import('../generated/holosphere_wasm.js');
-    const module = await createModule({ print: () => {} });
+for (const scenario of GENERATOR_SCENARIOS) {
+  test(`Mobius generator URL hydration settles before canonicalization (${scenario.name})`, async () => {
+    const {default: createModule} = await import('../generated/holosphere_wasm.js');
+    const module = await createModule({print: () => {}});
     const engine = new module.HolosphereEngine();
     assert.notEqual(engine.setResolution(96, 20), module.ResolutionSetResult.UNSUPPORTED, '96x20');
     assert.equal(engine.setEffect('MobiusGrid'), module.EffectSetResult.INSTALLED, 'MobiusGrid');
-    const target = {
-      'Mobius A Re': 0, 'Mobius A Im': 0,
-      'Mobius B Re': scenario.singular ? 0 : 1, 'Mobius B Im': 0,
-      'Mobius C Re': scenario.singular ? 0 : -1, 'Mobius C Im': 0,
-      'Mobius D Re': 0, 'Mobius D Im': 0,
-    };
+    const target = {'Spin X': 1.25, 'Spin Y': -0.5, 'Spin Z': 0,
+      'Push X': 2, 'Push Y': -0.25, 'Push Z': 0.75};
+    if (scenario.identity) for (const name of Object.keys(target)) target[name] = 0;
     const url = new URL('https://example.test/?effect=MobiusGrid');
     for (const [name, value] of Object.entries(target)) {
       if (scenario.raw) url.searchParams.set(`fx.${name}`, value);
       if (scenario.accepted) url.searchParams.set(`fx.__accepted.${name}`, value);
     }
-    const win = {
-      location: url, setTimeout, clearTimeout,
-      history: { replaceState(state, title, next) { win.location = new URL(next, win.location); } },
-    };
-    const sync = new URLSync(new AppState({ effect: 'MobiusGrid' }), ['effect'], {}, win);
+    const win = {location: url, setTimeout, clearTimeout,
+      history: {replaceState(state, title, next) {win.location = new URL(next, win.location);}}};
+    const sync = new URLSync(new AppState({effect: 'MobiusGrid'}), ['effect'], {}, win);
     const writes = [];
     const warnings = [];
     const panel = createEffectGui(realEngineDeps(module, engine, win, {
@@ -76,24 +71,15 @@ for (const scenario of COUPLED_SCENARIOS) {
       sync.flush();
       assert.deepEqual(warnings, []);
       const actual = Object.fromEntries(engine.getParameterDefinitions()
-        .filter(p => Object.hasOwn(target, p.name)).map(p => [p.name, p.acceptedValue]));
-      const stored = (name) => win.location.searchParams.get(name);
-      if (!scenario.singular) {
-        assert.deepEqual(actual, target);
-        if (scenario.raw) assert.equal(stored('fx.Mobius A Im'), '0');
-        assert.equal(stored('fx.__accepted.Mobius A Im'), '0');
-        assert.deepEqual(writes.filter(w => w.name === 'Mobius A Im').map(w => w.accepted).slice(0, 2), [false, true]);
-      } else {
-        assert.notDeepEqual(actual, target);
-        assert.ok(writes.some(w => !w.accepted));
-        assert.ok(writes.length <= Object.keys(target).length ** 2);
-        const prefix = scenario.raw ? 'fx.' : 'fx.__accepted.';
-        const unresolved = Object.keys(target).filter(name => !writes.some(w => w.name === name && w.accepted));
-        if (!scenario.raw) assert.ok(unresolved.length > 0);
-        for (const [name, value] of Object.entries(actual)) {
-          if (!scenario.raw && unresolved.includes(name)) assert.equal(stored(prefix + name), String(target[name]));
-          else assert.ok(Math.abs(Number(stored(prefix + name)) - value) < 0.00001);
-        }
+        .filter((parameter) => Object.hasOwn(target, parameter.name))
+        .map((parameter) => [parameter.name, parameter.acceptedValue]));
+      assert.deepEqual(actual, target);
+      const generatorWrites = writes.filter(({name}) => Object.hasOwn(target, name));
+      assert.equal(generatorWrites.length, Object.keys(target).length * (scenario.raw && scenario.accepted ? 2 : 1));
+      assert.ok(generatorWrites.every(({accepted}) => accepted));
+      for (const [name, value] of Object.entries(target)) {
+        if (scenario.raw) assert.equal(Number(win.location.searchParams.get(`fx.${name}`)), value);
+        assert.equal(Number(win.location.searchParams.get(`fx.__accepted.${name}`)), value);
       }
     } finally {
       panel.destroy();

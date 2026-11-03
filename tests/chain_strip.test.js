@@ -589,7 +589,7 @@ test('a band + appends while Insert opens the insertion palette after focus', as
   bandFor(h, 'sphere').querySelector('.chain-band-add').dispatch('click');
   let entries = paletteEntries(h);
   assert.equal(entries.every((entry) => entry.getAttribute('aria-disabled') === null), true);
-  entries.find((entry) => entry.dataset.operator === 'sphere.lens.mobius.v2')
+  entries.find((entry) => entry.dataset.operator === 'sphere.lens.mobius.v3')
     .dispatch('click');
   assert.deepEqual(labels(h).slice(0, 3), ['camera', 'lens', 'lens1'],
     'the band + lands at the band\'s last gap');
