@@ -181,7 +181,7 @@ test('endomorphisms carry controls; sockets carry only valid selectors', async (
   assert.match(remove.getAttribute('aria-label'), /^Remove .+ · lens$/);
   const controls = chipByLabel(h, 'camera').querySelector('.chain-chip-header')
     .querySelectorAll('button');
-  assert.deepEqual(controls.map((button) => button.textContent), ['◉', '', '×']);
+  assert.deepEqual(controls.map((button) => button.textContent), ['◉', '', '', '×']);
 });
 
 test('a socket names the function by the carrier its crossing produces', async () => {
@@ -201,6 +201,62 @@ test('a socket names the function by the carrier its crossing produces', async (
       .getAttribute('aria-label')),
     ['Source function', 'Palette'],
     'the sphere to field crossing is a source, not a second Palette socket');
+});
+
+test('each card exposes a named reset control without expanding or selecting it', async () => {
+  const h = await makeStrip();
+  for (const chip of chips(h)) {
+    const reset = chip.querySelector('.chain-chip-reset');
+    assert.ok(reset);
+    assert.match(reset.getAttribute('aria-label'), /parameters to defaults$/);
+    assert.equal(reset.querySelector('.chain-chip-reset-icon').getAttribute('aria-hidden'), 'true');
+  }
+  chipByLabel(h, 'camera').querySelector('.chain-chip-reset').dispatch('click');
+  assert.equal(h.store.selectedLabel(), null);
+  assert.equal(chipByLabel(h, 'camera').classList.contains('chain-chip--expanded'), false);
+  assert.equal(h.doc.activeElement, chipByLabel(h, 'camera').querySelector('.chain-chip-reset'));
+});
+
+test('a card reset restores only the active preset and is one undoable action', async () => {
+  const source = structuredClone(BASE.document);
+  const other = structuredClone(source.preset_bank.presets[0]);
+  other.preset_id = 'other';
+  source.preset_bank.presets.push(other);
+  source.preset_bank.choreography.generated_order.push('other');
+  delete source.preset_bank.choreography.dwell;
+  const h = await makeStrip({ source, presetId: 'other' });
+  assert.equal(h.store.setPresetValues('other', {
+    'camera.wander': 0.5, 'camera.spin-speed': 0.01, 'lens.symmetry': 'tetrahedral',
+  }).ok, true);
+  h.strip.render();
+  const before = h.store.document();
+  const defaults = Object.fromEntries(h.store.parameterDeclarations()
+    .filter((parameter) => parameter.id.startsWith('camera.'))
+    .map((parameter) => [parameter.id, parameter.default]));
+  chipByLabel(h, 'camera').querySelector('.chain-chip-reset').dispatch('click');
+  const after = h.store.document();
+  assert.deepEqual(after.preset_bank.presets[0], before.preset_bank.presets[0]);
+  const otherValues = (document) => document.preset_bank.presets
+    .find((preset) => preset.preset_id === 'other').values;
+  assert.deepEqual(otherValues(after), { ...otherValues(before), ...defaults });
+  assert.equal(h.applied.length, 1);
+  h.container.querySelector('.chain-undo').dispatch('click');
+  assert.deepEqual(h.store.document(), before);
+  h.container.querySelector('.chain-redo').dispatch('click');
+  assert.deepEqual(h.store.document(), after);
+});
+
+test('a card reset leaves baked parameters unchanged', async () => {
+  const h = await makeStrip({ parameterLive: (id) => id === 'camera.wander' });
+  assert.equal(h.store.setPresetValue(BASE.document.preset_bank.presets[0].preset_id,
+    'camera.wander', 0.5).ok, true);
+  h.strip.render();
+  const before = h.store.document().preset_bank.presets[0].values;
+  const initial = h.store.parameterDeclarations().find((parameter) => parameter.id === 'camera.wander').default;
+  assert.equal(chipByLabel(h, 'lens').querySelector('.chain-chip-reset').disabled, true);
+  chipByLabel(h, 'camera').querySelector('.chain-chip-reset').dispatch('click');
+  assert.deepEqual(h.store.document().preset_bank.presets[0].values,
+    { ...before, 'camera.wander': initial });
 });
 
 test('a carrier the chain passes over has no band', async () => {

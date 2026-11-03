@@ -2247,6 +2247,32 @@ const savedValues = (harness) => {
   return JSON.parse(harness.downloads.at(-1)[1]).preset_bank.presets[0].values;
 };
 
+test('a card reset applies defaults to the preview, Save and link with one undo', async () => {
+  const harness = await editorWorkbench({ source: null });
+  stageEditor(harness, 'sample')('sample.pattern-freq', 7);
+  stageEditor(harness, 'colorize')('colorize.palette-mapping', 'reverse');
+  const before = savedValues(harness);
+  const original = SCRATCH.preset_bank.presets[0].values;
+  harness.elements.get('shader-animation-toggle').dispatch('click');
+  stripChips(harness).find((chip) => chip.dataset.label === 'sample')
+    .querySelector('.chain-chip-reset').dispatch('click');
+  const after = savedValues(harness);
+  for (const [id, value] of Object.entries(original)) {
+    if (id.startsWith('sample.'))
+      assert.equal(after[id], typeof value === 'number' ? Math.fround(value) : value, id);
+  }
+  assert.equal(after['colorize.palette-mapping'], 'reverse');
+  assert.equal(harness.animationsPaused(), true);
+  assert.ok(harness.engine.writes.some(([name, value]) =>
+    name === 'sample.pattern-freq' && value === original['sample.pattern-freq']));
+  await harness.controller.flushDeepLink();
+  const linked = await decodeShaderStateHash(harness.win.location.hash);
+  assert.deepEqual(Object.fromEntries(Object.entries(linked.document.preset_bank.presets[0].values)
+    .map(([id, value]) => [id, typeof value === 'number' ? Math.fround(value) : value])), after);
+  harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
+  assert.deepEqual(savedValues(harness), before);
+});
+
 test('Grid Space switches modulation source and sampling atomically with one undo', async () => {
   const harness = await editorWorkbench({ source: JSON.stringify(promotedDocument('grid_space.shader.json')) });
   const original = savedValues(harness);

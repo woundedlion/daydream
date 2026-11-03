@@ -51,6 +51,7 @@ import { createPointerDrag } from '../../shared/pointer_drag.js';
  *     sequence: Array<{label?: string, operator: string}>) => EditResult,
  *   relabel: (oldLabel: string, newLabel: string) => EditResult,
  *   endValueRun: () => void,
+ *   setPresetValues: (presetId: string, values: Object<string, *>) => EditResult,
  *   undo: () => boolean, redo: () => boolean,
  *   canUndo: () => boolean, canRedo: () => boolean,
  * }} ChainStore
@@ -416,6 +417,26 @@ export function createChainStrip({
   const undo = () => {
     if (!store.undo()) return false;
     return commit(focusedLabel);
+  };
+
+  /** @param {string} label - The instance whose editable parameters reset. */
+  const resetParameters = (label) => {
+    commitSliderEdit();
+    const defaults = Object.fromEntries(declarations
+      .filter((parameter) => parameter.id.startsWith(`${label}.`) && parameterLive(parameter.id))
+      .map((parameter) => [parameter.id, parameter.default]));
+    if (Object.keys(defaults).length === 0) return;
+    const targetPreset = presetId() ?? store.document().preset_bank.presets[0]?.preset_id;
+    if (!targetPreset) return;
+    store.endValueRun();
+    const result = store.setPresetValues(targetPreset, defaults);
+    store.endValueRun();
+    if (!result.ok) {
+      report(result);
+      return;
+    }
+    commit(label, '.chain-chip-reset');
+    onCommitParameter();
   };
 
   const redo = () => {
@@ -1114,6 +1135,20 @@ export function createChainStrip({
       });
       header.appendChild(toggle);
     }
+
+    const reset = el('button', 'chain-chip-reset');
+    reset.type = 'button';
+    reset.disabled = !declared.some((parameter) => parameterLive(parameter.id));
+    reset.setAttribute('aria-label', `Reset ${op.name} · ${entry.label} parameters to defaults`);
+    reset.setAttribute('title', reset.disabled ? 'No editable parameters' : 'Reset parameters to defaults');
+    const resetIcon = el('span', 'chain-chip-reset-icon');
+    resetIcon.setAttribute('aria-hidden', 'true');
+    reset.appendChild(resetIcon);
+    reset.addEventListener('click', (/** @type {*} */ event) => {
+      event.stopPropagation();
+      resetParameters(entry.label);
+    });
+    header.appendChild(reset);
 
     const pin = el('button', 'chain-chip-pin');
     pin.type = 'button';

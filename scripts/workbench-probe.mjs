@@ -91,8 +91,8 @@ export async function probeStrip(tab) {
   });
   check(closedHeaders.icons.join('') === '◉×'
       && closedHeaders.rotateChildren.join(' ') === 'chain-chip-name '
-        + 'chain-chip-bypass chain-chip-pin chain-chip-remove'
-      && closedHeaders.projectChildren.join(' ') === 'chain-chip-function-label chain-chip-pin'
+        + 'chain-chip-bypass chain-chip-reset chain-chip-pin chain-chip-remove'
+      && closedHeaders.projectChildren.join(' ') === 'chain-chip-function-label chain-chip-reset chain-chip-pin'
       && closedHeaders.projectPrefix === 'Projection: '
       && closedHeaders.projectSelector !== 'none',
   'closed domain and transition cards omit instance ids');
@@ -581,6 +581,15 @@ export async function probeStrip(tab) {
   const stored = (await savedDocument(tab)).preset_bank.presets[0].values['rotate.wander'];
   check(shown !== before && Math.abs(stored - shown) < VALUE_TOLERANCE,
     `an inline control saves its value (${stored})`);
+
+  await (await tab.waitForSelector('.chain-chip[data-label="rotate"] .chain-chip-reset')).click();
+  const resetValue = Number(await tab.$eval(track, (node) => node.value));
+  check(resetValue === 0
+      && (await savedDocument(tab)).preset_bank.presets[0].values['rotate.wander'] === 0,
+  'a card reset restores its default in the controls and exported document');
+  await (await tab.waitForSelector('.chain-undo')).click();
+  check(Math.abs(Number(await tab.$eval(track, (node) => node.value)) - shown) < VALUE_TOLERANCE,
+    'one undo restores the value from before the card reset');
 
   // The step grid the readout gives up to stay valid comes back as arrow keys.
   const readout = '.chain-chip[data-label="rotate"]'

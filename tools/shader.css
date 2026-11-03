@@ -399,6 +399,7 @@
 }
 
 .chain-chip-pin,
+.chain-chip-reset,
 .chain-chip-remove,
 .chain-chip-bypass {
   margin: 0;
@@ -423,6 +424,8 @@
 
 .chain-chip-pin:hover,
 .chain-chip-pin:focus-visible,
+.chain-chip-reset:hover:not(:disabled),
+.chain-chip-reset:focus-visible,
 .chain-chip-remove:hover,
 .chain-chip-remove:focus-visible,
 .chain-chip-bypass:hover:not(:disabled),
@@ -431,7 +434,8 @@
   color: var(--bright-text);
 }
 
-.chain-chip-bypass:disabled {
+.chain-chip-bypass:disabled,
+.chain-chip-reset:disabled {
   color: var(--panel-border);
   cursor: default;
 }
@@ -457,6 +461,13 @@
 
 .chain-chip-pin[aria-pressed="true"] .chain-chip-pin-icon {
   transform: none;
+}
+
+.chain-chip-reset-icon {
+  width: 0.8125rem;
+  height: 0.8125rem;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .chain-chip-function-label {
