@@ -235,13 +235,14 @@ test('a second instance of a declared operator carries the whole catalog schema'
 
 test('an operator with a snap-curve field commits', async () => {
   const store = await makeStore();
-  const candidate = store.legalReplacements(SAMPLE, 1).find(
-    (entry) => entry.operator.id === 'sample.fractal.v2');
+  const FIELD_GAP = SAMPLE + 1;
+  const candidate = store.legalInsertions(FIELD_GAP).find(
+    (entry) => entry.operator.id === 'field.transfer.smooth-bands.v2');
   assert.equal(candidate.legal, true);
-  assert.deepEqual(store.replaceSpan(SAMPLE, 1, [{ operator: 'sample.fractal.v2' }]), { ok: true });
-  const iterations = store.document().descriptor.parameters.find(
-    (parameter) => parameter.id === 'sample.fractal-iterations');
-  assert.equal(iterations.interpolation.kind, 'SNAP');
+  assert.deepEqual(store.replaceSpan(FIELD_GAP, 0, [{ operator: 'field.transfer.smooth-bands.v2' }]), { ok: true });
+  const bands = store.document().descriptor.parameters.find(
+    (parameter) => parameter.id.endsWith('.band-count'));
+  assert.equal(bands.interpolation.kind, 'SNAP');
   assertGreen(store);
 });
 
@@ -797,21 +798,17 @@ test('legalSequences bridges a span with a run of crossings', async () => {
       .filter((entry) => entry.legal).map((entry) => entry.operator.id),
     'a span no longer run can bridge keeps its one-operator set');
 
-  // Project + warp + sample collapse into one sphere-to-field source.
-  assert.deepEqual(ids(store.legalSequences(PROJECT, 3, 1)),
-    ['sample.spherical-rings.v3', 'sample.spherical-noise.v3']);
-  assert.equal(store.replaceSpan(PROJECT, 3,
-    [{ operator: 'sample.spherical-rings.v3' }]).ok, true);
-
-  const expansions = ids(store.legalSequences(PROJECT, 1, 3));
+  // With the warp removed, Project and Sample are adjacent crossings.
+  assert.equal(store.replaceSpan(WARP, 1, []).ok, true);
+  const expansions = ids(store.legalSequences(PROJECT, 2, 3));
   const crossings = (input, output) => CATALOG.operators.filter(
     (operator) => operator.input === input && operator.output === output).length;
   assert.equal(expansions.length, crossings('sphere', 'field')
     + crossings('sphere', 'plane') * crossings('plane', 'field'));
   assert.equal(expansions.includes('project.stereographic.v2 sample.grid.v3'), true);
-  assert.deepEqual(ids(store.legalSequences(PROJECT, 1, 2)), expansions,
+  assert.deepEqual(ids(store.legalSequences(PROJECT, 2, 2)), expansions,
     'a run exactly maxLength crossings long is enumerated');
-  assert.equal(store.replaceSpan(PROJECT, 1, [
+  assert.equal(store.replaceSpan(PROJECT, 2, [
     { operator: 'project.stereographic.v2' }, { operator: 'sample.grid.v3' }]).ok, true);
   assert.deepEqual(store.chain().slice(PROJECT).map((entry) => entry.operator),
     ['project.stereographic.v2', 'sample.grid.v3', 'colorize.generated-palette.v4',

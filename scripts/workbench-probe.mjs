@@ -668,28 +668,6 @@ export async function probeStrip(tab) {
     'the capped palette scrolls to its remaining entries');
   await tab.keyboard.press('Escape');
   await tab.setViewport(VIEWPORT);
-
-  // A source that reads the sphere directly collapses the plane crossing, so
-  // that carrier holds no gap, chip or socket and is drawn no band at all.
-  const removePlaneStage = await tab.waitForSelector(
-    '.chain-band[data-carrier="plane"] .chain-chip .chain-chip-remove');
-  await removePlaneStage.hover();
-  await tab.evaluate(() => new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-  }));
-  await removePlaneStage.click();
-  await tab.waitForFunction(() => document.querySelector(
-    '.chain-band[data-carrier="plane"] .chain-chip') === null);
-  await tab.select(source, 'sample.spherical-rings.v3');
-  await tab.waitForFunction(() => document.querySelector('.chain-band[data-carrier="plane"]') === null);
-  const skipped = await tab.evaluate(() => ({
-    source: document.querySelector('.chain-chip-replace[aria-label="Source function"]')?.value,
-    carriers: [...document.querySelectorAll('.chain-band')].map(
-      (band) => band.dataset.carrier),
-  }));
-  check(skipped.source === 'sample.spherical-rings.v3'
-      && !skipped.carriers.includes('plane') && skipped.carriers.length > 0,
-  'a carrier the chain passes over is drawn no band');
   return failures;
 }
 

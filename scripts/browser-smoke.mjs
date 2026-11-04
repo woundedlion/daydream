@@ -135,7 +135,8 @@ async function smokeTwistParameters(tab, setPhase) {
     const catalog = await (await fetch('../generated/shader/engine_catalog.json')).json();
     const source = scratchChainDocument(catalog, [
       { label: 'twist', operator: 'sphere.lens.twist.v2' },
-      { label: 'sample', operator: 'sample.spherical-rings.v3' },
+      { label: 'project', operator: 'project.stereographic.v2' },
+      { label: 'sample', operator: 'sample.lattice.v2' },
       { label: 'colorize', operator: 'colorize.generated-palette.v4' },
     ]);
     source.effect_metadata.display_name = 'Twist parameter smoke';

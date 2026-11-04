@@ -198,10 +198,6 @@ export class FakeChainEngine {
         kind = 'ripple-burst-v1';
         state = { phase: 0, seed: 1337, burstCount: 0, frames: 0,
           waves: Array.from({length: 16}, () => ({age: 1000, burst: 0})) };
-      } else if (operator === 'sample.spherical-rings.v3') {
-        kind = 'spherical-rings-v2';
-        state = { walk: { noiseSeed: 1337, walkTime: 0, position: [0, 1, 0], direction: [1, 0, 0],
-          wander: [1, 0, 0, 0], angularVelocity: 0, spinPhase: 0 }, phase: 0 };
       } else if (operator.startsWith('sample.') || operator === 'sphere.lens.twist.v2'
           || operator === 'sphere.displace.potential.v1'
           || operator === 'sphere.displace.rossby-haurwitz.v1'
@@ -272,8 +268,6 @@ export class FakeChainEngine {
           if (!entry || typeof entry.instance !== 'string' || typeof entry.kind !== 'string'
               || !entry.state || Array.isArray(entry.state)) return true;
           if (entry.kind === 'spatial-walk-v2') return !spatial(entry.state);
-          if (entry.kind === 'spherical-rings-v2')
-            return !spatial(entry.state.walk) || !Number.isFinite(entry.state.phase);
           if (entry.kind === 'ripple-burst-v1')
             return !Number.isFinite(entry.state.phase) || !unsigned(entry.state.seed)
               || !unsigned(entry.state.burstCount) || !unsigned(entry.state.frames)

@@ -186,25 +186,6 @@ test('endomorphisms carry controls; sockets carry only valid selectors', async (
   assert.deepEqual(controls.map((button) => button.textContent), ['◉', '', '', '×']);
 });
 
-test('a socket names the function by the carrier its crossing produces', async () => {
-  const h = await makeStrip();
-  // camera, lens, sample (sphere to field), colorize: a shipped crossing
-  // that skips the plane band entirely.
-  assert.equal(h.store.replaceSpan(PROJECT, 3,
-    [{ operator: 'sample.spherical-noise.v3' }]).ok, true);
-  h.strip.render();
-
-  const sockets = h.container.querySelectorAll('.chain-chip--socket');
-  const names = sockets.map((chip) => chip.querySelector('.chain-chip-function-label')
-    .childNodes[0]);
-  assert.deepEqual(names, ['Source: ', 'Palette: ']);
-  assert.deepEqual(
-    sockets.map((chip) => chip.querySelector('.chain-chip-replace')
-      .getAttribute('aria-label')),
-    ['Source function', 'Palette'],
-    'the sphere to field crossing is a source, not a second Palette socket');
-});
-
 test('each card exposes a named reset control without expanding or selecting it', async () => {
   const h = await makeStrip();
   for (const chip of chips(h)) {
@@ -259,75 +240,6 @@ test('a card reset leaves baked parameters unchanged', async () => {
   chipByLabel(h, 'camera').querySelector('.chain-chip-reset').dispatch('click');
   assert.deepEqual(h.store.document().preset_bank.presets[0].values,
     { ...before, 'camera.wander': initial });
-});
-
-test('a carrier the chain passes over has no band', async () => {
-  const h = await makeStrip();
-  assert.equal(h.store.replaceSpan(PROJECT, 3,
-    [{ operator: 'sample.spherical-noise.v3' }]).ok, true);
-  h.strip.render();
-
-  assert.deepEqual(
-    h.container.querySelectorAll('.chain-band').map((band) => band.dataset.carrier),
-    ['sphere', 'field', 'color'],
-    'a framed, titled plane band would hold no gap, chip or socket');
-});
-
-test('a socket collapses an emptied band and expands back out of one', async () => {
-  const h = await makeStrip();
-  chipByLabel(h, 'warp2').dispatch('keydown', { key: 'Delete' });
-  assert.deepEqual(labels(h), ['camera', 'lens', 'project', 'sample', 'colorize', 'modulation'],
-    'the plane band is empty, so Project and Sample are adjacent crossings');
-
-  let select = chipByLabel(h, 'sample').querySelector('.chain-chip-replace');
-  assert.equal(select.options.some((option) =>
-    option.value === 'sample.spherical-rings.v3'), true,
-  'a source skipping the plane band is offered where that band is empty');
-  select.value = 'sample.spherical-rings.v3';
-  select.dispatch('change');
-  assert.deepEqual(h.store.chain().map((entry) => entry.operator),
-    ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2',
-      'sample.spherical-rings.v3', 'colorize.generated-palette.v4', 'color.modulate.v1'],
-    'the one source replaces both crossings');
-  assert.equal(bandFor(h, 'plane') === undefined, true,
-    'a skipped band has no gap to insert at, so it is not drawn');
-
-  select = h.container.querySelectorAll('.chain-chip--socket')[0]
-    .querySelector('.chain-chip-replace');
-  const crossings = (input, output) => CATALOG.operators.filter(
-    (operator) => operator.input === input && operator.output === output).length;
-  assert.equal(select.options.length, crossings('sphere', 'field')
-    + crossings('sphere', 'plane') * crossings('plane', 'field'),
-  'the socket offers every direct and projected source');
-  select.value = 'project.equirectangular.v2 sample.lattice.v2';
-  select.dispatch('change');
-  assert.deepEqual(h.store.chain().map((entry) => entry.operator),
-    ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2', 'project.equirectangular.v2',
-      'sample.lattice.v2', 'colorize.generated-palette.v4', 'color.modulate.v1']);
-  assert.ok(bandFor(h, 'plane').querySelector('.chain-band-add'),
-    'the plane band and its operator vocabulary are back');
-  assert.equal(h.applied.length, 3);
-});
-
-test('a loaded plane-skipping chain reaches the plane vocabulary through Delete', async () => {
-  const h = await makeStrip();
-  assert.equal(h.store.replaceSpan(PROJECT, 3,
-    [{ operator: 'sample.spherical-noise.v3' }]).ok, true);
-  h.strip.render();
-
-  const socket = h.container.querySelectorAll('.chain-chip--socket')[0];
-  socket.dispatch('keydown', { key: 'Delete' });
-  const pair = paletteEntries(h).find((entry) =>
-    entry.dataset.operator === 'project.gnomonic.v2 sample.fractal.v2');
-  assert.equal(pair.querySelector('.chain-palette-name').textContent,
-    'Gnomonic → Escape Fractal');
-  pair.dispatch('click');
-
-  assert.equal(paletteOf(h), null);
-  assert.deepEqual(h.store.chain().map((entry) => entry.operator),
-    ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2', 'project.gnomonic.v2',
-      'sample.fractal.v2', 'colorize.generated-palette.v4', 'color.modulate.v1']);
-  assert.ok(bandFor(h, 'plane').querySelector('.chain-band-add'));
 });
 
 test('pipeline arrows, wheel and background arrow keys scroll the viewport', async () => {
@@ -2251,7 +2163,8 @@ test('loaded twist and glitch stages expose omitted controls and persist slider 
 test('Ripple random center toggles manual coordinates and follows synchronized values', async () => {
   const source = scratchChainDocument(CATALOG, [
     { label: 'ripple', operator: 'sphere.displace.ripple.v2' },
-    { label: 'sample', operator: 'sample.spherical-rings.v3' },
+    { label: 'project', operator: 'project.stereographic.v2' },
+    { label: 'sample', operator: 'sample.lattice.v2' },
     { label: 'color', operator: 'colorize.generated-palette.v4' },
   ]);
   const h = await makeStrip({ source, writeThrough: true });
@@ -2278,7 +2191,8 @@ test('Ripple random center toggles manual coordinates and follows synchronized v
 function potentialDocument(values = {}, labels = ['potential']) {
   const source = scratchChainDocument(CATALOG, [
     ...labels.map((label) => ({label, operator: 'sphere.displace.potential.v1'})),
-    {label: 'sample', operator: 'sample.spherical-rings.v3'},
+    {label: 'project', operator: 'project.stereographic.v2'},
+    {label: 'sample', operator: 'sample.lattice.v2'},
     {label: 'color', operator: 'colorize.generated-palette.v4'},
   ]);
   Object.assign(source.preset_bank.presets[0].values, values);
