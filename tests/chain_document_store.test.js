@@ -12,7 +12,6 @@ import {
   createChainDocumentStore,
   documentFromChainSnapshot,
   scratchChainDocument,
-  synchronizePeriodicAffinePeriods,
 } from '../src/workbench/shader/chain_document_store.js';
 import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../src/workbench/shader/shader_deeplink.js';
 
@@ -45,76 +44,20 @@ const makeStore = ({ mutate, catalog = CATALOG } = {}) => {
   return createChainDocumentStore({ document, catalog });
 };
 
-const periodicAffineDocument = (catalog, warp = 'warp.affine-periodic.v1') => scratchChainDocument(catalog, [
-  { label: 'project', operator: 'project.stereographic.v2' },
-  { label: 'warp', operator: warp },
-  { label: 'sample', operator: 'sample.lattice.v2' },
-  { label: 'colorize', operator: 'colorize.generated-palette.v4' },
-]);
-
-test('periodic affine periods follow cell-scale edits, structural changes and history', async () => {
-  const catalog = CATALOG;
-  const document = periodicAffineDocument(catalog);
-  document.preset_bank.presets[0].values['sample.lattice-cell-scale'] = 3;
-  const store = await createChainDocumentStore({ document, catalog });
-  const period = () => store.document().preset_bank.presets[0].values['warp.lattice-period'];
-  assert.equal(period(), Math.fround(1 / 3));
-  assert.equal(store.setPresetValue('catalog-defaults', 'sample.lattice-cell-scale', 2.7).ok, true);
-  assert.equal(period(), Math.fround(1 / Math.fround(2.7)));
-  assert.equal(store.undo(), true);
-  assert.equal(period(), Math.fround(1 / 3));
-  assert.equal(store.redo(), true);
-  assert.equal(period(), Math.fround(1 / Math.fround(2.7)));
-
-  assert.equal(store.replaceSpan(1, 1, [{ label: 'warp', operator: 'warp.affine.v3' }]).ok, true);
-  assert.equal(store.setPresetValues('catalog-defaults', {
-    'sample.lattice-cell-scale': 4, 'warp.lattice-period': 7,
-  }).ok, true);
-  assert.equal(period(), 7);
-  assert.equal(store.replaceSpan(1, 1, [{ label: 'warp', operator: 'warp.affine-periodic.v1' }]).ok, true);
-  assert.equal(period(), 0.25);
-});
-
-test('periodic affine normalization materializes an undeclared period in each preset', () => {
-  const catalog = CATALOG;
-  const document = periodicAffineDocument(catalog);
-  document.descriptor.parameters = document.descriptor.parameters.filter(
-    (parameter) => parameter.id !== 'warp.lattice-period');
-  document.descriptor.serialization.fields = document.descriptor.serialization.fields.filter(
-    (id) => id !== 'warp.lattice-period');
-  document.descriptor.path_policies.push({
-    id: 'staggered', kind: 'STAGGERED_ORDERED',
-    groups: document.descriptor.parameters.map((parameter) => parameter.id),
-  });
-  delete document.preset_bank.presets[0].values['warp.lattice-period'];
-  document.preset_bank.presets[0].values['sample.lattice-cell-scale'] = 2;
-  const second = structuredClone(document.preset_bank.presets[0]);
-  second.preset_id = 'second';
-  second.values['sample.lattice-cell-scale'] = 5;
-  document.preset_bank.presets.push(second);
-  document.preset_bank.choreography.generated_order.push('second');
-  document.preset_bank.choreography.dwell.second = 600;
-  assert.equal(synchronizePeriodicAffinePeriods(document, catalog), true);
-  assert.deepEqual(document.preset_bank.presets.map((preset) => preset.values['warp.lattice-period']),
-    [0.5, Math.fround(0.2)]);
-  assert.deepEqual(compiler.validateShaderDocument(document, { catalog }), []);
-  assert.equal(synchronizePeriodicAffinePeriods(document, catalog), false);
-});
-
-test('periodic affine binding stops at an intervening planar warp', () => {
-  const catalog = CATALOG;
-  const document = scratchChainDocument(catalog, [
+test('an affine fallback lattice period stays authored across cell-scale edits', async () => {
+  const document = scratchChainDocument(CATALOG, [
     { label: 'project', operator: 'project.stereographic.v2' },
-    { label: 'warp', operator: 'warp.affine-periodic.v1' },
-    { label: 'wave', operator: 'warp.wave-shear.v2' },
+    { label: 'warp', operator: 'warp.affine.v4' },
     { label: 'sample', operator: 'sample.lattice.v2' },
     { label: 'colorize', operator: 'colorize.generated-palette.v4' },
   ]);
-  const values = document.preset_bank.presets[0].values;
-  values['sample.lattice-cell-scale'] = 2;
-  values['warp.lattice-period'] = 7;
-  assert.equal(synchronizePeriodicAffinePeriods(document, catalog), false);
-  assert.equal(values['warp.lattice-period'], 7);
+  const store = await createChainDocumentStore({ document, catalog: CATALOG });
+  const period = () => store.document().preset_bank.presets[0].values['warp.lattice-period'];
+  assert.equal(period(), 1);
+  assert.equal(store.setPresetValue('catalog-defaults', 'sample.lattice-cell-scale', 2.7).ok, true);
+  assert.equal(period(), 1);
+  assert.equal(store.setPresetValue('catalog-defaults', 'warp.lattice-period', 7).ok, true);
+  assert.equal(period(), 7);
 });
 
 /** Asserts the store's current document passes the v2 validator. */
@@ -753,7 +696,7 @@ test('legality lists every operator with reasons for the illegal', async () => {
   const span = store.legalReplacements(PROJECT, 1);
   const spanById = new Map(span.map((entry) => [entry.operator.id, entry]));
   assert.equal(spanById.get('project.bonne.v3').legal, true);
-  assert.equal(spanById.get('warp.affine.v3').legal, false);
+  assert.equal(spanById.get('warp.affine.v4').legal, false);
   assert.throws(() => store.legalInsertions(99), RangeError);
 });
 
@@ -829,7 +772,7 @@ test('an exhausted operator budget refuses insertion but not replacement', async
   assert.equal(insertion.ok, false);
   assert.equal(insertion.diagnostics[0].code, 'BUDGET_EXCEEDED');
   const swap = store.legalReplacements(WARP, 1);
-  assert.equal(swap.find((entry) => entry.operator.id === 'warp.affine.v3').legal, true);
+  assert.equal(swap.find((entry) => entry.operator.id === 'warp.affine.v4').legal, true);
 });
 
 test('arena accounting honors per_param_name_bytes when declared', async () => {

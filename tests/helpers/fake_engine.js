@@ -188,7 +188,7 @@ export class FakeChainEngine {
       } else if (operator === 'color.modulate.v1') {
         kind = 'modulation-clock-v1';
         state = {source: 0, version: 1, phaseTurns: 0, initialized: true};
-      } else if (operator.startsWith('warp.affine.') || operator === 'warp.affine-periodic.v1') {
+      } else if (operator.startsWith('warp.affine.')) {
         kind = 'affine-clock-v1';
         state = { phase: 0, rotation: 0 };
       } else if (operator.includes('noise') || operator.includes('curl') || operator.includes('displace.direct')) {

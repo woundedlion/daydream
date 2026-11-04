@@ -41,13 +41,6 @@ parameter controls and buffers; authoring operations use a short-lived
 `getShaderChainBindings()` handle. Release each handle after the call. Handles
 expire when the effect or geometry is replaced or the engine/module is destroyed.
 
-When Periodic Affine immediately precedes Primitive Lattice, the document store
-derives its repeat period from the reciprocal lattice cell scale. The period
-control is read-only; changing cell scale updates both engine parameters in one
-batch. Imports and structural edits reconcile this binding before previewing.
-Other periodic sources use an explicit repeat period, and generic Affine retains
-its independently editable period.
-
 `getSnapshot()` and `restoreSnapshot()` carry the ordered instance/operator chain,
 accepted named parameters, typed per-instance runtime, palette state and animation
 pause. Workbench links use `#shader=v2` with their document and typed snapshot.

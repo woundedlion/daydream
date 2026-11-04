@@ -11,8 +11,7 @@ import { fieldOf as fieldSegment, MODULATION_OPERATOR } from './chain_presentati
 import { errorDetail } from '../../shared/banner.js';
 import { applyChainDocument, resolveParameterWrite } from './chain_apply.js';
 import {
-  createChainDocumentStore, documentFromChainSnapshot, periodicAffineBindings,
-  scratchChainDocument, synchronizePeriodicAffinePeriods,
+  createChainDocumentStore, documentFromChainSnapshot, scratchChainDocument,
 } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
 import { BAKED_CONSTANT_IDS, bakedTopologyFields, engineControlNames } from '../../../generated/shader/shader_workbench.mjs';
@@ -120,10 +119,9 @@ function compiledControlFor(parameterId, definitions, baked, descriptor, catalog
   return { name: null, refusal: `no engine parameter matches "${parameterId}"` };
 }
 
-/** @param {*} binding @param {string} id @param {*} control @param {ParameterDefinition[]} definitions */
-function liveDerivedControl(binding, id, control, definitions) {
+/** @param {string} id @param {*} control @param {ParameterDefinition[]} definitions */
+function liveDerivedControl(id, control, definitions) {
   if (control.name === null) return false;
-  if (binding.sourceId !== null || fieldSegment(id) === 'lattice-period') return true;
   const label = id.slice(0, id.indexOf('.'));
   const resource = control.name.slice(0, control.name.lastIndexOf('.'));
   return control.name === fieldSegment(id) || control.name.endsWith('.' + fieldSegment(id))
@@ -196,7 +194,7 @@ export function applyFixedShaderDocument(engine, module, compiled, presetId,
     const binding = deriveBinding(compiled.document.descriptor, parameterId, values);
     if (!binding) continue;
     const control = compiledControlFor(parameterId, definitions, baked, compiled.document.descriptor, catalog);
-    if (liveDerivedControl(binding, parameterId, control, definitions)) continue;
+    if (liveDerivedControl(parameterId, control, definitions)) continue;
     if (!binding.valid)
       return `"${parameterId}" must match the fixed build's derived value ${binding.expected}`;
     derived.add(parameterId);
@@ -500,7 +498,6 @@ export function createShaderDocumentController({
   const parameterLive = (parameterId) => {
     const descriptor = { chain: chainUi?.store.chainView()
       ?? active?.compiled.document.descriptor.chain ?? [] };
-    if (periodicAffineBindings(descriptor).some(({ id }) => id === parameterId)) return false;
     if (active?.compiledSide !== true) return true;
     if (engineControlName(parameterId, getEngine()?.getParameterDefinitions() ?? []).name !== null) return true;
     return !BAKED_CONSTANT_IDS.has(parameterId) && !bakedFields.has(fieldSegment(parameterId))
@@ -536,28 +533,6 @@ export function createShaderDocumentController({
       if (modulated && values[`${label}.modulation-evaluation`] === 'baked-cube'
           && Number(presetValues[`${label}.pattern-scale`] ?? 1) > 8)
         values[`${label}.pattern-scale`] = 8;
-      if (active.compiledSide) {
-        const definitions = getEngine()?.getParameterDefinitions() ?? [];
-        const editedPresetValues = { ...presetValues, [parameterId]: value };
-        for (const id of Object.keys(presetValues)) {
-          const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, editedPresetValues);
-          if (binding && liveDerivedControl(binding, id,
-            engineControlName(id, definitions), definitions)) continue;
-          if (binding?.sourceId === parameterId)
-            values[id] = binding.expected;
-        }
-      }
-      const bindings = periodicAffineBindings(document.descriptor);
-      if (bindings.length > 0) {
-        const candidate = structuredClone(document);
-        const candidateValues = candidate.preset_bank.presets.find(
-          (/** @type {*} */ preset) => preset.preset_id === active.presetId).values;
-        Object.assign(candidateValues, values);
-        synchronizePeriodicAffinePeriods(candidate, operatorCatalog);
-        for (const { id } of bindings) {
-          if (candidateValues[id] !== presetValues[id]) values[id] = candidateValues[id];
-        }
-      }
       const coupled = Object.keys(values).length > 1;
       const result = chainUi.store.setPresetValues(active.presetId, values, () => {
         if (addsDeclaration && active.compiledSide) return { ok: true };
@@ -587,7 +562,7 @@ export function createShaderDocumentController({
             for (const [id, next] of Object.entries(values)) {
               const resolved = engineControlName(id, definitions);
               const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, {...presetValues, ...values});
-              if (binding && !liveDerivedControl(binding, id, resolved, definitions)) continue;
+              if (binding && !liveDerivedControl(id, resolved, definitions)) continue;
               if (resolved.refusal) { refusal = resolved.refusal; break; }
               if (resolved.name === null) continue;
               const write = resolveParameterWrite(definitions, resolved.name, next);
@@ -662,10 +637,6 @@ export function createShaderDocumentController({
       presetId: () => active?.presetId ?? null,
       onEditParameter: writeStageEdit,
       parameterLive,
-      parameterInactiveReason: (parameterId) => periodicAffineBindings({ chain: store.chainView() })
-        .some(({ id }) => id === parameterId)
-        ? 'Derived from the following lattice cell size'
-        : 'This parameter is baked into the compiled build',
       parameterRanges: () => chainUi?.store === store && active?.compiledSide !== true
         ? callWorkbenchBinding(getEngine(), 'getShaderChainParameterRanges', [], []) : [],
       onCommitParameter: () => { void flushDeepLink(); },
@@ -701,14 +672,6 @@ export function createShaderDocumentController({
     if (compiled.status !== 'VALID') {
       showError(diagnosticText(compiled));
       return false;
-    }
-    const normalized = structuredClone(compiled.document);
-    if (synchronizePeriodicAffinePeriods(normalized, operatorCatalog)) {
-      compiled = compiler.compileShaderDocument(normalized, { catalog: operatorCatalog });
-      if (compiled.status !== 'VALID') {
-        showError(diagnosticText(compiled));
-        return false;
-      }
     }
     // Resolved before anything is built: the strip renders the active preset's values.
     const presetId = session?.preset

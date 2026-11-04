@@ -109,7 +109,6 @@ const SOCKET_FUNCTIONS = {
  * @param {() => boolean} [options.bypassAvailable] - Whether a bypass reaches
  *   what is rendering. False disables the toggles and states why.
  * @param {(parameterId: string) => boolean} [options.parameterLive] - Whether a parameter reaches the active build.
- * @param {(parameterId: string) => string} [options.parameterInactiveReason] - Why a parameter cannot be edited.
  * @param {() => ParameterRange[]} [options.parameterRanges] - Current scalar and enum-index limits from the preview engine.
  * @returns {Object} The strip.
  */
@@ -117,7 +116,6 @@ export function createChainStrip({
   doc, container, store, catalog, announce, onApply, onSelect = () => {},
   presetId = () => null, onEditParameter = () => {}, onCommitParameter = () => {},
   bypassAvailable = () => true, parameterLive = () => true,
-  parameterInactiveReason = () => BAKED_PARAMETER_REASON,
   parameterRanges = () => [],
 }) {
   const { opOf, bandLayout, appendGap, choiceEntries, choiceKey, socketChoices, sharesBand } = createChainPresentation({
@@ -787,10 +785,10 @@ export function createChainStrip({
       for (const control of row.querySelectorAll('input, select')) control.disabled = !live;
       if (!row.hidden && !live) {
         row.dataset.deactivated = 'true';
-        if (shown !== null) { shown.textContent = parameterInactiveReason(id); continue; }
+        if (shown !== null) { shown.textContent = BAKED_PARAMETER_REASON; continue; }
         const note = el('span', 'chain-param-note');
         note.setAttribute('id', reasonId(id));
-        note.textContent = parameterInactiveReason(id);
+        note.textContent = BAKED_PARAMETER_REASON;
         row.appendChild(note);
         describeControls(row, reasonId(id));
       } else {

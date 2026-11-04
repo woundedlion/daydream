@@ -583,7 +583,7 @@ test('a band + appends while Insert opens the insertion palette after focus', as
   assert.ok(paletteOf(h));
   entries = paletteEntries(h);
   assert.ok(entries.length > 0);
-  const illegal = entries.find((entry) => entry.dataset.operator === 'warp.affine.v3');
+  const illegal = entries.find((entry) => entry.dataset.operator === 'warp.affine.v4');
   assert.equal(illegal, undefined, 'invalid stages are omitted instead of greyed out');
   const applied = h.applied.length;
   entries.find((entry) => entry.dataset.operator === 'sphere.lens.glitch.v2')

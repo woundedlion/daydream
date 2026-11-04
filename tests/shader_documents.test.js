@@ -459,9 +459,9 @@ test('the GridWorms compiled preset preserves dormant noise settings without noi
   assert.deepEqual(document, before);
 });
 
-const derivedPeriodDocument = (period, scale = 2) => ({ document: {
+const affinePeriodDocument = (period, scale = 2) => ({ document: {
   descriptor: { chain: [
-    { label: 'warp1', operator: 'warp.affine.v3' },
+    { label: 'warp1', operator: 'warp.affine.v4' },
     { label: 'cells', operator: 'sample.lattice.v2' },
   ] },
   preset_bank: { presets: [{ preset_id: 'noon', values: {
@@ -470,46 +470,22 @@ const derivedPeriodDocument = (period, scale = 2) => ({ document: {
   } }] },
 } });
 
-test('a fixed affine period is applied through its lattice source control', () => {
+test('a fixed affine fallback period applies through its own control', () => {
   const engine = fixedEngine(() => true);
-  engine.getParameterDefinitions = () => [{ name: 'Lattice Cell Scale' }];
-  assert.equal(applyFixedShaderDocument(engine, MODULE, derivedPeriodDocument(0.5),
+  engine.getParameterDefinitions = () => [{ name: 'Lattice Cell Scale' },
+    { name: 'outer_warp.Lattice Period' }];
+  assert.equal(applyFixedShaderDocument(engine, MODULE, affinePeriodDocument(0.75),
     'noon', ['noon'], BAKED, fixedDerivedBinding), null);
   assert.deepEqual(engine.selected, ['noon']);
-  assert.deepEqual(engine.writes, [['Lattice Cell Scale', 2]]);
+  assert.deepEqual(engine.writes, [['Lattice Cell Scale', 2], ['outer_warp.Lattice Period', 0.75]]);
 });
 
-test('an independent affine period refuses before reference selection or parameter writes', () => {
+test('a fixed affine fallback period without its control refuses the apply', () => {
   const engine = fixedEngine(() => true);
   engine.getParameterDefinitions = () => [{ name: 'Lattice Cell Scale' }];
-  assert.match(applyFixedShaderDocument(engine, MODULE, derivedPeriodDocument(0.75),
-    'noon', ['noon'], BAKED, fixedDerivedBinding), /warp1\.lattice-period.*derived value/);
-  assert.deepEqual(engine.selected, []);
+  assert.match(applyFixedShaderDocument(engine, MODULE, affinePeriodDocument(0.75),
+    'noon', ['noon'], BAKED, fixedDerivedBinding), /no engine parameter matches "warp1\.lattice-period"/);
   assert.deepEqual(engine.writes, []);
-});
-
-test('a derived affine period still requires its source control to be writable', () => {
-  for (const definitions of [[], [{ name: 'Lattice Cell Scale', readonly: true }]]) {
-    const engine = fixedEngine(() => true);
-    engine.getParameterDefinitions = () => definitions;
-    assert.match(applyFixedShaderDocument(engine, MODULE, derivedPeriodDocument(0.5),
-      'noon', ['noon'], BAKED, fixedDerivedBinding), /no engine parameter matches|read-only/);
-    assert.deepEqual(engine.writes, []);
-  }
-});
-
-test('a fixed period without a lattice source must equal the fixed unit period', () => {
-  for (const [period, accepted] of [[1, true], [0.5, false]]) {
-    const compiled = derivedPeriodDocument(period);
-    compiled.document.descriptor.chain.pop();
-    delete compiled.document.preset_bank.presets[0].values['cells.lattice-cell-scale'];
-    const engine = fixedEngine(() => true);
-    const refusal = applyFixedShaderDocument(engine, MODULE, compiled,
-      'noon', ['noon'], BAKED, fixedDerivedBinding);
-    assert.equal(refusal === null, accepted);
-    assert.deepEqual(engine.writes, []);
-    assert.deepEqual(engine.selected, accepted ? ['noon'] : []);
-  }
 });
 
 // A stale exemption would silently cover an id that has since become
@@ -1287,7 +1263,7 @@ test('the scratch document opens as a live, editable chain', async () => {
   assert.ok(harness.engine.writes.some(([name]) => name === 'colorize.palette-chroma'),
     'the opening preview carries the catalog defaults');
 
-  clickPlaneBandEntry(harness, 'warp.affine.v3');
+  clickPlaneBandEntry(harness, 'warp.affine.v4');
 
   assert.equal(harness.engine.chainCalls.at(-1).length, 5);
 });
@@ -1490,7 +1466,7 @@ test('an oversized document clears the previous shader state hash', async () => 
 
 test('shader edits keep the full state hash current', async () => {
   const harness = await editorWorkbench({ source: null });
-  clickPlaneBandEntry(harness, 'warp.affine.v3');
+  clickPlaneBandEntry(harness, 'warp.affine.v4');
   stripChips(harness).find((chip) => chip.dataset.label === 'rotate')
     .querySelector('.chain-chip-bypass').dispatch('click');
   const value = stripChips(harness).find((chip) => chip.dataset.label === 'sample')
@@ -2889,7 +2865,7 @@ test('fixed document presets preserve sparse option IDs and refuse numeric gaps'
   }
 });
 
-test('compiled lattice edits update the derived period atomically and reapply', async () => {
+test('compiled lattice edits keep the authored fallback period and reapply', async () => {
   const source = withoutEmbeddedModulation(JSON.stringify(promotedDocument('grid_space.shader.json')));
   const harness = await editorWorkbench({ source, sourceFiles: {'grid_space.shader.json': source}, patternCatalog: JSON.stringify({
     source_documents: { 'grid-space': 'grid_space.shader.json' },
@@ -2903,7 +2879,8 @@ test('compiled lattice edits update the derived period atomically and reapply', 
   edit('sample.lattice-cell-scale', 2.7);
   edit('sample.lattice-cell-scale', 3.1);
   const values = savedValues(harness);
-  assert.equal(values['warp1.lattice-period'], Math.fround(1 / Math.fround(3.1)));
+  assert.equal(Math.fround(values['sample.lattice-cell-scale']), Math.fround(3.1));
+  assert.equal(values['warp1.lattice-period'], original['warp1.lattice-period']);
   const period = harness.elements.get('chain-strip').querySelectorAll('.chain-param')
     .find((row) => row.dataset.parameter === 'warp1.lattice-period')
     .querySelector('.chain-param-value');
@@ -2928,36 +2905,21 @@ test('fixed apply resolves a registered secondary compiled control name', () => 
   assert.deepEqual(engine.writes, [['Affine Scale X', 2.5]]);
 });
 
-const periodicAffineStudy = (operatorId = 'warp.affine-periodic.v1') => {
+const affineLatticeStudy = () => {
   const catalog = JSON.parse(ENGINE_CATALOG);
   const document = scratchChainDocument(catalog, [
     { label: 'project', operator: 'project.stereographic.v2' },
-    { label: 'warp', operator: operatorId },
+    { label: 'warp', operator: 'warp.affine.v4' },
     { label: 'sample', operator: 'sample.lattice.v2' },
     { label: 'colorize', operator: 'colorize.generated-palette.v4' },
   ]);
   document.preset_bank.presets[0].values['sample.lattice-cell-scale'] = 4;
-  document.preset_bank.presets[0].values['warp.lattice-period'] = 1;
   return { source: JSON.stringify(document), engineCatalog: JSON.stringify(catalog) };
 };
 
-test('periodic affine loading normalizes its period before any engine write', async () => {
-  const harness = await editorWorkbench(periodicAffineStudy());
-  assert.equal(savedValues(harness)['warp.lattice-period'], 0.25);
-  assert.ok(harness.engine.writes.some(([id]) => id === 'warp.lattice-period'));
-  assert.ok(harness.engine.writes.filter(([id]) => id === 'warp.lattice-period')
-    .every(([, value]) => value === 0.25));
-  stageEditor(harness, 'warp');
-  const row = stripChips(harness).find((chip) => chip.dataset.label === 'warp')
-    .querySelectorAll('.chain-param').find((row) => row.dataset.parameter === 'warp.lattice-period');
-  assert.equal(row.querySelector('.chain-param-control').disabled, true);
-  assert.equal(row.querySelector('.chain-param-note').textContent,
-    'Derived from the following lattice cell size');
-});
-
-test('periodic affine cell-scale edits batch the reciprocal period with history and links', async () => {
-  const harness = await editorWorkbench(periodicAffineStudy());
-  const original = savedValues(harness);
+test('an affine fallback period stays editable beside a lattice source', async () => {
+  const harness = await editorWorkbench(affineLatticeStudy());
+  assert.equal(savedValues(harness)['warp.lattice-period'], 1);
   const batches = [];
   const apply = harness.engine.bindings.setShaderChainParameters;
   harness.engine.bindings.setShaderChainParameters = (writes) => {
@@ -2965,39 +2927,13 @@ test('periodic affine cell-scale edits batch the reciprocal period with history 
     return apply(writes);
   };
   stageEditor(harness, 'sample')('sample.lattice-cell-scale', 2.7);
-  const reciprocal = Math.fround(1 / Math.fround(2.7));
-  assert.deepEqual(batches, [[
-    { name: 'sample.lattice-cell-scale', value: 2.7 },
-    { name: 'warp.lattice-period', value: reciprocal },
-  ]]);
-  const values = savedValues(harness);
-  assert.equal(values['warp.lattice-period'], reciprocal);
-  await harness.controller.flushDeepLink();
-  const linked = await decodeShaderStateHash(harness.win.location.hash);
-  assert.equal(linked.document.preset_bank.presets[0].values['warp.lattice-period'], reciprocal);
-  harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
-  assert.deepEqual(savedValues(harness), original);
-  harness.elements.get('chain-strip').querySelector('.chain-redo').dispatch('click');
-  assert.deepEqual(savedValues(harness), values);
-});
-
-test('a refused periodic affine scale batch keeps both values and history unchanged', async () => {
-  const harness = await editorWorkbench(periodicAffineStudy());
-  const original = savedValues(harness);
-  harness.engine.bindings.setShaderChainParameters = () => ParamSetResult.INADMISSIBLE;
-  stageEditor(harness, 'sample')('sample.lattice-cell-scale', 2.7);
-  assert.match(harness.elements.get('shader-document-status').textContent, /INADMISSIBLE/);
-  assert.deepEqual(savedValues(harness), original);
-  assert.equal(harness.elements.get('chain-strip').querySelector('.chain-undo').disabled, true);
-});
-
-test('generic affine retains an independently editable period in the interpreter', async () => {
-  const harness = await editorWorkbench(periodicAffineStudy('warp.affine.v3'));
-  assert.equal(savedValues(harness)['warp.lattice-period'], 1);
-  stageEditor(harness, 'sample')('sample.lattice-cell-scale', 2.7);
+  assert.ok(batches.flat().every(({ name }) => name !== 'warp.lattice-period'));
   assert.equal(savedValues(harness)['warp.lattice-period'], 1);
   stageEditor(harness, 'warp')('warp.lattice-period', 0.75);
   assert.equal(savedValues(harness)['warp.lattice-period'], 0.75);
+  const row = stripChips(harness).find((chip) => chip.dataset.label === 'warp')
+    .querySelectorAll('.chain-param').find((row) => row.dataset.parameter === 'warp.lattice-period');
+  assert.equal(row.querySelector('.chain-param-control').disabled, false);
 });
 
 test('authored native controls preserve resource identities and live topology readbacks', () => {
@@ -3008,7 +2944,7 @@ test('authored native controls preserve resource identities and live topology re
   const descriptor = {chain: [
     {label: 'camera', operator: 'sphere.rotate.v2'},
     {label: 'second', resource_key: 'world', operator: 'sphere.rotate.v2'},
-    {label: 'slide', resource_key: 'plane', operator: 'warp.affine.v3'},
+    {label: 'slide', resource_key: 'plane', operator: 'warp.affine.v4'},
     {label: 'flow', resource_key: 'velocity', operator: 'warp.vector-noise.v2'},
     {label: 'cells', operator: 'sample.lattice.v2'},
   ]};
@@ -3046,7 +2982,7 @@ test('a live affine period remains independent when its sampler has no lattice c
   const engine = fixedEngine(() => true);
   engine.getParameterDefinitions = () => [{name: 'plane.Lattice Period'}];
   const descriptor = {chain: [
-    {label: 'slide', resource_key: 'plane', operator: 'warp.affine.v3'},
+    {label: 'slide', resource_key: 'plane', operator: 'warp.affine.v4'},
     {label: 'sample', operator: 'sample.grid.v3'},
   ]};
   const values = {'slide.lattice-period': 2.5};
@@ -3062,7 +2998,7 @@ test('native warp speed names follow resource keys across instance labels and re
     ['spin', 'inner_warp', 'Planar Warp 2 Speed'],
     ['drift', 'velocity', 'velocity.Planar Warp Speed'],
   ]) {
-    const descriptor = {chain: [{label, resource_key: key, operator: 'warp.affine.v3'}]};
+    const descriptor = {chain: [{label, resource_key: key, operator: 'warp.affine.v4'}]};
     const engine = fixedEngine(() => true);
     engine.getParameterDefinitions = () => [{name}, {name: 'Speed'}];
     const values = {[`${label}.speed`]: 0.007};

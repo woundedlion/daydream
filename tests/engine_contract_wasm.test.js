@@ -1775,7 +1775,8 @@ test('retired chain operators are absent and refuse without changing the live pr
   for (const operator of [
     'colorize.generated-palette.v2', 'project.airocean.v2', 'project.bonne.v2',
     'project.peirce-square-fast.v2', 'project.peirce.v2', 'sample.grid.v2',
-    'sample.twin-wave.v2', 'warp.affine.v2', 'sphere.lens.mobius.v2',
+    'sample.twin-wave.v2', 'warp.affine.v2', 'warp.affine.v3',
+    'warp.affine-periodic.v1', 'sphere.lens.mobius.v2',
   ]) {
     assert.equal(catalog.operators.some((entry) => entry.id === operator), false);
     const result = chainCall(engine, 'setShaderChain', [{instance: 'retired', operator}]);
