@@ -8,7 +8,7 @@ test('stageGrouping uses registered titles and pipeline order', () => {
   const grouping = stageGrouping(params);
   assert.deepEqual(grouping.order, ['Camera', 'Surface Noise', 'Projection Frame', 'Projection', 'Function', 'Colorize']);
   assert.equal(grouping.titles.get('Surface Noise'), 'Curl');
-  assert.equal(grouping.titles.get('Function'), 'Primitive Lattice');
+  assert.equal(grouping.titles.get('Function'), 'Tessellation');
   assert.equal(grouping.assignments.size, params.length);
   const other = stageGrouping(kaleidoscopeSmoothParams());
   assert.equal(other.titles.get('Planar Warp 2'), 'Mirror Tile');

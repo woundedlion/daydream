@@ -140,10 +140,10 @@ test('a schema rebuild keeps the stage folders the user collapsed', () => {
   h.panel.sync();
 
   assert.equal(h.guis.length, 2, 'the panel was rebuilt');
-  assert.deepEqual(h.gui().folders.map((f) => f.name), ['Camera', 'Curl', 'Spin + Wander', 'Equirectangular', 'Primitive Lattice', 'Generated Analogous']);
+  assert.deepEqual(h.gui().folders.map((f) => f.name), ['Camera', 'Curl', 'Spin + Wander', 'Equirectangular', 'Tessellation', 'Generated Analogous']);
   assert.equal(folder('Curl').closed, true);
   assert.equal(folder('Generated Analogous').closed, true);
-  assert.equal(folder('Primitive Lattice').closed, false, 'the rest stay open');
+  assert.equal(folder('Tessellation').closed, false, 'the rest stay open');
 });
 
 test('KaleidoscopeMelt controls use the fixed pipeline modes as folders', () => {
@@ -160,7 +160,7 @@ test('KaleidoscopeMelt controls use the fixed pipeline modes as folders', () => 
     [...KALEIDOSCOPE_MELT_STAGE_ORDER].sort());
   assert.deepEqual(h.gui().folders.map((folder) => folder.name),
     ['Camera', 'Curl', 'Spin + Wander', 'Equirectangular',
-      'Primitive Lattice', 'Generated Analogous']);
+      'Tessellation', 'Generated Analogous']);
   assert.equal(h.gui().ctrl('Camera Wander').folder, 'Camera');
   assert.equal(h.gui().ctrl('Camera Wander').label, 'Wander');
   assert.equal(h.gui().ctrl('Surface Noise Strength').folder, 'Curl');
@@ -168,8 +168,8 @@ test('KaleidoscopeMelt controls use the fixed pipeline modes as folders', () => 
   assert.equal(h.gui().ctrl('Projection Spin Speed').folder, 'Spin + Wander');
   assert.equal(h.gui().ctrl('Projection Spin Speed').label, 'Spin Speed');
   assert.equal(h.gui().ctrl('Central Meridian').folder, 'Equirectangular');
-  assert.equal(h.gui().ctrl('Lattice Cell Scale').folder, 'Primitive Lattice');
-  assert.equal(h.gui().ctrl('Lattice Cell Scale').label, 'Cell Scale');
+  assert.equal(h.gui().ctrl('Cell Scale').folder, 'Tessellation');
+  assert.equal(h.gui().ctrl('Cell Scale').label, 'Cell Scale');
   assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Generated Analogous');
   assert.deepEqual(h.warnings, [], 'every parameter reached a stage');
 });

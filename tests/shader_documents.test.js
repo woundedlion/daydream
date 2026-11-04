@@ -462,27 +462,27 @@ test('the GridWorms compiled preset preserves dormant noise settings without noi
 const affinePeriodDocument = (period, scale = 2) => ({ document: {
   descriptor: { chain: [
     { label: 'warp1', operator: 'warp.affine.v4' },
-    { label: 'cells', operator: 'sample.lattice.v2' },
+    { label: 'cells', operator: 'sample.tessellation.v3' },
   ] },
   preset_bank: { presets: [{ preset_id: 'noon', values: {
-    'cells.lattice-cell-scale': scale,
+    'cells.cell-scale': scale,
     'warp1.lattice-period': period,
   } }] },
 } });
 
 test('a fixed affine fallback period applies through its own control', () => {
   const engine = fixedEngine(() => true);
-  engine.getParameterDefinitions = () => [{ name: 'Lattice Cell Scale' },
+  engine.getParameterDefinitions = () => [{ name: 'Cell Scale' },
     { name: 'outer_warp.Lattice Period' }];
   assert.equal(applyFixedShaderDocument(engine, MODULE, affinePeriodDocument(0.75),
     'noon', ['noon'], BAKED, fixedDerivedBinding), null);
   assert.deepEqual(engine.selected, ['noon']);
-  assert.deepEqual(engine.writes, [['Lattice Cell Scale', 2], ['outer_warp.Lattice Period', 0.75]]);
+  assert.deepEqual(engine.writes, [['Cell Scale', 2], ['outer_warp.Lattice Period', 0.75]]);
 });
 
 test('a fixed affine fallback period without its control refuses the apply', () => {
   const engine = fixedEngine(() => true);
-  engine.getParameterDefinitions = () => [{ name: 'Lattice Cell Scale' }];
+  engine.getParameterDefinitions = () => [{ name: 'Cell Scale' }];
   assert.match(applyFixedShaderDocument(engine, MODULE, affinePeriodDocument(0.75),
     'noon', ['noon'], BAKED, fixedDerivedBinding), /no engine parameter matches "warp1\.lattice-period"/);
   assert.deepEqual(engine.writes, []);
@@ -2876,10 +2876,10 @@ test('compiled lattice edits keep the authored fallback period and reapply', asy
   assert.equal(toggle.disabled, false);
   toggle.dispatch('click');
   const edit = stageEditor(harness, 'sample');
-  edit('sample.lattice-cell-scale', 2.7);
-  edit('sample.lattice-cell-scale', 3.1);
+  edit('sample.cell-scale', 2.7);
+  edit('sample.cell-scale', 3.1);
   const values = savedValues(harness);
-  assert.equal(Math.fround(values['sample.lattice-cell-scale']), Math.fround(3.1));
+  assert.equal(Math.fround(values['sample.cell-scale']), Math.fround(3.1));
   assert.equal(values['warp1.lattice-period'], original['warp1.lattice-period']);
   const period = harness.elements.get('chain-strip').querySelectorAll('.chain-param')
     .find((row) => row.dataset.parameter === 'warp1.lattice-period')
@@ -2910,10 +2910,10 @@ const affineLatticeStudy = () => {
   const document = scratchChainDocument(catalog, [
     { label: 'project', operator: 'project.stereographic.v2' },
     { label: 'warp', operator: 'warp.affine.v4' },
-    { label: 'sample', operator: 'sample.lattice.v2' },
+    { label: 'sample', operator: 'sample.tessellation.v3' },
     { label: 'colorize', operator: 'colorize.generated-palette.v4' },
   ]);
-  document.preset_bank.presets[0].values['sample.lattice-cell-scale'] = 4;
+  document.preset_bank.presets[0].values['sample.cell-scale'] = 4;
   return { source: JSON.stringify(document), engineCatalog: JSON.stringify(catalog) };
 };
 
@@ -2926,7 +2926,7 @@ test('an affine fallback period stays editable beside a lattice source', async (
     batches.push(writes);
     return apply(writes);
   };
-  stageEditor(harness, 'sample')('sample.lattice-cell-scale', 2.7);
+  stageEditor(harness, 'sample')('sample.cell-scale', 2.7);
   assert.ok(batches.flat().every(({ name }) => name !== 'warp.lattice-period'));
   assert.equal(savedValues(harness)['warp.lattice-period'], 1);
   stageEditor(harness, 'warp')('warp.lattice-period', 0.75);
@@ -2939,19 +2939,19 @@ test('an affine fallback period stays editable beside a lattice source', async (
 test('authored native controls preserve resource identities and live topology readbacks', () => {
   const values = {'camera.wander': 0.3, 'camera.spin-speed': 0.02,
     'second.wander': 0.7, 'second.spin-speed': 0.04, 'slide.lattice-period': 0.413,
-    'cells.lattice-cell-scale': 2, 'flow.basis': 'ridged3',
+    'cells.cell-scale': 2, 'flow.basis': 'ridged3',
     'cells.coverage-mode': 'edge-fade-squared', 'flow.edge-width': 0.4};
   const descriptor = {chain: [
     {label: 'camera', operator: 'sphere.rotate.v2'},
     {label: 'second', resource_key: 'world', operator: 'sphere.rotate.v2'},
     {label: 'slide', resource_key: 'plane', operator: 'warp.affine.v4'},
     {label: 'flow', resource_key: 'velocity', operator: 'warp.vector-noise.v2'},
-    {label: 'cells', operator: 'sample.lattice.v2'},
+    {label: 'cells', operator: 'sample.tessellation.v3'},
   ]};
   const definitions = [
     {name: 'Camera Wander', value: 0},
     ...['camera.Wander', 'camera.Spin Speed', 'world.Wander', 'world.Spin Speed',
-      'plane.Lattice Period', 'Lattice Cell Scale', 'velocity.Warp Edge Width']
+      'plane.Lattice Period', 'Cell Scale', 'velocity.Warp Edge Width']
       .map((name) => ({name, value: 0})),
     {name: 'velocity.basis', options: ['Simplex', 'Fbm3', 'Ridged3'], optionValues: [2, 4, 9], value: 2},
     {name: 'coverage-mode', options: ['None', 'Weight', 'Weight Squared', 'Edge Fade', 'Edge Fade Squared'], value: 0},
@@ -2970,7 +2970,7 @@ test('authored native controls preserve resource identities and live topology re
     'live', ['live'], BAKED, fixedDerivedBinding, JSON.parse(ENGINE_CATALOG)), null);
   assert.deepEqual(engine.writes, [
     ['camera.Wander', 0.3], ['camera.Spin Speed', 0.02], ['world.Wander', 0.7],
-    ['world.Spin Speed', 0.04], ['plane.Lattice Period', 0.413], ['Lattice Cell Scale', 2],
+    ['world.Spin Speed', 0.04], ['plane.Lattice Period', 0.413], ['Cell Scale', 2],
     ['velocity.basis', 9], ['coverage-mode', 4], ['velocity.Warp Edge Width', 0.4],
   ]);
   for (const [name, value] of engine.writes)
@@ -3072,11 +3072,11 @@ test('authored compiled stage edits keep camera spin, coverage and independent a
   stageEditor(harness, 'camera')('camera.wander', 0.4);
   stageEditor(harness, 'camera')('camera.spin-speed', 0.03);
   stageEditor(harness, 'warp1')('warp1.lattice-period', 0.413);
-  stageEditor(harness, 'sample')('sample.lattice-cell-scale', 3.1);
+  stageEditor(harness, 'sample')('sample.cell-scale', 3.1);
   stageEditor(harness, 'sample')('sample.coverage-mode', 'edge-fade');
   assert.deepEqual(harness.compiledEngine.writes, [
     ['camera.Wander', 0.4], ['camera.Spin Speed', 0.03],
-    ['outer_warp.Lattice Period', 0.413], ['Lattice Cell Scale', 3.1], ['coverage-mode', 3],
+    ['outer_warp.Lattice Period', 0.413], ['Cell Scale', 3.1], ['coverage-mode', 3],
   ]);
   const saved = savedValues(harness);
   assert.equal(saved['warp1.lattice-period'], Math.fround(0.413));

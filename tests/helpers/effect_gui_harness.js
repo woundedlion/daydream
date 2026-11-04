@@ -27,10 +27,10 @@ export function chainSnapshotParams() {
 
 export function kaleidoscopeMeltParams() {
   return [
-    'Lattice Cell Scale',
-    'Lattice Shape',
-    'Lattice Softness',
-    'Lattice Radius',
+    'Cell Scale',
+    'Cell Shape',
+    'Cell Softness',
+    'Cell Radius',
     'Central Meridian',
     'Projection Spin Speed',
     'Projection Wander',
@@ -53,7 +53,7 @@ export function kaleidoscopeMeltParams() {
     'Hue Noise Speed',
   ].map((name, i) => {
     const groups = [
-      {name: 'Function', title: 'Primitive Lattice', order: 7},
+      {name: 'Function', title: 'Tessellation', order: 7},
       {name: 'Projection', title: 'Equirectangular', order: 4},
       {name: 'Projection Frame', title: 'Spin + Wander', order: 3},
       {name: 'Camera', title: 'Camera', order: 0},

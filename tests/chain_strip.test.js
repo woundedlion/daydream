@@ -2164,7 +2164,7 @@ test('Ripple random center toggles manual coordinates and follows synchronized v
   const source = scratchChainDocument(CATALOG, [
     { label: 'ripple', operator: 'sphere.displace.ripple.v2' },
     { label: 'project', operator: 'project.stereographic.v2' },
-    { label: 'sample', operator: 'sample.lattice.v2' },
+    { label: 'sample', operator: 'sample.tessellation.v3' },
     { label: 'color', operator: 'colorize.generated-palette.v4' },
   ]);
   const h = await makeStrip({ source, writeThrough: true });
@@ -2192,7 +2192,7 @@ function potentialDocument(values = {}, labels = ['potential']) {
   const source = scratchChainDocument(CATALOG, [
     ...labels.map((label) => ({label, operator: 'sphere.displace.potential.v1'})),
     {label: 'project', operator: 'project.stereographic.v2'},
-    {label: 'sample', operator: 'sample.lattice.v2'},
+    {label: 'sample', operator: 'sample.tessellation.v3'},
     {label: 'color', operator: 'colorize.generated-palette.v4'},
   ]);
   Object.assign(source.preset_bank.presets[0].values, values);

@@ -48,13 +48,13 @@ test('an affine fallback lattice period stays authored across cell-scale edits',
   const document = scratchChainDocument(CATALOG, [
     { label: 'project', operator: 'project.stereographic.v2' },
     { label: 'warp', operator: 'warp.affine.v4' },
-    { label: 'sample', operator: 'sample.lattice.v2' },
+    { label: 'sample', operator: 'sample.tessellation.v3' },
     { label: 'colorize', operator: 'colorize.generated-palette.v4' },
   ]);
   const store = await createChainDocumentStore({ document, catalog: CATALOG });
   const period = () => store.document().preset_bank.presets[0].values['warp.lattice-period'];
   assert.equal(period(), 1);
-  assert.equal(store.setPresetValue('catalog-defaults', 'sample.lattice-cell-scale', 2.7).ok, true);
+  assert.equal(store.setPresetValue('catalog-defaults', 'sample.cell-scale', 2.7).ok, true);
   assert.equal(period(), 1);
   assert.equal(store.setPresetValue('catalog-defaults', 'warp.lattice-period', 7).ok, true);
   assert.equal(period(), 7);
@@ -870,7 +870,7 @@ test('chainArenaBytes matches a mixed-alignment golden and validator diagnostic 
       { label: 'camera', operator: 'sphere.rotate.v2' },
       { label: 'glitch', operator: 'sphere.lens.glitch.v2' },
       { label: 'project', operator: 'project.stereographic.v2' },
-      { label: 'sample', operator: 'sample.lattice.v2' },
+      { label: 'sample', operator: 'sample.tessellation.v3' },
       { label: 'colorize', operator: 'colorize.generated-palette.v4' },
     ],
   ];

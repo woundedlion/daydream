@@ -27,7 +27,7 @@ export function stageGrouping(params) {
 
 /**
  * Drops the stage-name prefix from a control label, or Projection under
- * Projection Frame, Mirror under Planar Warp, and Lattice under Function.
+ * Projection Frame and Mirror under Planar Warp.
  * @param {string} stage - The pipeline stage the control was grouped under.
  * @param {string} name - Engine parameter name.
  * @returns {string} The control's displayed name.
@@ -38,8 +38,5 @@ export function stageControlLabel(stage, name) {
     return name.slice('Projection '.length);
   }
   if (stage.startsWith('Planar Warp ') && name.startsWith('Mirror ')) return name.slice('Mirror '.length);
-  if (stage === 'Function' && name.startsWith('Lattice ')) {
-    return name.slice('Lattice '.length);
-  }
   return name;
 }
