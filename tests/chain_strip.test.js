@@ -423,7 +423,7 @@ test('Delete opens a socket replacement palette containing only valid stages', a
   const bonne = entries.find((entry) => entry.dataset.operator === 'project.bonne.v3');
   assert.equal(bonne.getAttribute('aria-disabled'), null,
     'a same-pair operator is enabled');
-  assert.equal(entries.find((entry) => entry.dataset.operator === 'sample.grid.v3'),
+  assert.equal(entries.find((entry) => entry.dataset.operator === 'sample.grid.v4'),
     undefined);
   assert.equal(h.doc.activeElement.dataset.operator, 'project.stereographic.v2',
     'focus moves to the palette\'s first enabled entry');
@@ -1807,7 +1807,7 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     'colorize.brightness-top': 1,
   };
   const chain = [
-    { label: 'sample', operator: 'sample.grid.v3' },
+    { label: 'sample', operator: 'sample.grid.v4' },
     { label: 'warp1', operator: 'warp.wave-shear.v2' },
     { label: 'camera', operator: 'sphere.rotate.v2' },
     { label: 'colorize', operator: 'colorize.generated-palette.v4' },
@@ -2122,7 +2122,7 @@ test('loaded twist and glitch stages expose omitted controls and persist slider 
     { label: 'twist', operator: 'sphere.lens.twist.v2' },
     { label: 'glitch', operator: 'sphere.lens.glitch.v2' },
     { label: 'project', operator: 'project.stereographic.v2' },
-    { label: 'sample', operator: 'sample.grid.v3' },
+    { label: 'sample', operator: 'sample.grid.v4' },
     { label: 'color', operator: 'colorize.generated-palette.v4' },
   ]);
   const twist = CATALOG.operators.find((operator) => operator.id === 'sphere.lens.twist.v2');

@@ -318,7 +318,7 @@ test('getShaderChainCatalog matches the installed generated/shader/engine_catalo
 const DEFAULT_CHAIN = [
   { instance: 'camera', operator: 'sphere.rotate.v2' },
   { instance: 'project', operator: 'project.stereographic.v2' },
-  { instance: 'sample', operator: 'sample.grid.v3' },
+  { instance: 'sample', operator: 'sample.grid.v4' },
   { instance: 'colorize', operator: 'colorize.generated-palette.v4' },
 ];
 
@@ -347,7 +347,7 @@ test('setShaderChain applies a chain, registers label.field params and bumps the
   const coverage = defs.find((d) => d.name === 'sample.coverage-mode');
   assert.ok(coverage, 'the sample instance must register its topology enum');
   const catalog = JSON.parse(M.ShaderChainBindings.getShaderChainCatalog());
-  const field = catalog.operators.find((op) => op.id === 'sample.grid.v3')
+  const field = catalog.operators.find((op) => op.id === 'sample.grid.v4')
     .params.find((p) => p.id === 'coverage-mode');
   assert.deepEqual(Array.from(coverage.options), field.values,
     'a topology enum must offer the catalog values as its options, in order');
@@ -643,7 +643,7 @@ test('setShaderChain refuses transactionally and names the offending entry', () 
   const unknown = chainCall(engine, 'setShaderChain', [
     { instance: 'camera', operator: 'sphere.rotate.v2' },
     { instance: 'project', operator: 'project.unknown.v9' },
-    { instance: 'sample', operator: 'sample.grid.v3' },
+    { instance: 'sample', operator: 'sample.grid.v4' },
     { instance: 'colorize', operator: 'colorize.generated-palette.v4' },
   ]);
   assert.equal(unknown.status, M.ChainStatus.UNKNOWN_OPERATOR);
@@ -872,7 +872,7 @@ test('Symmetric Strength spans its full range without changing the unit-field fo
     assert.equal(bindings.setShaderChain([
       { instance: 'field', operator: 'sphere.displace.symmetric.v2' },
       { instance: 'project', operator: 'project.stereographic.v2' },
-      { instance: 'sample', operator: 'sample.grid.v3' },
+      { instance: 'sample', operator: 'sample.grid.v4' },
       { instance: 'colorize', operator: 'colorize.generated-palette.v4' },
     ]).code, 'APPLIED');
     const initial = engine.getParameterAdvisories();
@@ -898,7 +898,7 @@ test('Symmetric snapshot restore requires current controls and rotation state in
     assert.equal(bindings.setShaderChain([
       {instance: 'field', operator: 'sphere.displace.symmetric.v2'},
       {instance: 'project', operator: 'project.stereographic.v2'},
-      {instance: 'sample', operator: 'sample.grid.v3'},
+      {instance: 'sample', operator: 'sample.grid.v4'},
       {instance: 'colorize', operator: 'colorize.generated-palette.v4'},
     ]).code, 'APPLIED');
     const current = bindings.getSnapshot();

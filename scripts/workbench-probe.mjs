@@ -458,9 +458,9 @@ export async function probeStrip(tab) {
   check(sourceChoices.label === 'Source function'
       && sourceChoices.values.every((value) => value.startsWith('sample.')),
   `the Source function selector offers ${sourceChoices.values.length} sampling stages`);
-  await tab.select(source, 'sample.rings.v2');
+  await tab.select(source, 'sample.spiral.v3');
   check(await tab.$eval(source, (node) => node instanceof HTMLSelectElement
-    && node.value === 'sample.rings.v2'),
+    && node.value === 'sample.spiral.v3'),
   'the source function changes directly from its selector');
 
   const sphereBandBefore = await boxOf(tab, '.chain-band[data-carrier="sphere"]');

@@ -47,7 +47,7 @@ export const UNDO_DEPTH = 100;
 export const DEFAULT_SCRATCH_CHAIN = Object.freeze([
   { label: 'rotate', operator: 'sphere.rotate.v2' },
   { label: 'project', operator: 'project.stereographic.v2' },
-  { label: 'sample', operator: 'sample.grid.v3' },
+  { label: 'sample', operator: 'sample.grid.v4' },
   { label: 'colorize', operator: PALETTE_OPERATOR },
 ]);
 

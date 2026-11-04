@@ -984,7 +984,7 @@ test('a workbench missing document controls preserves its URL across rendered an
       isValid: () => true,
       getSnapshot: () => ({schemaVersion: 3, chain: [
         {instance: 'project', operator: 'project.stereographic.v2'},
-        {instance: 'sample', operator: 'sample.grid.v3'},
+        {instance: 'sample', operator: 'sample.grid.v4'},
         {instance: 'colorize', operator: 'colorize.generated-palette.v3'},
       ], parameters: [], modulation: [], animationsPaused: false}),
       restoreSnapshot: () => ChainSnapshotRestoreResult.APPLIED,

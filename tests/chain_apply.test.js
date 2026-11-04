@@ -26,7 +26,7 @@ const MODULE = { ParamSetResult };
 const CHAIN = [
   { label: 'camera', operator: 'sphere.rotate.v2' },
   { label: 'project', operator: 'project.stereographic.v2' },
-  { label: 'sample', operator: 'sample.grid.v3' },
+  { label: 'sample', operator: 'sample.grid.v4' },
   { label: 'colorize', operator: 'colorize.generated-palette.v4' },
 ];
 

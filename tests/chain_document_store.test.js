@@ -369,7 +369,7 @@ test('a crossing cannot be removed, only replaced', async () => {
 
   const replacement = store.replaceSpan(PROJECT, 3, [
     { operator: 'project.equirectangular.v2' },
-    { operator: 'sample.grid.v3' },
+    { operator: 'sample.grid.v4' },
   ]);
   assert.equal(replacement.ok, true);
   assert.deepEqual(labels(store),
@@ -440,7 +440,7 @@ test('reusing a label under a new operator re-seeds it from catalog defaults', a
   const before = store.document();
   assert.notEqual(before.preset_bank.presets[0].values['sample.pattern-freq'], 1);
   assert.equal('sample.edge-width' in before.preset_bank.presets[0].values, false);
-  const result = store.replaceSpan(SAMPLE, 1, [{ label: 'sample', operator: 'sample.grid.v3' }]);
+  const result = store.replaceSpan(SAMPLE, 1, [{ label: 'sample', operator: 'sample.grid.v4' }]);
   assert.equal(result.ok, true);
   const document = store.document();
   for (const preset of document.preset_bank.presets) {
@@ -690,8 +690,8 @@ test('legality lists every operator with reasons for the illegal', async () => {
     { operator: CATALOG.operators.find((operator) => operator.id === 'warp.wave-shear.v2'), legal: true });
   assert.equal(byId.get('sphere.rotate.v2').legal, false);
   assert.match(byId.get('sphere.rotate.v2').reason, /consumes the sphere carrier/);
-  assert.equal(byId.get('sample.grid.v3').legal, false);
-  assert.match(byId.get('sample.grid.v3').reason, /produces the field carrier/);
+  assert.equal(byId.get('sample.grid.v4').legal, false);
+  assert.match(byId.get('sample.grid.v4').reason, /produces the field carrier/);
 
   const span = store.legalReplacements(PROJECT, 1);
   const spanById = new Map(span.map((entry) => [entry.operator.id, entry]));
@@ -748,13 +748,13 @@ test('legalSequences bridges a span with a run of crossings', async () => {
     (operator) => operator.input === input && operator.output === output).length;
   assert.equal(expansions.length, crossings('sphere', 'field')
     + crossings('sphere', 'plane') * crossings('plane', 'field'));
-  assert.equal(expansions.includes('project.stereographic.v2 sample.grid.v3'), true);
+  assert.equal(expansions.includes('project.stereographic.v2 sample.grid.v4'), true);
   assert.deepEqual(ids(store.legalSequences(PROJECT, 2, 2)), expansions,
     'a run exactly maxLength crossings long is enumerated');
   assert.equal(store.replaceSpan(PROJECT, 2, [
-    { operator: 'project.stereographic.v2' }, { operator: 'sample.grid.v3' }]).ok, true);
+    { operator: 'project.stereographic.v2' }, { operator: 'sample.grid.v4' }]).ok, true);
   assert.deepEqual(store.chain().slice(PROJECT).map((entry) => entry.operator),
-    ['project.stereographic.v2', 'sample.grid.v3', 'colorize.generated-palette.v4',
+    ['project.stereographic.v2', 'sample.grid.v4', 'colorize.generated-palette.v4',
       'color.modulate.v1']);
   assertGreen(store);
   assert.throws(() => store.legalSequences(99, 0, 1), RangeError);
@@ -884,7 +884,7 @@ test('chainArenaBytes matches a mixed-alignment golden and validator diagnostic 
         ...Array.from({ length: count },
           (unused, index) => ({ label: `endo${index}`, operator })),
         { label: 'project', operator: 'project.stereographic.v2' },
-        { label: 'sample', operator: 'sample.grid.v3' },
+        { label: 'sample', operator: 'sample.grid.v4' },
         { label: 'colorize', operator: 'colorize.generated-palette.v4' },
       ]);
     }
@@ -988,7 +988,7 @@ test('the scratch document compiles clean against the catalog', async () => {
   assert.deepEqual(compiled.document.descriptor.chain, [
     { label: 'rotate', operator: 'sphere.rotate.v2' },
     { label: 'project', operator: 'project.stereographic.v2' },
-    { label: 'sample', operator: 'sample.grid.v3' },
+    { label: 'sample', operator: 'sample.grid.v4' },
     { label: 'colorize', operator: 'colorize.generated-palette.v4' },
   ]);
   assert.equal(compiled.document.preset_bank.presets.length, 1);
@@ -1002,7 +1002,7 @@ test('the scratch document compiles clean against the catalog', async () => {
   for (const id of [
     'colorize.phase-oscillation-speed',
   ]) assert.equal(units.get(id), 'turn-per-frame', id);
-  for (const id of ['project.projection-spin-speed', 'sample.speed', 'sample.angle-speed'])
+  for (const id of ['project.projection-spin-speed', 'sample.speed'])
     assert.equal(units.get(id), 'radian-per-frame', id);
   assert.equal(units.get('colorize.palette-mapping'), 'mode');
 });

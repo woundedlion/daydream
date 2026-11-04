@@ -11,7 +11,7 @@ export function chainSnapshot(value = 0) {
     modulation: [{instance: 'colorize', recipe: modulationRecipe()}],
     chain: [
       {instance: 'project', operator: 'project.stereographic.v2'},
-      {instance: 'sample', operator: 'sample.grid.v3'},
+      {instance: 'sample', operator: 'sample.grid.v4'},
       {instance: 'colorize', operator: 'colorize.generated-palette.v3'},
     ],
     parameters: [{name: 'sample.pattern-freq', value}],
@@ -69,10 +69,8 @@ export function kaleidoscopeSmoothParams() {
   return [
     'Pattern Freq',
     'Speed',
-    'Source Angle Speed',
     'Complexity',
     'Pattern Mix',
-    'Drift',
     'Singularity Fade',
     'Projection Spin Speed',
     'Projection Wander',
@@ -83,6 +81,15 @@ export function kaleidoscopeSmoothParams() {
     'Mirror Cell Y',
     'Mirror Offset X',
     'Mirror Offset Y',
+    'Planar Warp Speed',
+    'Affine Rotation Rate',
+    'Repeat Windings A',
+    'Repeat Windings B',
+    'Affine Scale X',
+    'Affine Scale Y',
+    'Affine Shear',
+    'Repeat Cells',
+    'Fallback Lattice Period',
     'Palette Chroma',
     'Palette Mapping',
     'Mapping Frequency',
@@ -103,7 +110,7 @@ export function kaleidoscopeSmoothParams() {
       {name: 'Planar Warp 2', title: 'Mirror Tile', order: 6},
       {name: 'Colorize', title: 'Generated Analogous', order: 10},
     ];
-    const index = i < 6 ? 0 : i === 6 ? 1 : i < 9 ? 2 : i === 9 ? 3 : i < 16 ? 4 : 5;
+    const index = i < 4 ? 0 : i === 4 ? 1 : i < 7 ? 2 : i === 7 ? 3 : i < 23 ? 4 : 5;
     return { name, group: groups[index], value: 0.5, min: 0, max: 1, animated: true };
   });
 }

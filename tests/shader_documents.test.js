@@ -70,7 +70,7 @@ test('v2 shader links retain typed runtime and palette state', async () => {
     document: {descriptor: {chain: [{label: 'source'}]}},
     preset: 'night', bypassed: [], paused: true,
     chainSnapshot: {
-      schemaVersion: 5, chain: [{instance: 'source', operator: 'sample.grid.v3'}],
+      schemaVersion: 5, chain: [{instance: 'source', operator: 'sample.grid.v4'}],
       modulation: [], parameters: [{name: 'source.pattern-freq', value: 1}], animationsPaused: true,
       runtime: [{instance: 'source', kind: 'source-clock-v1',
         state: {primary: 1.25, secondary: 0.5, angle: 2}}],
@@ -516,7 +516,7 @@ const shaderDocument = ({ digest = 'digest-equator', status = 'VALID',
   document: {
     effect_id: 'KaleidoscopeFlowers',
     effect_metadata: { display_name: 'Kaleidoscope Flowers' },
-    descriptor: { chain: [{ label: 'sample', operator: 'sample.grid.v3' }] },
+    descriptor: { chain: [{ label: 'sample', operator: 'sample.grid.v4' }] },
     preset_bank: { presets: [
       { preset_id: 'noon', display_name: 'Noon', values: { 'sample.pattern-freq': 2 } },
       { preset_id: 'dusk', display_name: 'Dusk', values: { 'sample.pattern-freq': 5 } },
@@ -776,7 +776,7 @@ test('a deep-linked document id opens that document', async () => {
 
   assert.equal(harness.elements.get('shader-document-select').value, 'KaleidoscopeFlowers');
   assert.deepEqual(harness.engine.chained.at(-1),
-    [{ instance: 'sample', operator: 'sample.grid.v3' }]);
+    [{ instance: 'sample', operator: 'sample.grid.v4' }]);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /Kaleidoscope Flowers · Noon/);
 });
@@ -807,7 +807,7 @@ test('choosing a catalog source previews it through the interpreter', async () =
   assert.deepEqual(harness.engine.selected, [],
     'no fixed-effect reference preset is staged for an interpreted load');
   assert.deepEqual(harness.engine.chained.at(-1),
-    [{ instance: 'sample', operator: 'sample.grid.v3' }]);
+    [{ instance: 'sample', operator: 'sample.grid.v4' }]);
   assert.deepEqual(harness.engine.writes.slice(SCRATCH_WRITES),
     [['sample.pattern-freq', 2]]);
   const presets = harness.elements.get('shader-preset-select');
@@ -869,7 +869,7 @@ test('an imported study the catalog does not carry has no parity build', async (
   assert.deepEqual(harness.engine.selected, [],
     'the dynamic path stages no fixed-effect reference preset');
   assert.deepEqual(harness.engine.chained.at(-1),
-    [{ instance: 'sample', operator: 'sample.grid.v3' }]);
+    [{ instance: 'sample', operator: 'sample.grid.v4' }]);
   assert.deepEqual(harness.engine.writes.slice(SCRATCH_WRITES),
     [['sample.pattern-freq', 2]],
     'the preset lands by parameter id, not by alias name');
@@ -1253,7 +1253,7 @@ test('the scratch document opens as a live, editable chain', async () => {
 
   assert.deepEqual(harness.selections, ['shader-chain']);
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
-    ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v3',
+    ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v4',
       'colorize.generated-palette.v4']);
   assert.deepEqual(stripChips(harness).map((chip) => chip.dataset.label),
     ['rotate', 'project', 'sample', 'colorize']);
@@ -1660,7 +1660,7 @@ test('a malformed shader state link falls back to an editable scratch chain', as
   });
 
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
-    ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v3',
+    ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v4',
       'colorize.generated-palette.v4']);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /shader link could not be restored: Error: invalid shader link payload/i);
@@ -1704,7 +1704,8 @@ test('Kaleidoscope Stained Glass loads its effect preset into the interpreter co
     'project.gnomonic.v2',
     'warp.vector-noise.v2',
     'warp.mirror-tile.v2',
-    'sample.grid.v3',
+    'warp.affine.v4',
+    'sample.grid.v4',
     'colorize.generated-palette.v4',
     'color.modulate.v1',
   ]);
@@ -1713,6 +1714,7 @@ test('Kaleidoscope Stained Glass loads its effect preset into the interpreter co
     ['project', 'project.singularity-fade'],
     ['warp1', 'warp1.strength'],
     ['warp2', 'warp2.speed'],
+    ['affine', 'affine.rotation-rate'],
     ['sample', 'sample.pattern-freq'],
     ['colorize', 'colorize.brightness-bottom'],
   ]) {
@@ -2063,11 +2065,11 @@ test('stage controls stay expanded and source function is directly selectable', 
   const select = source.querySelector('.chain-chip-replace');
   assert.equal(select.getAttribute('aria-label'), 'Source function');
   assert.equal(select.options.every((option) => option.value.startsWith('sample.')), true);
-  select.value = 'sample.rings.v2';
+  select.value = 'sample.spiral.v3';
   select.dispatch('change');
 
   assert.ok(harness.engine.chainCalls.at(-1)
-    .some((entry) => entry.operator === 'sample.rings.v2'));
+    .some((entry) => entry.operator === 'sample.spiral.v3'));
 });
 
 test('an add menu omits stages that are invalid at its gap', async () => {
@@ -2983,7 +2985,7 @@ test('a live affine period remains independent when its sampler has no lattice c
   engine.getParameterDefinitions = () => [{name: 'plane.Lattice Period'}];
   const descriptor = {chain: [
     {label: 'slide', resource_key: 'plane', operator: 'warp.affine.v4'},
-    {label: 'sample', operator: 'sample.grid.v3'},
+    {label: 'sample', operator: 'sample.grid.v4'},
   ]};
   const values = {'slide.lattice-period': 2.5};
   assert.equal(applyFixedShaderDocument(engine, MODULE,
@@ -3018,7 +3020,7 @@ test('potential nested native fields retain term identities across colliding res
     {label: 'bend', resource_key: 'surface', operator: 'sphere.displace.potential.v1'},
     {label: 'flow', resource_key: 'vector', operator: 'sphere.displace.curl.v2'},
     {label: 'warp', operator: 'warp.vector-noise.v2'},
-    {label: 'sample', operator: 'sample.grid.v3'},
+    {label: 'sample', operator: 'sample.grid.v4'},
   ]};
   const values = {};
   const definitions = [];
@@ -3031,12 +3033,12 @@ test('potential nested native fields retain term identities across colliding res
       ...(field.values ? {options: field.values} : {})});
     expected.push([`surface.${field.id}`, stored]);
   }
-  Object.assign(values, {'bend.drift': 0.01, 'sample.drift': 0.75,
+  Object.assign(values, {'bend.drift': 0.01, 'sample.complexity': 0.75,
     'flow.basis': 'fbm3', 'warp.basis': 'ridged3'});
-  definitions.push({name: 'surface.Drift', value: 0}, {name: 'source.Drift', value: 0},
+  definitions.push({name: 'surface.Drift', value: 0}, {name: 'source.Complexity', value: 0},
     {name: 'vector.basis', options: ['simplex', 'fbm3', 'ridged3'], value: 0},
     {name: 'outer_warp.basis', options: ['simplex', 'fbm3', 'ridged3'], value: 0});
-  expected.push(['surface.Drift', 0.01], ['source.Drift', 0.75],
+  expected.push(['surface.Drift', 0.01], ['source.Complexity', 0.75],
     ['vector.basis', 1], ['outer_warp.basis', 2]);
   const decoys = ['Amplitude', 'Phase', 'surface.Amplitude', 'surface.Phase', 'Drift', 'basis']
     .map((name) => ({name, value: 123}));

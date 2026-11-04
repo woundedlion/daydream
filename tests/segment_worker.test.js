@@ -860,7 +860,7 @@ test('init restores a ShaderChain snapshot', async () => {
   const snapshot = {
     schemaVersion: 3,
     chain: [{instance: 'project', operator: 'project.stereographic.v2'},
-      {instance: 'sample', operator: 'sample.grid.v3'},
+      {instance: 'sample', operator: 'sample.grid.v4'},
       {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],
     parameters: [{name: 'sample.pattern-freq', value: 1}],
     animationsPaused: true,
@@ -980,7 +980,7 @@ test('setEffect restores ShaderChain snapshot after rebuilding', async () => {
   const snapshot = {
     schemaVersion: 3,
     chain: [{instance: 'project', operator: 'project.stereographic.v2'},
-      {instance: 'sample', operator: 'sample.grid.v3'},
+      {instance: 'sample', operator: 'sample.grid.v4'},
       {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],
     parameters: [{name: 'sample.pattern-freq', value: 1}],
     animationsPaused: true,
