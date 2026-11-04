@@ -480,11 +480,18 @@ test('a fixed affine fallback period applies through its own control', () => {
   assert.deepEqual(engine.writes, [['Cell Scale', 2], ['outer_warp.Lattice Period', 0.75]]);
 });
 
-test('a fixed affine fallback period without its control refuses the apply', () => {
+test('a fixed affine field without its control holds its compiled-out identity', () => {
   const engine = fixedEngine(() => true);
   engine.getParameterDefinitions = () => [{ name: 'Cell Scale' }];
-  assert.match(applyFixedShaderDocument(engine, MODULE, affinePeriodDocument(0.75),
-    'noon', ['noon'], BAKED, fixedDerivedBinding), /no engine parameter matches "warp1\.lattice-period"/);
+  assert.equal(applyFixedShaderDocument(engine, MODULE, affinePeriodDocument(0.75),
+    'noon', ['noon'], BAKED, fixedDerivedBinding), null);
+  assert.deepEqual(engine.writes, [['Cell Scale', 2]]);
+  const rotating = affinePeriodDocument(0.75);
+  rotating.document.preset_bank.presets[0].values['warp1.rotation-rate'] = 0.5;
+  engine.writes.length = 0;
+  assert.equal(applyFixedShaderDocument(engine, MODULE, rotating,
+    'noon', ['noon'], BAKED, fixedDerivedBinding),
+  `"warp1.rotation-rate" must match the fixed build's derived value 0`);
   assert.deepEqual(engine.writes, []);
 });
 
@@ -1085,9 +1092,14 @@ const HEX_PATTERN_CATALOG = JSON.stringify({
  */
 function compiledBuildEngine(source = KALEIDOSCOPE_HEX_BRIGHT) {
   const document = JSON.parse(source);
+  const fixed = (parameter) => {
+    const binding = fixedDerivedBinding(document.descriptor, parameter.id,
+      document.preset_bank.presets[0].values);
+    return binding !== null && binding.unregistered !== true;
+  };
   const definitions = document.descriptor.parameters.filter((parameter) =>
     !BAKED_CONSTANT_IDS.has(parameter.id) && !BAKED.has(parameter.id.slice(parameter.id.indexOf('.') + 1))
-    && !fixedDerivedBinding(document.descriptor, parameter.id, document.preset_bank.presets[0].values))
+    && !fixed(parameter))
     .map((parameter) => ({
     name: primaryName(parameter.id, document.descriptor),
     ...(parameter.storage === 'enum8' ? { options: [...parameter.domain.values] } : {}),

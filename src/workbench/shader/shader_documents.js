@@ -119,9 +119,13 @@ function compiledControlFor(parameterId, definitions, baked, descriptor, catalog
   return { name: null, refusal: `no engine parameter matches "${parameterId}"` };
 }
 
-/** @param {string} id @param {*} control @param {ParameterDefinition[]} definitions */
-function liveDerivedControl(id, control, definitions) {
+/**
+ * @param {string} id @param {*} control @param {ParameterDefinition[]} definitions
+ * @param {{unregistered?: true}} binding - An `unregistered` binding is live wherever a control resolves.
+ */
+function liveDerivedControl(id, control, definitions, binding) {
   if (control.name === null) return false;
+  if (binding.unregistered) return true;
   const label = id.slice(0, id.indexOf('.'));
   const resource = control.name.slice(0, control.name.lastIndexOf('.'));
   return control.name === fieldSegment(id) || control.name.endsWith('.' + fieldSegment(id))
@@ -194,7 +198,7 @@ export function applyFixedShaderDocument(engine, module, compiled, presetId,
     const binding = deriveBinding(compiled.document.descriptor, parameterId, values);
     if (!binding) continue;
     const control = compiledControlFor(parameterId, definitions, baked, compiled.document.descriptor, catalog);
-    if (liveDerivedControl(parameterId, control, definitions)) continue;
+    if (liveDerivedControl(parameterId, control, definitions, binding)) continue;
     if (!binding.valid)
       return `"${parameterId}" must match the fixed build's derived value ${binding.expected}`;
     derived.add(parameterId);
@@ -562,7 +566,7 @@ export function createShaderDocumentController({
             for (const [id, next] of Object.entries(values)) {
               const resolved = engineControlName(id, definitions);
               const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, {...presetValues, ...values});
-              if (binding && !liveDerivedControl(id, resolved, definitions)) continue;
+              if (binding && !liveDerivedControl(id, resolved, definitions, binding)) continue;
               if (resolved.refusal) { refusal = resolved.refusal; break; }
               if (resolved.name === null) continue;
               const write = resolveParameterWrite(definitions, resolved.name, next);
