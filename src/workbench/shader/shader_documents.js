@@ -852,6 +852,15 @@ export function createShaderDocumentController({
     ? chainUi.store.document()
     : structuredClone(active.compiled.document);
 
+  /**
+   * The document Save writes: the current one without its disabled stages.
+   * @returns {*} An isolated copy.
+   * @throws {Error} If the document without those stages fails validation.
+   */
+  const exportableDocument = () => chainUi
+    ? chainUi.store.exportDocument()
+    : structuredClone(active.compiled.document);
+
   const clearLinkTimers = () => {
     if (linkDebounceTimer !== null) clearTimeout(linkDebounceTimer);
     if (linkMaxTimer !== null) clearTimeout(linkMaxTimer);
@@ -911,7 +920,13 @@ export function createShaderDocumentController({
   const save = () => {
     if (!active) return false;
     void flushDeepLink();
-    const document = currentDocument();
+    let document;
+    try {
+      document = exportableDocument();
+    } catch (error) {
+      showError(`The shader document could not be saved: ${errorDetail(error)}.`);
+      return false;
+    }
     return exportDocument(document, active.filename.endsWith('.shader.json')
       ? active.filename : `${document.effect_id ?? document.document_id}.shader.json`);
   };
@@ -924,13 +939,13 @@ export function createShaderDocumentController({
   const saveAs = async () => {
     if (!active) return false;
     void flushDeepLink();
-    const document = currentDocument();
     const savedActive = active;
-    const savedDocument = JSON.stringify(document);
-    copies += 1;
-    document.document_id = `${document.document_id}-copy${copies}`;
-    let filename = `${document.document_id}.shader.json`;
+    const savedDocument = JSON.stringify(currentDocument());
     try {
+      const document = exportableDocument();
+      copies += 1;
+      document.document_id = `${document.document_id}-copy${copies}`;
+      let filename = `${document.document_id}.shader.json`;
       const source = compiler.exportShaderDocumentJson(document);
       if (typeof win.showSaveFilePicker === 'function') {
         const file = await win.showSaveFilePicker({

@@ -1912,6 +1912,55 @@ test('a Save As copy carries the edits made since the load', async () => {
     validateShaderDocument(copy, { catalog: JSON.parse(ENGINE_CATALOG) }), []);
 });
 
+/** @param {*} document @param {string} label */
+const expectStageAbsent = (document, label) => {
+  const owned = (/** @type {string} */ id) => id.startsWith(`${label}.`);
+  assert.equal(document.descriptor.chain.some((entry) => entry.label === label), false);
+  assert.equal(document.descriptor.parameters.some((parameter) => owned(parameter.id)), false);
+  assert.equal(document.descriptor.serialization.fields.some(owned), false);
+  for (const preset of document.preset_bank.presets)
+    assert.equal(Object.keys(preset.values).some(owned), false);
+  assert.deepEqual(
+    validateShaderDocument(document, { catalog: JSON.parse(ENGINE_CATALOG) }), []);
+};
+
+test('Save and Save As omit bypassed stages and keep them in the editor', async () => {
+  const harness = await editorWorkbench();
+  const bypass = () => stripChips(harness).find((chip) => chip.dataset.label === 'lens')
+    .querySelector('.chain-chip-bypass').dispatch('click');
+  bypass();
+
+  assert.equal(harness.controller.save(), true);
+  expectStageAbsent(JSON.parse(harness.downloads.at(-1)[1]), 'lens');
+  assert.equal(await harness.controller.saveAs(), true);
+  expectStageAbsent(JSON.parse(harness.downloads.at(-1)[1]), 'lens');
+  assert.equal(stripChips(harness).find((chip) => chip.dataset.label === 'lens')
+    .classList.contains('chain-chip--bypassed'), true);
+
+  bypass();
+  assert.equal(harness.controller.save(), true);
+  assert.equal(JSON.parse(harness.downloads.at(-1)[1]).descriptor.chain
+    .some((entry) => entry.label === 'lens'), true);
+});
+
+test('Save omits a modulation stage only when every preset disables it', async () => {
+  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const [first, second] = document.preset_bank.presets;
+  first.values['modulation.modulation-enabled'] = 'disabled';
+  const source = exportShaderDocumentJson(document);
+  const harness = await editorWorkbench({ source });
+
+  assert.equal(harness.controller.save(), true);
+  assert.equal(JSON.parse(harness.downloads.at(-1)[1]).descriptor.chain
+    .some((entry) => entry.label === 'modulation'), true);
+
+  second.values['modulation.modulation-enabled'] = 'disabled';
+  const disabled = exportShaderDocumentJson(document);
+  const disabledHarness = await editorWorkbench({ source: disabled });
+  assert.equal(disabledHarness.controller.save(), true);
+  expectStageAbsent(JSON.parse(disabledHarness.downloads.at(-1)[1]), 'modulation');
+});
+
 for (const [entered, filename] of [
   ['  Night study  ', 'Night study.shader.json'],
   ['Night study.json', 'Night study.json'],
@@ -2059,7 +2108,7 @@ test('an add menu omits stages that are invalid at its gap', async () => {
     true);
 });
 
-test('a bypass reshapes the engine program while the saved document keeps the stage', async () => {
+test('a bypass reshapes the engine program and skips the bypassed parameters', async () => {
   const harness = await editorWorkbench();
   const writesBefore = harness.engine.writes.length;
   stripChips(harness).find((chip) => chip.dataset.label === 'lens')
@@ -2073,12 +2122,6 @@ test('a bypass reshapes the engine program while the saved document keeps the st
   assert.ok(!harness.engine.writes.slice(writesBefore)
     .some(([name]) => name.startsWith('lens.')),
   'a bypassed instance registers no parameters, so its values are skipped');
-
-  assert.equal(harness.controller.save(), true);
-  const saved = JSON.parse(harness.downloads.at(-1)[1]);
-  assert.equal(saved.descriptor.chain.length, 7);
-  assert.ok(saved.descriptor.chain.some((entry) => entry.label === 'lens'),
-    'bypass is session state, never serialized');
 });
 
 /**

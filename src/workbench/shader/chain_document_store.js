@@ -746,8 +746,8 @@ export async function createChainDocumentStore({
     bypassedLabels: () => [...bypassed],
 
     /**
-     * Toggles the session bypass of one endomorphism. Never serialized: the
-     * document and its digest are untouched.
+     * Toggles the session bypass of one endomorphism. The document and its
+     * digest are untouched; `exportDocument` omits bypassed instances.
      * @param {string} label - A live chain label.
      * @param {boolean} on - Whether the instance is bypassed.
      * @returns {EditResult} A refusal for an unknown label, crossing or modulation stage.
@@ -767,6 +767,33 @@ export async function createChainDocumentStore({
       if (on) bypassed.add(label);
       else bypassed.delete(label);
       return { ok: true };
+    },
+
+    /**
+     * @returns {*} A copy of the current document without its bypassed
+     *   instances or the modulation stages every preset disables.
+     * @throws {Error} If the reduced document fails validation.
+     */
+    exportDocument: () => {
+      const presets = doc.preset_bank.presets;
+      const disabled = chain().filter((entry) => bypassed.has(entry.label)
+        || (entry.operator === MODULATION_OPERATOR && presets.every(
+          (/** @type {{values: Record<string, *>}} */ preset) =>
+            preset.values[`${entry.label}.modulation-enabled`] === 'disabled')))
+        .map((entry) => entry.label);
+      const candidate = structuredClone(doc);
+      if (disabled.length === 0) return candidate;
+      candidate.descriptor.chain = candidate.descriptor.chain.filter(
+        (/** @type {ChainEntry} */ entry) => !disabled.includes(entry.label));
+      removeInstances(candidate, disabled);
+      dropDegenerateEdges(candidate);
+      synchronizePeriodicAffinePeriods(candidate, catalog);
+      const diagnostics = diagnosticsOf(candidate);
+      if (diagnostics.length > 0) {
+        throw new Error('the document without its disabled stages fails validation: '
+          + diagnostics.map((/** @type {Diagnostic} */ d) => d.code).join(', '));
+      }
+      return candidate;
     },
 
     /**
