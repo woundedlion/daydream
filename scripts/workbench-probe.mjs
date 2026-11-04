@@ -1079,10 +1079,21 @@ export async function probePaletteAndModulations(tab) {
     node.click();
   });
   const document = await savedDocument(tab);
-  const snapshot = (await decodeShaderStateHash(await tab.evaluate(() => location.hash)))?.chainSnapshot;
-  check(document.descriptor.chain.slice(-3).map((entry) => entry.label).join() === [second, first, hue].join()
-    && snapshot?.modulation.find((entry) => entry.instance === first)?.recipe.enabled === false,
-  'one header toggle disables a layer while preserving its authored order and settings');
+  const shared = await (await tab.waitForFunction(async (label) => {
+    const {decodeShaderStateHash} = await import('../src/workbench/shader/shader_deeplink.js');
+    const state = await decodeShaderStateHash(location.hash);
+    const recipe = state?.chainSnapshot?.modulation.find((entry) => entry.instance === label)?.recipe;
+    return recipe?.enabled === false && state;
+  }, {timeout: TIMEOUT_MS}, first)).jsonValue();
+  const recipe = shared.chainSnapshot.modulation.find((entry) => entry.instance === first)?.recipe;
+  const editorOrder = await tab.$$eval(`${stack} .chain-chip`, (nodes) => nodes.map((node) => node.dataset.label));
+  check(editorOrder.join() === [second, first, hue].join()
+    && shared.document.descriptor.chain.slice(-3).map((entry) => entry.label).join() === [second, first, hue].join()
+    && Math.abs((recipe?.mechanic.amount ?? 0) - 0.3) <= VALUE_TOLERANCE,
+  'the disabled layer retains its authored order and settings in the editor and share link');
+  check(document.descriptor.chain.slice(-2).map((entry) => entry.label).join() === [second, hue].join()
+    && document.descriptor.chain.every((entry) => entry.label !== first),
+  'Save omits the disabled modulation and keeps the enabled layers in order');
   await tab.$eval(`${layer(hue)} .chain-chip-remove`, (node) => node.click());
   check(await tab.$(layer(hue)) === null && await tab.$('.chain-chip[data-label="colorize"]') !== null,
     'removing a modulation preserves the permanent Palette card');
