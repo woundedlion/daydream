@@ -1041,3 +1041,14 @@ div.label {
 .segment-stats .seg-total {
   border-top: 1px solid var(--panel-border);
 }
+
+.segment-stats .seg-notices span:not(:empty) {
+  display: block;
+  max-width: 28rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.segment-stats .seg-notices {
+  color: var(--muted-text);
+}

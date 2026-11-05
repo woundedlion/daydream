@@ -542,6 +542,7 @@ const CONTRAST_EXEMPT = {
     '.segment-stats .seg-status': 'translucent readout over the live canvas',
     '.segment-stats .seg-status.seg-fault': 'translucent readout over the live canvas',
     '.segment-stats .seg-detail': 'translucent readout over the live canvas',
+    '.segment-stats .seg-notices': 'translucent readout over the live canvas',
   },
   'shader.css': {
     '.shader-toolbar button:disabled':

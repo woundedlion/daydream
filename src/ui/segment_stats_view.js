@@ -190,7 +190,7 @@ export class SegmentStatsView {
       setText(c.label, diverged ? `Seg ${s} ⚠` : `Seg ${s}`);
       const labelClass = diverged ? 'seg-label seg-diverged' : 'seg-label';
       if (c.label.className !== labelClass) c.label.className = labelClass;
-      setText(c.notice, diverged ? warnings.join('; ') : '');
+      setText(c.notice, diverged ? `Seg ${s}: ${warnings.join('; ')}` : '');
 
       setText(c.compute, `${timing.toFixed(1)} ms`);
       const computeClass = timing > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
@@ -255,7 +255,7 @@ export class SegmentStatsView {
     };
     const spanCell = () => { const e = td(''); e.colSpan = 3; return e; };
     const notices = this.doc.createElement('div');
-    notices.className = 'visually-hidden';
+    notices.className = 'seg-notices';
 
     mkRow([colHeader('Segment'), colHeader('Compute'),
            colHeader('Scr A KiB'), colHeader('Scr B KiB'), colHeader('Persist KiB')]);

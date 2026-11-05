@@ -157,9 +157,9 @@ test('a segment whose engine refused a write is marked with its notices', () => 
   assert.equal(cell(2, 'Segment').getAttribute('title'), null);
   assert.equal(cell(2, 'Segment').getAttribute('aria-describedby'), notice(2).id);
   assert.equal(notice(2).id, 'seg-notice-1');
-  assert.equal(notice(2).parentNode.classList.contains('visually-hidden'), true);
+  assert.equal(notice(2).parentNode.classList.contains('seg-notices'), true);
   assert.equal(notice(2).textContent,
-    'setParameter(Ghost) rejected: UNKNOWN_PARAM; '
+    'Seg 1: setParameter(Ghost) rejected: UNKNOWN_PARAM; '
     + 'selectPreset(9) rejected: 3 presets, still on 0');
 
   state.warnings = [null, null];
