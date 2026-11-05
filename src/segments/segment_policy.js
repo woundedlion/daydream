@@ -102,5 +102,5 @@ export function maxSegmentCount(nav = globalThis.navigator, isMobile = false) {
     else if (gib <= 4) cap = SEGMENT_COUNT_CONSTRAINED;
   }
   if (isMobile) cap = Math.min(cap, SEGMENT_COUNT_CONSTRAINED);
-  return Math.max(cap, SEGMENT_COUNT_MIN);
+  return cap;
 }
