@@ -300,7 +300,8 @@ body {
   -webkit-backdrop-filter: blur(5px);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
   pointer-events: none;
-  white-space: nowrap;
+  white-space: normal;
+  max-width: calc(var(--main-width) - 6rem);
 }
 
 #saveBtn:hover {
