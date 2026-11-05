@@ -357,6 +357,8 @@ test('generateRegistryCpp emits a live base chain relax count', () => {
   const item = { base: 'icosahedron_relax', ops: [{ op: 'hankin', params: { angle: 62 } }] };
   const baseRecipe = { seed: 'icosahedron', ops: [chainStep('relax', 100)] };
   assert.match(generateRegistryCpp(item, baseRecipe),
+    /^\/\/ Live relax: 100 iterations run on the device;\n\/\/ add a RelaxBakes entry before shipping\./);
+  assert.match(generateRegistryCpp(item, baseRecipe),
     /\{Op::RELAX, 100\.0f\}/);
 });
 

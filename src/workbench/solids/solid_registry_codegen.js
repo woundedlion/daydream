@@ -423,7 +423,14 @@ export function generateRegistryCpp(item, baseRecipe = null) {
       + `primitive steps; IslamicStars supports at most ${MAX_BUILD_STEPS}`);
   }
   const table = definitionHeadCpp('OpStep', `${stepsName}[]`, true);
-  return seedConstant
+  const liveRelaxIterations = (baseRecipe?.ops ?? [])
+    .reduce((count, step) => count + (step.op === 'relax' ? step.param : 0), 0)
+    + item.ops.reduce((count, step) => count
+      + (typeof step !== 'string' && step.op === 'relax' ? opParams(step).iter : 0), 0);
+  const relaxNotice = liveRelaxIterations > 0
+    ? `// Live relax: ${liveRelaxIterations} iterations run on the device;\n`
+      + '// add a RelaxBakes entry before shipping.\n' : '';
+  return relaxNotice + seedConstant
     + `// clang-format off\n${docCommentCpp(`Step table for ${funcName}.`)}\n`
     + `${table.prefix}${stepList.join(`,\n${' '.repeat(table.indent)}`)},\n};\n// clang-format on\n`
     + `${docCommentCpp(`Recipe mirror of IslamicStarPatterns::${funcName}.`)}\n`

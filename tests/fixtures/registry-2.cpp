@@ -1,3 +1,5 @@
+// Live relax: 100 iterations run on the device;
+// add a RelaxBakes entry before shipping.
 // clang-format off
 /** Step table for truncated_icosahedron_ambo_relax100_truncate01_hk59. */
 inline constexpr OpStep
