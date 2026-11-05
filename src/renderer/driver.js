@@ -86,6 +86,9 @@ export class LabelPool {
   }
 }
 
+/** @param {number} accumulator @param {number} interval @returns {number} */
+const sweepFraction = (accumulator, interval) => (accumulator % interval) / interval;
+
 /**
  * Browser-side simulator: drives the three.js scene that renders the LED
  * sphere as instanced dots, on a fixed-timestep sim clock with on-demand
@@ -533,7 +536,7 @@ export class Daydream {
         && (!this.povSweep || this.povSweep.width !== this.W
           || this.povSweep.height !== this.H)) {
       this.povSweep = new PovSweep(this.W, this.H, this.pixels,
-        (this.timeAccumulator % this.frameInterval) / this.frameInterval,
+        sweepFraction(this.timeAccumulator, this.frameInterval),
         this.frameInterval * 1000);
     } else if (!this.povFidelity && this.povSweep) {
       this.povSweep = null;
@@ -559,7 +562,7 @@ export class Daydream {
     if (this.povSweep && isViewLive(this.pixels)) {
       if (!this.povResetPending && (this.paused ? captureReady : advanced))
         this.povSweep.beginFrame(this.pixels);
-      const fraction = (this.timeAccumulator % this.frameInterval) / this.frameInterval;
+      const fraction = sweepFraction(this.timeAccumulator, this.frameInterval);
       if (this.povSweep.advance(fraction)) this.needsRender = true;
       if (this.timeAccumulator !== previousSweepTime)
         this.needsRender = true;
@@ -591,7 +594,7 @@ export class Daydream {
     const colorAttribute = this.dotMesh?.instanceColor;
     const sourcePixels = colorAttribute?.array;
     if (this.povSweep && colorAttribute) {
-      const fraction = (this.timeAccumulator % this.frameInterval) / this.frameInterval;
+      const fraction = sweepFraction(this.timeAccumulator, this.frameInterval);
       const pixels = this.povSweep.visualPixels(fraction, this.povResponseScale);
       colorAttribute.array = this.povSweep.displayPixels(this.showSweepBoundary, pixels);
       colorAttribute.needsUpdate = true;
