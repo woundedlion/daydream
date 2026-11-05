@@ -904,6 +904,24 @@ test('preset navigation is available to global keyboard shortcuts', () => {
   assert.equal(h.gui().ctrl('presetIndex').getValue(), 1);
 });
 
+for (const initialCount of [1, 3]) test(`single-preset navigation preserves edits (initial count=${initialCount})`, () => {
+  const h = makeHarness({ params: [SPEED], presetCount: initialCount });
+  h.panel.build();
+  h.gui().ctrl('Speed').setValue(0.7);
+  h.writes.length = 0;
+  h.state.presetCount = 1;
+
+  assert.equal(h.panel.movePreset(-1), false);
+  assert.equal(h.panel.movePreset(1), false);
+  assert.deepEqual(h.writes, []);
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.7);
+  assert.ok(h.gui().ctrl('presetIndex'));
+  if (initialCount === 1) {
+    assert.equal(h.gui().ctrl('previousPreset'), undefined);
+    assert.equal(h.gui().ctrl('nextPreset'), undefined);
+  }
+});
+
 test('a preset selection adopts requested enums with no stepped frame behind it', () => {
   const mode = {
     name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'],

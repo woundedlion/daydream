@@ -163,7 +163,7 @@ export function createEffectActions(fx, deps) {
   /** @param {number} delta @returns {boolean} */
   function move(delta) {
     const count = presets.count();
-    if (count <= 0) return false;
+    if (count <= 1) return false;
     return choose((presets.index() + delta + count) % count);
   }
 
@@ -217,11 +217,11 @@ export function createEffectActions(fx, deps) {
       preset.onChange(choose);
       state.previousPreset = () => move(-1);
       state.nextPreset = () => move(1);
-      addAction('previousPreset', PREVIOUS_ICON, 'Previous Preset', 'preset-nav-previous');
+      if (presetCount > 1) addAction('previousPreset', PREVIOUS_ICON, 'Previous Preset', 'preset-nav-previous');
       preset.domElement.classList.add('effect-action', 'preset-nav-selector');
       row.appendChild(preset.domElement);
       controllers.push(preset);
-      addAction('nextPreset', NEXT_ICON, 'Next Preset', 'preset-nav-next');
+      if (presetCount > 1) addAction('nextPreset', NEXT_ICON, 'Next Preset', 'preset-nav-next');
     }
     row.style.gridTemplateColumns = `repeat(${controllers.length}, minmax(0, 1fr))`;
   } catch (error) {
