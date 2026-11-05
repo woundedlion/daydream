@@ -276,7 +276,7 @@ async function init() {
 
   generateThumbnails(thumbnailAbort.signal).catch(e => {
     if (engineTrapped(e)) return;
-    console.error('Thumbnail generation failed:', e);
+    showThumbnailError(`Thumbnails failed: ${e.message}`);
   });
 
   renderSavedList();
