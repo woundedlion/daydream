@@ -780,8 +780,8 @@ export function customHueTurns(baseTurns, offsets, template = [0, 0, 0, 0],
 /**
  * The offset a custom hue key takes when moved onto the turn a drag landed on:
  * the representative of `wrappedTurn` nearest where the key already was, so a
- * drag across the seam does not spin it the long way round, clamped to ±2
- * turns so it cannot wind up unboundedly.
+ * drag across the seam does not spin it the long way round. Offsets beyond
+ * ±2 turns can move inward but cannot wind further out.
  * @param {number} baseTurns - The keys' base hue.
  * @param {number} offset - The moved key's current offset from the base.
  * @param {number} wrappedTurn - The pointed-at hue, as read off the wheel.
@@ -789,7 +789,8 @@ export function customHueTurns(baseTurns, offsets, template = [0, 0, 0, 0],
  */
 export function movedHueKeyOffset(baseTurns, offset, wrappedTurn) {
   const nextTurn = equivalentTurnNear(wrappedTurn, baseTurns + offset);
-  return Math.max(-2, Math.min(2, nextTurn - baseTurns));
+  const limit = Math.max(2, Math.abs(offset));
+  return Math.max(-limit, Math.min(limit, nextTurn - baseTurns));
 }
 
 /**

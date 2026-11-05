@@ -763,6 +763,10 @@ test('the axis and key writers fill the object they are handed', () => {
   assert.deepEqual(turns, [0.25, 0.35, 0.15, 0.4]);
   assert.ok(Math.abs(movedHueKeyOffset(0.98, 0, 0.02) - 0.04) < 1e-12, 'nearest across the seam');
   assert.equal(movedHueKeyOffset(0, 2, 0.4), 2, 'clamped to two turns');
+  assert.equal(movedHueKeyOffset(0, 5, 1 / 360), 5, 'large offsets cannot wind further out');
+  assert.ok(Math.abs(movedHueKeyOffset(0, 5, -1 / 360) - (5 - 1 / 360)) < 1e-12);
+  assert.equal(movedHueKeyOffset(0, -5, -1 / 360), -5);
+  assert.ok(Math.abs(movedHueKeyOffset(0, -5, 1 / 360) - (-5 + 1 / 360)) < 1e-12);
 });
 
 test('enum ordinals name the option that carries them', () => {
