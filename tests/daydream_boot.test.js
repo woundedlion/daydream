@@ -342,6 +342,20 @@ test('the record toggle announces the session and the container it settled on', 
     'the overlay belongs to the controls, so the page teardown drops it');
 });
 
+for (const failure of ['error', 'empty']) test(`synchronous stop ${failure} notice survives the toggle`, () => {
+  const rig = recordingRig();
+  const recorder = rig.attach(fakeRecorder());
+  rig.button.object.record();
+  recorder.toggle = () => {
+    if (failure === 'error') recorder.onError(new Error('encoder died'));
+    else recorder.onEmptySession();
+    return false;
+  };
+  rig.button.object.record();
+  assert.match(rig.notices.at(-1), failure === 'error' ? /encoder died/ : /no frames were captured/);
+  assert.equal(rig.canvasEl.classList.contains('recording'), false);
+});
+
 test('a recorder fault reports its reason and stops offering to stop', () => {
   const rig = recordingRig();
   const recorder = rig.attach(fakeRecorder());

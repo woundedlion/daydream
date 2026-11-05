@@ -358,7 +358,10 @@ test('the pad probe rejects wrong geometry and a pointer that never moves its va
       boundingBox: async () => ({ x: 0, y: 0, width: 0, height: 0 }),
     }),
     mouse: { move: async () => {}, down: async () => {}, up: async () => {}, click: async () => {} },
-    $eval: async () => false,
+    $eval: async (selector, callback) => selector === '#parameters' ? callback({
+      getBoundingClientRect: () => ({bottom:100}), querySelectorAll: () => [90, 110].map(bottom => ({
+        getBoundingClientRect: () => ({bottom})})),
+    }) : false,
     $$eval: async () => 1,
     evaluate: async () => ({ re: '0.00', im: '0.00', left: '0%', top: '0%', label: '' }),
   };
@@ -561,4 +564,27 @@ test('palette and modulation probe reports a family whose controls fail to appea
     assert.deepEqual(failures, broken
       ? ['generated reveals its own palette controls and reaches the live engine'] : []);
   }
+});
+
+
+for (const broken of [false, true]) test(`effect-recipe probe detects repeated arrows and stale placeholder=${broken}`, async () => {
+  let index = -1;
+  const values = broken ? ['0', '0', '1'] : ['0', '1', ''];
+  const failures = await probeEffectRecipeArrows({focus: async () => {},
+    keyboard: {press: async () => { index++; }},
+    $eval: async (selector, read) => read({value: values[index]})});
+  assert.equal(failures.length, broken ? 2 : 0);
+});
+
+for (const missing of [false, true]) test(`numeric range probe checks exact accessibility node with missing=${missing}`, async () => {
+  let detached = false;
+  const failures = await probeNumericRange({evaluate: async () => {}, waitForSelector: async () => {},
+    focus: async () => {}, $eval: async () => {}, createCDPSession: async () => ({
+      send: async command => command === 'DOM.getDocument' ? {root:{nodeId:1}}
+        : command === 'DOM.querySelector' ? {nodeId:2}
+        : {nodes: missing ? [] : [{role:{value:'textbox'},value:{value:'0.750'},description:{value:'Range -1 to 1.'}}]},
+      detach: async () => { detached = true; },
+    })});
+  assert.equal(failures.length, missing ? 2 : 0);
+  assert.equal(detached, true);
 });
