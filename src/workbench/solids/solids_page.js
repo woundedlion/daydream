@@ -1041,6 +1041,7 @@ function reorderOp(from, to, revision) {
     // Re-derived from the live ops: param edits land outside the commit queue.
     setOps(movedOps(state.ops, from, to));
     renderOps();
+    showGateMsg('');
     update();
     showGateMsg(`moved ${opName} to position ${to + 1}`, { persist: false });
     const movedItem = document.getElementById('opsList').children[to];
@@ -1178,6 +1179,7 @@ function wireRowDrag(grip, index, el, list, revision) {
         // Re-derived from the live ops: param edits land outside the commit queue.
         setOps(movedOps(state.ops, index, toIndex));
         renderOps();
+        showGateMsg('');
         update();
       });
     },
@@ -1255,6 +1257,7 @@ function updateOpParam(index, key, value, revision) {
       if (revision !== opsRevision || parameterEdits.get(editKey) !== edit) return;
       if (check.ok) {
         state.ops[index].params[key] = val;
+        showGateMsg('');
         update();
         return;
       }
@@ -1305,6 +1308,7 @@ function removeOp(index, revision) {
     }
     setOps(candidate);
     renderOps();
+    showGateMsg('');
     update();
     const rows = document.getElementById('opsList').children;
     (rows[Math.min(index, rows.length - 1)]?.querySelector('.remove-op-btn')
@@ -1342,6 +1346,7 @@ function addOp(opName) {
     }
     setOps([...state.ops, newOp]);
     renderOps();
+    showGateMsg('');
     update();
   });
 }
@@ -1351,6 +1356,7 @@ function resetOps() {
     if (state.ops.length > 1 && !window.confirm(`Clear all ${state.ops.length} operations?`)) return;
     setOps([]);
     renderOps();
+    showGateMsg('');
     update();
   });
 }

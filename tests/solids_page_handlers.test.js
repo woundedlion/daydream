@@ -1,12 +1,42 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
-import { authoredParamRange, generateFuncAndRecipe, OP_DEFS, savedChainShapeError, savedSolidExportError, seedOpParams, snapToStep } from '../src/workbench/solids/solid_codegen.js';
+import { authoredParamRange, generateFuncAndRecipe, movedOps, OP_DEFS, savedChainShapeError, savedSolidExportError, seedOpParams, snapToStep } from '../src/workbench/solids/solid_codegen.js';
 import { registryDisplayName } from '../src/workbench/solids/solid_registry_codegen.js';
 import { createPointerDrag } from '../src/shared/pointer_drag.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
 const handler = pageHandlers(new URL('../src/workbench/solids/solids_page.js', import.meta.url));
+
+for (const action of ['addOp', 'removeOp', 'resetOps', 'reorderOp', 'updateOpParam']) {
+  test(`successful ${action} clears a stale gate refusal before rendering`, async () => {
+    const state = {base: 'cube', ops: [{op: 'truncate', params: {t: 0.3}}, {op: 'dual', params: {}}]};
+    let queued;
+    let notice = 'rejected: old operation';
+    let updates = 0;
+    const row = {querySelector: () => null, querySelectorAll: () => []};
+    const context = {state, opsRevision: 1, MAX_RECIPE_STEPS: 255,
+      currentMeshIsCurrent: false, currentMesh: null, seedOpParams: () => ({}),
+      queueCommit: task => { queued = task; }, chainIsValid: async () => ({ok: true}),
+      setOps: next => { state.ops = next; }, movedOps,
+      showGateMsg: message => { notice = message; }, renderOps() {},
+      update: () => { assert.equal(notice, ''); updates += 1; },
+      document: {getElementById: () => ({children: [row, row]}), querySelector: () => null},
+      window: {confirm: () => true}, parameterEdits: new Map(), OP_DEFS: {}, structuredClone,
+      syncSweepWarning() {},
+      opTopologyKey: op => op.params.t === 0.5, scheduleUpdate: {cancel() {}},
+    };
+    const call = handler(action, context);
+    if (action === 'addOp') call('kis');
+    else if (action === 'removeOp') call(0, 1);
+    else if (action === 'reorderOp') call(0, 1, 1);
+    else if (action === 'updateOpParam') call(0, 't', '0.5', 1);
+    else call();
+    await queued();
+    assert.equal(updates, 1);
+    assert.doesNotMatch(notice, /rejected/);
+  });
+}
 
 test('storage changes reload saved solids without restoring removed cards', () => {
   const savedSolids = [{name: 'old'}];
@@ -209,7 +239,7 @@ for (const [count, index, expected] of [[3, 1, 1], [3, 2, 1], [1, 0, 'add']]) {
     const removeOp = handler('removeOp', {
       state, opsRevision: 1, queueCommit: (fn) => { pending = fn(); },
       chainIsValid: async () => ({ ok: true }), setOps: (ops) => { state.ops = ops; },
-      renderOps() {}, update() {},
+      renderOps() {}, update() {}, showGateMsg() {},
       document: {
         getElementById: (id) => {
           assert.equal(id, 'opsList');
@@ -693,7 +723,7 @@ test('queued hankin seeds its angle from the preceding committed mesh', async ()
     chainIsValid: async () => ({ ok: true }),
     setOps: (ops) => { state.ops = ops; }, renderOps() {},
     update: () => { context.currentMesh = triangle; },
-    showGateMsg: (message) => assert.fail(message),
+    showGateMsg: (message) => assert.equal(message, ''),
   };
   const addOp = handler('addOp', context);
   addOp('kis');
@@ -721,7 +751,7 @@ test('two adds queued at one below the op cap commit only the first', async () =
   for (const task of queued) await task();
   assert.equal(state.ops.length, 255);
   assert.equal(validations, 1);
-  assert.deepEqual(messages, ['rejected: a chain carries at most 255 ops']);
+  assert.deepEqual(messages, ['', 'rejected: a chain carries at most 255 ops']);
   assert.equal(savedChainShapeError(state.base, state.ops), null);
 });
 
