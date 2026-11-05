@@ -67,6 +67,11 @@
   outline-offset: -2px;
 }
 
+.lil-gui select:focus-visible + .lil-display {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
 /* Exposed to assistive tech, removed from the visual layout. */
 .visually-hidden {
   position: absolute;

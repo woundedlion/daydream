@@ -12,6 +12,7 @@ import { syncParamAdvisories } from '../src/ui/effect_param_advisories.js';
 import { installConsoleCapture } from './helpers/fake_console.js';
 import { fakePanelGui } from './helpers/fake_app.js';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import {
   fakeElement, installDocument, restoreDocumentAfterEach, restoreWindowAfterEach,
@@ -284,6 +285,8 @@ test('the panel classes the scroll restore and the stylesheet select on hold',
       'the panel scroll container is no longer .lil-children');
     assert.equal(dropdown.domElement.querySelector('.lil-display'), dropdown.$display,
       'an OptionController no longer wraps its select in .lil-display');
+    const css = readFileSync(new URL('../styles/index.css', import.meta.url), 'utf8');
+    assert.match(css, /\.lil-gui select:focus-visible \+ \.lil-display\s*\{[^}]*outline: 2px solid var\(--focus-ring\);/);
   });
 
 test('addColor and addFolder hand back the shapes the GUI layer wraps', async () => {
