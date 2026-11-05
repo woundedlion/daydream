@@ -42,6 +42,7 @@ test('a dismiss button that mounts after startup still clears the notice', () =>
 
   assert.equal(body.hidden, true);
   assert.equal(elements.get('apply-notice-text').textContent, '');
+  assert.equal(elements.get('canvas').focusCalls, 1);
 
   // Every id this path resolves at click time, pinned against the real markup.
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');

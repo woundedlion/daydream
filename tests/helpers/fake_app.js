@@ -430,9 +430,11 @@ export function startApp({
   const restore = stashGlobals('document', 'window', 'ResizeObserver',
     'requestAnimationFrame', 'cancelAnimationFrame');
   const ids = ['gui-container', 'effect-sidebar', 'apply-notice-dismiss',
-    'apply-notice-body', 'apply-notice-text', 'canvas-container',
+    'apply-notice-body', 'apply-notice-text', 'canvas-container', 'canvas',
     'loading-overlay', 'apply-notice', 'segment-stats', ...documentIds];
-  const elements = new Map(ids.map((id) => [id, fakeElement(id.endsWith('-select') ? 'select' : 'div')]));
+  const elements = new Map(ids.map((id) => [id, fakeElement(id === 'canvas' ? 'canvas'
+    : id.endsWith('-select') ? 'select' : 'div', {connected: true})]));
+  elements.get('canvas').setAttribute('tabindex', '0');
   const docTarget = fakeElement('document');
   const docListeners = docTarget.listeners;
   // Every id the app asks the document for, in order.
