@@ -318,6 +318,16 @@ function recordingRig({ labelAxes = false } = {}) {
   };
 }
 
+for (const povFidelity of [false, true]) test(`recording discloses sweep sampling when POV fidelity is ${povFidelity}`, () => {
+  const rig = recordingRig();
+  rig.driver.povFidelity = povFidelity;
+  rig.attach(fakeRecorder());
+  rig.button.object.record();
+  assert.equal(rig.notices.at(-1).includes('the sweep animation samples only the beginning'), povFidelity);
+  rig.button.object.record();
+  assert.equal(rig.notices.at(-1).includes('the sweep animation samples only the beginning'), false);
+});
+
 test('the record toggle announces the session and the container it settled on', async () => {
   const rig = recordingRig({ labelAxes: true });
   assert.equal(rig.button.enabled, false,

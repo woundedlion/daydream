@@ -118,12 +118,15 @@ export function createRecordingControls({
     const axisWarning = isRecording && driver.labelAxes
       ? ' Axis labels are page overlays, not canvas pixels; the recording will not carry them.'
       : '';
+    const sweepWarning = isRecording && driver.povFidelity
+      ? ' POV fidelity recordings capture simulation ticks; the sweep animation samples only the beginning of each sweep.'
+      : '';
     const memoryNotice = isRecording && typeof globalThis.showSaveFilePicker !== 'function'
       ? ` This browser saves up to ${MEMORY_BUFFER_LIMIT_BYTES / 1_000_000} MB per recording`
         + ` (about ${Math.floor(MEMORY_BUFFER_LIMIT_BYTES * 8 / (recSettings.recQuality * 1_000_000))} seconds at this quality).`
       : '';
     startNotice = `${isRecording ? 'Recording started.' : 'Recording stopped.'}`
-      + `${axisWarning}${memoryNotice}`;
+      + `${axisWarning}${sweepWarning}${memoryNotice}`;
     showNotice(startNotice);
     showRecording(isRecording);
   }};
