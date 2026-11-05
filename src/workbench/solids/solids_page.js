@@ -280,6 +280,8 @@ async function init() {
   });
 
   renderSavedList();
+  window.addEventListener('storage', reloadSavedSolids);
+  onPageTeardown(() => window.removeEventListener('storage', reloadSavedSolids));
   updateToggles();
   update();
   renderBaseSolid();
@@ -550,6 +552,16 @@ const savedStorage = loadSavedSolids();
 const savedSolids = savedStorage.entries;
 const savedStorageStatus = document.getElementById('savedStorageStatus');
 if (savedStorageStatus) savedStorageStatus.textContent = savedStorage.notice;
+
+function reloadSavedSolids(event) {
+  if (event.key !== SAVED_SOLIDS_KEY && event.key !== null) return;
+  const loaded = loadSavedSolids();
+  savedSolids.splice(0, savedSolids.length, ...loaded.entries);
+  savedStorage.rejected.push(...loaded.rejected);
+  savedStorage.notice = loaded.notice;
+  if (savedStorageStatus) savedStorageStatus.textContent = loaded.notice;
+  renderSavedList();
+}
 
 function persistSavedSolids() {
   const status = document.getElementById('savedStorageStatus');

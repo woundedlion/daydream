@@ -8,6 +8,27 @@ import { fakeElement } from './helpers/fake_dom.js';
 
 const handler = pageHandlers(new URL('../src/workbench/solids/solids_page.js', import.meta.url));
 
+test('storage changes reload saved solids without restoring removed cards', () => {
+  const savedSolids = [{name: 'old'}];
+  const savedStorage = {rejected: ['previous'], notice: ''};
+  const savedStorageStatus = {textContent: ''};
+  let entries = [{name: 'other-tab'}];
+  let renders = 0;
+  const reload = handler('reloadSavedSolids', {SAVED_SOLIDS_KEY: 'saved', savedSolids,
+    savedStorage, savedStorageStatus, loadSavedSolids: () => ({entries,
+      rejected: ['invalid'], notice: 'rejected'}), renderSavedList: () => { renders += 1; }});
+  reload({key: 'unrelated'});
+  assert.equal(renders, 0);
+  reload({key: 'saved'});
+  assert.equal(JSON.stringify(savedSolids), JSON.stringify(entries));
+  assert.equal(JSON.stringify(savedStorage.rejected), '["previous","invalid"]');
+  assert.equal(savedStorageStatus.textContent, 'rejected');
+  entries = [];
+  reload({key: null});
+  assert.equal(savedSolids.length, 0);
+  assert.equal(renders, 2);
+});
+
 test('star thumbnails are load buttons while base solids retain radio selection', () => {
   const state = { base: 'cube' };
   const configure = handler('configureBaseSolidThumbnail', {
