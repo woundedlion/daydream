@@ -732,11 +732,14 @@ function baseSelectContext(overrides = {}) {
 
 test('a simple base keeps the op stack and clears an earlier rejection', async () => {
   const { context, calls, run } = baseSelectContext();
+  let highlights = 0;
+  context.highlightBaseSolid = () => { highlights++; };
   const select = handler('selectBaseSolid', context);
   context.chainIsValid = async () => ({ ok: false, message: 'overflow' });
   select('tetrahedron', {});
   await run();
   assert.equal(context.state.base, 'cube');
+  assert.equal(highlights, 1);
   assert.match(calls.at(-1)[1], /^rejected: the op stack fails on this solid/);
 
   context.chainIsValid = async () => ({ ok: true });

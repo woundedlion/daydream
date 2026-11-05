@@ -460,6 +460,7 @@ function selectBaseSolid(key, btn) {
         showGateMsg(ops === state.ops
           ? `rejected: the op stack fails on this solid — ${check.message}`
           : `rejected: ${check.message}`);
+        highlightBaseSolid();
         if (document.activeElement === btn) {
           document.querySelector('.thumb-btn[aria-checked="true"]')?.focus();
         }
