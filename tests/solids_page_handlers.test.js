@@ -304,6 +304,7 @@ for (const op of ['ambo', 'meta']) test(`${op} gate preserves authored descripti
     opGate: { refresh: async () => ({ blocked: new Set([op]), complete: true }) },
     showGateMsg: (message) => messages.push(message), addOp: (op) => added.push(op),
   };
+  context.setOpBlocked = handler('setOpBlocked', context);
   await handler('refreshOpGating', context)();
   assert.equal(button.disabled, false);
   assert.equal(attributes.get('aria-disabled'), 'true');

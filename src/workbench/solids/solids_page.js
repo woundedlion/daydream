@@ -1251,6 +1251,20 @@ function showGateMsg(text, { persist = true } = {}) {
   gateMsgTimer = persist ? null : setTimeout(() => { el.innerText = ''; }, 3000);
 }
 
+function setOpBlocked(btn, reason) {
+  btn.dataset.authoredDescription ??= btn.getAttribute('aria-describedby') ?? '';
+  if (reason) {
+    btn.setAttribute('aria-disabled', 'true');
+    btn.title = reason;
+    btn.setAttribute('aria-describedby', [btn.dataset.authoredDescription, 'opBlockedReason'].filter(Boolean).join(' '));
+  } else {
+    btn.removeAttribute('aria-disabled');
+    if (btn.dataset.authoredDescription) btn.setAttribute('aria-describedby', btn.dataset.authoredDescription);
+    else btn.removeAttribute('aria-describedby');
+    btn.removeAttribute('title');
+  }
+}
+
 /**
  * Re-enables every add-op button: a gate that stopped probing fails open.
  * @param {string} reason - Why the sweep stopped, shown to the user.
@@ -1259,11 +1273,7 @@ function showGateMsg(text, { persist = true } = {}) {
 function openOpGate(reason) {
   if (!wasmModule) return;
   for (const btn of document.querySelectorAll('#addOpGrid [data-op]')) {
-    btn.dataset.authoredDescription ??= btn.getAttribute('aria-describedby') ?? '';
-    btn.removeAttribute('aria-disabled');
-    if (btn.dataset.authoredDescription) btn.setAttribute('aria-describedby', btn.dataset.authoredDescription);
-    else btn.removeAttribute('aria-describedby');
-    btn.removeAttribute('title');
+    setOpBlocked(btn, null);
   }
   showGateMsg(`op availability is no longer checked: ${reason}`);
 }
@@ -1282,19 +1292,10 @@ async function refreshOpGating() {
   }
 
   for (const btn of buttons) {
-    btn.dataset.authoredDescription ??= btn.getAttribute('aria-describedby') ?? '';
     const blocked = probe.blocked.has(btn.dataset.op);
     // An incomplete pass is a lower bound; unnamed ops keep their last state.
     if (!blocked && !probe.complete) continue;
-    btn.setAttribute('aria-disabled', String(blocked));
-    if (blocked) {
-      btn.title = document.getElementById('opBlockedReason').textContent;
-      btn.setAttribute('aria-describedby', [btn.dataset.authoredDescription, 'opBlockedReason'].filter(Boolean).join(' '));
-    } else {
-      if (btn.dataset.authoredDescription) btn.setAttribute('aria-describedby', btn.dataset.authoredDescription);
-      else btn.removeAttribute('aria-describedby');
-      btn.removeAttribute('title');
-    }
+    setOpBlocked(btn, blocked ? document.getElementById('opBlockedReason').textContent : null);
   }
 }
 
