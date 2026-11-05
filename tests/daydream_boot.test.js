@@ -19,13 +19,8 @@ import { captureConsole, installConsoleCapture } from './helpers/fake_console.js
 import { createRecordingControls } from '../src/recording/recording_controls.js';
 import { Daydream } from '../src/renderer/driver.js';
 import { createSegmentPoolSpawner, createSegmentedPovControls } from '../src/ui/segmented_pov_controls.js';
-import {
-  fakeGui,
-  fakeWasmModule,
-  noticeText,
-  trackedStartApp,
-  segmentCountControl,
-} from './helpers/fake_app.js';
+import { fakeWasmModule, noticeText, trackedStartApp, segmentCountControl } from './helpers/fake_app.js';
+import { fakeGui } from './helpers/fake_gui.js';
 
 restoreDocumentAfterEach();
 const startApp = trackedStartApp();

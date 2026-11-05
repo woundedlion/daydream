@@ -1,6 +1,6 @@
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakePanelGui } from './helpers/fake_app.js';
+import { fakePanelGui } from './helpers/fake_gui.js';
 import { fakeCopyText } from './helpers/effect_gui_harness.js';
 import {
   createEffectActions,

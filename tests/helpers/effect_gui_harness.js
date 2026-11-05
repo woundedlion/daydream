@@ -1,6 +1,6 @@
 // createEffectGui harness: doubles for every injected collaborator plus the
 // parameter fixtures the effect_gui suites share.
-import { fakePanelGui } from './fake_app.js';
+import { fakePanelGui } from './fake_gui.js';
 import { createEffectGui } from '../../src/ui/effect_gui.js';
 import { fakeElement, installDocument } from './fake_dom.js';
 import { ChainSnapshotRestoreResult } from './fake_engine.js';

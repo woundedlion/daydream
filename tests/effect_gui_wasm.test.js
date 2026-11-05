@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createEffectGui } from '../src/ui/effect_gui.js';
 import { GUI } from '../src/ui/gui.js';
 import { AppState, URLSync, roundUrlNumber } from '../src/app/state.js';
-import { fakeGui } from './helpers/fake_app.js';
+import { fakeGui } from './helpers/fake_gui.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
 function realEngineDeps(module, engine, win, { onWrite = () => {}, warnings }) {

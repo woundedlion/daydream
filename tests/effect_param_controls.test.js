@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {fakePanelGui} from './helpers/fake_app.js';
+import { fakePanelGui } from './helpers/fake_gui.js';
 import {restoreDocumentAfterEach} from './helpers/fake_dom.js';
 import {SPEED, GLOW} from './helpers/effect_gui_harness.js';
 import {addParamControl, sliderDecimals} from '../src/ui/effect_param_controls.js';

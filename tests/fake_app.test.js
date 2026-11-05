@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { GUI } from '../src/ui/gui.js';
 import { Daydream } from '../src/renderer/driver.js';
 import { AppState, URLSync } from '../src/app/state.js';
-import { fakeDriver, fakeGui, fakePanelGui } from './helpers/fake_app.js';
+import { fakeDriver } from './helpers/fake_app.js';
+import { fakeGui, fakePanelGui } from './helpers/fake_gui.js';
 
 for (const factory of [fakeGui, fakePanelGui]) {
   test(`${factory.name} clears stored companions and rejects nonnumeric values`, () => {

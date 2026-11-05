@@ -11,7 +11,7 @@ import { createEffectGui } from '../src/ui/effect_gui.js';
 import { addParamControl } from '../src/ui/effect_param_controls.js';
 import { syncParamAdvisories } from '../src/ui/effect_param_advisories.js';
 import { installConsoleCapture } from './helpers/fake_console.js';
-import { fakePanelGui } from './helpers/fake_app.js';
+import { fakePanelGui } from './helpers/fake_gui.js';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
