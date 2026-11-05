@@ -2715,48 +2715,46 @@ test('a chain snapshot restores its program and accepted parameters into the edi
 });
 
 for (const route of ['link', 'query']) {
-  for (const schemaVersion of [5]) {
-    test(`schema ${schemaVersion} ${route} Twist snapshots restore total angles and runtime`, async () => {
-      const catalog = JSON.parse(ENGINE_CATALOG);
-      const twist = catalog.operators.find((operator) => operator.id === 'sphere.lens.twist.v2');
-      Object.assign(twist.params[0], {id: 'twist-angle', name: 'Twist Angle (rad)', min: -96, max: 96, default: Math.PI * 2});
-      const document = scratchChainDocument(catalog, [
-        {label: 'lens', operator: twist.id}, ...SCRATCH.descriptor.chain,
-      ]);
-      const distribution = Math.fround(0.7);
-      const angle = -9;
-      Object.assign(document.preset_bank.presets[0].values,
-        {'lens.twist-angle': angle, 'lens.twist-distribution': distribution});
-      const engine = new FakeChainEngine();
-      engine.catalog = catalog;
-      engine.setEffect('shader-chain');
-      const compiled = compileShaderDocument(document, {catalog});
-      assert.equal(compiled.status, 'VALID');
-      assert.equal(applyChainDocument({engine, module: MODULE, compiled, presetId: 'catalog-defaults',
-        syncEffectGui() {}, invalidate() {}}), null);
-      const snapshot = callWorkbenchBinding(engine, 'getSnapshot', []);
-      snapshot.schemaVersion = schemaVersion;
-      Object.assign(snapshot.runtime.find(({instance}) => instance === 'lens').state,
-        {primary: 0.375, secondary: -0.625, angle: 1.25});
-      snapshot.animationsPaused = true;
-      const before = structuredClone(snapshot);
-      const payload = gzipSync(JSON.stringify({d: document, p: 'catalog-defaults', b: [], a: true, s: snapshot})).toString('base64url');
-      const hash = route === 'link' ? `#shader=v2.${payload}` : '';
-      const search = route === 'query' ? `?fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(snapshot))}`
-        : '?effect=ShaderChain';
-      const harness = await editorWorkbench({source: null, hash, search,
-        engineCatalog: JSON.stringify(catalog), pausedFromEngine: true});
-      assert.equal(harness.controller.preservesOriginalLink(), false,
-        harness.elements.get('shader-document-status').textContent);
-      const restored = callWorkbenchBinding(harness.engine, 'getSnapshot', []);
-      assert.equal(restored.parameters.find(({name}) => name === 'lens.twist-angle')?.value, angle);
-      assert.deepEqual(restored.runtime, snapshot.runtime);
-      assert.deepEqual(restored.paletteBank, snapshot.paletteBank);
-      assert.equal(restored.animationsPaused, true);
-      assert.equal(savedValues(harness)['lens.twist-angle'], angle);
-      assert.deepEqual(snapshot, before);
-    });
-  }
+  test(`schema ${CHAIN_SNAPSHOT_SCHEMA_VERSION} ${route} Twist snapshots restore total angles and runtime`, async () => {
+    const catalog = JSON.parse(ENGINE_CATALOG);
+    const twist = catalog.operators.find((operator) => operator.id === 'sphere.lens.twist.v2');
+    Object.assign(twist.params[0], {id: 'twist-angle', name: 'Twist Angle (rad)', min: -96, max: 96, default: Math.PI * 2});
+    const document = scratchChainDocument(catalog, [
+      {label: 'lens', operator: twist.id}, ...SCRATCH.descriptor.chain,
+    ]);
+    const distribution = Math.fround(0.7);
+    const angle = -9;
+    Object.assign(document.preset_bank.presets[0].values,
+      {'lens.twist-angle': angle, 'lens.twist-distribution': distribution});
+    const engine = new FakeChainEngine();
+    engine.catalog = catalog;
+    engine.setEffect('shader-chain');
+    const compiled = compileShaderDocument(document, {catalog});
+    assert.equal(compiled.status, 'VALID');
+    assert.equal(applyChainDocument({engine, module: MODULE, compiled, presetId: 'catalog-defaults',
+      syncEffectGui() {}, invalidate() {}}), null);
+    const snapshot = callWorkbenchBinding(engine, 'getSnapshot', []);
+    snapshot.schemaVersion = CHAIN_SNAPSHOT_SCHEMA_VERSION;
+    Object.assign(snapshot.runtime.find(({instance}) => instance === 'lens').state,
+      {primary: 0.375, secondary: -0.625, angle: 1.25});
+    snapshot.animationsPaused = true;
+    const before = structuredClone(snapshot);
+    const payload = gzipSync(JSON.stringify({d: document, p: 'catalog-defaults', b: [], a: true, s: snapshot})).toString('base64url');
+    const hash = route === 'link' ? `#shader=v2.${payload}` : '';
+    const search = route === 'query' ? `?fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(snapshot))}`
+      : '?effect=ShaderChain';
+    const harness = await editorWorkbench({source: null, hash, search,
+      engineCatalog: JSON.stringify(catalog), pausedFromEngine: true});
+    assert.equal(harness.controller.preservesOriginalLink(), false,
+      harness.elements.get('shader-document-status').textContent);
+    const restored = callWorkbenchBinding(harness.engine, 'getSnapshot', []);
+    assert.equal(restored.parameters.find(({name}) => name === 'lens.twist-angle')?.value, angle);
+    assert.deepEqual(restored.runtime, snapshot.runtime);
+    assert.deepEqual(restored.paletteBank, snapshot.paletteBank);
+    assert.equal(restored.animationsPaused, true);
+    assert.equal(savedValues(harness)['lens.twist-angle'], angle);
+    assert.deepEqual(snapshot, before);
+  });
 }
 
 test('a refused chain snapshot rolls the engine back and keeps the link', async () => {

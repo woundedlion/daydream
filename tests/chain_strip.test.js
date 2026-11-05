@@ -327,7 +327,6 @@ test('clicking a chip header toggles its pin and selection', async () => {
   chipByLabel(h, 'warp2').querySelector('.chain-chip-name').dispatch('click');
 
   assert.equal(h.store.selectedLabel(), 'warp2');
-  assert.equal(h.store.selectedLabel(), 'warp2');
   const chip = chipByLabel(h, 'warp2');
   assert.equal(chip.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
   chip.dispatch('mouseleave');
@@ -339,11 +338,9 @@ test('clicking a chip header toggles its pin and selection', async () => {
 
   chipByLabel(h, 'warp2').querySelector('.chain-param-control').dispatch('click');
   assert.equal(h.store.selectedLabel(), 'warp2', 'a click inside the parameters keeps the selection');
-  assert.equal(h.store.selectedLabel(), 'warp2');
   assert.equal(chipByLabel(h, 'warp2').getAttribute('aria-current'), 'true');
 
   chipByLabel(h, 'warp2').dispatch('click');
-  assert.equal(h.store.selectedLabel(), null);
   assert.equal(h.store.selectedLabel(), null);
   const collapsed = chipByLabel(h, 'warp2');
   assert.equal(collapsed.classList.contains('chain-chip--expanded'), false);
@@ -582,7 +579,6 @@ test('a band + appends while Insert opens the insertion palette after focus', as
   assert.equal(chipByLabel(h, 'lens1').getAttribute('aria-current'), 'true');
   assert.equal(chipByLabel(h, 'lens1')
     .classList.contains('chain-chip--expanded'), true);
-  assert.equal(h.store.selectedLabel(), 'lens1');
   assert.equal(h.applied.length, 1);
 
   chipByLabel(h, 'camera').dispatch('click');
@@ -815,7 +811,6 @@ test('a chip selects by click', async () => {
 
   chipByLabel(h, 'lens').dispatch('click');
   assert.equal(h.store.selectedLabel(), 'lens');
-  assert.equal(h.store.selectedLabel(), 'lens', 'the selection is announced once');
   assert.deepEqual(h.applied, [], 'a selection is no structural edit');
 });
 
@@ -2044,7 +2039,6 @@ test('parameter and header controls keep a tile pinned without selecting it agai
   chipByLabel(h, 'camera').dispatch('click');
   chipByLabel(h, 'camera').querySelector('.chain-chip-bypass').dispatch('click');
   assert.equal(chipByLabel(h, 'camera').classList.contains('chain-chip--expanded'), true);
-  assert.equal(h.store.selectedLabel(), 'camera');
   assert.equal(h.store.selectedLabel(), 'camera');
   const socket = chipByLabel(h, 'project');
   socket.querySelector('.chain-chip-replace').dispatch('click');
