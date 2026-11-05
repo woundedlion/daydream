@@ -289,6 +289,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .lil-gui.lil-transition > .lil-children {
+    transition: height 1ms !important;
+  }
+
   .canvas-container.recording::after {
     animation: none;
   }

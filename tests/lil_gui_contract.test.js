@@ -289,6 +289,11 @@ test('the panel classes the scroll restore and the stylesheet select on hold',
     assert.match(css, /\.lil-gui select:focus-visible \+ \.lil-display\s*\{[^}]*outline: 2px solid var\(--focus-ring\);/);
   });
 
+test('reduced-motion folders retain a transitionend event to finish opening', () => {
+  const css = readFileSync(new URL('../styles/index.css', import.meta.url), 'utf8');
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.lil-gui\.lil-transition > \.lil-children\s*\{\s*transition: height 1ms !important;/);
+});
+
 test('addColor and addFolder hand back the shapes the GUI layer wraps', async () => {
   const gui = await realGUI();
   const color = gui.addColor({ tint: '#ff00ff' }, 'tint');
