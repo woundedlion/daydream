@@ -2351,3 +2351,12 @@ test('refreshLabels culls an axis below the scaled facing cutoff at both orbit d
     assert.ok(visible.includes('Z'));
   }
 });
+
+
+test('immediate POV reset passes the displayed pixels and tolerates absent history', () => {
+  const pixels = new Uint8Array([1, 2, 3]);
+  const received = [];
+  Daydream.prototype.resetPovNow.call({pixels, povSweep: {reset: value => received.push(value)}});
+  assert.deepEqual(received, [pixels]);
+  assert.doesNotThrow(() => Daydream.prototype.resetPovNow.call({pixels, povSweep: null}));
+});

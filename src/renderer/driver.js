@@ -703,6 +703,11 @@ export class Daydream {
     return true;
   }
 
+  /** Replace POV history with the current displayed pixels. */
+  resetPovNow() {
+    this.povSweep?.reset(this.pixels);
+  }
+
   /** Replace POV history when the next complete effect frame is displayed. */
   resetPovOnNextFrame() {
     this.povResetPending = true;

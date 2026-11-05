@@ -49,6 +49,7 @@ export function fakeDriver() {
     advanceFrameClock() { return true; },
     invalidate() { this.invalidated = true; this.needsRender = true; },
     stepOnce() { this.invalidate(); this.stepFrames = Math.max(1, this.stepFrames); },
+    resetPovNow: Daydream.prototype.resetPovNow,
     resetPovOnNextFrame: Daydream.prototype.resetPovOnNextFrame,
     keydown(e) { this.keys.push(e); },
     setStrobeColumns: Daydream.prototype.setStrobeColumns,
