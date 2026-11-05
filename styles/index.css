@@ -247,7 +247,7 @@
 .global-stats td { padding: 0 4px; white-space: nowrap; }
 .global-stats--desktop td { padding: 0 8px; }
 .global-stats .perf-time { color: var(--muted-text); }
-.global-stats .perf-time.slow { color: var(--error-text); }
+.global-stats .perf-time.slow { color: var(--error-text); font-weight: 700; }
 .global-stats th:not(:last-child),
 .global-stats td:not(:last-child) { border-right: 1px solid var(--stats-divider); }
 
@@ -1018,6 +1018,7 @@ div.label {
 }
 
 .segment-stats .seg-time.slow {
+  font-weight: 700;
   color: var(--error-text);
 }
 
