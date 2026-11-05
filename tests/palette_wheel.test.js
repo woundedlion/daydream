@@ -1,3 +1,4 @@
+import {oklchLinearRgb} from '../src/workbench/palettes/palette_wheel.js';
 // The palette tool's hue-key wheel, run end to end against a recording context
 // double: the gamut raster, the marker and label geometry laid over it, and the
 // pointer and keyboard arithmetic a key is moved by.
@@ -10,7 +11,7 @@ import {
   hueKeyLabelBoxes, hueKeyMarkerPoints, hueKeyNudgeTurns, paintHueWheelRaster,
   wheelTurnAt,
 } from '../src/workbench/palettes/palette_wheel.js';
-import { hitTestHueKeyMarker, oklchLinearRgb } from '../src/workbench/palettes/palette_controls.js';
+import { hitTestHueKeyMarker } from '../src/workbench/palettes/palette_controls.js';
 import { linearToSrgbFloat } from '../src/shared/color.js';
 
 // Slate-900: what the raster paints outside the gamut.

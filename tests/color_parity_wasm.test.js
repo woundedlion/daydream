@@ -1,3 +1,4 @@
+import {oklchLinearRgb, maxSrgbGamutChroma} from '../src/workbench/palettes/palette_wheel.js';
 //
 // Browser tools' colour, Lissajous and Mobius math parity and goldens,
 // run against the real shipped WASM module.
@@ -12,7 +13,7 @@ import createHolosphereModule from '../generated/holosphere_wasm.js';
 import * as C from '../src/shared/color.js';
 import * as P from '../src/workbench/palettes/palette_math.js';
 import {
-  defaultPaletteRecipe, hueKeyState, paletteEnumName, maxSrgbGamutChroma, oklchLinearRgb, PaletteV4,
+  defaultPaletteRecipe, hueKeyState, paletteEnumName,  PaletteV4,
 } from '../src/workbench/palettes/palette_controls.js';
 import * as L from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';

@@ -1,3 +1,4 @@
+import {oklchLinearRgb, maxSrgbGamutChroma} from '../src/workbench/palettes/palette_wheel.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -17,7 +18,7 @@ const {
   paletteEnumName, paletteEnumOrdinal,
   PALETTE_RECIPE_PRESETS, loopSweepTurns,
   paletteRecipeAvailability, wrapTurns, signedTurnDelta, equivalentTurnNear,
-  hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
+  hitTestHueKeyMarker,
   hueKeyState, customHueKeyState, customHueSweepRepresentable, customHueTurns,
   movedHueKeyOffset,
 } =
