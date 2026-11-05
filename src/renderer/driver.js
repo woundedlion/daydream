@@ -572,7 +572,8 @@ export class Daydream {
       this.needsRender = true;
     }
     if (this.povSweep && isViewLive(this.pixels)) {
-      if (!this.povResetPending && advanced) this.povSweep.beginFrame(this.pixels);
+      if (!this.povResetPending && (this.paused ? captureReady : advanced))
+        this.povSweep.beginFrame(this.pixels);
       const fraction = (this.timeAccumulator % this.frameInterval) / this.frameInterval;
       if (this.povSweep.advance(fraction)) this.needsRender = true;
       if (this.timeAccumulator !== previousSweepTime)

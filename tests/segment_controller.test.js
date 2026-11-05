@@ -1008,13 +1008,14 @@ test('a pool fault notifies the host once after workers stop', () => {
   controller.destroy();
 });
 
-test('paused steps capture completed worker generations once after painting', async (t) => {
+for (const povFidelity of [false, true]) test(`paused steps capture completed worker generations once after painting (fidelity=${povFidelity})`, async (t) => {
   const pixels = new Uint16Array(4 * 2 * 3);
   const captured = [];
   let displayed = -1;
   const renderer = {
     W: 4, H: 2, pixels,
     paused: true, stepFrames: 0, needsRender: false, heldCaptures: 0,
+    povFidelity, povResponseScale: 1, timeAccumulator: 31.25, frameInterval: 62.5,
     win: { performance },
     dotMesh: { instanceColor: fakeColorAttribute(pixels) },
     advanceFrameClock: () => false,
@@ -1056,6 +1057,7 @@ test('paused steps capture completed worker generations once after painting', as
     assert.deepEqual(captured, previous, 'completion has not painted the canvas');
     repaint();
     assert.equal(displayed, value);
+    if (povFidelity) assert.equal(renderer.povSweep.emissions.at(-1).pixels[0], value);
     assert.deepEqual(captured, [...previous, value]);
     renderer.invalidate();
     repaint();
