@@ -2,8 +2,7 @@
 // daydream.js's composition root once its WASM module lands, plus the control
 // blocks start() lifts out, driven through their factories.
 //
-// Cases that read the source anchor on the call site and name the failure they
-// stand in for.
+// Notice owner names are checked against the composition source.
 import { canonicalEffectId, effectDisplayName } from '../src/effects/effect_identity.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,41 +23,6 @@ import { fakeGui } from './helpers/fake_gui.js';
 
 restoreDocumentAfterEach();
 const startApp = trackedStartApp();
-
-/**
- * Blanks a source's comments to spaces, leaving every other offset where it
- * was. Prose cannot then satisfy a pattern, so a case that names wiring fails
- * when only a comment describes it.
- * @param {string} src - Source text.
- * @returns {string} The source with its comment bodies spaced out.
- */
-function withoutComments(src) {
-  const out = [...src];
-  for (let i = 0; i < src.length; i++) {
-    const c = src[i];
-    if (c === "'" || c === '"' || c === '`') {
-      for (i++; i < src.length && src[i] !== c; i++) if (src[i] === '\\') i++;
-      continue;
-    }
-    if (c !== '/') continue;
-    let end;
-    if (src[i + 1] === '/') {
-      const eol = src.indexOf('\n', i);
-      end = eol < 0 ? src.length : eol;
-    } else if (src[i + 1] === '*') {
-      const close = src.indexOf('*/', i + 2);
-      end = close < 0 ? src.length : close + 2;
-    } else {
-      continue;
-    }
-    for (let j = i; j < end; j++) if (out[j] !== '\n') out[j] = ' ';
-    i = end - 1;
-  }
-  return out.join('');
-}
-
-const SOURCE = withoutComments(
-  readFileSync(new URL('../src/app/daydream.js', import.meta.url), 'utf8'));
 
 // The two simulator presets, as the driver is told to size itself to them.
 const PHANTASM = [288, 144, 0.25];
@@ -644,7 +608,8 @@ test('segmented controls reconcile a mobile spawn and resize without a second po
 });
 
 test('the segmented controls have their own notice owner', async (t) => {
-  const owners = [...SOURCE.matchAll(/const \w+_NOTICE = '([^']+)'/g)].map((match) => match[1]);
+  const source = readFileSync(new URL('../src/app/daydream.js', import.meta.url), 'utf8');
+  const owners = [...source.matchAll(/const \w+_NOTICE = '([^']+)'/g)].map((match) => match[1]);
   assert.ok(owners.length > 1);
   assert.equal(new Set(owners).size, owners.length);
 
