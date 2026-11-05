@@ -1,4 +1,5 @@
 import { EFFECT_IDENTITIES } from '../generated/engine_contract.mjs';
+import {chainSnapshot} from './helpers/effect_gui_harness.js';
 //
 // Real-engine contract pin for the WASM surface: loads the shipped module and
 // exercises the methods and return shapes FakeEngine models, plus MeshOps and
@@ -537,6 +538,16 @@ test('every catalog operator matches fake snapshot runtime kinds and state keys'
     assert.equal(chainCall(engine, 'restoreSnapshot', snapshot), M.ChainSnapshotRestoreResult.APPLIED,
       operator.id);
     assert.deepEqual(chainCall(engine, 'getSnapshot').runtime, snapshot.runtime, operator.id);
+  }
+});
+
+test('effect-panel snapshot fixtures restore on the real engine and conformant fake', () => {
+  for (const target of [engine, new FakeChainEngine()]) {
+    target.setEffect('ShaderChain');
+    for (const value of [0, 0.5, 1]) {
+      assert.equal(chainCall(target, 'restoreSnapshot', chainSnapshot(value)).value,
+        ChainSnapshotRestoreResult.APPLIED.value);
+    }
   }
 });
 
