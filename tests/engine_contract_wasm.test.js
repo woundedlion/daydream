@@ -533,6 +533,10 @@ test('every catalog operator matches fake snapshot runtime kinds and state keys'
       return { kind: entry?.kind ?? 'none', keys: Object.keys(entry?.state ?? {}).sort() };
     };
     assert.deepEqual(shape(fake), shape(engine), operator.id);
+    const snapshot = JSON.parse(JSON.stringify(chainCall(engine, 'getSnapshot')));
+    assert.equal(chainCall(engine, 'restoreSnapshot', snapshot), M.ChainSnapshotRestoreResult.APPLIED,
+      operator.id);
+    assert.deepEqual(chainCall(engine, 'getSnapshot').runtime, snapshot.runtime, operator.id);
   }
 });
 
