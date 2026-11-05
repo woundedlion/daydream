@@ -3230,3 +3230,16 @@ for (const schemaVersion of [3, 4]) {
     assert.match(accepted.elements.get('shader-document-status').textContent, /Restored the chain snapshot/);
   });
 }
+
+test('an untouched linked scratch chain keeps its source and saved baseline', async () => {
+  const hash = await encodeShaderStateHash({ document: SCRATCH,
+    preset: SCRATCH.preset_bank.presets[0].preset_id, bypassed: [], paused: false });
+  const h = await editorWorkbench({ source: null, hash });
+  const source = h.elements.get('shader-document-select');
+  assert.equal(source.value, '');
+  h.win.confirm = () => { throw new Error('unexpected discard prompt'); };
+  source.value = '';
+  await onChange(source)();
+  h.controller.save();
+  assert.equal(h.downloads.at(-1)[0], 'scratch.shader.json');
+});
