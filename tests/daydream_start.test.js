@@ -279,3 +279,8 @@ test('GSReactionDiffusion has no Pause Presets control', async () => {
   assert.ok(panel);
   assert.equal(panel.controllers.some((controller) => controller.property === 'pause'), false);
 });
+
+test('the shader workbench offers no Test All control', () => {
+  const { guis } = startApp({ daydreamMode: 'shader-workbench' });
+  assert.equal(guis[0].controllers.some(c => c.property === 'testAll'), false);
+});

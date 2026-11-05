@@ -63,7 +63,7 @@ import {
 
 // UI layer degrades gracefully (log + keep last good state); lower layers trap.
 
-// Dwell time per effect while "Test All" cycles the active route's test roster.
+// Dwell time per effect while "Test All" cycles the test roster.
 const TEST_ALL_INTERVAL_MS = 1000;
 const EXPECTED_SEGMENT_CONTROLLER_API_VERSION = 4;
 
@@ -552,7 +552,7 @@ export function start({
     win,
   }) : null;
 
-  testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('Test All')
+  testAllController = shaderWorkbench ? null : guiInstance.addSession({ testAll: false }, 'testAll').name('Test All')
     .onChange((v) => {
       if (v) testAllTicker.start();
       else testAllTicker.stop();
