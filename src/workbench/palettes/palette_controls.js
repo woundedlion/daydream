@@ -621,6 +621,14 @@ function harmonyRelationships(recipe) {
 }
 
 /**
+ * @param {PaletteRecipe} recipe - Custom keys and the target harmony.
+ * @returns {number} Harmony base placing its first anchor on the first custom key.
+ */
+export function harmonyBaseFromCustomKeys(recipe) {
+  return wrapTurns(recipe.hue.customTurns[0] - harmonyRelationships(recipe)[0]);
+}
+
+/**
  * @param {ReadonlyArray<number>} keys - Evenly spaced key values.
  * @param {number} count - How many keys to resample to; at least two.
  * @returns {number[]} The same shape linearly resampled to `count` keys.

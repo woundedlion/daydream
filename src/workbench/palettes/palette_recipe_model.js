@@ -11,7 +11,7 @@
 
 import {
   applyPaletteControls, clampRecipeWindow, customHueKeyState,
-  customHueSweepRepresentable, defaultPaletteRecipe, loopSweepTurns,
+  customHueSweepRepresentable, defaultPaletteRecipe, harmonyBaseFromCustomKeys, loopSweepTurns,
   movedHueKeyOffset, PALETTE_AXIS_CONTROLS, paletteControlsFromRecipe,
   paletteEnumOrdinal, wrapTurns,
 } from './palette_controls.js';
@@ -259,6 +259,8 @@ export class PaletteRecipeModel {
     paletteEnumOrdinal('hueMode', mode);
     if (mode === this.#readings.hueMode) return true;
     if (mode === 'CUSTOM') return this.activateCustomHues();
+    if (mode === 'HARMONY' && this.#readings.hueMode === 'CUSTOM')
+      this.#readings.baseTurns = harmonyBaseFromCustomKeys(this.#current);
     this.#readings.hueMode = mode;
     this.#rebuild();
     return true;

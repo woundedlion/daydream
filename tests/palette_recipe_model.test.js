@@ -174,6 +174,22 @@ test('hue mode transitions hand off into CUSTOM unless a loop sweep would be los
   assert.throws(() => model.applyHueModeTransition('SPIRAL'), /Unknown hueMode member/);
 });
 
+for (const harmony of ['ANALOGOUS', 'ACCENTED_ANALOGOUS']) {
+  for (const direction of ['SHORTEST', 'CLOCKWISE', 'COUNTERCLOCKWISE']) {
+    test(`${harmony} keeps its base through repeated custom handoffs (${direction})`, () => {
+      const model = new PaletteRecipeModel();
+      model.setChoice('harmony', harmony);
+      model.setChoice('direction', direction);
+      model.setBaseHue(0.2);
+      for (let pass = 0; pass < 3; pass += 1) {
+        assert.equal(model.applyHueModeTransition('CUSTOM'), true);
+        assert.equal(model.applyHueModeTransition('HARMONY'), true);
+        assert.ok(Math.abs(model.baseHueTurns - 0.2) < 1e-12);
+      }
+    });
+  }
+}
+
 test('a LOOP sweep rounds to whole turns inside the domain, mode and sweep operations', () => {
   const model = new PaletteRecipeModel();
   model.setAmount('sweepTurns', 2.4);
