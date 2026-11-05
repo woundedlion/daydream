@@ -234,6 +234,13 @@ test('--root requires a path', () => {
     /--root requires a path/);
 });
 
+test('--vendor-root requires a path', () => {
+  assert.match(expectFailure(process.execPath, [SCRIPT_SRC, '--vendor-root'], {env}),
+    /--vendor-root requires a path/);
+  assert.match(expectFailure(process.execPath, [SCRIPT_SRC, '--vendor-root', '--local'], {env}),
+    /--vendor-root requires a path/);
+});
+
 test('transitive Three imports cannot escape the package', () => {
   installModules();
   writeFileSync(join(root, 'node_modules/three/build/three.module.js'),
