@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import {after, test} from 'node:test';
 import createModule from '../generated/holosphere_wasm.js';
 import {callWorkbenchBinding} from '../src/engine/workbench_bindings.js';
+import {readFileSync} from 'node:fs';
+import {compileShaderDocument} from '../generated/shader/shader_workbench.mjs';
+import {documentFromChainSnapshot, scratchChainDocument} from '../src/workbench/shader/chain_document_store.js';
+import {applyChainDocument} from '../src/workbench/shader/chain_apply.js';
 
 const module = await createModule({print: () => {}});
 const engine = new module.HolosphereEngine();
@@ -224,5 +228,45 @@ test('a snapshot accessor may rebuild geometry without trapping internal handles
   } finally {
     bindings.delete();
     engine.setDisplayCaps(0, 0);
+  }
+});
+
+test('real modulation snapshots import every authored preset field', () => {
+  const catalog = JSON.parse(readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
+  const document = scratchChainDocument(catalog, [
+    {label: 'project', operator: 'project.stereographic.v2'},
+    {label: 'sample', operator: 'sample.grid.v4'},
+    {label: 'colorize', operator: 'colorize.generated-palette.v4'},
+    {label: 'ink', operator: 'color.modulate.v1'},
+  ]);
+  const preset = document.preset_bank.presets[0];
+  Object.assign(preset.values, {
+    'ink.modulation-source': 'sphere-smooth-grid',
+    'ink.modulation-evaluation': 'direct',
+    'ink.modulation-mechanic': 'opacity',
+    'ink.modulation-amount': 0.375,
+    'ink.pattern-noise-basis': 'ridged3',
+    'ink.pattern-noise-variant': 'octave-contour',
+    'ink.pattern-scale': 2.5,
+    'ink.pattern-speed': -0.000125,
+    'ink.pattern-contrast': 1.25,
+    'ink.grid-frequency': 3.5,
+    'ink.grid-offset': 0.25,
+    'ink.grid-speed': -0.03125,
+  });
+  const compiled = compileShaderDocument(JSON.stringify(document), {catalog});
+  assert.equal(compiled.status, 'VALID', JSON.stringify(compiled.diagnostics));
+  engine.setEffect('ShaderChain');
+  assert.equal(applyChainDocument({engine, module, compiled, presetId: preset.preset_id,
+    syncEffectGui() {}, invalidate() {}}), null);
+  const snapshot = capture();
+  assert.ok(snapshot.modulation.some(({instance}) => instance === 'ink'));
+  const imported = documentFromChainSnapshot(snapshot, catalog);
+  const checked = compileShaderDocument(JSON.stringify(imported), {catalog});
+  assert.equal(checked.status, 'VALID', JSON.stringify(checked.diagnostics));
+  const actual = checked.document.preset_bank.presets[0].values;
+  for (const [name, value] of Object.entries(preset.values)) {
+    assert.equal(typeof actual[name] === 'number' ? Math.fround(actual[name]) : actual[name],
+      typeof value === 'number' ? Math.fround(value) : value, name);
   }
 });
