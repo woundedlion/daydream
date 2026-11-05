@@ -536,7 +536,6 @@ export function createShaderDocumentController({
     if (!parameterLive(parameterId)) return false;
     try {
       if (chainUi === null || active === null || active.presetId === null) return false;
-      const addsDeclaration = !chainUi.store.declares(parameterId);
       const document = chainUi.store.document();
       const presetValues = document.preset_bank.presets
         .find((/** @type {*} */ preset) => preset.preset_id === active.presetId).values;
@@ -554,6 +553,8 @@ export function createShaderDocumentController({
       if (modulated && values[`${label}.modulation-evaluation`] === 'baked-cube'
           && Number(presetValues[`${label}.pattern-scale`] ?? 1) > 8)
         values[`${label}.pattern-scale`] = 8;
+      const store = chainUi.store;
+      const addsDeclaration = Object.keys(values).some(id => !store.declares(id));
       const coupled = Object.keys(values).length > 1;
       const result = chainUi.store.setPresetValues(active.presetId, values, () => {
         if (addsDeclaration && active.compiledSide) return { ok: true };
