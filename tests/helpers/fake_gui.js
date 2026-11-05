@@ -123,6 +123,7 @@ function buildGui(namespace, optionsReplaces, panel, hydrated, stored) {
   const gui = {
     namespace,
     domElement: fakeElement('div'),
+    titleElement: fakeElement('button'),
     controllers: [],
     folders: [],
     $children: childrenElement,
@@ -212,6 +213,7 @@ function buildGui(namespace, optionsReplaces, panel, hydrated, stored) {
     },
   };
   gui.domElement.ownerDocument = childrenElement.ownerDocument;
+  gui.domElement.appendChild(gui.titleElement);
   gui.domElement.appendChild(childrenElement);
   if (panel) {
     gui.addDisplayFolder = (name) => {

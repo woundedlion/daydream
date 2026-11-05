@@ -368,6 +368,18 @@ test('a schema rebuild hands keyboard focus back to the same control', () => {
   assert.equal(h.gui().ctrl('Bonne Parallel').$input.focusCalls, 0);
 });
 
+test('a schema rebuild focuses its title when the focused parameter disappears', () => {
+  const h = makeHarness({params: [SPEED, GLOW], engineValues: [0.2, true], generation: 7});
+  h.panel.build(); h.panel.mount();
+  h.state.focused = h.gui().ctrl('Glow').$input;
+  h.state.params = [SPEED];
+  h.state.engineValues = [0.2];
+  h.state.generation = 8;
+  h.panel.sync();
+  assert.equal(h.gui().titleElement.focusCalls, 1);
+  assert.equal(h.gui().ctrl('Speed').$input.focusCalls, 0);
+});
+
 test('a schema rebuild hands keyboard focus back to the same action control', () => {
   const h = makeHarness({
     params: [SPEED], engineValues: [0.1], generation: 7, presetCount: 3,

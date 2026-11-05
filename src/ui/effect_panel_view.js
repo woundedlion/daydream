@@ -116,11 +116,14 @@ export function createEffectPanelView({ focusedElement, guiContainer, isMobile }
     }
     const scroller = scrollElement(fx?.gui);
     if (captured.property !== null) {
+      let restored = false;
       for (const [property, controller] of panelControllers(fx)) {
         if (property !== captured.property) continue;
         focusWidget(controller)?.focus?.({ preventScroll: true });
+        restored = true;
         break;
       }
+      if (!restored) fx?.gui?.titleElement?.focus?.({ preventScroll: true });
     }
     // Last, so a host that ignores preventScroll is still overridden.
     if (scroller) scroller.scrollTop = captured.scrollTop;
