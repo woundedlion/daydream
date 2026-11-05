@@ -371,6 +371,10 @@ export class FakeChainEngine {
 
   getParameterAdvisories() { return []; }
 
+  getDocumentParameterDefinitions() { return []; }
+
+  setDocumentParameter() { return ParamSetResult.UNKNOWN_PARAM; }
+
   setParameter(name, value) {
     const definition = this.definitions.find((d) => d.name === name);
     if (!definition) return ParamSetResult.UNKNOWN_PARAM;

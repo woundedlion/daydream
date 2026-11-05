@@ -3,15 +3,37 @@ import {after, test} from 'node:test';
 import createModule from '../generated/holosphere_wasm.js';
 import {callWorkbenchBinding} from '../src/engine/workbench_bindings.js';
 import {readFileSync} from 'node:fs';
-import {compileShaderDocument} from '../generated/shader/shader_workbench.mjs';
+import {bakedTopologyFields, compileShaderDocument, fixedDerivedBinding} from '../generated/shader/shader_workbench.mjs';
 import {documentFromChainSnapshot, scratchChainDocument} from '../src/workbench/shader/chain_document_store.js';
 import {applyChainDocument} from '../src/workbench/shader/chain_apply.js';
+import {applyFixedShaderDocument} from '../src/workbench/shader/shader_documents.js';
 
 const module = await createModule({print: () => {}});
 const engine = new module.HolosphereEngine();
 const capture = () => callWorkbenchBinding(engine, 'getSnapshot', []);
 const restore = (snapshot) => callWorkbenchBinding(engine, 'restoreSnapshot', [snapshot]);
 after(() => engine.delete());
+
+test('every catalog document preset applies to its compiled engine', () => {
+  const catalog = JSON.parse(readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
+  const patterns = new URL('../generated/shader/patterns/', import.meta.url);
+  const sources = JSON.parse(readFileSync(new URL('catalog.json', patterns), 'utf8')).source_documents;
+  let applied = 0;
+  for (const [effectId, filename] of Object.entries(sources)) {
+    const compiled = compileShaderDocument(readFileSync(new URL(filename, patterns), 'utf8'), {catalog});
+    assert.equal(compiled.status, 'VALID', effectId);
+    assert.equal(engine.setEffect(effectId), module.EffectSetResult.INSTALLED, effectId);
+    const referenceIds = engine.getPresetIds();
+    for (const preset of compiled.document.preset_bank.presets) {
+      assert.equal(applyFixedShaderDocument(engine, module, compiled, preset.preset_id,
+        referenceIds, bakedTopologyFields(catalog), fixedDerivedBinding, catalog), null,
+      `${effectId}/${preset.preset_id}`);
+      applied += 1;
+    }
+  }
+  assert.equal(Object.keys(sources).length, 23);
+  assert.equal(applied, 35);
+});
 
 function installModulatedChain() {
   engine.setEffect('ShaderChain');

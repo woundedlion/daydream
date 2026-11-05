@@ -14,7 +14,7 @@ import {
   createChainDocumentStore, documentFromChainSnapshot, scratchChainDocument,
 } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
-import { BAKED_CONSTANT_IDS, bakedTopologyFields, engineControlNames } from '../../../generated/shader/shader_workbench.mjs';
+import { BAKED_CONSTANT_IDS, bakedTopologyFields, documentModulationBinding, engineControlNames } from '../../../generated/shader/shader_workbench.mjs';
 import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../../effects/effect_persistence.js';
 import { copyToClipboard } from '../../shared/copy_text.js';
 import { downloadBlob } from '../../shared/download_file.js';
@@ -143,6 +143,32 @@ function performEngineWrites(engine, module, writes) {
   return refusal ? `"${refusal.name}" was refused: ${enumConstantName(module.ParamSetResult, refusal.result)}` : null;
 }
 
+/** @param {*} descriptor @param {string} parameterId @param {*[]} definitions */
+function documentControlFor(descriptor, parameterId, definitions) {
+  const binding = documentModulationBinding(descriptor, parameterId);
+  return binding && definitions.find((definition) => definition.resource === binding.resource
+    && definition.id === binding.id);
+}
+
+/** @param {*} definition @param {*} value @returns {*|string|null} */
+function resolveDocumentWrite(definition, value) {
+  if (typeof value !== 'number' || !Number.isFinite(value))
+    return `"${definition.id}" has no numeric value`;
+  if (definition.readonly) return snapshotValueEqual(value, definition.value)
+    ? null : `"${definition.id}" must match the fixed build's value ${definition.value}`;
+  return {resource: definition.resource, id: definition.id, stored: value};
+}
+
+/** @param {*} engine @param {*} module @param {*[]} writes @returns {string|null} */
+function performDocumentWrites(engine, module, writes) {
+  for (const {resource, id, stored} of writes) {
+    const result = engine.setDocumentParameter(resource, id, stored);
+    if (result !== module.ParamSetResult.APPLIED)
+      return `"${resource}.${id}" was refused: ${enumConstantName(module.ParamSetResult, result)}`;
+  }
+  return null;
+}
+
 /**
  * @param {import('../../../generated/holosphere_wasm.js').HolosphereEngine} engine @param {import('../../../generated/holosphere_wasm.js').HolosphereModule} module @param {CompiledDocument} compiled
  * @param {string} presetId
@@ -157,18 +183,28 @@ function applyDocumentValues(engine, module, compiled, presetId, baked, derived,
     .find((/** @type {*} */ candidate) => candidate.preset_id === presetId)
     ?? compiled.document.preset_bank.presets[0];
   const definitions = engine.getParameterDefinitions();
+  const documentDefinitions = engine.getDocumentParameterDefinitions?.() ?? [];
+  const documentWrites = [];
   /** @type {Array<{name: string, stored: *}>} */
   const writes = [];
   for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
     if (derived.has(parameterId)) continue;
     const { name, refusal } = compiledControlFor(parameterId, definitions, baked, compiled.document.descriptor, catalog);
-    if (refusal) return refusal;
+    if (refusal) {
+      const definition = documentControlFor(compiled.document.descriptor, parameterId, documentDefinitions);
+      if (!definition) return refusal;
+      const write = resolveDocumentWrite(definition, value);
+      if (typeof write === 'string') return write;
+      if (write) documentWrites.push(write);
+      continue;
+    }
     if (name === null) continue;
     const write = resolveParameterWrite(definitions, name, value);
     if (typeof write === 'string') return write;
     writes.push(write);
   }
-  return performEngineWrites(engine, module, writes);
+  return performEngineWrites(engine, module, writes)
+    ?? performDocumentWrites(engine, module, documentWrites);
 }
 
 /**
@@ -520,7 +556,13 @@ export function createShaderDocumentController({
     const descriptor = { chain: chainUi?.store.chainView()
       ?? active?.compiled.document.descriptor.chain ?? [] };
     if (active?.compiledSide !== true) return true;
-    if (engineControlName(parameterId, liveDefinitions()).name !== null) return true;
+    const control = engineControlName(parameterId, liveDefinitions());
+    if (control.name !== null) return true;
+    if (control.refusal) {
+      const definition = documentControlFor(descriptor, parameterId,
+        getEngine()?.getDocumentParameterDefinitions?.() ?? []);
+      if (definition) return !definition.readonly;
+    }
     return !BAKED_CONSTANT_IDS.has(parameterId) && !bakedFields.has(fieldSegment(parameterId))
       && !compiler.fixedDerivedBinding?.(descriptor, parameterId, {});
   };
@@ -565,7 +607,7 @@ export function createShaderDocumentController({
         const control = engineControlName(parameterId, definitions);
         const paused = getAnimationsPaused();
         let refusal = control.refusal;
-        if (refusal === null && control.name !== null) {
+        if (active.compiledSide || (refusal === null && control.name !== null)) {
           if (coupled && !active.compiledSide) {
             const writes = [];
             for (const [id, next] of Object.entries(values)) {
@@ -581,18 +623,30 @@ export function createShaderDocumentController({
             }
           } else if (active.compiledSide) {
             const writes = [];
+            const documentWrites = [];
+            const documentDefinitions = engine.getDocumentParameterDefinitions?.() ?? [];
+            refusal = null;
             for (const [id, next] of Object.entries(values)) {
               const resolved = engineControlName(id, definitions);
               const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, {...presetValues, ...values});
               if (binding && !liveDerivedControl(id, resolved, definitions, binding)) continue;
-              if (resolved.refusal) { refusal = resolved.refusal; break; }
+              if (resolved.refusal) {
+                const definition = documentControlFor(document.descriptor, id, documentDefinitions);
+                if (!definition) { refusal = resolved.refusal; break; }
+                const write = resolveDocumentWrite(definition, next);
+                if (typeof write === 'string') { refusal = write; break; }
+                if (write) documentWrites.push(write);
+                continue;
+              }
               if (resolved.name === null) continue;
               const write = resolveParameterWrite(definitions, resolved.name, next);
               if (typeof write === 'string') { refusal = write; break; }
               writes.push(write);
             }
-            if (refusal === null) refusal = performEngineWrites(engine, module, writes);
-          } else refusal = writeEngineValue(engine, module, definitions, control.name, value);
+            if (refusal === null) refusal = performEngineWrites(engine, module, writes)
+              ?? performDocumentWrites(engine, module, documentWrites);
+          } else if (control.name !== null)
+            refusal = writeEngineValue(engine, module, definitions, control.name, value);
         }
         if (paused !== null) {
           setAnimationsPaused(paused);

@@ -271,6 +271,8 @@ function fixedEngine(answer) {
     writes,
     selectPresetById: (id) => { selected.push(id); return answer(id); },
     getParameterDefinitions: () => [{ name: 'Pattern Freq' }],
+    getDocumentParameterDefinitions: () => [],
+    setDocumentParameter: () => ParamSetResult.UNKNOWN_PARAM,
     setParameter: (name, value) => {
       writes.push([name, value]);
       return ParamSetResult.APPLIED;
@@ -302,6 +304,35 @@ test('a fixed-pipeline preset is staged on the engine preset it names', () => {
     engine, MODULE, fixedDocument(), 'dusk', ['noon', 'dusk'], BAKED, fixedDerivedBinding), null);
   assert.deepEqual(engine.selected, ['dusk']);
   assert.deepEqual(engine.writes, [['Pattern Freq', 5]]);
+});
+
+test('compiled modulation fields use exact resources and retain readonly values', () => {
+  const engine = fixedEngine(() => true);
+  const definitions = [
+    {resource: 'ink', id: 'grid-axis-b-x', readonly: true, value: Math.fround(0.3)},
+    {resource: 'ink', id: 'pattern-scale', readonly: false, value: 1},
+  ];
+  engine.getDocumentParameterDefinitions = () => definitions;
+  engine.setDocumentParameter = (resource, id, value) => {
+    engine.writes.push([resource, id, value]);
+    return ParamSetResult.APPLIED;
+  };
+  const compiled = {document: {
+    descriptor: {chain: [{label: 'modulation', resource_key: 'ink', operator: 'color.modulate.v1'}]},
+    preset_bank: {presets: [{preset_id: 'one', values: {
+      'modulation.grid-axis-b-x': 0.3, 'modulation.pattern-scale': 2,
+    }}]},
+  }};
+  const apply = () => applyFixedShaderDocument(engine, MODULE, compiled, 'one', ['one'],
+    BAKED, () => null);
+  assert.equal(apply(), null);
+  assert.deepEqual(engine.writes, [['ink', 'pattern-scale', 2]]);
+  engine.writes.length = 0;
+  definitions[0].value = 0.4;
+  assert.match(apply(), /must match the fixed build/);
+  assert.deepEqual(engine.writes, []);
+  definitions[0].resource = 'other';
+  assert.match(apply(), /no engine parameter matches/);
 });
 
 // The document's presets and the effect's reference presets are separate banks:
