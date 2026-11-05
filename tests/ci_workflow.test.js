@@ -475,6 +475,16 @@ test('required suite steps execute without suppression', () => {
   }
 });
 
+test('every workflow and required browser or engine gate rejects suppression', () => {
+  for (const name of readdirSync(resolve(REPO, WORKFLOW_DIR)).filter((name) => name.endsWith('.yml'))) {
+    const source = workflowText(name);
+    assert.doesNotMatch(source, /^\s*continue-on-error:/m, name);
+    assert.doesNotMatch(source, /\|\|\s*true\b/, name);
+    if (['browser-smoke.yml', 'engine-bundle.yml'].includes(name))
+      assert.doesNotMatch(source, /^ {4,8}if:/m, name);
+  }
+});
+
 test('reusable suites require the independently selected engine pin', () => {
   for (const file of ['js-unit-suite.yml', 'browser-smoke.yml']) {
     const suite = workflowText(file);
