@@ -1312,6 +1312,7 @@ test('a streaming session that produces no data never opens the chosen file', as
 
   rec.start('empty');
   const recorder = rec.mediaRecorder;
+  await drainSink();
   // No ondataavailable: the session streams nothing.
   rec.stop();
   recorder.onstop();
@@ -1947,4 +1948,21 @@ test('superseded streaming recorder ignores picker cancellation and backlog over
   assert.equal(rec.isRecording, true);
   assert.deepEqual(errors, []);
   rec.stop();
+});
+
+
+test('stopping while the Save dialog is open prevents a later encoder start', async (t) => {
+  t.after(installRecorderEnv());
+  let accept;
+  globalThis.showSaveFilePicker = () => new Promise(resolve => { accept = resolve; });
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.start('cancelled');
+  const encoder = rec.mediaRecorder;
+  assert.equal(rec.starting, true);
+  rec.stop();
+  accept({createWritable: async () => assert.fail('cancelled session opened a file')});
+  await drainSink();
+  assert.equal(encoder.timesliceMs, undefined);
+  assert.equal(encoder.state, 'inactive');
+  assert.equal(rec.starting, false);
 });
