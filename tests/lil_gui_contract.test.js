@@ -30,7 +30,11 @@ function installHost() {
     head: fakeElement('head'),
     body: fakeElement('body'),
     activeElement: null,
-    createElement: (tag) => fakeElement(tag),
+    createElement: (tag) => {
+      const element = fakeElement(tag);
+      if (tag === 'input') element.type = 'text';
+      return element;
+    },
   });
   globalThis.window = {
     matchMedia: () => ({ matches: false }),
@@ -60,6 +64,7 @@ test('fold band decorates a real lil-gui slider without changing its range or va
     assert.ok(controller.domElement.querySelector('.lil-slider'));
     assert.equal(controller.domElement.classList.contains('param-fold-advisory'), true);
     assert.equal(controller.domElement.style.getPropertyValue('--param-fold-high'), '60%');
+    assert.equal(controller.$input.type, 'text');
     assert.equal(controller.$input.value, '0.700');
     assert.equal(controller.getValue(), 0.7);
     controller.setValue(0.9);

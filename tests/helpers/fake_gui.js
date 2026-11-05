@@ -20,6 +20,7 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
   const kind = isOptionList(args[0]) ? 'select'
     : typeof object[property] === 'function' ? 'button' : 'input';
   const widget = fakeElement(kind);
+  if (kind === 'input') widget.type = typeof object[property] === 'boolean' ? 'checkbox' : 'text';
   const domElement = fakeElement('div');
   domElement.appendChild(widget);
   const controller = {

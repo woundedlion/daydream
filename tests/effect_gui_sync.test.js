@@ -539,6 +539,22 @@ test('a warning raised mid-drag lands on the pointer release', () => {
     .querySelector('.param-warning-note').textContent, warning);
 });
 
+test('a warning raised while typing waits for the input to blur', () => {
+  const warning = 'Speed is faster than the stream.';
+  const h = makeHarness({params: [SPEED], engineValues: [0.1],
+    onEngineParam(name, value, state) { state.params = [{...SPEED, warning}]; }});
+  h.panel.build(); h.panel.mount();
+  const controller = h.gui().ctrl('Speed');
+  controller.$input.dispatch('input');
+  controller.setValue(0.9);
+  h.panel.sync();
+  assert.equal(h.guis.length, 1);
+  controller.$input.dispatch('blur');
+  h.panel.sync();
+  assert.equal(h.guis.length, 2);
+  assert.equal(h.gui().ctrl('Speed').domElement.querySelector('.param-warning-note').textContent, warning);
+});
+
 test('a warning raised mid-key-repeat lands on the key release', () => {
   const speed = { ...SPEED };
   const warning = 'Speed is faster than the segment stream can follow.';
