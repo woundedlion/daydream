@@ -536,19 +536,7 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
     requireParams('generateFuncAndRecipe', opName, o);
     const params = opParams(o);
 
-    if (opName === 'truncate') {
-      requireFinite(opName, 't', params.t);
-      chain += `.truncate(${formatFloat(params.t)})`;
-      nameParts.push(`_truncate${pctSuffix(params.t)}`);
-    } else if (opName === 'expand') {
-      requireFinite(opName, 't', params.t);
-      chain += `.expand(${formatFloat(params.t)})`;
-      nameParts.push(`_expand${pctSuffix(params.t)}`);
-    } else if (opName === 'chamfer') {
-      requireFinite(opName, 't', params.t);
-      chain += `.chamfer(${formatFloat(params.t)})`;
-      nameParts.push(`_chamfer${pctSuffix(params.t)}`);
-    } else if (opName === 'hankin') {
+    if (opName === 'hankin') {
       requireFinite(opName, 'angle', params.angle);
       if (params.angle < 0) {
         throw new Error(`generateFuncAndRecipe: hankin angle ${params.angle} is negative; suffix must stay a valid C++ identifier`);
@@ -564,10 +552,10 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
       requireCount(opName, 'iter', params.iter);
       chain += `.relax(${params.iter})`;
       nameParts.push(`_relax${params.iter}`);
-    } else if (opName === 'bevel') {
+    } else if (OP_DEFS[opName].params.t) {
       requireFinite(opName, 't', params.t);
-      chain += `.bevel(${formatFloat(params.t)})`;
-      nameParts.push(`_bevel${pctSuffix(params.t)}`);
+      chain += `.${opName}(${formatFloat(params.t)})`;
+      nameParts.push(`_${opName}${pctSuffix(params.t)}`);
     } else {
       // Parameterless ops.
       chain += `.${opName}()`;
