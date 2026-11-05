@@ -8,7 +8,7 @@
 import { boxOf, checks, isMain, runProbe, walkTo } from './probe_harness.mjs';
 
 const PAGE = 'tools/mobius.html';
-const VIEWPORT = { width: 1280, height: 900 };
+const VIEWPORT = { width: 1280, height: 800 };
 const TIMEOUT_MS = 90_000;
 // The coefficient whose pad the gestures land on.
 const PARAM = 'B';
@@ -132,6 +132,11 @@ export async function probePad(tab) {
   }
   check(await tab.$eval('#degenerateWarning', (node) => (node.textContent ?? '') !== ''),
     'a zero determinant displays the degenerate warning');
+  check(await tab.$eval('#parameters', (panel) => {
+    const bottom = panel.getBoundingClientRect().bottom;
+    return [...panel.querySelectorAll('.complex-plane-label')]
+      .every(label => label.getBoundingClientRect().bottom <= bottom);
+  }), 'coefficient readouts fit the panel while the degenerate warning is visible');
   for (const key of ['A', 'D']) {
     const plane = await boxOf(tab, `#${key}_plane`);
     await tab.mouse.click(plane.x + plane.width * 0.75, plane.y + plane.height / 2);

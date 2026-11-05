@@ -4,7 +4,7 @@
  */
 
 :root {
-  --panel-height: 280px;
+  --panel-height: 316px;
   --sidebar-width: 240px;
 }
 
@@ -189,6 +189,7 @@
 
 #parameters::-webkit-scrollbar {
   height: 6px;
+  width: 6px;
 }
 
 #parameters::-webkit-scrollbar-track {
