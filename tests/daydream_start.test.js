@@ -217,7 +217,7 @@ test('the teardown releases the page listeners and the GUI it built', () => {
   assert.equal(teardown.disposed(), true);
   assert.deepEqual(listeners, [], 'every page listener must be removed');
   assert.deepEqual(docListeners, [], 'every document listener must be removed');
-  assert.equal(guis[0].destroyed, true, 'the global GUI must be destroyed');
+  assert.equal(guis[0].destroyed, 1, 'the global GUI must be destroyed');
   assert.equal(driver.disposed, true, 'the driver owns GPU buffers');
 });
 

@@ -1032,7 +1032,7 @@ test('a refused effect reset preserves edits and a later reset restores defaults
   const setEffect = module.engine.setEffect;
   module.engine.setEffect = () => EffectSetResult.UNKNOWN_EFFECT;
   captureConsole(() => panel.ctrl('reset').getValue()());
-  assert.equal(panel.destroyed, false);
+  assert.equal(panel.destroyed, 0);
   assert.equal(panel.ctrl('Speed').getValue(), 0.75);
   assert.equal(noticeText(app), 'Effect reset was rejected. The panel still shows the current values.');
   assert.equal(app.elements.get('apply-notice-body').hidden, false);
@@ -1040,7 +1040,7 @@ test('a refused effect reset preserves edits and a later reset restores defaults
   module.engine.setEffect = setEffect;
   panel.ctrl('reset').getValue()();
 
-  assert.equal(panel.destroyed, true);
+  assert.equal(panel.destroyed, 1);
   assert.equal(app.guis.at(-1).ctrl('Speed').getValue(), 0.2);
   assert.equal(noticeText(app), '');
   assert.equal(app.elements.get('apply-notice-body').hidden, true);

@@ -132,7 +132,7 @@ function buildGui(namespace, optionsReplaces, panel, hydrated, stored) {
     stored: panel ? stored : new Map(),
     storedReads: [],
     storedWrites: [],
-    destroyed: panel ? 0 : false,
+    destroyed: 0,
     destroyThrows: null,
     closed: false,
     ctrl(property) { return this.controllers.find((c) => c.property === property); },
@@ -197,7 +197,7 @@ function buildGui(namespace, optionsReplaces, panel, hydrated, stored) {
     close() { return gui.open(false); },
     open(open = true) { gui.closed = !open; return gui; },
     destroy() {
-      gui.destroyed = panel ? gui.destroyed + 1 : true;
+      gui.destroyed += 1;
       if (gui.destroyThrows) throw gui.destroyThrows;
       for (const controller of gui.controllers) {
         if (controller.domElement.parentNode !== childrenElement)
