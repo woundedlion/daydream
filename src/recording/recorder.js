@@ -140,6 +140,8 @@ export class VideoRecorder {
     this.onError = null;
     /** @type {(() => void)|null} */
     this.onEmptySession = null;
+    /** @type {(() => void)|null} */
+    this.onStarted = null;
     /** @type {((err: Error, filename: string) => void)|null} Save failure for a completed session. */
     this.onSaveError = null;
     /** @type {((err: Error) => void)|null} Streaming save switched to Downloads. */
@@ -366,6 +368,7 @@ export class VideoRecorder {
         this.elapsedSeconds = 0;
         this.recordingStartedAtMs = this.now();
         this.visibilityChanged();
+        this.onStarted?.();
       } catch (err) {
         recorder.ondataavailable = null;
         recorder.onstop = null;

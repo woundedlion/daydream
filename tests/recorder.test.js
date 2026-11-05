@@ -1966,3 +1966,19 @@ test('stopping while the Save dialog is open prevents a later encoder start', as
   assert.equal(encoder.state, 'inactive');
   assert.equal(rec.starting, false);
 });
+
+
+test('started hook waits for the Save dialog and the running encoder', async (t) => {
+  t.after(installRecorderEnv());
+  let accept;
+  globalThis.showSaveFilePicker = () => new Promise(resolve => { accept = resolve; });
+  const rec = new VideoRecorder(recordableCanvas());
+  let started = 0;
+  rec.onStarted = () => { assert.equal(rec.mediaRecorder.state, 'recording'); started++; };
+  rec.start('pending');
+  assert.equal(started, 0);
+  accept({createWritable: async () => ({write() {}, close() {}})});
+  await drainSink();
+  assert.equal(started, 1);
+  rec.stop();
+});

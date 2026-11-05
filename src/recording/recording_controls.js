@@ -105,6 +105,22 @@ export function createRecordingControls({
     driver.invalidate();
   };
 
+  const announceStarted = () => {
+    const axisWarning = driver.labelAxes
+      ? ' Axis labels are page overlays, not canvas pixels; the recording will not carry them.'
+      : '';
+    const sweepWarning = driver.povFidelity
+      ? ' POV fidelity recordings capture simulation ticks; the sweep animation samples only the beginning of each sweep.'
+      : '';
+    const memoryNotice = typeof globalThis.showSaveFilePicker !== 'function'
+      ? ` This browser saves up to ${MEMORY_BUFFER_LIMIT_BYTES / 1_000_000} MB per recording`
+        + ` (about ${Math.floor(MEMORY_BUFFER_LIMIT_BYTES * 8 / (recSettings.recQuality * 1_000_000))} seconds at this quality).`
+      : '';
+    startNotice = 'Recording started.'
+      + `${axisWarning}${sweepWarning}${memoryNotice}`;
+    showNotice(startNotice);
+  };
+
   const recordState = { record: () => {
     const recorder = getRecorder();
     if (!recorder) {
@@ -118,20 +134,12 @@ export function createRecordingControls({
     // there was no session to stop, and the same owner tag would overwrite it.
     if (!wasRecording && !isRecording) return;
     if (!isRecording && (sessionError || sessionEmpty)) { showRecording(false); return; }
-    // The notice region carries the state change to assistive tech.
-    const axisWarning = isRecording && driver.labelAxes
-      ? ' Axis labels are page overlays, not canvas pixels; the recording will not carry them.'
-      : '';
-    const sweepWarning = isRecording && driver.povFidelity
-      ? ' POV fidelity recordings capture simulation ticks; the sweep animation samples only the beginning of each sweep.'
-      : '';
-    const memoryNotice = isRecording && typeof globalThis.showSaveFilePicker !== 'function'
-      ? ` This browser saves up to ${MEMORY_BUFFER_LIMIT_BYTES / 1_000_000} MB per recording`
-        + ` (about ${Math.floor(MEMORY_BUFFER_LIMIT_BYTES * 8 / (recSettings.recQuality * 1_000_000))} seconds at this quality).`
-      : '';
-    startNotice = `${isRecording ? 'Recording started.' : 'Recording stopped.'}`
-      + `${axisWarning}${sweepWarning}${memoryNotice}`;
-    showNotice(startNotice);
+    if (isRecording) {
+      if (recorder.starting) {
+        startNotice = 'Choose a file to start recording.';
+        showNotice(startNotice);
+      } else announceStarted();
+    } else showNotice('Recording stopped.');
     showRecording(isRecording);
   }};
 
@@ -155,6 +163,7 @@ export function createRecordingControls({
     attach(recorder) {
       recorder.frameInterval = driver.frameInterval;
       recordingSettings.replay();
+      recorder.onStarted = announceStarted;
       recorder.onFormatFallback = (extension) => {
         const label = Object.keys(REC_FORMATS)
           .find(key => REC_FORMATS[key] === extension) ?? extension.toUpperCase();

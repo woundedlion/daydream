@@ -359,6 +359,21 @@ for (const failure of ['error', 'empty']) test(`synchronous stop ${failure} noti
   assert.equal(rig.canvasEl.classList.contains('recording'), false);
 });
 
+test('Save dialog notices wait for the encoder before announcing recording', () => {
+  const rig = recordingRig({labelAxes: true});
+  const recorder = rig.attach(fakeRecorder());
+  const toggle = recorder.toggle.bind(recorder);
+  recorder.toggle = name => { const result = toggle(name); recorder.starting = result; return result; };
+  rig.button.object.record();
+  assert.equal(rig.notices.at(-1), 'Choose a file to start recording.');
+  recorder.starting = false;
+  recorder.onStarted();
+  assert.match(rig.notices.at(-1), /^Recording started\./);
+  assert.match(rig.notices.at(-1), /Axis labels are page overlays/);
+  recorder.onFormatFallback('webm');
+  assert.match(rig.notices.at(-1), /^Recording started\./);
+});
+
 test('a recorder fault reports its reason and stops offering to stop', () => {
   const rig = recordingRig();
   const recorder = rig.attach(fakeRecorder());
