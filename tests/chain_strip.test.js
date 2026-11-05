@@ -59,7 +59,6 @@ async function makeStrip({
     ...documentEvents(),
   });
   const applied = [];
-  const selections = [];
   const announced = [];
   const edits = [];
   const commits = [];
@@ -70,7 +69,6 @@ async function makeStrip({
     catalog,
     announce: (message) => announced.push(message),
     onApply: () => applied.push(store.programShape().map((entry) => entry.instance)),
-    onSelect: (label) => selections.push(label),
     presetId: () => presetId,
     onEditParameter: (parameterId, value) => {
       if (!acceptParameter()) return false;
@@ -84,7 +82,7 @@ async function makeStrip({
     parameterRanges,
   });
   return {
-    store, container, doc, strip, applied, selections, announced, edits, commits,
+    store, container, doc, strip, applied, announced, edits, commits,
   };
 }
 
@@ -329,7 +327,7 @@ test('clicking a chip header toggles its pin and selection', async () => {
   chipByLabel(h, 'warp2').querySelector('.chain-chip-name').dispatch('click');
 
   assert.equal(h.store.selectedLabel(), 'warp2');
-  assert.deepEqual(h.selections, ['warp2']);
+  assert.equal(h.store.selectedLabel(), 'warp2');
   const chip = chipByLabel(h, 'warp2');
   assert.equal(chip.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
   chip.dispatch('mouseleave');
@@ -341,12 +339,12 @@ test('clicking a chip header toggles its pin and selection', async () => {
 
   chipByLabel(h, 'warp2').querySelector('.chain-param-control').dispatch('click');
   assert.equal(h.store.selectedLabel(), 'warp2', 'a click inside the parameters keeps the selection');
-  assert.deepEqual(h.selections, ['warp2']);
+  assert.equal(h.store.selectedLabel(), 'warp2');
   assert.equal(chipByLabel(h, 'warp2').getAttribute('aria-current'), 'true');
 
   chipByLabel(h, 'warp2').dispatch('click');
   assert.equal(h.store.selectedLabel(), null);
-  assert.deepEqual(h.selections, ['warp2', null]);
+  assert.equal(h.store.selectedLabel(), null);
   const collapsed = chipByLabel(h, 'warp2');
   assert.equal(collapsed.classList.contains('chain-chip--expanded'), false);
   assert.equal(collapsed.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'false');
@@ -356,7 +354,7 @@ test('clicking a chip header toggles its pin and selection', async () => {
   assert.equal(collapsed.classList.contains('chain-chip--expanded'), false);
 
   chipByLabel(h, 'camera').dispatch('keydown', { key: 'Enter' });
-  assert.deepEqual(h.selections, ['warp2', null, 'camera']);
+  assert.equal(h.store.selectedLabel(), 'camera');
   chipByLabel(h, 'camera').dispatch('keydown', { key: ' ' });
   assert.equal(h.store.selectedLabel(), null,
     'keyboard activation toggles selection like a click');
@@ -415,7 +413,7 @@ test('× and Delete remove an endomorphism and re-apply the program', async () =
     [['camera', 'project', 'warp2', 'sample', 'colorize', 'modulation']]);
   assert.equal(h.doc.activeElement.dataset.label, 'project',
     'focus lands on the chip that filled the removed slot');
-  assert.deepEqual(h.selections, ['lens', null],
+  assert.equal(h.store.selectedLabel(), null,
     'removing the selected chip clears the published selection');
 
   chipByLabel(h, 'warp2').dispatch('keydown', { key: 'Delete' });
@@ -584,7 +582,7 @@ test('a band + appends while Insert opens the insertion palette after focus', as
   assert.equal(chipByLabel(h, 'lens1').getAttribute('aria-current'), 'true');
   assert.equal(chipByLabel(h, 'lens1')
     .classList.contains('chain-chip--expanded'), true);
-  assert.deepEqual(h.selections, ['lens1']);
+  assert.equal(h.store.selectedLabel(), 'lens1');
   assert.equal(h.applied.length, 1);
 
   chipByLabel(h, 'camera').dispatch('click');
@@ -817,7 +815,7 @@ test('a chip selects by click', async () => {
 
   chipByLabel(h, 'lens').dispatch('click');
   assert.equal(h.store.selectedLabel(), 'lens');
-  assert.deepEqual(h.selections, ['lens'], 'the selection is announced once');
+  assert.equal(h.store.selectedLabel(), 'lens', 'the selection is announced once');
   assert.deepEqual(h.applied, [], 'a selection is no structural edit');
 });
 
@@ -2021,13 +2019,13 @@ test('parameter and header controls keep a tile pinned without selecting it agai
   assert.equal(chipByLabel(h, 'sample'), chip);
   assert.equal(chip.classList.contains('chain-chip--expanded'), true);
   assert.equal(chip.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'true');
-  assert.deepEqual(h.selections, ['sample']);
+  assert.equal(h.store.selectedLabel(), 'sample');
 
   chipByLabel(h, 'camera').dispatch('click');
   chipByLabel(h, 'camera').querySelector('.chain-chip-bypass').dispatch('click');
   assert.equal(chipByLabel(h, 'camera').classList.contains('chain-chip--expanded'), true);
   assert.equal(h.store.selectedLabel(), 'camera');
-  assert.deepEqual(h.selections, ['sample', 'camera']);
+  assert.equal(h.store.selectedLabel(), 'camera');
   const socket = chipByLabel(h, 'project');
   socket.querySelector('.chain-chip-replace').dispatch('click');
   assert.equal(socket.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'false');

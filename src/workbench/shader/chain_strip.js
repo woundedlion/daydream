@@ -98,8 +98,6 @@ const SOCKET_FUNCTIONS = {
  *   status region; refusals report through it, and a committed edit clears it.
  * @param {() => void} options.onApply - Runs after every committed structural
  *   edit, undo/redo and bypass toggle.
- * @param {(label: string|null) => void} [options.onSelect] - Runs when the
- *   selected instance changes.
  * @param {() => string|null} [options.presetId] - The preset the inline stage
  *   controls read and write; null falls back to the document's first.
  * @param {(parameterId: string, value: *) => boolean|void} [options.onEditParameter] -
@@ -114,7 +112,7 @@ const SOCKET_FUNCTIONS = {
  * @returns {Object} The strip.
  */
 export function createChainStrip({
-  doc, container, store, catalog, announce, onApply, onSelect = () => {},
+  doc, container, store, catalog, announce, onApply,
   presetId = () => null, onEditParameter = () => {}, onCommitParameter = () => {},
   bypassAvailable = () => true, parameterLive = () => true,
   parameterRanges = () => [],
@@ -125,8 +123,6 @@ export function createChainStrip({
 
   /** @type {string|null} Roving-tabindex position, by instance label. */
   let focusedLabel = null;
-  /** @type {string|null} The last selection onSelect was told about. */
-  let notifiedSelection = null;
   /** @type {{element: *, anchor: *}|null} */
   let palette = null;
   /** @type {{undo: *, redo: *}|null} The current render's history buttons. */
@@ -189,13 +185,6 @@ export function createChainStrip({
     return false;
   };
 
-  /** Tells the caller when the store's selection has moved. */
-  const notifySelection = () => {
-    const selected = store.selectedLabel();
-    if (selected === notifiedSelection) return;
-    notifiedSelection = selected;
-    onSelect(selected);
-  };
 
   /**
    * Rebuilds the strip after a committed edit, restores focus, and re-applies
@@ -208,7 +197,6 @@ export function createChainStrip({
   const commit = (focusLabel, focusControl = null) => {
     announce('');
     render({ focusLabel, focusControl });
-    notifySelection();
     onApply();
     return true;
   };
@@ -226,7 +214,6 @@ export function createChainStrip({
     if (open) pinnedLabels.add(label);
     else pinnedLabels.delete(label);
     render({ focusLabel: label });
-    notifySelection();
   };
 
   /**
