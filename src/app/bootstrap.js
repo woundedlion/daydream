@@ -31,6 +31,22 @@ export class StaleModuleError extends Error {
   }
 }
 
+/** The application graph did not finish importing before its deadline. */
+export class ModuleImportTimeoutError extends Error {}
+
+/**
+ * Imports the application graph within a deadline, then starts it.
+ * @param {{importModule?: () => Promise<{start: () => unknown}>, timers?: {setTimeout: Function, clearTimeout: Function}, ms?: number}} [options]
+ * @returns {Promise<unknown>} The application's start result.
+ */
+export async function loadApplication({
+  importModule = () => import('./daydream.js'), timers = globalThis, ms = 90000,
+} = {}) {
+  const mod = await raceDeadline(importModule, ms, timers,
+    () => { throw new ModuleImportTimeoutError('The application module import timed out.'); });
+  return mod.start();
+}
+
 // A module fetch failure, across browser wordings. Chrome reports the entry
 // module's URL, so a blocked CDN and a missing same-origin module look alike.
 const MODULE_FETCH_FAILURE = new RegExp([
@@ -144,6 +160,7 @@ export function refreshWithDeadline(refresh, {
 export function bootRemedy(error) {
   const detail = errorDetail(error);
   if (error instanceof StaleModuleError) return STALE_MODULE_REMEDY;
+  if (error instanceof ModuleImportTimeoutError) return VENDOR_REMEDY;
   if (detail.startsWith('SyntaxError')
       || (typeof globalThis.WebAssembly?.LinkError === 'function'
         && error instanceof globalThis.WebAssembly.LinkError)
@@ -243,7 +260,7 @@ export function reportBootFailure(error, {
  * @returns {Promise<boolean>} True when the application module loaded.
  */
 export async function bootstrap({
-  loader = async () => (await import('./daydream.js')).start(),
+  loader = () => loadApplication(),
   document: doc = globalThis.document,
   location: pageLocation = globalThis.location,
   logger = globalThis.console,

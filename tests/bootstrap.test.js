@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import {
-  bootRemedy, bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
+  loadApplication, ModuleImportTimeoutError, bootRemedy, bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
   StaleModuleError, STALE_MODULE_REMEDY, VENDOR_REMEDY, REFRESH_DEADLINE_MS,
 } from '../src/app/bootstrap.js';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
@@ -621,4 +621,21 @@ test('boot failure advice tolerates an absent WebAssembly global', () => {
   } finally {
     globalThis.WebAssembly = wasm;
   }
+});
+
+test('a stalled application import expires with vendor guidance', async () => {
+  let expire;
+  const timers = { setTimeout(callback, ms) { assert.equal(ms, 90000); expire = callback; return 1; }, clearTimeout() {} };
+  const pending = loadApplication({ importModule: () => new Promise(() => {}), timers });
+  expire();
+  await assert.rejects(pending, error => error instanceof ModuleImportTimeoutError
+    && bootRemedy(error) === VENDOR_REMEDY);
+});
+
+test('application start runs after the import deadline is cleared', async () => {
+  let cleared = false;
+  const timers = { setTimeout() { return 1; }, clearTimeout() { cleared = true; } };
+  assert.equal(await loadApplication({ timers,
+    importModule: async () => ({ start() { assert.equal(cleared, true); return 7; } }),
+  }), 7);
 });
