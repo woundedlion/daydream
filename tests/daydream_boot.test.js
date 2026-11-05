@@ -337,7 +337,10 @@ test('the record toggle announces the session and the container it settled on', 
   assert.equal(rig.driver.invalidations, 2, 'the stop brings the PiP back');
   assert.equal(rig.driver.steps, 0, 'recording controls redraw without advancing the effect');
 
+  rig.button.object.record();
+  assert.equal(rig.canvasEl.classList.contains('recording'), true);
   rig.controls.removeOverlay();
+  assert.equal(rig.canvasEl.classList.contains('recording'), false);
   assert.equal(rig.canvasEl.children.length, 0,
     'the overlay belongs to the controls, so the page teardown drops it');
 });

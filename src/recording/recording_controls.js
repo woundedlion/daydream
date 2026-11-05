@@ -200,6 +200,9 @@ export function createRecordingControls({
       }
     },
     /** Drop the duration overlay the controls mounted. @returns {void} */
-    removeOverlay() { durationEl.remove(); },
+    removeOverlay() {
+      doc.getElementById('canvas-container')?.classList.remove('recording');
+      durationEl.remove();
+    },
   };
 }
