@@ -19,6 +19,7 @@ const NOT_CHECKED = new Set([
 // out of scope.
 const SKIP_DIRS = new Set([
   'node_modules', '.git', '.worktrees', 'vendor', 'three.js', 'tests', 'engine', 'engine-bundle',
+  '.claude', 'prompts',
 ]);
 
 /**
