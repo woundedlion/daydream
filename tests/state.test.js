@@ -313,15 +313,16 @@ test('a refused history write does not propagate out of the URL layer', () => {
  * Installs a /sim window on a fake URL timer whose history.replaceState throws
  * while `history.refuse` is set and otherwise records the URL.
  * @param {string} message - Message of the refusal error.
+ * @param {string} [search] - Initial query string.
  * @returns {{history: {refuse: boolean}, timer: ReturnType<typeof fakeUrlTimer>,
  *   written: string[]}} The refusal switch, the timer and the accepted URLs.
  */
-function installRefusingHistoryWindow(message) {
+function installRefusingHistoryWindow(message, search = '') {
   const written = [];
   const history = { refuse: true };
   const timer = fakeUrlTimer();
   installWindow({
-    location: { pathname: '/sim' },
+    location: { pathname: '/sim', search },
     history: {
       replaceState: (state, title, url) => {
         if (history.refuse) throw new Error(message);
@@ -339,6 +340,25 @@ function installRefusingHistoryWindow(message) {
  * it nothing. An ad-hoc GUI param lives only in the buffer: dropping it there
  * would lose the value with nothing left to re-assert it.
  */
+test('URLSync retains pending reset through refusal and abandons it at exhaustion', (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const { history, timer, written } = installRefusingHistoryWindow('rate limit', '?effect=ShapeShifter&fx.speed=9');
+  const sync = new URLSync(new AppState({ effect: 'ShapeShifter' }), ['effect']);
+  sync.reset(['effect']);
+  timer.fire();
+  assert.deepEqual(written, []);
+  history.refuse = false;
+  timer.fire();
+  assert.deepEqual(written, ['/sim?effect=ShapeShifter']);
+
+  history.refuse = true;
+  sync.reset(['effect']);
+  for (let attempt = 0; attempt < URL_FLUSH_MAX_RETRIES; attempt++) timer.fire();
+  const params = new URLSearchParams('effect=ShapeShifter&fx.speed=11');
+  sync.applyPendingReset(params);
+  assert.equal(params.get('fx.speed'), '11');
+});
+
 test('URLSync holds its ad-hoc buffer through a refused history write', () => {
   const { history, timer, written } = installRefusingHistoryWindow('rate limit');
   const captured = installConsoleCapture('warn');
