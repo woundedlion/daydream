@@ -171,6 +171,16 @@ test('a rejected switch off a full-config effect restores it without a replay', 
     + 'acceptedValue');
 });
 
+test('a rejected resolution restores the captured chain snapshot without parameter replay', async () => {
+  const app = makeApp({rejectResolutions: new Set(['Hi']), fullConfigEffects: new Set(['Alpha'])});
+  app.activeEffect.state.Speed = 0.9;
+  app.appState.set('resolution', 'Hi');
+  await Promise.resolve();
+  assert.deepEqual(app.chainRestores, [{snapshot: {chain: 0.9}, effect: 'Alpha'}]);
+  assert.deepEqual(app.paramWrites, []);
+  assert.deepEqual(app.fatals, []);
+});
+
 test('a rejected switch off a per-parameter effect still replays its values', () => {
   const app = makeApp({ rejectEffects: new Set(['Beta']) });
   app.activeEffect.state.Speed = 0.9;
