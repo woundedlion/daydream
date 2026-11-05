@@ -84,7 +84,7 @@ for (const localAppData of [undefined, 'C:/Users/browser-fixture/AppData/Local']
   });
 }
 
-test('font fallback failures are expected but other request failures are not', () => {
+test('font CDN failures are expected but other request failures are not', () => {
   const listeners = new Map();
   const tab = { on: (name, handler) => listeners.set(name, handler) };
   const problems = [];
@@ -134,9 +134,11 @@ test('console errors, uncaught exceptions and error responses are problems', () 
   responded(response(500, `${origin}/tools/shader.html`));
 
   assert.deepEqual(problems, [
+    'console error: Failed to load resource',
     'console error: chip render threw',
     'console error: TypeError: x is undefined',
     'uncaught: boom',
+    `HTTP 404: ${origin}/vendor/fonts/fonts.css`,
     'HTTP 404: https://example.test/favicon.ico',
     `HTTP 500: ${origin}/tools/shader.html`,
   ]);
@@ -164,7 +166,7 @@ for (const prefix of ['/daydream', '/nested/daydream/']) {
       listeners.get('response')({ status: () => 404, url: () => url });
     };
 
-    for (const path of ['vendor/fonts/fonts.css', 'favicon.ico']) {
+    for (const path of ['favicon.ico']) {
       report(new URL(path, base).href);
       report(path);
     }
@@ -172,20 +174,22 @@ for (const prefix of ['/daydream', '/nested/daydream/']) {
     assert.deepEqual(problems, []);
 
     const unexpected = [
+      new URL('vendor/fonts/fonts.css', base).href,
+      'vendor/fonts/fonts.css',
       `${origin}/vendor/fonts/fonts.css`,
       `${origin}/other/vendor/fonts/fonts.css`,
       new URL('other/fonts.css', base).href,
       'https://example.test/daydream/vendor/fonts/fonts.css',
     ];
     for (const url of unexpected) report(url);
-    listeners.get('pageerror')(new Error('font fallback threw'));
+    listeners.get('pageerror')(new Error('font loading threw'));
     assert.deepEqual(problems, [
       ...unexpected.flatMap((url) => [
         `request failed: ${url} (net::ERR_ABORTED)`,
         `console error: Failed to load ${url}`,
         `HTTP 404: ${url}`,
       ]),
-      'uncaught: font fallback threw',
+      'uncaught: font loading threw',
     ]);
   });
 }

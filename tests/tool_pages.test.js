@@ -85,9 +85,7 @@ const scriptsOf = (page) => {
 };
 
 /**
- * The repo stylesheets a page links. The vendored font sheet lives in the
- * gitignored /vendor/ and is absent from a checkout, so only what exists is
- * collected.
+ * The existing repository stylesheets a page links.
  * @param {string} page - Repo-relative page path.
  * @returns {string[][]} Path segments of each stylesheet.
  */
@@ -113,7 +111,7 @@ const SERVED_PAGES = servedPages().map((page) => ({
 const SCRIPT_SRC = {
   'tools/lissajous.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
   'tools/mobius.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
-  'tools/palettes.html': ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"],
+  'tools/palettes.html': ["'self'", "'wasm-unsafe-eval'"],
   'tools/shader.html':
     ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
   'tools/solids.html':
@@ -304,24 +302,16 @@ test('every served page\'s script-src is exactly its committed token list', () =
   }
 });
 
-/**
- * A page tools.css styles has to link the font families it names, or it renders
- * in the system fallback. The vendored stylesheet is gitignored, so on the
- * deploy only the link's onerror swap to the CDN copy loads fonts.
- */
-test('every tool page links the font families tools.css styles for', () => {
+test('every tool page directly links the styled font families', () => {
   for (const name of PAGES) {
     const csp = cspOf(`tools/${name}.html`);
     const fontLink = headOf(pageSrc(name))
-      .match(/<link\b[^>]*href="\.\.\/vendor\/fonts\/fonts\.css"[^>]*>/)?.[0];
+      .match(/<link\b[^>]*href="https:\/\/fonts\.googleapis\.com\/css2[^"]*"[^>]*>/)?.[0];
     assert.ok(fontLink, `${name}.html links no font stylesheet`);
-    assert.match(fontLink,
-      /onerror="this\.onerror=null;this\.href='https:\/\/fonts\.googleapis\.com\/css2\?family=Inter[^']*family=JetBrains\+Mono[^']*'"/,
-      `${name}.html font link carries no CDN onerror fallback, so the deploy renders in the system font`);
-    assert.ok(directive(csp, 'style-src').includes('https://fonts.googleapis.com'),
-      `${name}.html CSP blocks the font stylesheet's CDN fallback`);
-    assert.ok(directive(csp, 'font-src').includes('https://fonts.gstatic.com'),
-      `${name}.html CSP blocks the fallback font files`);
+    assert.match(fontLink, /family=Inter.*family=JetBrains\+Mono/);
+    assert.doesNotMatch(fontLink, /onerror=/);
+    assert.ok(directive(csp, 'style-src').includes('https://fonts.googleapis.com'));
+    assert.ok(directive(csp, 'font-src').includes('https://fonts.gstatic.com'));
   }
 });
 
