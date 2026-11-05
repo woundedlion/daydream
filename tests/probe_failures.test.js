@@ -1,5 +1,4 @@
 import { closeProbeResources, checks, collectProblems, describeProbeFailure, isMain, measureChecks } from '../scripts/probe_harness.mjs';
-import { encodeShaderStateHash } from '../src/workbench/shader/shader_deeplink.js';
 import { feedbackAtClick, probeColorStrip, probeHueWheel, rgbMovedTogether } from '../scripts/palettes-probe.mjs';
 import { readdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
@@ -504,10 +503,21 @@ test('palette and modulation probe reports a family whose controls fail to appea
   for (const broken of [false, true]) {
     let family = 'cycling-generated';
     let stages = [];
-    let bypassed = null;
+    let disabled = null;
+    const amounts = new Map();
     const tab = {
       select: async (selector, value) => { if (selector.includes('palette-type')) family = value; },
-      waitForFunction: async () => {},
+      waitForFunction: async (_callback, _options, label) => {
+        if (label === undefined) return undefined;
+        assert.equal(label, disabled);
+        return {jsonValue: async () => ({
+          document: {descriptor: {chain: stages}},
+          chainSnapshot: {modulation: stages.map((entry) => ({
+            instance: entry.label,
+            recipe: {enabled: entry.label !== disabled, mechanic: {amount: amounts.get(entry.label)}},
+          }))},
+        })};
+      },
       waitForSelector: async () => ({click: async () => {}}),
       $: async (selector) => selector.includes('colorize') || stages.some((entry) => selector.includes(entry.label)) ? {} : null,
       async $eval(selector, callback, ...args) {
@@ -521,8 +531,13 @@ test('palette and modulation probe reports a family whose controls fail to appea
           return;
         }
         const label = selector.match(/data-label="([^"]+)"/)?.[1];
-        if (selector.includes('.chain-modulation-enabled')) bypassed = label;
+        if (selector.includes('.chain-modulation-enabled')) disabled = label;
         if (selector.includes('.chain-chip-remove')) stages = stages.filter((entry) => entry.label !== label);
+        const parameterLabel = selector.match(/data-parameter="([^.]+)\.modulation-amount"/)?.[1];
+        if (selector.includes('.chain-param-value') && parameterLabel) {
+          const input = {value: '', dispatchEvent() { amounts.set(parameterLabel, Number(this.value)); }};
+          return callback(input, ...args);
+        }
         const field = selector.match(/data-parameter="colorize.([^"]+)"/)?.[1];
         const visible = {
           generated: ['palette-harmony'], procedural: ['palette-name'], gradient: ['gradient-start-r'],
@@ -536,12 +551,8 @@ test('palette and modulation probe reports a family whose controls fail to appea
           : stages.map((entry) => ({dataset: {label: entry.label}})));
       },
       async evaluate(callback) {
-        const document = {descriptor: {chain: stages}};
-        if (String(callback).includes('location.hash')) return encodeShaderStateHash({document,
-          preset: 'p', bypassed: [], paused: false, chainSnapshot: {schemaVersion: 5,
-            chain: stages.map(({label, operator}) => ({instance: label, operator})),
-            parameters: [], modulation: stages.map((entry) => ({instance: entry.label, recipe: {enabled: entry.label !== bypassed}})), animationsPaused: false}});
-        if (String(callback).includes('Promise.all')) return JSON.stringify(document);
+        if (String(callback).includes('Promise.all'))
+          return JSON.stringify({descriptor: {chain: stages.filter((entry) => entry.label !== disabled)}});
       },
     };
     const failures = await probePaletteAndModulations(tab);
