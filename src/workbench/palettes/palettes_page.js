@@ -4,10 +4,9 @@
  *
  * Page module for tools/palettes.html.
  */
-import { copyToClipboard, wireCopyBlock } from '../../shared/clipboard.js';
+import { wireCopyBlock } from '../../shared/clipboard.js';
 import { replaceUrl } from '../../shared/url.js';
 import { showFatalError, bootstrapTool } from '../../shared/banner.js';
-import { linearRgbToHex } from '../../shared/color.js';
 import {
   ProceduralPalette, GenerativePalette,
   proceduralPaletteCpp, proceduralParamsForViewport,
@@ -21,8 +20,7 @@ import {
   paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
   PALETTE_CONTROL_IDS,
   PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
-  zoomRecipeWindow, paletteStripView, waveGraphLabel,
-  stripDragIntent,
+  zoomRecipeWindow, waveGraphLabel,
 } from './palette_controls.js';
 import { PaletteRecipeModel } from './palette_recipe_model.js';
 import { mountProceduralSliders } from './procedural_sliders.js';
@@ -32,7 +30,7 @@ import { createHueKeyWheel } from './hue_key_wheel_controller.js';
 import { standDownIfHalted } from '../../shared/engine_halt.js';
 import { wireFlyout } from '../../shared/flyout.js';
 import { createFrameScheduler, onPageTeardown } from '../../shared/page_lifecycle.js';
-import { createPointerDrag, innerRect } from '../../shared/pointer_drag.js';
+import { createStripController } from './strip_controller.js';
 
 let activeTab = 'procedural';
 
@@ -117,10 +115,6 @@ function visiblePhaseRange() {
   if (activeTab === 'procedural') return paletteViewport.value;
   const { offset, span } = (/** @type {GenerativePalette|null} */ (palette))?.canonicalRecipe?.input ?? recipeModel.window;
   return { start: offset, end: offset + span };
-}
-
-function zoomed() {
-  return paletteStripView(visiblePhaseRange()).zoomed;
 }
 
 /** @param {'lightness'|'chroma'} axisName */
@@ -298,15 +292,8 @@ function buildEffectRecipePresets() {
   select.addEventListener('pointerdown', () => { select.value = ''; });
 }
 
-// Drag-to-zoom state
-/** @type {ReturnType<typeof createPointerDrag>|null} */
-let stripDrag = null;
-let isSelectionActive = false; // Tracks if drag is active AND within Y-bounds
-let dragStartPosition = 0.0;
-let dragEndPosition = 0.0;
-/** @type {ReturnType<typeof setTimeout>|null} */
-let copyFeedbackTimer = null;
-let copyRequestId = 0;
+/** @type {ReturnType<typeof createStripController>|null} */
+let stripController = null;
 // DOM elements, resolved in init() once the document has loaded.
 /** @type {HTMLCanvasElement} */
 let waveGraphCanvas;
@@ -332,204 +319,6 @@ let copyFeedbackHex;
 // Owns the strip's offscreen gradient cache; built in init().
 /** @type {ReturnType<typeof createColorStripPainter>|null} */
 let colorStripPainter = null;
-
-/**
- * The normalized (0-1) X coordinate of a pointer event over the strip.
- * @param {PointerEvent} event - Pointer position.
- * @returns {number} The clamped coordinate, or zero when the strip has no width.
- */
-function getNormalizedX(event) {
-  if (!colorStripCanvas) return 0;
-  const rect = innerRect(colorStripCanvas);
-  const x = event.clientX - rect.left;
-  return rect.width > 0 ? Math.max(0, Math.min(1, x / rect.width)) : 0;
-}
-
-/**
- * Handles the start of a drag or click on the color strip.
- * @param {PointerEvent} event
- * @returns {boolean|void}
- */
-function handleDragStart(event) {
-  if (!colorStripCanvas) return false;
-
-  isSelectionActive = true; // Selection is active on start
-  dragStartPosition = getNormalizedX(event);
-  dragEndPosition = dragStartPosition;
-  colorStripCanvas.style.cursor = 'crosshair';
-
-  drawColorStrip();
-}
-
-/**
- * Handles pointer movement during a drag.
- * Cancels selection if the pointer moves above or below the canvas.
- * @param {PointerEvent} event
- */
-function handleDragMove(event) {
-  dragEndPosition = getNormalizedX(event);
-
-  if (colorStripCanvas) {
-    const rect = innerRect(colorStripCanvas);
-    const y = event.clientY;
-    isSelectionActive = y >= rect.top && y <= rect.top + rect.height;
-  }
-
-  drawColorStrip(isSelectionActive
-    ? { start: dragStartPosition, end: dragEndPosition }
-    : null);
-}
-
-/**
- * Handles the end of a drag (zoom) or a simple click (copy color).
- * @param {PointerEvent} event
- */
-function handleDragEnd(event) {
-  if (!colorStripCanvas) return;
-
-  handleDragMove(event);
-
-  const wasSelectionActive = isSelectionActive;
-
-  isSelectionActive = false;
-  colorStripCanvas.style.cursor = 'pointer';
-
-  if (!wasSelectionActive) {
-    drawColorStrip();
-    return;
-  }
-
-  const { intent, start, end } = stripDragIntent(
-    dragStartPosition, dragEndPosition);
-
-  if (intent === 'copy') {
-    drawColorStrip();
-    copyPaletteColor(start, event.clientX, event.clientY)
-      .catch(reportCopyFailure);
-  } else if (activeTab === 'procedural') {
-    paletteViewport.zoom(start, end);
-    redrawForViewport();
-  } else {
-    zoomRecipeWindowControls(start, end);
-  }
-}
-
-function handleDragCancel() {
-  if (!colorStripCanvas) return;
-  isSelectionActive = false;
-  colorStripCanvas.style.cursor = 'pointer';
-  drawColorStrip();
-}
-
-function updateStripView() {
-  if (!colorStripCanvas) return;
-  const view = paletteStripView(visiblePhaseRange());
-  colorStripCanvas.setAttribute('aria-label', view.ariaLabel);
-  if (paletteRangeHeading) paletteRangeHeading.textContent = view.heading;
-}
-
-/** @param {number|undefined} clientX @param {number|undefined} clientY */
-function feedbackPosition(clientX, clientY) {
-  if (Number.isFinite(clientX) && Number.isFinite(clientY)) {
-    return { x: clientX, y: clientY };
-  }
-  const rect = colorStripCanvas.getBoundingClientRect();
-  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-}
-
-/** @param {number} position @param {number} [clientX] @param {number} [clientY] */
-async function copyPaletteColor(position, clientX = undefined, clientY = undefined) {
-  if (!palette || !copyFeedback || !copyFeedbackSwatch
-      || !copyFeedbackStatus || !copyFeedbackHex) return;
-
-  const phase = activeTab === 'procedural'
-    ? paletteViewport.map(position)
-    : position;
-  const [red, green, blue] = palette.get(phase);
-  const hex = linearRgbToHex(red, green, blue);
-  const { x, y } = feedbackPosition(clientX, clientY);
-  copyFeedbackSwatch.style.backgroundColor = hex;
-  copyFeedbackHex.textContent = hex;
-  copyFeedbackStatus.textContent = 'Copying';
-  copyFeedback.style.left = `${x}px`;
-  copyFeedback.style.top = `${y}px`;
-  if (copyFeedbackTimer !== null) {
-    clearTimeout(copyFeedbackTimer);
-    copyFeedbackTimer = null;
-  }
-  copyFeedback.classList.add('is-visible');
-
-  const requestId = ++copyRequestId;
-  const copied = await copyToClipboard(hex);
-  if (requestId !== copyRequestId) return;
-  copyFeedbackStatus.textContent = copied ? 'Copied' : 'Copy failed';
-  dismissCopyFeedbackLater();
-}
-
-/** Fades the copy feedback out after the message has had time to read. */
-function dismissCopyFeedbackLater() {
-  if (copyFeedbackTimer !== null) clearTimeout(copyFeedbackTimer);
-  copyFeedbackTimer = setTimeout(() => {
-    copyFeedback.classList.remove('is-visible');
-    copyFeedbackTimer = null;
-  }, 1300);
-}
-
-/**
- * Resolves a copy that threw. The bubble reads 'Copying' from the moment the
- * attempt starts, so an unreported rejection would strand it there.
- * @param {any} error - The rejection.
- * @returns {void}
- */
-function reportCopyFailure(error) {
-  console.error(error);
-  if (!copyFeedback || !copyFeedbackStatus) return;
-  copyFeedbackStatus.textContent = 'Copy failed';
-  dismissCopyFeedbackLater();
-}
-
-function zoomAroundCenter() {
-  if (activeTab === 'procedural') {
-    paletteViewport.zoom(0.4, 0.6);
-    redrawForViewport();
-  } else {
-    zoomRecipeWindowControls(0.4, 0.6);
-  }
-}
-
-/** @param {KeyboardEvent} event */
-function handleStripKeyDown(event) {
-  if ((event.key === 'Enter' || event.key === ' ') && !event.shiftKey) {
-    copyPaletteColor(0.5).catch(reportCopyFailure);
-  } else if (event.key === 'ArrowLeft' && event.shiftKey) {
-    handleResetZoom();
-  } else if (event.key === 'ArrowRight' && event.shiftKey) {
-    zoomAroundCenter();
-  } else {
-    return;
-  }
-  event.preventDefault();
-}
-
-function handleResetZoom() {
-  if (!zoomed()) return;
-  if (activeTab === 'procedural') {
-    paletteViewport.reset();
-    redrawForViewport();
-  } else {
-    recipeModel.setWindow(0, 1);
-    renderRecipeWindow();
-    scheduleUpdate();
-  }
-}
-
-function syncResetZoomButton() {
-  if (resetZoomButton) {
-    const hidden = !zoomed();
-    if (hidden && document.activeElement === resetZoomButton) colorStripCanvas.focus();
-    resetZoomButton.classList.toggle('hidden', hidden);
-  }
-}
 
 /** @param {{start:number,end:number}|null} selectionRange */
 function drawColorStrip(selectionRange = null) {
@@ -563,9 +352,9 @@ function redrawForViewport() {
   drawPaletteWaveGraph();
   if (activeTab === 'generative' && (/** @type {GenerativePalette|null} */ (palette))?.canonicalRecipe)
     (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).draw(/** @type {import('./palette_controls.js').PaletteRecipe} */ ((/** @type {GenerativePalette} */ (palette)).canonicalRecipe));
-  updateStripView();
+  stripController?.updateView();
   updatePaletteCodeOutput();
-  syncResetZoomButton();
+  stripController?.syncResetZoom();
 }
 
 
@@ -593,8 +382,8 @@ function updatePaletteCodeOutput() {
 function loadNamedPalette(entry) {
   (/** @type {NonNullable<typeof proceduralSliders>} */ (proceduralSliders)).setAll(proceduralPaletteParams(entry));
   paletteViewport.reset();
-  syncResetZoomButton();
-  updateStripView();
+  stripController?.syncResetZoom();
+  stripController?.updateView();
   updatePalette();
 }
 
@@ -659,8 +448,8 @@ function updatePalette() {
   if (activeTab === 'generative')
     (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).draw(/** @type {import('./palette_controls.js').PaletteRecipe} */ ((/** @type {GenerativePalette} */ (palette)).canonicalRecipe));
   drawColorStrip();
-  updateStripView();
-  syncResetZoomButton();
+  stripController?.updateView();
+  stripController?.syncResetZoom();
 
   updatePaletteCodeOutput();
 }
@@ -817,19 +606,11 @@ async function init() {
   window.addEventListener('resize', scheduleViewportRedraw);
 
 
-  stripDrag = createPointerDrag({
-    element: colorStripCanvas,
-    onStart: handleDragStart,
-    onMove: handleDragMove,
-    onEnd: /** @type {(event: PointerEvent|null) => void} */ (handleDragEnd),
-    onCancel: handleDragCancel,
-  });
-  colorStripCanvas.addEventListener('keydown', handleStripKeyDown);
-  updateStripView();
-
-  if (resetZoomButton) {
-    resetZoomButton.addEventListener('click', handleResetZoom);
-  }
+  stripController = createStripController({canvas: colorStripCanvas, viewport: paletteViewport,
+    model: recipeModel, getTab: () => activeTab, getPalette: () => palette, visiblePhaseRange,
+    drawColorStrip, redrawForViewport, zoomRecipeWindowControls, renderRecipeWindow, scheduleUpdate,
+    resetZoomButton, paletteRangeHeading,
+    feedback: {root: copyFeedback, swatch: copyFeedbackSwatch, status: copyFeedbackStatus, hex: copyFeedbackHex}});
 
   onPageTeardown(wireCopyBlock({
     source: /** @type {HTMLElement} */ (document.getElementById('palette_code_output')),
@@ -846,14 +627,11 @@ async function init() {
   onPageTeardown(() => {
     scheduleUpdate.cancel();
     scheduleViewportRedraw.cancel();
-    copyRequestId += 1;
-    if (copyFeedbackTimer !== null) clearTimeout(copyFeedbackTimer);
     (/** @type {NonNullable<typeof proceduralSliders>} */ (proceduralSliders)).dispose();
     teardownExportFlyout();
     baseHueSlider.removeEventListener('keydown', (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).onBaseHueKeyDown);
     window.removeEventListener('resize', scheduleViewportRedraw);
-    (/** @type {NonNullable<typeof stripDrag>} */ (stripDrag)).remove();
-    colorStripCanvas.removeEventListener('keydown', handleStripKeyDown);
+    stripController?.dispose();
     (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).dispose();
     setPaletteOps(null);
     if (wasmModule?.HS_MODULE_DEAD !== true)
