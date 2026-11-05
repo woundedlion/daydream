@@ -184,16 +184,14 @@ test('proceduralParamsForViewport reparameterizes the exported phase window', ()
 });
 
 test('the reparameterized palette samples the window it stands for', () => {
-  const fromParams = (p) => new ProceduralPalette(
-    [p.A_R, p.A_G, p.A_B], [p.B_R, p.B_G, p.B_B],
-    [p.C_R, p.C_G, p.C_B], [p.D_R, p.D_G, p.D_B]);
+
   const viewport = { start: 0.2, end: 0.6 };
   const span = viewport.end - viewport.start;
 
   for (const entry of NAMED_PROCEDURAL_PALETTES) {
     const parameters = proceduralPaletteParams(entry);
-    const full = fromParams(parameters);
-    const windowed = fromParams(proceduralParamsForViewport(parameters, viewport));
+    const full = ProceduralPalette.fromParams(parameters);
+    const windowed = ProceduralPalette.fromParams(proceduralParamsForViewport(parameters, viewport));
     for (let step = 0; step <= 8; step++) {
       const position = step / 8;
       const inWindow = full.getChannelValues(viewport.start + position * span);

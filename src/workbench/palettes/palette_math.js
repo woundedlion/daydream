@@ -102,6 +102,13 @@ export class ProceduralPalette {
     this.d = [...d];
   }
 
+  /** @param {ProceduralParams} params @returns {ProceduralPalette} */
+  static fromParams(params) {
+    return new ProceduralPalette(
+      [params.A_R, params.A_G, params.A_B], [params.B_R, params.B_G, params.B_B],
+      [params.C_R, params.C_G, params.C_B], [params.D_R, params.D_G, params.D_B]);
+  }
+
   /**
    * Calculates the linearized color vector (R, G, B) for a time parameter t.
    * @param {number} t - Time parameter in [0, 1].
@@ -111,11 +118,11 @@ export class ProceduralPalette {
    *   device's interpolated 16-bit-linear LUT by up to ~1 LSB per channel.
    */
   get(t) {
-    const r = Math.max(0, Math.min(1, this.a[0] + this.b[0] * fastCos(TWO_PI * (this.c[0] * t + this.d[0]))));
-    const g = Math.max(0, Math.min(1, this.a[1] + this.b[1] * fastCos(TWO_PI * (this.c[1] * t + this.d[1]))));
-    const b = Math.max(0, Math.min(1, this.a[2] + this.b[2] * fastCos(TWO_PI * (this.c[2] * t + this.d[2]))));
-
-    return [srgbToLinearFloat(r), srgbToLinearFloat(g), srgbToLinearFloat(b)];
+    const channels = this.getChannelValues(t);
+    for (let i = 0; i < channels.length; i++) {
+      channels[i] = srgbToLinearFloat(Math.max(0, Math.min(1, channels[i])));
+    }
+    return channels;
   }
 
   /**

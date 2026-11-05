@@ -547,11 +547,7 @@ function drawPaletteWaveGraph() {
   let plotted = palette;
   if (activeTab === 'procedural') {
     const view = proceduralParamsForViewport((/** @type {NonNullable<typeof proceduralSliders>} */ (proceduralSliders)).values(), paletteViewport.value);
-    plotted = new ProceduralPalette(
-      [view.A_R, view.A_G, view.A_B],
-      [view.B_R, view.B_G, view.B_B],
-      [view.C_R, view.C_G, view.C_B],
-      [view.D_R, view.D_G, view.D_B]);
+    plotted = ProceduralPalette.fromParams(view);
   }
   if (!plotted) return;
   drawWaveGraph({ canvas: waveGraphCanvas,
@@ -639,11 +635,7 @@ function updatePalette() {
   if (engineHalted) return;
   if (activeTab === 'procedural') {
     const parameters = (/** @type {NonNullable<typeof proceduralSliders>} */ (proceduralSliders)).values();
-    const A = [parameters.A_R, parameters.A_G, parameters.A_B];
-    const B = [parameters.B_R, parameters.B_G, parameters.B_B];
-    const C = [parameters.C_R, parameters.C_G, parameters.C_B];
-    const D = [parameters.D_R, parameters.D_G, parameters.D_B];
-    palette = new ProceduralPalette(A, B, C, D);
+    palette = ProceduralPalette.fromParams(parameters);
   } else {
     try {
       palette = new GenerativePalette(/** @type {import('./palette_controls.js').PaletteRecipe} */ (recipeModel.recipe()));
