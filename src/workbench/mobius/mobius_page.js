@@ -265,10 +265,11 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
   const dotElement = makeDiv('complex-plane-dot', dotId);
   inner.append(makeDiv('axis-h'), makeDiv('axis-v'), dotElement);
 
+  const axisKeyShortcuts = 'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Home';
   const reElement = makeAxis(reId, `Parameter ${id} real part`,
-    'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Home', false);
+    axisKeyShortcuts, false);
   const imElement = makeAxis(imId, `Parameter ${id} imaginary part`,
-    'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Home', true);
+    axisKeyShortcuts, true);
   planeElement.append(inner, reElement, imElement);
 
   const labelElement = makeDiv('complex-plane-label', labelId);
@@ -306,30 +307,28 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
 
   uiUpdaters[id] = updateUI;
 
+  const clampSnap = (value, threshold = undefined) =>
+    snapCoefficientComponent(Math.max(-maxExtent, Math.min(maxExtent, value)), threshold);
+  const commit = (re, im) => {
+    if (activePreset) stopAnimation();
+    paramObj.re = re;
+    paramObj.im = im;
+    updateUI();
+    onChange();
+  };
+
   const handleInput = (clientX, clientY) => {
     // The dot rides .complex-plane-inner, which spans the pad's padding box,
     // not the border box getBoundingClientRect() reports.
     const rect = innerRect(planeElement);
     if (rect.width <= 0 || rect.height <= 0) return;
-    if (activePreset) stopAnimation();
-
     const width = rect.width;
     const height = rect.height;
-    let x = clientX - rect.left;
-    let y = clientY - rect.top;
-    let nx = (x / width) * 2 - 1;
-    let ny = -((y / height) * 2 - 1);
-    let re = nx * maxExtent;
-    let im = ny * maxExtent;
-    re = Math.max(-maxExtent, Math.min(maxExtent, re));
-    im = Math.max(-maxExtent, Math.min(maxExtent, im));
-    re = snapCoefficientComponent(re);
-    im = snapCoefficientComponent(im);
-
-    paramObj.re = re;
-    paramObj.im = im;
-    updateUI();
-    onChange();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const nx = (x / width) * 2 - 1;
+    const ny = -((y / height) * 2 - 1);
+    commit(clampSnap(nx * maxExtent), clampSnap(ny * maxExtent));
   };
 
   // The plane carries touch-action: none, which is what stops the page
@@ -351,8 +350,7 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
 
   // Keyboard equivalent of dragging the dot: a handle's arrows nudge its own
   // part, decreasing on Left/Down and increasing on Right/Up (Shift for a
-  // coarser step); Home recenters to the origin. Mirrors handleInput's
-  // stop-animation / clamp / snap / notify sequence.
+  // coarser step); Home recenters to the origin.
   const onAxisKeyDown = (axis) => (e) => {
     const step = e.shiftKey ? 0.2 : 0.05;
     let delta = 0;
@@ -363,7 +361,6 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
       default: return;
     }
     e.preventDefault();
-    if (activePreset) stopAnimation();
     const home = e.key === 'Home';
     let re = paramObj.re;
     let im = paramObj.im;
@@ -371,14 +368,11 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
       re = 0;
       im = 0;
     } else if (axis === 're') {
-      re = snapCoefficientComponent(Math.max(-maxExtent, Math.min(maxExtent, re + delta)), step / 4);
+      re = clampSnap(re + delta, step / 4);
     } else {
-      im = snapCoefficientComponent(Math.max(-maxExtent, Math.min(maxExtent, im + delta)), step / 4);
+      im = clampSnap(im + delta, step / 4);
     }
-    paramObj.re = re;
-    paramObj.im = im;
-    updateUI();
-    onChange();
+    commit(re, im);
   };
 
   const reKeyDown = onAxisKeyDown('re');
