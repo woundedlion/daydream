@@ -1818,14 +1818,14 @@ test('retired chain operators are absent and refuse without changing the live pr
   }
 });
 
-test('generated effect identities install canonical and legacy IDs with the same preset keys', () => {
+test('generated effect identities install canonical IDs and display names with the same preset keys', () => {
   assert.deepEqual(engine.getEffectIdentities(), EFFECT_IDENTITIES);
   const ids = new Set();
   for (const row of EFFECT_IDENTITIES) {
     assert.match(row.id, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     assert.equal(ids.has(row.id), false);
     ids.add(row.id);
-    for (const request of [row.id, row.display_name, ...row.legacy_ids]) {
+    for (const request of [row.id, row.display_name]) {
       assert.equal(engine.setEffect(request), M.EffectSetResult.INSTALLED, request);
       assert.deepEqual(engine.getPresetIds(), (() => {
         engine.setEffect(row.id);

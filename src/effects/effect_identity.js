@@ -8,7 +8,7 @@ import { EFFECT_IDENTITIES } from '../../generated/engine_contract.mjs';
 
 const identities = new Map(EFFECT_IDENTITIES.map((identity) => [identity.id, identity]));
 const aliases = new Map(EFFECT_IDENTITIES.flatMap((identity) =>
-  [identity.id, identity.display_name, ...identity.legacy_ids].map((name) => [name, identity.id])));
+  [identity.id, identity.display_name].map((name) => [name, identity.id])));
 
 /** @param {string} name @returns {string} Canonical engine ID, or the unknown input. */
 export function canonicalEffectId(name) {
