@@ -95,50 +95,69 @@ test('GitHub API supports public reads, authenticated writes and surfaces HTTP e
   await assert.rejects(githubApi('', async () => ({ ok: false, status: 403 }))('denied'), /HTTP 403/);
 });
 
-test('resolve skips an already deployed pair and final checks reject either advancing head', async (t) => {
+function commandFixture(t) {
   const root = scratchDir(t, 'deployment-pair-');
-  const env = { GITHUB_REPOSITORY: repo, GITHUB_SHA: pair.daydream, GITHUB_OUTPUT: join(root, 'outputs'), PAIR_FILE: join(root, 'pair.json') };
+  const env = {GITHUB_REPOSITORY: repo, GITHUB_SHA: pair.daydream,
+    GITHUB_OUTPUT: join(root, 'outputs'), PAIR_FILE: join(root, 'pair.json')};
   const api = async (path) => {
-    if (path.includes('statuses')) return [{ state: 'success' }];
-    if (path.includes('deployments')) return [{ id: 42, payload: pair }];
+    if (path.includes('statuses')) return [{state: 'success'}];
+    if (path.includes('deployments')) return [{id: 42, payload: pair}];
     return heads(path);
   };
+  writeFileSync(env.PAIR_FILE, JSON.stringify(pair));
+  return {env, api};
+}
+
+test('resolve skips deployed pairs, honors force and rejects stale source heads', async (t) => {
+  const {env, api} = commandFixture(t);
   await run('resolve', env, api);
   assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /deploy=false/);
   assert.deepEqual(JSON.parse(readFileSync(env.PAIR_FILE)), pair);
   writeFileSync(env.GITHUB_OUTPUT, '');
-  await run('resolve', { ...env, GITHUB_EVENT_NAME: 'workflow_dispatch', FORCE_DEPLOY: 'true' }, api);
+  await run('resolve', {...env, GITHUB_EVENT_NAME: 'workflow_dispatch', FORCE_DEPLOY: 'true'}, api);
   assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /deploy=true/);
   writeFileSync(env.GITHUB_OUTPUT, '');
-  await run('resolve', { ...env, GITHUB_EVENT_NAME: 'schedule' }, async (path) => {
-    if (path.includes('statuses')) return [{ state: 'failure' }];
+  await run('resolve', {...env, GITHUB_EVENT_NAME: 'schedule'}, async (path) => {
+    if (path.includes('statuses')) return [{state: 'failure'}];
     return api(path);
   });
   assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /deploy=false/);
-  await run('check', env, heads);
-  assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /current=true/);
-  for (const moved of ['daydream', 'holosphere']) {
-    writeFileSync(env.GITHUB_OUTPUT, '');
-    await run('check', env, async (path) => ({ sha: path.includes(moved === 'holosphere' ? 'woundedlion/pov' : repo)
-      ? 'c'.repeat(40) : (await heads(path)).sha }));
-    assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /current=false/);
-  }
   writeFileSync(env.GITHUB_OUTPUT, '');
   await run('resolve', env, async (path) => path.includes('deployments') ? [] : heads(path));
   assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /deploy=true/);
   writeFileSync(env.GITHUB_OUTPUT, '');
-  await run('resolve', { ...env, GITHUB_SHA: 'd'.repeat(40) }, async (path) => path.includes('deployments') ? [] : heads(path));
+  await run('resolve', {...env, GITHUB_SHA: 'd'.repeat(40)}, async (path) => path.includes('deployments') ? [] : heads(path));
   assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /deploy=false/);
+});
+
+test('check accepts the selected pair and rejects either advancing head', async (t) => {
+  const {env} = commandFixture(t);
+  await run('check', env, heads);
+  assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /current=true/);
+  for (const moved of ['daydream', 'holosphere']) {
+    writeFileSync(env.GITHUB_OUTPUT, '');
+    await run('check', env, async (path) => ({sha: path.includes(moved === 'holosphere' ? 'woundedlion/pov' : repo)
+      ? 'c'.repeat(40) : (await heads(path)).sha}));
+    assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /current=false/);
+  }
+});
+
+test('record and attempt publish their success and pending statuses', async (t) => {
+  const {env} = commandFixture(t);
   const calls = [];
-  await run('record', { ...env, GITHUB_SERVER_URL: 'https://github.com', GITHUB_RUN_ID: '5' }, async (...args) => {
-    calls.push(args); return { id: 42 };
+  await run('record', {...env, GITHUB_SERVER_URL: 'https://github.com', GITHUB_RUN_ID: '5'}, async (...args) => {
+    calls.push(args); return {id: 42};
   });
   assert.equal(calls[1][1].log_url, 'https://github.com/example/daydream/actions/runs/5');
   calls.length = 0;
-  await run('attempt', { ...env, GITHUB_SERVER_URL: 's', GITHUB_RUN_ID: '1' }, async (...args) => {
-    calls.push(args); return { id: 42 };
+  await run('attempt', {...env, GITHUB_SERVER_URL: 's', GITHUB_RUN_ID: '1'}, async (...args) => {
+    calls.push(args); return {id: 42};
   });
   assert.equal(calls[1][1].state, 'pending');
+});
+
+test('command arguments reject unknown commands and missing repositories', async (t) => {
+  const {env, api} = commandFixture(t);
   await assert.rejects(run('bad', env, api), /Unknown deployment/);
   await assert.rejects(run('resolve', {}, api), /Missing repository/);
 });
