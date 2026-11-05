@@ -381,13 +381,13 @@ test('PaletteOps compiles deterministic V4 recipe LUTs', () => {
   let baked;
   try {
     const first = ops.compileAndBakeV4(recipe);
+    baked = Uint8Array.from(first.lut);
     const second = ops.compileAndBakeV4(recipe);
     assert.equal(first.status.code, M.PaletteCompileCode.OK);
-    baked = Uint8Array.from(first.lut);
     assert.equal(first.canonicalRecipe.schemaVersion, 4);
     assert.equal('keyCount' in first.canonicalRecipe, false);
     assert.equal(first.lut.length, 256 * 3);
-    assert.deepEqual(Uint8Array.from(second.lut), Uint8Array.from(first.lut));
+    assert.deepEqual(Uint8Array.from(second.lut), baked);
   } finally {
     ops.delete();
   }
@@ -568,9 +568,14 @@ test('browser GenerativePalette owns the real bridge result', () => {
     const recipe = defaultPaletteRecipe();
     recipe.hue.baseTurns = 0.37;
     const direct = ops.compileAndBakeV4(recipe);
+    const baked = Uint8Array.from(direct.lut);
     const palette = new P.GenerativePalette(recipe);
-    assert.deepEqual(palette.lut, Uint8Array.from(direct.lut));
+    assert.deepEqual(palette.lut, baked);
     assert.deepEqual(palette.canonicalRecipe, direct.canonicalRecipe);
+    recipe.hue.baseTurns = 0.7;
+    const changed = ops.compileAndBakeV4(recipe);
+    assert.notDeepEqual(Uint8Array.from(changed.lut), palette.lut);
+    assert.deepEqual(palette.lut, baked);
   } finally {
     P.setPaletteOps(null);
     ops.delete();
