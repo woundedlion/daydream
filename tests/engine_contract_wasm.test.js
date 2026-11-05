@@ -1741,6 +1741,18 @@ test('registry export rejects oversized intermediate primitive endpoints', async
   });
 });
 
+test('whole-generated registry chains skip bridge budgets but retain endpoint budgets', async () => {
+  const validator = createChainValidator(() => createHolosphereModule({print: sink, printErr: sink}));
+  await assert.doesNotReject(validateRegistryFaces(validator, {
+    name: 'Whole', base: 'truncatedIcosidodecahedron',
+    ops: ['kis', {op: 'expand', params: {t: 0.5}}, 'dual'],
+  }));
+  await assert.rejects(validateRegistryFaces(validator, {
+    name: 'Oversized', base: 'truncatedIcosahedron',
+    ops: [{op: 'expand', params: {t: 0.5}}, 'kis', 'kis', 'kis'],
+  }), /endpoint has .* faces/);
+});
+
 test('registry validation expands composite and flattened base recipes', async (t) => {
   const validator = createChainValidator(() => createHolosphereModule({ print: sink, printErr: sink }));
   const module = await validator.acquire();

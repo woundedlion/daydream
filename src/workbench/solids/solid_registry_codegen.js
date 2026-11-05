@@ -25,6 +25,7 @@ import {
   opParams,
   requireParams,
   snakeIdentifier,
+  unsweepableReason,
 } from './solid_codegen.js';
 import { engineHalted } from '../../shared/engine_halt.js';
 import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns } from '../../shared/cpp_format.js';
@@ -89,6 +90,7 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
         const name = typeof op === 'string' ? op : op.op;
         return LOWERING[name]?.(op) ?? [op];
       });
+      const swept = primitives.every((primitive) => !unsweepableReason(primitive));
       let previousName = '';
       for (const [index, primitive] of primitives.entries()) {
         const name = typeof primitive === 'string' ? primitive : primitive.op;
@@ -115,7 +117,7 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
         mesh.delete();
         mesh = next;
         check();
-        if (bridgeFaces > MAX_BUILD_FACES)
+        if (swept && bridgeFaces > MAX_BUILD_FACES)
           throw new Error(`Registry bridge has ${bridgeFaces} faces; maximum is ${MAX_BUILD_FACES}`);
         previousName = name;
       }
