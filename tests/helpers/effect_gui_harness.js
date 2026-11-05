@@ -26,94 +26,101 @@ export function chainSnapshotParams() {
   ];
 }
 
+function groupedParams(groups) {
+  return groups.flatMap(([group, names]) => names.map(name =>
+    ({name, group, value: 0.5, min: 0, max: 1, animated: true})));
+}
+
 export function kaleidoscopeMeltParams() {
-  return [
-    'Cell Scale',
-    'Cell Shape',
-    'Cell Softness',
-    'Cell Radius',
-    'Central Meridian',
-    'Projection Spin Speed',
-    'Projection Wander',
-    'Camera Wander',
-    'Surface Noise Scale',
-    'Surface Noise Strength',
-    'Surface Noise Speed',
-    'Palette Chroma',
-    'Palette Mapping',
-    'Mapping Frequency',
-    'Mapping Phase',
-    'Phase Oscillation Depth',
-    'Phase Oscillation Speed',
-    'Brightness Bottom',
-    'Brightness Top',
-    'Opacity at Value 0',
-    'Opacity at Value 1',
-    'Hue Shift Amount',
-    'Hue Noise Scale',
-    'Hue Noise Speed',
-  ].map((name, i) => {
-    const groups = [
-      {name: 'Function', title: 'Tessellation', order: 7},
-      {name: 'Projection', title: 'Equirectangular', order: 4},
-      {name: 'Projection Frame', title: 'Spin + Wander', order: 3},
-      {name: 'Camera', title: 'Camera', order: 0},
-      {name: 'Surface Noise', title: 'Curl', order: 2},
-      {name: 'Colorize', title: 'Generated Analogous', order: 10},
-    ];
-    const index = i < 4 ? 0 : i === 4 ? 1 : i < 7 ? 2 : i === 7 ? 3 : i < 11 ? 4 : 5;
-    return { name, group: groups[index], value: 0.5, min: 0, max: 1, animated: true };
-  });
+  return groupedParams([
+    [{name: 'Function', title: 'Tessellation', order: 7}, [
+      'Cell Scale',
+      'Cell Shape',
+      'Cell Softness',
+      'Cell Radius',
+    ]],
+    [{name: 'Projection', title: 'Equirectangular', order: 4}, [
+      'Central Meridian',
+    ]],
+    [{name: 'Projection Frame', title: 'Spin + Wander', order: 3}, [
+      'Projection Spin Speed',
+      'Projection Wander',
+    ]],
+    [{name: 'Camera', title: 'Camera', order: 0}, [
+      'Camera Wander',
+    ]],
+    [{name: 'Surface Noise', title: 'Curl', order: 2}, [
+      'Surface Noise Scale',
+      'Surface Noise Strength',
+      'Surface Noise Speed',
+    ]],
+    [{name: 'Colorize', title: 'Generated Analogous', order: 10}, [
+      'Palette Chroma',
+      'Palette Mapping',
+      'Mapping Frequency',
+      'Mapping Phase',
+      'Phase Oscillation Depth',
+      'Phase Oscillation Speed',
+      'Brightness Bottom',
+      'Brightness Top',
+      'Opacity at Value 0',
+      'Opacity at Value 1',
+      'Hue Shift Amount',
+      'Hue Noise Scale',
+      'Hue Noise Speed',
+    ]],
+  ]);
 }
 
 export function kaleidoscopeSmoothParams() {
-  return [
-    'Pattern Freq',
-    'Speed',
-    'Complexity',
-    'Pattern Mix',
-    'Singularity Fade',
-    'Projection Spin Speed',
-    'Projection Wander',
-    'Camera Wander',
-    'Planar Warp 2 Speed',
-    'Mirror Rotation',
-    'Mirror Cell X',
-    'Mirror Cell Y',
-    'Mirror Offset X',
-    'Mirror Offset Y',
-    'Planar Warp Speed',
-    'Affine Rotation Rate',
-    'Repeat Windings A',
-    'Repeat Windings B',
-    'Affine Scale X',
-    'Affine Scale Y',
-    'Affine Shear',
-    'Repeat Cells',
-    'Fallback Lattice Period',
-    'Palette Chroma',
-    'Palette Mapping',
-    'Mapping Frequency',
-    'Mapping Phase',
-    'Phase Oscillation Depth',
-    'Phase Oscillation Speed',
-    'Opacity at Value 0',
-    'Opacity at Value 1',
-    'Hue Shift Amount',
-    'Hue Noise Scale',
-    'Hue Noise Speed',
-  ].map((name, i) => {
-    const groups = [
-      {name: 'Function', title: 'Grid', order: 7},
-      {name: 'Projection', title: 'Stereographic', order: 4},
-      {name: 'Projection Frame', title: 'Spin + Wander', order: 3},
-      {name: 'Camera', title: 'Camera', order: 0},
-      {name: 'Planar Warp 2', title: 'Mirror + Affine', order: 6},
-      {name: 'Colorize', title: 'Generated Analogous', order: 10},
-    ];
-    const index = i < 4 ? 0 : i === 4 ? 1 : i < 7 ? 2 : i === 7 ? 3 : i < 23 ? 4 : 5;
-    return { name, group: groups[index], value: 0.5, min: 0, max: 1, animated: true };
-  });
+  return groupedParams([
+    [{name: 'Function', title: 'Grid', order: 7}, [
+      'Pattern Freq',
+      'Speed',
+      'Complexity',
+      'Pattern Mix',
+    ]],
+    [{name: 'Projection', title: 'Stereographic', order: 4}, [
+      'Singularity Fade',
+    ]],
+    [{name: 'Projection Frame', title: 'Spin + Wander', order: 3}, [
+      'Projection Spin Speed',
+      'Projection Wander',
+    ]],
+    [{name: 'Camera', title: 'Camera', order: 0}, [
+      'Camera Wander',
+    ]],
+    [{name: 'Planar Warp 2', title: 'Mirror + Affine', order: 6}, [
+      'Planar Warp 2 Speed',
+      'Mirror Rotation',
+      'Mirror Cell X',
+      'Mirror Cell Y',
+      'Mirror Offset X',
+      'Mirror Offset Y',
+      'Planar Warp Speed',
+      'Affine Rotation Rate',
+      'Repeat Windings A',
+      'Repeat Windings B',
+      'Affine Scale X',
+      'Affine Scale Y',
+      'Affine Shear',
+      'Repeat Cells',
+      'Fallback Lattice Period',
+    ]],
+    [{name: 'Colorize', title: 'Generated Analogous', order: 10}, [
+      'Palette Chroma',
+      'Palette Mapping',
+      'Mapping Frequency',
+      'Mapping Phase',
+      'Phase Oscillation Depth',
+      'Phase Oscillation Speed',
+      'Opacity at Value 0',
+      'Opacity at Value 1',
+      'Hue Shift Amount',
+      'Hue Noise Scale',
+      'Hue Noise Speed',
+    ]],
+  ]);
 }
 
 /**
