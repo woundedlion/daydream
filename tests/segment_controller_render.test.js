@@ -248,6 +248,27 @@ test('a generation published while paused composites without another tick', asyn
   }
 });
 
+test('a paused active pool renders and publishes as soon as every worker is ready', async () => {
+  setDisplayGrid(4, 2);
+  const c = makeController();
+  c.active = true;
+  driver.paused = true;
+  try {
+    c.create(2);
+    deliverReady(c, 0);
+    assert.equal(c.workers[0].posted.some(message => message.type === 'render'), false);
+    deliverReady(c, 1);
+    assert.ok(c.workers.every(worker => worker.posted.some(message => message.type === 'render')));
+    await deliverGeneration(c, gridHalves(333));
+    assert.equal(driver.pixels[idx(1, 0, 4)], 333);
+    assert.equal(driver.pixels[idx(3, 0, 4)], 333);
+    assert.equal(c.hasPublishedFrame(), true);
+    assert.equal(driver.invalidations, 1);
+  } finally {
+    driver.paused = false;
+  }
+});
+
 test('the boundary setter re-composites and invalidates a paused held generation', async () => {
   setDisplayGrid(4, 2);
 

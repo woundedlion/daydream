@@ -573,6 +573,7 @@ export class SegmentController {
           this.faultedRebuilds = 0;
           this.clearTimers('bootWatchdog', 'initWatchdog');
           console.log(`[Segmented] All ${numSegments} workers ready`);
+          if (this.driver.paused && this.active) this.tick();
         }
       } else if (msg.type === 'booted') {
         if (msg.version !== PROTOCOL_VERSION) {
