@@ -318,9 +318,9 @@ test('compiled modulation fields use exact resources and retain readonly values'
     return ParamSetResult.APPLIED;
   };
   const compiled = {document: {
-    descriptor: {chain: [{label: 'modulation', resource_key: 'ink', operator: 'color.modulate.v1'}]},
+    descriptor: {chain: [{label: 'ink', operator: 'color.modulate.v1'}]},
     preset_bank: {presets: [{preset_id: 'one', values: {
-      'modulation.grid-axis-b-x': 0.3, 'modulation.pattern-scale': 2,
+      'ink.grid-axis-b-x': 0.3, 'ink.pattern-scale': 2,
     }}]},
   }};
   const apply = () => applyFixedShaderDocument(engine, MODULE, compiled, 'one', ['one'],
@@ -3004,14 +3004,14 @@ test('an affine fallback period stays editable beside a lattice source', async (
 
 test('authored native controls preserve resource identities and live topology readbacks', () => {
   const values = {'camera.wander': 0.3, 'camera.spin-speed': 0.02,
-    'second.wander': 0.7, 'second.spin-speed': 0.04, 'slide.lattice-period': 0.413,
-    'cells.cell-scale': 2, 'flow.basis': 'ridged3',
-    'cells.coverage-mode': 'edge-fade-squared', 'flow.edge-width': 0.4};
+    'world.wander': 0.7, 'world.spin-speed': 0.04, 'plane.lattice-period': 0.413,
+    'cells.cell-scale': 2, 'velocity.basis': 'ridged3',
+    'cells.coverage-mode': 'edge-fade-squared', 'velocity.edge-width': 0.4};
   const descriptor = {chain: [
     {label: 'camera', operator: 'sphere.rotate.v2'},
-    {label: 'second', resource_key: 'world', operator: 'sphere.rotate.v2'},
-    {label: 'slide', resource_key: 'plane', operator: 'warp.affine.v4'},
-    {label: 'flow', resource_key: 'velocity', operator: 'warp.vector-noise.v2'},
+    {label: 'world', operator: 'sphere.rotate.v2'},
+    {label: 'plane', operator: 'warp.affine.v4'},
+    {label: 'velocity', operator: 'warp.vector-noise.v2'},
     {label: 'cells', operator: 'sample.tessellation.v3'},
   ]};
   const definitions = [
@@ -3048,23 +3048,23 @@ test('a live affine period remains independent when its sampler has no lattice c
   const engine = fixedEngine(() => true);
   engine.getParameterDefinitions = () => [{name: 'plane.Lattice Period'}];
   const descriptor = {chain: [
-    {label: 'slide', resource_key: 'plane', operator: 'warp.affine.v4'},
+    {label: 'plane', operator: 'warp.affine.v4'},
     {label: 'sample', operator: 'sample.grid.v4'},
   ]};
-  const values = {'slide.lattice-period': 2.5};
+  const values = {'plane.lattice-period': 2.5};
   assert.equal(applyFixedShaderDocument(engine, MODULE,
     {document: {descriptor, preset_bank: {presets: [{preset_id: 'live', values}]}}},
     'live', ['live'], BAKED, fixedDerivedBinding), null);
   assert.deepEqual(engine.writes, [['plane.Lattice Period', 2.5]]);
 });
 
-test('native warp speed names follow resource keys across instance labels and repetition', () => {
-  for (const [label, key, name] of [
-    ['warp', undefined, 'Planar Warp 1 Speed'],
-    ['spin', 'inner_warp', 'Planar Warp 2 Speed'],
-    ['drift', 'velocity', 'velocity.Planar Warp Speed'],
+test('native warp speed names follow instance labels', () => {
+  for (const [label, name] of [
+    ['warp', 'Planar Warp 1 Speed'],
+    ['warp2', 'Planar Warp 2 Speed'],
+    ['drift', 'drift.Planar Warp Speed'],
   ]) {
-    const descriptor = {chain: [{label, resource_key: key, operator: 'warp.affine.v4'}]};
+    const descriptor = {chain: [{label, operator: 'warp.affine.v4'}]};
     const engine = fixedEngine(() => true);
     engine.getParameterDefinitions = () => [{name}, {name: 'Speed'}];
     const values = {[`${label}.speed`]: 0.007};
@@ -3081,8 +3081,8 @@ test('potential nested native fields retain term identities across colliding res
     .params.filter((field) => field.id.startsWith('term-'));
   assert.equal(fields.length, 24);
   const descriptor = {chain: [
-    {label: 'bend', resource_key: 'surface', operator: 'sphere.displace.potential.v1'},
-    {label: 'flow', resource_key: 'vector', operator: 'sphere.displace.curl.v2'},
+    {label: 'surface', operator: 'sphere.displace.potential.v1'},
+    {label: 'vector', operator: 'sphere.displace.curl.v2'},
     {label: 'warp', operator: 'warp.vector-noise.v2'},
     {label: 'sample', operator: 'sample.grid.v4'},
   ]};
@@ -3092,13 +3092,13 @@ test('potential nested native fields retain term identities across colliding res
   for (const field of fields) {
     const value = field.values?.at(-1) ?? (field.id.endsWith('phase') ? 2.7 : -1.25);
     const stored = field.values ? field.values.length - 1 : value;
-    values[`bend.${field.id}`] = value;
+    values[`surface.${field.id}`] = value;
     definitions.push({name: `surface.${field.id}`, value: 0,
       ...(field.values ? {options: field.values} : {})});
     expected.push([`surface.${field.id}`, stored]);
   }
-  Object.assign(values, {'bend.drift': 0.01, 'sample.complexity': 0.75,
-    'flow.basis': 'fbm3', 'warp.basis': 'ridged3'});
+  Object.assign(values, {'surface.drift': 0.01, 'sample.complexity': 0.75,
+    'vector.basis': 'fbm3', 'warp.basis': 'ridged3'});
   definitions.push({name: 'surface.Drift', value: 0}, {name: 'source.Complexity', value: 0},
     {name: 'vector.basis', options: ['simplex', 'fbm3', 'ridged3'], value: 0},
     {name: 'outer_warp.basis', options: ['simplex', 'fbm3', 'ridged3'], value: 0});
@@ -3194,18 +3194,16 @@ test('authored compiled modulation edits replay coupled source and amount writes
   assert.equal(native['modulation-mechanic'], 1);
 });
 
-test('fixed Twist presets use descriptor resource identities for arbitrary labels', () => {
-  for (const [label, resource, prefix] of [
-    ['lens', undefined, ''], ['whorl', undefined, 'whorl.'], ['whorl', 'lens', ''],
-    ['whorl', 'coil', 'coil.'],
+test('fixed Twist presets use label identities', () => {
+  for (const [label, prefix] of [
+    ['lens', ''], ['whorl', 'whorl.'],
   ]) {
     const fields = [['twist-angle', 'Twist Angle (rad)', 7.25],
       ['twist-distribution', 'Twist Distribution', 0.625], ['speed', 'Speed', 0.035], ['drift', 'Drift', 0.006]];
     const engine = fixedEngine(() => true);
     engine.getParameterDefinitions = () => fields.map(([, name]) => ({name: prefix + name}));
     const compiled = fixedDocument();
-    compiled.document.descriptor = {chain: [{label, operator: 'sphere.lens.twist.v2',
-      ...(resource ? {resource_key: resource} : {})}]};
+    compiled.document.descriptor = {chain: [{label, operator: 'sphere.lens.twist.v2'}]};
     compiled.document.preset_bank.presets[0].values = Object.fromEntries(
       fields.map(([field, , value]) => [`${label}.${field}`, value]));
     assert.equal(applyFixedShaderDocument(engine, MODULE, compiled, 'noon', ['noon'],
