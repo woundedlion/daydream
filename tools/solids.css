@@ -421,6 +421,11 @@ body {
 
 /* Small screens: stack the columns and let the page scroll. */
 @media (max-width: 900px) {
+  .move-op-btn, .remove-op-btn, .del-btn {
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+  }
+
   :root {
     --main-width: 100vw;
   }
@@ -459,6 +464,12 @@ body {
     border-top: 1px solid var(--slate-700);
   }
 }
+@media (hover: none) {
+  .drag-handle {
+    opacity: 1;
+  }
+}
+
 .group:focus-visible .op-tooltip {
   display: block;
 }
