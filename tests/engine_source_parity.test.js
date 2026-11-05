@@ -1,7 +1,7 @@
 //
 // Source-text parity between the browser tools' hand-transcribed engine values
 // and the C++ headers they are transcribed from, at the engine revision
-// recorded alongside the installed WASM.
+// recorded alongside the installed WASM. Dirty installs must be rebuilt from a clean tree.
 //
 // Without an engine checkout the cases skip, unless HOLOSPHERE_ENGINE_REQUIRED=1,
 // under which a missing tree fails.
@@ -38,6 +38,8 @@ const ISLAMIC_STARS_H = 'effects/IslamicStars.h';
  */
 const header = (path) => {
   assert.ok(engineRoot, engineMissing);
+  assert.match(enginePin, /^[0-9a-f]{40}$/,
+    'Source parity reads a committed engine revision; reinstall the engine from a clean tree.');
   return execFileSync('git', ['-C', engineRoot, 'show', `${enginePin}:${path}`],
     { encoding: 'utf8' });
 };
