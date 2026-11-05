@@ -1,5 +1,5 @@
 import { closeProbeResources, checks, collectProblems, describeProbeFailure, isMain, measureChecks } from '../scripts/probe_harness.mjs';
-import { feedbackAtClick, probeColorStrip, probeHueWheel, rgbMovedTogether } from '../scripts/palettes-probe.mjs';
+import { feedbackAtClick, probeColorStrip, probeHueWheel, probeEffectRecipeArrows, rgbMovedTogether } from '../scripts/palettes-probe.mjs';
 import { readdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -33,6 +33,7 @@ const PROBES = [
   ['workbench-probe.mjs', 'probeStartupPersistence', probeStartupPersistence],
 
   ['palettes-probe.mjs', 'probeHueWheel', probeHueWheel],
+  ['palettes-probe.mjs', 'probeEffectRecipeArrows', probeEffectRecipeArrows],
 
   ['lissajous-probe.mjs', 'probeHistoryRestore', probeHistoryRestore],
 
