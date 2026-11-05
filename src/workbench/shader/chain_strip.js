@@ -219,10 +219,12 @@ export function createChainStrip({
    * @returns {void}
    */
   const select = (label) => {
-    const selected = label === store.selectedLabel() ? null : label;
+    const open = !pinnedLabels.has(label);
+    const selected = open ? label : store.selectedLabel() === label ? null : store.selectedLabel();
     if (!store.setSelectedLabel(selected)) return;
     if (selected !== null) focusedLabel = selected;
-    if (!pinnedLabels.delete(label)) pinnedLabels.add(label);
+    if (open) pinnedLabels.add(label);
+    else pinnedLabels.delete(label);
     render({ focusLabel: label });
     notifySelection();
   };

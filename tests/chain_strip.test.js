@@ -2543,3 +2543,14 @@ test('resetting declared defaults leaves the document and undo application untou
   assert.deepEqual(h.store.document(), before);
   assert.equal(h.applied.length, 0);
 });
+
+test('header toggling after a pin keeps selection and expansion aligned', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'camera').querySelector('.chain-chip-pin').dispatch('click');
+  chipByLabel(h, 'camera').querySelector('.chain-chip-name').dispatch('click');
+  assert.equal(chipByLabel(h, 'camera').classList.contains('chain-chip--expanded'), false);
+  assert.equal(h.store.selectedLabel(), null);
+  chipByLabel(h, 'camera').querySelector('.chain-chip-name').dispatch('click');
+  assert.equal(chipByLabel(h, 'camera').classList.contains('chain-chip--expanded'), true);
+  assert.equal(h.store.selectedLabel(), 'camera');
+});
