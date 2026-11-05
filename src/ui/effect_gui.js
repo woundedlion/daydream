@@ -706,7 +706,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       if (moduleDead(error)) throw error;
       if (rebuildFailureGeneration !== generation) {
         logWarn('Effect GUI: parameter-schema rebuild failed', error);
-        showConfigImportNotice('Effect controls could not be rebuilt.');
+        showConfigImportNotice('Effect controls could not be rebuilt and may be out of date. Reload the page.');
         rebuildFailureGeneration = generation;
       }
       return false;
@@ -772,7 +772,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
         if (moduleDead(error)) throw error;
         activeEffect = null;
         logWarn('Effect GUI: panel construction failed', error);
-        showConfigImportNotice('Effect controls could not be built.');
+        showConfigImportNotice('Effect controls could not be built. Select another effect or reload the page.');
         return;
       }
       persistence.persist(activeEffect.gui, { existingOnly: true });

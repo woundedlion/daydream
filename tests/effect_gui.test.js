@@ -318,7 +318,7 @@ test('a failed initial panel build reports an unavailable control panel', () => 
   const h = makeHarness({ params: null });
   h.panel.build();
   assert.equal(h.panel.active(), null);
-  assert.deepEqual(h.configNotices, ['Effect controls could not be built.']);
+  assert.deepEqual(h.configNotices, ['Effect controls could not be built. Select another effect or reload the page.']);
   assert.match(h.warnings[0], /panel construction failed/);
   assert.equal(h.guis[0].destroyed, 1);
 });

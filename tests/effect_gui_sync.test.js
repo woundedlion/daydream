@@ -320,7 +320,7 @@ test('a failed schema rebuild keeps the live panel and reports once per generati
   h.panel.sync();
 
   assert.equal(h.warnings.length, 1, 'the same failure logged again on the next frame');
-  assert.deepEqual(h.configNotices, ['Effect controls could not be rebuilt.']);
+  assert.deepEqual(h.configNotices, ['Effect controls could not be rebuilt and may be out of date. Reload the page.']);
   assert.equal(h.guis.length, 2,
     'a failure the generation has not moved past re-allocated a panel per frame');
 
