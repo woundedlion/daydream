@@ -205,7 +205,7 @@ const callArgs = (src, open) => {
 /**
  * Class tokens a script puts on the elements it builds, read from
  * `className =`, `classList.add`/`toggle`, `…Class`/`…Classes` options, and
- * the class argument of an `el(tag, classes)` builder. A class assembled any
+ * the class arguments of `el(tag, classes)` and `makeDiv(classes, id)`. A class assembled any
  * other way goes ungated.
  * @param {string} src - Script source.
  * @returns {Set<string>} Referenced class tokens.
@@ -214,6 +214,9 @@ const scriptClasses = (src) => {
   const tokens = new Set();
   const literals = (s) => [...s.matchAll(/(['"`])([^'"`]*)\1/g)].map(([, , v]) => v);
   for (const [, , value] of src.matchAll(/\.className\s*=\s*(['"`])([^'"`]*)\1/g)) {
+    addTokens(tokens, value);
+  }
+  for (const [, , value] of src.matchAll(/\bmakeDiv\(\s*(['"`])([^'"`]*)\1/g)) {
     addTokens(tokens, value);
   }
   for (const [, method, args] of src.matchAll(/\.classList\.(add|toggle)\(([^)]*)\)/g)) {
@@ -235,6 +238,11 @@ const scriptClasses = (src) => {
   }
   return tokens;
 };
+
+test('class discovery includes literal makeDiv class lists', () => {
+  assert.deepEqual([...scriptClasses("makeDiv('complex-plane-inner axis-h', 'id'); makeDiv(className, id);")],
+    ['complex-plane-inner', 'axis-h']);
+});
 
 test('tool pages load no Tailwind CDN code', () => {
   for (const name of PAGES) {
