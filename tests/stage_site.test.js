@@ -21,11 +21,10 @@ function fixture(t, readme = 'new README.md') {
   const root = join(scratch, 'repo');
   const bundle = join(scratch, 'bundle');
   const site = join(scratch, 'site');
-  const write = writeFileAt;
-  write(root, 'src/app/daydream.js', 'export const app = true;\n');
-  write(root, 'site_manifest.txt', '# source\n\nsrc/app/daydream.js\ngenerated/shader/composed_effect_roster.mjs\ngenerated/shader/patterns/old.shader.json\n');
-  write(root, 'generated/shader/patterns/old.shader.json', '{}');
-  write(root, 'generated/holosphere_wasm.sha', 'a'.repeat(40));
+  writeFileAt(root, 'src/app/daydream.js', 'export const app = true;\n');
+  writeFileAt(root, 'site_manifest.txt', '# source\n\nsrc/app/daydream.js\ngenerated/shader/composed_effect_roster.mjs\ngenerated/shader/patterns/old.shader.json\n');
+  writeFileAt(root, 'generated/shader/patterns/old.shader.json', '{}');
+  writeFileAt(root, 'generated/holosphere_wasm.sha', 'a'.repeat(40));
   const git = (...args) => execFileSync('git', ['-C', root, ...args], { env: isolatedGitEnv(), encoding: 'utf8' }).trim();
   git('init', '-q');
   git('config', 'core.autocrlf', 'false');
@@ -43,7 +42,7 @@ function fixture(t, readme = 'new README.md') {
   try { installEngineBundle(bundle, root); } finally { capture.restore(); }
   assert.equal(capture.messages.length, 1);
   assert.match(capture.messages[0], /^Installed \d+ engine assets/);
-  return { root, bundle, site, pair, write, git, scratch };
+  return { root, bundle, site, pair, write: writeFileAt, git, scratch };
 }
 
 /** @param {string} base @returns {string[]} Every file under `base`, as sorted forward-slash paths. */

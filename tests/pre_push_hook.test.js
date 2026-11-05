@@ -14,7 +14,7 @@ const { hook: HOOK, sh: SH, skip: SKIP, missing: MISSING_SH } = hookUnderTest('p
 
 test('pre-push refuses a push from a tree that cannot run the suites',
   { skip: SKIP }, (t) => {
-    const run = runWithTools(fixtureRoot(t), {});
+    const run = runWithTools(scratchDir(t, 'pre-push-hook-'), {});
     assert.notEqual(run.status, 0, `${run.stdout}${run.stderr}`);
     assert.match(run.stderr, /node not found/);
   });
@@ -50,16 +50,6 @@ function runWithTools(root, tools, input = '') {
   });
 }
 
-/**
- * A fixture root removed when the case ends.
- * @param {import('node:test').TestContext} t - Case whose after() removes the root.
- * @returns {string} The root.
- */
-function fixtureRoot(t) {
-  const root = scratchDir(t, 'pre-push-hook-');
-  return root;
-}
-
 /** @param {string} path @returns {string} MSYS-compatible path. */
 function posixPath(path) {
   return path.replace(/\\/g, '/')
@@ -73,7 +63,7 @@ function posixPath(path) {
  * @returns {{root: string, env: NodeJS.ProcessEnv, sha: string}} Fixture state.
  */
 function snapshotFixture(t, { marker = false, suiteFailure = false } = {}) {
-  const root = fixtureRoot(t);
+  const root = scratchDir(t, 'pre-push-hook-');
   const env = isolatedGitEnv();
   delete env.NODE_TEST_CONTEXT;
   for (const directory of ['.githooks', 'tests', 'node_modules', 'bin', 'tools', 'scripts', 'generated'])
@@ -105,7 +95,7 @@ function snapshotFixture(t, { marker = false, suiteFailure = false } = {}) {
 
 test('pre-push refuses a push from a tree that cannot install the suites',
   { skip: SKIP }, (t) => {
-    const root = fixtureRoot(t);
+    const root = scratchDir(t, 'pre-push-hook-');
     // node answers, so the refusal is reached at the next tool rather than the
     // first: a hook that stopped checking npm would run the suites through it.
     const run = runWithTools(root, { node: 'exit 0' });
@@ -116,9 +106,7 @@ test('pre-push refuses a push from a tree that cannot install the suites',
 
 test('pre-push runs the source checks successfully',
   { skip: SKIP }, (t) => {
-    const root = fixtureRoot(t);
-    mkdirSync(join(root, 'node_modules'), { recursive: true });
-    writeFileSync(join(root, 'node_modules', '.package-lock.json'), '{}\n');
+    const root = withInstalledModules(t);
     const run = runWithTools(root, {
       node: 'exit 0',
       npm: 'exit 0',
@@ -131,9 +119,7 @@ test('pre-push runs the source checks successfully',
   });
 
 test('pre-push refuses a stale working-tree import map', { skip: SKIP }, (t) => {
-  const root = fixtureRoot(t);
-  mkdirSync(join(root, 'node_modules'), { recursive: true });
-  writeFileSync(join(root, 'node_modules', '.package-lock.json'), '{}\n');
+  const root = withInstalledModules(t);
   writeFileSync(join(root, 'vendor-importmap.js'), 'stale\n');
   const git = spawnSync(SH, ['-c', 'command -v git'], { encoding: 'utf8' }).stdout.trim();
   assert.ok(git, 'git must resolve inside the shell');
@@ -149,9 +135,7 @@ test('pre-push refuses a stale working-tree import map', { skip: SKIP }, (t) => 
 });
 
 test('pre-push refuses stale Tailwind styles', { skip: SKIP }, (t) => {
-  const root = fixtureRoot(t);
-  mkdirSync(join(root, 'node_modules'), { recursive: true });
-  writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}\n');
+  const root = withInstalledModules(t);
   const run = runWithTools(root, {
     node: 'exit 0',
     npm: 'exit 0',
@@ -165,9 +149,7 @@ test('pre-push refuses stale Tailwind styles', { skip: SKIP }, (t) => {
 
 test('pre-push refuses a failing source workflow suite',
   { skip: SKIP }, (t) => {
-    const root = fixtureRoot(t);
-    mkdirSync(join(root, 'node_modules'), { recursive: true });
-    writeFileSync(join(root, 'node_modules', '.package-lock.json'), '{}\n');
+    const root = withInstalledModules(t);
     const run = runWithTools(root, {
       node: 'echo unit-suite-failed >&2; exit 7',
       npm: 'exit 0',
@@ -181,9 +163,7 @@ test('pre-push refuses a failing source workflow suite',
 
 for (const step of ['lint', 'typecheck', 'importmap', 'generate:tailwind']) {
   test(`pre-push stops when ${step} fails`, { skip: SKIP }, (t) => {
-    const root = fixtureRoot(t);
-    mkdirSync(join(root, 'node_modules'), { recursive: true });
-    writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}\n');
+    const root = withInstalledModules(t);
     const run = runWithTools(root, {
       node: 'echo unexpected-unit-suite >&2; exit 0',
       npm: `if [ "$2" = ${step} ]; then echo ${step}-failed >&2; exit 7; fi`,
@@ -198,7 +178,7 @@ for (const step of ['lint', 'typecheck', 'importmap', 'generate:tailwind']) {
 }
 
 test('pre-push requires installed dependencies', { skip: SKIP }, (t) => {
-  const run = runWithTools(fixtureRoot(t), {
+  const run = runWithTools(scratchDir(t, 'pre-push-hook-'), {
     node: 'exit 0', npm: 'echo unexpected-npm >&2; exit 0', git: 'exit 0',
   });
   assert.notEqual(run.status, 0);
@@ -207,9 +187,7 @@ test('pre-push requires installed dependencies', { skip: SKIP }, (t) => {
 });
 
 test('pre-push accepts a ref deletion without running source checks', { skip: SKIP }, (t) => {
-  const root = fixtureRoot(t);
-  mkdirSync(join(root, 'node_modules'));
-  writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}');
+  const root = withInstalledModules(t);
   const run = runWithTools(root, {
     node: 'echo unexpected-node >&2; exit 17',
     npm: 'echo unexpected-npm >&2; exit 17',
@@ -309,3 +287,10 @@ test('pre-push checks both update snapshots around an intervening deletion', {sk
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.deepEqual(readFileSync(calls, 'utf8').trim().split('\n'), ['committed', 'second']);
 });
+
+function withInstalledModules(t) {
+  const root = scratchDir(t, 'pre-push-hook-');
+  mkdirSync(join(root, 'node_modules'), {recursive: true});
+  writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}\n');
+  return root;
+}

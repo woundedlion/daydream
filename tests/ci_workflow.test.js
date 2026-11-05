@@ -45,7 +45,7 @@ test('npm install points git at the tracked hooks, every one executable', () => 
 });
 
 test('the reusable JavaScript suite runs all required checks', () => {
-  const suite = workflowText(`js-unit-suite.yml`);
+  const suite = workflowText('js-unit-suite.yml');
   for (const command of ['npm test', 'npm run lint', 'npm run typecheck']) {
     assert.ok(suite.split(/\n/).some((line) =>
       line.trim().replace(/^- /, '') === `run: ${command}`),
@@ -57,7 +57,7 @@ test('the reusable JavaScript suite runs all required checks', () => {
 // No workflow is a tracked *.sh file, so the Lint shell step cannot see the
 // bash inside the `run:` blocks; actionlint is what pipes it through shellcheck.
 test('the reusable suite lints the workflow YAML and the bash inside it', () => {
-  const suite = workflowText(`js-unit-suite.yml`);
+  const suite = workflowText('js-unit-suite.yml');
   assert.match(suite, /https:\/\/github\.com\/rhysd\/actionlint\/releases\/download\/v1\.7\.12\/actionlint_1\.7\.12_linux_amd64\.tar\.gz/);
   assert.match(suite, /8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8.*sha256sum --check --strict/);
   assert.ok(suite.indexOf('sha256sum --check --strict') < suite.indexOf('tar -xzf'));
@@ -232,7 +232,7 @@ test('the job scan reads a quoted key and refuses a spelling it cannot', () => {
 
 test('external workflow actions use immutable commit pins', () => {
   for (const file of readdirSync(resolve(REPO, WORKFLOW_DIR)).filter((name) => /\.ya?ml$/.test(name))) {
-    const source = workflowText(`${file}`);
+    const source = workflowText(file);
     for (const match of source.matchAll(/^\s*(?:-\s*)?uses:\s*([^\s#]+)/gm)) {
       const action = match[1];
       if (action.startsWith('./')) continue;
@@ -317,7 +317,7 @@ test('PR suites consume the provenance-gated bundle before CI can pass', () => {
 });
 
 test('the reusable suite verifies CDN integrity and lints tracked shell hooks', () => {
-  const suite = workflowText(`js-unit-suite.yml`);
+  const suite = workflowText('js-unit-suite.yml');
   assert.match(suite, /name: Verify CDN integrity\s+run: node scripts\/check-cdn-integrity\.mjs/);
   assert.match(suite, /run: pip install --require-hashes -r requirements\/shellcheck\.txt/);
   const shell = suite.split('- name: Lint shell')[1]?.split(/\n {6}- /)[0] ?? '';
@@ -336,18 +336,18 @@ test('workflow trigger parsing cannot hide flow or quoted declarations', () => {
 });
 
 test('shell lint has no workflow-wide excluded diagnostics', () => {
-  const suite = workflowText(`js-unit-suite.yml`);
+  const suite = workflowText('js-unit-suite.yml');
   assert.doesNotMatch(suite, /shellcheck[^\n]*(?:\s-e\b|--exclude)|SHELLCHECK_OPTS/);
 });
 
 test('engine bundle API failures stop the gate instead of entering its poll timeout', () => {
-  const gate = workflowText(`engine-bundle.yml`);
+  const gate = workflowText('engine-bundle.yml');
   assert.match(gate, /Cannot query engine CI; check token access[^\n]+\n\s+exit 1/);
   assert.match(gate, /actions: read/);
 });
 
 test('engine selection snapshots current master and preserves an explicit pair', (t) => {
-  const gate = workflowText(`engine-bundle.yml`);
+  const gate = workflowText('engine-bundle.yml');
   const block = gate.split('      - name: Resolve engine pin\n')[1].split('      - name:')[0];
   const body = block.split('        run: |\n')[1].replace(/^ {10}/gm, '');
   const current = 'a'.repeat(40);
@@ -368,12 +368,12 @@ test('engine selection snapshots current master and preserves an explicit pair',
 });
 
 test('actionlint enumerates both workflow extensions', () => {
-  const suite = workflowText(`js-unit-suite.yml`);
+  const suite = workflowText('js-unit-suite.yml');
   assert.ok(suite.includes("git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml'"));
 });
 
 test('expiring bundles warn and expired bundles explain fresh dispatch recovery', () => {
-  const gate = workflowText(`engine-bundle.yml`);
+  const gate = workflowText('engine-bundle.yml');
   assert.match(gate, /::warning::Engine bundle expires/);
   assert.match(gate, /if \[ "\$expired" = true \]/);
   assert.equal((gate.match(/gh workflow run ci\.yml --repo woundedlion\/pov --ref master/g) ?? []).length, 3);
@@ -414,7 +414,7 @@ test('local pushes check source while paired browser coverage remains mandatory 
   const hook = readFileSync(resolve(REPO, '.githooks/pre-push'), 'utf8');
   assert.doesNotMatch(hook, /wasm_provenance|npm test|run_probe|resolveBrowser/);
   assert.match(hook, /node --test tests\/ci_workflow\.test\.js tests\/deployment_pair\.test\.js tests\/stage_site\.test\.js/);
-  const browser = workflowText(`browser-smoke.yml`);
+  const browser = workflowText('browser-smoke.yml');
   assert.ok(browser.includes('for script in scripts/browser-smoke.mjs scripts/*-probe.mjs'));
   assert.match(browser, /timeout -k 10s/);
 });
@@ -452,7 +452,7 @@ test('the CI gate CLI rejects an ungated job before evaluating results', (t) => 
 });
 
 test('required suite steps execute without suppression', () => {
-  const suite = workflowText(`js-unit-suite.yml`);
+  const suite = workflowText('js-unit-suite.yml');
   const required = ['Lint JavaScript', 'Typecheck', 'Verify committed import map', 'Verify generated Tailwind styles', 'Verify CDN integrity', 'Lint shell', 'Lint workflows', 'Test'];
   const blocks = suite.split(/(?=^ {6}- )/m);
   for (const name of required) {
@@ -509,7 +509,7 @@ test('all event types serialize final pair checks, publication and recording in 
 test('engine bundle polling retries transient queries and artifact calls', (t) => {
   const shell = findBash();
   if (!shell) { t.skip('Bash is unavailable'); return; }
-  const gate = workflowText(`engine-bundle.yml`);
+  const gate = workflowText('engine-bundle.yml');
   const block = gate.split('      - name: Download the verified engine bundle\n')[1].split('      - name:')[0];
   const root = scratchDir(t, 'engine-retries-');
   const body = block.split('        run: |\n')[1].replace(/^ {10}/gm, '')

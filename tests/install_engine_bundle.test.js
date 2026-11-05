@@ -22,19 +22,18 @@ function fixture(t, shape = () => {}) {
   const root = scratchDir(t, 'daydream-bundle-');
   const bundle = join(root, 'bundle');
   const destination = join(root, 'daydream');
-  const write = writeFileAt;
-  write(destination, 'src/app/daydream.js', 'application');
-  write(destination, 'generated/holosphere_wasm.sha', 'a'.repeat(40));
-  write(destination, 'generated/shader/patterns/obsolete.shader.json', 'obsolete');
-  write(destination, 'docs/screenshots/nested/obsolete.png', 'obsolete');
-  write(destination, 'docs/screenshots/notes.txt', 'notes');
+  writeFileAt(destination, 'src/app/daydream.js', 'application');
+  writeFileAt(destination, 'generated/holosphere_wasm.sha', 'a'.repeat(40));
+  writeFileAt(destination, 'generated/shader/patterns/obsolete.shader.json', 'obsolete');
+  writeFileAt(destination, 'docs/screenshots/nested/obsolete.png', 'obsolete');
+  writeFileAt(destination, 'docs/screenshots/notes.txt', 'notes');
   const files = Object.fromEntries([
     ...RUNTIME_PATHS, 'generated/shader/patterns/new.shader.json',
   ].map((path) => [path, `fresh ${path}`]));
   files['generated/holosphere_wasm.sha'] = 'b'.repeat(40);
   shape(files);
   writeEngineBundle(bundle, files);
-  return { bundle, destination, write };
+  return { bundle, destination, write: writeFileAt };
 }
 
 test('install replaces stale assets and preserves consumer-owned files', (t) => {
@@ -103,8 +102,6 @@ test('a bundle whose source pin is not one full commit is refused', (t) => {
   assert.equal(existsSync(join(destination, 'generated/holosphere_wasm.js')), false);
 });
 
-
-
 test('a destination without daydream.js is not a checkout', (t) => {
   const { bundle, destination } = fixture(t);
   rmSync(join(destination, 'src/app/daydream.js'));
@@ -171,10 +168,6 @@ test('runtime mirrors include engine documents but exclude Daydream sources', ()
     'src/app/daydream.js',
     'src/workbench/shader/shader_documents.js']) assert.equal(runtimePath(path), false, path);
 });
-
-
-
-
 
 for (const missing of RUNTIME_PATHS) test(`a bundle missing ${missing} preserves its destination`, (t) => {
   const {bundle, destination} = fixture(t, (files) => { delete files[missing]; });

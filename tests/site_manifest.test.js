@@ -149,8 +149,6 @@ test('engine-backed pages declare the browser-smoke readiness overlay', () => {
  */
 const walkFromPages = () => {
   const entries = manifestEntries();
-  const covered = (path) =>
-    entries.includes(path);
 
   const tracked = trackedFiles();
   const seen = new Set();
@@ -163,12 +161,12 @@ const walkFromPages = () => {
     const path = queue.pop();
     if (seen.has(path)) continue;
     seen.add(path);
-    if (!covered(path)) unpublished.push(path);
+    if (!entries.includes(path)) unpublished.push(path);
     const refs = referencesOf(path);
     escaping.push(...refs.escaping);
     for (const target of refs.targets) {
       if (generated(target)) {
-        if (!covered(target)) unpublished.push(`${path} -> ${target}`);
+        if (!entries.includes(target)) unpublished.push(`${path} -> ${target}`);
         seen.add(target);
         continue;
       }
@@ -182,7 +180,7 @@ const walkFromPages = () => {
         absent.push(`${path} -> ${target}`);
         continue;
       }
-      if (!covered(target)) unpublished.push(`${path} -> ${target}`);
+      if (!entries.includes(target)) unpublished.push(`${path} -> ${target}`);
       if (/\.(m?js|html|css)$/.test(target)) queue.push(target);
       else seen.add(target);
     }
@@ -227,9 +225,6 @@ const CATALOG = `${PATTERNS}/catalog.json`;
 const missingCatalog = sourceOnly && !existsSync(resolve(REPO, CATALOG));
 
 // The pattern catalog lists the published source documents.
-const PATTERN_NON_SOURCES = [
-  CATALOG,
-];
 
 /**
  * Pattern documents fetched by the source catalog.
@@ -238,7 +233,7 @@ const PATTERN_NON_SOURCES = [
 const servedPatterns = () => new Set([
   ...Object.values(missingCatalog ? {} : JSON.parse(read(CATALOG)).source_documents).map(
     (/** @type {*} */ filename) => `${PATTERNS}/${filename}`),
-  ...PATTERN_NON_SOURCES,
+  CATALOG,
 ]);
 
 /** @returns {string[]} Repo-relative documents directly in the pattern directory. */
@@ -255,10 +250,8 @@ test('the site manifest publishes nothing the served pages do not reach', () => 
 
   const { seen } = pageWalk();
   const served = servedPatterns();
-  const reached = (entry) =>
-    seen.has(entry);
   const unreached = entries.filter(
-    (entry) => !generated(entry) && !UNREFERENCED.includes(entry) && !served.has(entry) && !reached(entry));
+    (entry) => !generated(entry) && !UNREFERENCED.includes(entry) && !served.has(entry) && !seen.has(entry));
   assert.deepEqual(unreached.slice(0, 5), [],
     `${unreached.length} ${MANIFEST} entries are neither a served page, ` +
       'reachable from one, nor declared unreferenced — the manifest is the only ' +
