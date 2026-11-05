@@ -548,3 +548,14 @@ test('canonical buttons retain display-keyed size and preset metadata', () => {
   assert.match(button.getAttribute('aria-label'), /^Comets, 12 presets/);
   assert.equal(sidebar.items[0].size, 2048);
 });
+
+test('the effect list leaves browser chords unhandled', () => {
+  const { sidebar, selected } = makeSidebar();
+  sidebar.setEffects(['A', 'B'], {});
+  for (const modifier of ['altKey', 'ctrlKey', 'metaKey']) {
+    let prevented = false;
+    sidebar.onKeyDown({ key: 'ArrowLeft', [modifier]: true, preventDefault() { prevented = true; } });
+    assert.equal(prevented, false);
+  }
+  assert.deepEqual(selected, []);
+});

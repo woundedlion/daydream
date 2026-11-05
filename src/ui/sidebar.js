@@ -403,6 +403,7 @@ export class EffectSidebar {
    * @param {KeyboardEvent} e - The keydown event from the list element.
    */
   onKeyDown(e) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
     const btns = this.orderedButtons;
     if (!btns.length) return;
 
