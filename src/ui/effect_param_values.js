@@ -44,6 +44,7 @@ export function createParamValueSync({
 }) {
   // Throttle the param/value length-skew warning to once per skew episode.
   let skewLogged = false;
+  let selectorsPending = false;
 
   /**
    * Re-seat the panel's enum selectors on the `requestedValue`s in the
@@ -54,12 +55,14 @@ export function createParamValueSync({
    * @returns {void}
    */
   function adoptRequestedEnums(display, focused) {
+    selectorsPending = false;
     if (!display.hasEnumControls) return;
     for (const parameter of getParameterDefinitions()) {
       const controller = display.controllerByName.get(parameter.name);
       if (!controller?.isEnum || controller.isReadonly) continue;
       const isEditing = focused !== null
         && controller.domElement?.contains(focused) === true;
+      if (isEditing) selectorsPending = true;
       const { update, value } = resolveParamSync(
         controller.getValue(), selectorControlValue(parameter), { isEditing });
       if (!update) continue;
@@ -85,8 +88,8 @@ export function createParamValueSync({
     const focused = focusedElement() ?? null;
     // The definitions marshal allocates; run it only when an engine-driven
     // selector can have moved.
-    if (!segmentsOwnDisplay() && advanced && display.hasEnumControls
-        && (display.hasAnimatedEnums || presetAdvanced)) {
+    if (!segmentsOwnDisplay() && display.hasEnumControls
+        && ((advanced && (display.hasAnimatedEnums || presetAdvanced)) || selectorsPending)) {
       adoptRequestedEnums(display, focused);
     }
 
@@ -127,6 +130,6 @@ export function createParamValueSync({
     syncValues,
     adoptRequestedEnums,
     /** Re-arm the skew warning for a newly published panel. */
-    resetSkew() { skewLogged = false; },
+    resetSkew() { skewLogged = false; selectorsPending = false; },
   };
 }

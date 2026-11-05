@@ -1037,6 +1037,23 @@ test('preset advancement refreshes nonanimated requested selectors', () => {
   assert.equal(h.gui().ctrl('Mode').getValue(), 1);
 });
 
+test('a focused static selector adopts a pending preset after focus leaves', () => {
+  const mode = {name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'], animated: false};
+  const h = makeHarness({params: [mode], engineValues: [0], presetCount: 3});
+  h.panel.build();
+  const selector = h.gui().ctrl('Mode');
+  h.state.focused = selector.$select;
+  h.state.params = [{...mode, requestedValue: 1}];
+  h.state.presetIndex = 1;
+  h.panel.sync();
+  assert.equal(selector.getValue(), 0);
+  h.panel.sync();
+  assert.equal(selector.getValue(), 0);
+  h.state.focused = null;
+  h.panel.sync(false);
+  assert.equal(selector.getValue(), 1);
+});
+
 for (const chainSnapshotEnabled of [false, true]) test(`preset selection ${chainSnapshotEnabled ? 'keeps' : 'clears'} stored writable values (chainSnapshotEnabled=${chainSnapshotEnabled})`, () => {
   const h = makeHarness({ params: [SPEED, TELEMETRY], presetCount: 3, chainSnapshotEnabled,
     chainSnapshot: chainSnapshot() });
