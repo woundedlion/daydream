@@ -236,6 +236,30 @@ test('a thrown effect apply never rolls back into a trapped module', () => {
   ]);
 });
 
+test('a thrown resolution apply is logged and rolled back', async () => {
+  const failure = new Error('setResolution exploded');
+  const app = makeApp({ throwOnEffect: failure });
+  app.appState.set('resolution', 'Hi');
+  await Promise.resolve();
+  assert.equal(app.appState.get('resolution'), 'Lo');
+  assert.deepEqual(applyCalls(app, 'applyResolution').map((call) => call.resolution), ['Hi', 'Lo']);
+  assert.deepEqual(app.errors, [{ message: 'Resolution switch failed:', error: failure }]);
+  assert.deepEqual(app.fatals, []);
+  assert.deepEqual(app.urlSyncs, ['Lo']);
+});
+
+test('a thrown resolution apply never rolls back into a trapped module', async () => {
+  const failure = new WebAssembly.RuntimeError('unreachable');
+  const app = makeApp({ throwOnEffect: failure, moduleDead: () => true });
+  app.appState.set('resolution', 'Hi');
+  await Promise.resolve();
+  assert.equal(app.appState.get('resolution'), 'Hi');
+  assert.deepEqual(applyCalls(app, 'applyResolution').map((call) => call.resolution), ['Hi']);
+  assert.deepEqual(app.errors, [{ message: 'Resolution switch failed:', error: failure }]);
+  assert.deepEqual(app.fatals, ['Resolution change trapped the rendering engine. Reload the page.']);
+  assert.deepEqual(app.urlSyncs, ['Hi']);
+});
+
 test('an effect rollback that is itself rejected raises the fatal banner', () => {
   const app = makeApp({ rejectEffects: new Set(['Alpha', 'Beta']) });
 
