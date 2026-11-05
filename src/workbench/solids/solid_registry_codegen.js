@@ -20,7 +20,6 @@ import {
   MAX_RECIPE_STEPS,
   SIMPLE_SEEDS,
   exactHankinDegrees,
-  formatFloat,
   generateFuncAndRecipe,
   opParams,
   requireParams,
@@ -28,9 +27,8 @@ import {
   unsweepableReason,
 } from './solid_codegen.js';
 import { engineHalted } from '../../shared/engine_halt.js';
-import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns } from '../../shared/cpp_format.js';
+import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns, formatFloatCpp } from '../../shared/cpp_format.js';
 
-export { MAX_RECIPE_STEPS };
 /** Maximum lowered primitive steps accepted by the effect. */
 export const MAX_BUILD_STEPS = 8;
 /** Maximum face count of replay endpoints and morph intermediates. */
@@ -165,20 +163,20 @@ export function opStepCpp(o) {
     if (!(params.angle > 0)) {
       throw new Error(`opStepCpp: hankin param "angle" must be positive, got ${params.angle}`);
     }
-    return `{Op::HANKIN, ${formatFloat(params.angle)} * IslamicStarPatterns::D2R}`;
+    return `{Op::HANKIN, ${formatFloatCpp(params.angle)} * IslamicStarPatterns::D2R}`;
   }
   if (opName === 'snub') {
-    return `{Op::SNUB, ${formatFloat(params.t)}, ${formatFloat(params.twist)}}`;
+    return `{Op::SNUB, ${formatFloatCpp(params.t)}, ${formatFloatCpp(params.twist)}}`;
   }
   if (opName === 'relax') {
     // The engine's apply_step refuses a bake-less RELAX below one iteration.
     if (!(params.iter >= 1)) {
       throw new Error(`opStepCpp: relax param "iter" must be at least 1, got ${params.iter}`);
     }
-    return `{Op::RELAX, ${formatFloat(params.iter)}}`;
+    return `{Op::RELAX, ${formatFloatCpp(params.iter)}}`;
   }
   if (OP_DEFS[opName].params.t) {
-    return `{Op::${opName.toUpperCase()}, ${formatFloat(params.t)}}`;
+    return `{Op::${opName.toUpperCase()}, ${formatFloatCpp(params.t)}}`;
   }
   return `{Op::${opName.toUpperCase()}}`;
 }
@@ -193,7 +191,7 @@ export function opStepCpp(o) {
  */
 function exactFloatLiteral(where, value) {
   try {
-    return formatFloat(value);
+    return formatFloatCpp(value);
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     throw new Error(`generateRegistryCpp: ${where} ${detail.replace(/^formatFloatCpp: /, '')}`,
@@ -220,7 +218,7 @@ function recipeStepCpp(step) {
     }
     const deg = exactHankinDegrees(step.param);
     const angle = deg !== null
-      ? `${formatFloat(deg)} * IslamicStarPatterns::D2R`
+      ? `${formatFloatCpp(deg)} * IslamicStarPatterns::D2R`
       : exactFloatLiteral('base chain hankin angle', step.param);
     return `{Op::HANKIN, ${angle}}`;
   }

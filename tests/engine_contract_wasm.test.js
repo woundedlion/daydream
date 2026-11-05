@@ -13,7 +13,7 @@ import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import { createChainValidator } from '../src/workbench/solids/solid_validation.js';
 import {
-  KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
+  KNOWN_OPS, OP_DEFS, CATALAN_BASES, SIMPLE_SEEDS,
   DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure,
 } from '../src/workbench/solids/solid_codegen.js';
 import {
@@ -1468,18 +1468,18 @@ test('every OP_DEFS bound sits inside the engine domain the WASM bridge enforces
 });
 
 test('the Platonic and Catalan seed lists name registered Simple solids', () => {
-  assert.ok(PLATONIC_SOLIDS.length > 0 && CATALAN_BASES.size > 0, 'both seed lists are populated');
+  assert.ok(SIMPLE_SEEDS.slice(0, 5).length > 0 && CATALAN_BASES.size > 0, 'both seed lists are populated');
   const registry = M.MeshOps.getRegistry();
   const simple = new Set();
   for (let i = 0; i < registry.length; i++) {
     if (registry[i].category === 'Simple') simple.add(registry[i].name);
   }
-  const unregistered = [...PLATONIC_SOLIDS, ...CATALAN_BASES]
+  const unregistered = [...SIMPLE_SEEDS.slice(0, 5), ...CATALAN_BASES]
     .filter((name) => !simple.has(name));
   assert.deepEqual(unregistered.slice(0, 5), [],
     `solid_codegen.js lists ${unregistered.length} names the engine registers no ` +
     'Simple solid for; update src/workbench/solids/solid_codegen.js to match solids.h');
-  const inBoth = [...PLATONIC_SOLIDS].filter((name) => CATALAN_BASES.has(name));
+  const inBoth = [...SIMPLE_SEEDS.slice(0, 5)].filter((name) => CATALAN_BASES.has(name));
   assert.deepEqual(inBoth.slice(0, 5), [],
     `${inBoth.length} names are in both seed lists; the namespace qualifier ` +
     'would be ambiguous');

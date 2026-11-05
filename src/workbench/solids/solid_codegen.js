@@ -287,11 +287,6 @@ export const DEFINED_SEED_CONSTANTS = new Set([
 ]);
 
 /**
- * The Platonic seeds, the leading run of simple_registry.
- */
-export const PLATONIC_SOLIDS = SIMPLE_SEEDS.slice(0, 5);
-
-/**
  * The Catalan seeds, mirrored from `namespace Catalan` in procedural_solids.h.
  * A generated recipe function on a Catalan base qualifies its seed call with
  * `Catalan::`; registry generation refuses Catalan seeds.
@@ -456,8 +451,6 @@ function requireNamespace(where, ns) {
   }
 }
 
-export const formatFloat = formatFloatCpp;
-
 /**
  * Formats a registry solid name for display: splits camelCase and underscore
  * segments into words and capitalizes each, so
@@ -541,12 +534,12 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
       if (params.angle < 0) {
         throw new Error(`generateFuncAndRecipe: hankin angle ${params.angle} is negative; suffix must stay a valid C++ identifier`);
       }
-      chain += `.hankin(${formatFloat(params.angle)} * D2R)`;
+      chain += `.hankin(${formatFloatCpp(params.angle)} * D2R)`;
       nameParts.push(`_hk${Math.round(params.angle)}`);
     } else if (opName === 'snub') {
       requireFinite(opName, 't', params.t);
       requireFinite(opName, 'twist', params.twist);
-      chain += `.snub(${formatFloat(params.t)}, ${formatFloat(params.twist)})`;
+      chain += `.snub(${formatFloatCpp(params.t)}, ${formatFloatCpp(params.twist)})`;
       nameParts.push(`_snub${pctSuffix(params.t)}_tw${pctSuffix(params.twist)}`);
     } else if (opName === 'relax') {
       requireCount(opName, 'iter', params.iter);
@@ -554,7 +547,7 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
       nameParts.push(`_relax${params.iter}`);
     } else if (OP_DEFS[opName].params.t) {
       requireFinite(opName, 't', params.t);
-      chain += `.${opName}(${formatFloat(params.t)})`;
+      chain += `.${opName}(${formatFloatCpp(params.t)})`;
       nameParts.push(`_${opName}${pctSuffix(params.t)}`);
     } else {
       // Parameterless ops.

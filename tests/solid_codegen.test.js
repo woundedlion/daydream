@@ -14,7 +14,6 @@ const {
   SAVED_SOLIDS_MAX,
   captureSavedSolidThumbnail,
   queueSavedSolidRestore,
-  formatFloat,
   formatSolidName,
   pctSuffix,
   generateFuncAndRecipe,
@@ -36,7 +35,6 @@ const {
   unsweepableReason,
 } =
   await import('../src/workbench/solids/solid_codegen.js');
-const { formatFloatCpp } = await import('../src/shared/cpp_format.js');
 
 /**
  * Builds an op whose params object records every key a code path reads, in read
@@ -155,11 +153,6 @@ test('applyOp throws when the module soft-rejects an op', () => {
   assert.throws(
     () => applyOp({ hankin: () => null }, { op: 'hankin', params: { angle: 54 } }),
     /applyOp: op "hankin" was rejected/);
-});
-
-/** formatFloat re-exports cpp_format's formatFloatCpp. */
-test('formatFloat is wired to the authoritative formatFloatCpp', () => {
-  assert.equal(formatFloat, formatFloatCpp);
 });
 
 /** Verifies formatSolidName splits camelCase and underscore segments into capitalized words. */

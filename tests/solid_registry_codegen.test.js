@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { D2R_F32, KNOWN_OPS, PARAMETERIZED_OPS, SIMPLE_SEEDS, DEFINED_SEED_CONSTANTS, seedOpParams } from '../src/workbench/solids/solid_codegen.js';
+import { D2R_F32, MAX_RECIPE_STEPS, KNOWN_OPS, PARAMETERIZED_OPS, SIMPLE_SEEDS, DEFINED_SEED_CONSTANTS, seedOpParams } from '../src/workbench/solids/solid_codegen.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { upperSnake, opStepCpp, generateRegistryCpp, validateRegistryFaces, MAX_RECIPE_STEPS, MAX_BUILD_STEPS } from '../src/workbench/solids/solid_registry_codegen.js';
+import { upperSnake, opStepCpp, generateRegistryCpp, validateRegistryFaces, MAX_BUILD_STEPS } from '../src/workbench/solids/solid_registry_codegen.js';
 
 test('upperSnake splits camelCase runs and uppercases the rest', () => {
   assert.equal(upperSnake('truncatedIcosahedron_hk58_chamfer63'),

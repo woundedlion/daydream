@@ -9,7 +9,7 @@ import { createCommitQueue, createChainValidator, createOpGate } from './solid_v
 import { initScene, copyWithFeedback, showFatalError, bootstrapTool, formatKB } from '../shared.js';
 import { standDownIfHalted } from '../../shared/engine_halt.js';
 import {
-  OP_DEFS,
+  OP_DEFS, MAX_RECIPE_STEPS,
   SAVED_SOLIDS_MAX,
   captureSavedSolidThumbnail,
   queueSavedSolidRestore,
@@ -29,7 +29,7 @@ import {
 } from './solid_codegen.js';
 import { fanTriangulateFace, uniqueEdges } from './solid_geometry.js';
 import { buildBaseMesh, buildChainMesh } from './solid_build.js';
-import { registryDisplayName, generateRegistryCpp, validateRegistryFaces, MAX_RECIPE_STEPS } from './solid_registry_codegen.js';
+import { registryDisplayName, generateRegistryCpp, validateRegistryFaces } from './solid_registry_codegen.js';
 import { buildOpRow, formatParamValue, syncSweepWarning } from './solid_op_rows.js';
 import { createMeshRenderer, meshStatsLine, meshCanvasLabel, MAX_INDEX_LABELS }
   from './solid_render.js';
