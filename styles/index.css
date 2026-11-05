@@ -723,7 +723,7 @@
     padding: 6px 10px 6px 7px;
     min-width: 110px;
     font-size: 12px;
-    text-align: center;
+    justify-content: center;
     width: auto;
   }
 
