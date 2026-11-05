@@ -404,7 +404,7 @@
 .effect-sidebar {
   width: fit-content;
   min-width: 15rem;
-  max-width: 25rem;
+  max-width: none;
   background: var(--sidebar-bg);
   border-right: 1px solid var(--panel-border);
   display: flex;
@@ -473,7 +473,7 @@
 }
 
 .effect-name {
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .effect-size {
@@ -648,7 +648,7 @@
   .effect-list {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(110px, max-content);
+    grid-auto-columns: max-content;
     gap: 2px;
     width: 100%;
     overflow-x: auto;
@@ -712,6 +712,7 @@
   .effect-button {
     /* Left padding is short by the 3px marker gutter, keeping the label centered. */
     padding: 6px 10px 6px 7px;
+    min-width: 110px;
     font-size: 12px;
     text-align: center;
     width: auto;
