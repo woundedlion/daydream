@@ -10,6 +10,7 @@ import {
   COLOR_PARAMETER_GROUPS, MODULATION_PARAMETER_GROUPS, COLOR_PARAMETER_NAMES,
   POTENTIAL_OPERATOR, POTENTIAL_PARAMETER_GROUPS,
   colorParameterHidden, modulationParameterHidden, PALETTE_OPERATOR, MODULATION_OPERATOR,
+  BAKED_MODULATION_SCALE_MAX, UNIT_MODULATION_AMOUNT_MIN, UNIT_MODULATION_AMOUNT_MAX,
 } from './chain_presentation.js';
 
 /** @typedef {import('./chain_presentation.js').CatalogOperator} CatalogOperator */
@@ -758,11 +759,11 @@ export function createChainStrip({
         }
         if (modulation && field === 'pattern-scale'
             && values[`${label}.modulation-evaluation`] === 'baked-cube')
-          maximum = Math.min(maximum, 8);
+          maximum = Math.min(maximum, BAKED_MODULATION_SCALE_MAX);
         if (modulation && field === 'modulation-amount'
             && values[`${label}.modulation-mechanic`] !== 'hue-rotation') {
-          minimum = Math.max(minimum, 0);
-          maximum = Math.min(maximum, 1);
+          minimum = Math.max(minimum, UNIT_MODULATION_AMOUNT_MIN);
+          maximum = Math.min(maximum, UNIT_MODULATION_AMOUNT_MAX);
         }
         for (const control of row.querySelectorAll('input')) {
           control.min = String(minimum);

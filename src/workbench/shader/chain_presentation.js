@@ -29,6 +29,9 @@ const READOUT_STEPS = 1000;
 
 export const PALETTE_OPERATOR = 'colorize.generated-palette.v4';
 export const MODULATION_OPERATOR = 'color.modulate.v1';
+export const BAKED_MODULATION_SCALE_MAX = 8;
+export const UNIT_MODULATION_AMOUNT_MIN = 0;
+export const UNIT_MODULATION_AMOUNT_MAX = 1;
 export const POTENTIAL_OPERATOR = 'sphere.displace.potential.v1';
 
 /** @type {ParameterGroup[]} */

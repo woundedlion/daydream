@@ -7,7 +7,10 @@ import { canonicalEffectId, effectDisplayName } from "../../effects/effect_ident
 import { engineHalted } from '../../shared/engine_halt.js';
 import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot, shaderChainCatalog } from '../../engine/workbench_bindings.js';
 import { enumConstantName, replayParameterWrites } from '../../effects/param_sync.js';
-import { fieldOf as fieldSegment, MODULATION_OPERATOR } from './chain_presentation.js';
+import {
+  BAKED_MODULATION_SCALE_MAX, fieldOf as fieldSegment, MODULATION_OPERATOR,
+  UNIT_MODULATION_AMOUNT_MIN, UNIT_MODULATION_AMOUNT_MAX,
+} from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
 import { applyChainDocument, resolveParameterWrite } from './chain_apply.js';
 import {
@@ -595,11 +598,12 @@ export function createShaderDocumentController({
         values[`${label}.modulation-evaluation`] = 'direct';
       if (modulated && field === 'modulation-mechanic' && value !== 'hue-rotation') {
         const amount = Number(presetValues[`${label}.modulation-amount`] ?? 0);
-        values[`${label}.modulation-amount`] = Math.max(0, Math.min(1, amount));
+        values[`${label}.modulation-amount`] = Math.max(UNIT_MODULATION_AMOUNT_MIN,
+          Math.min(UNIT_MODULATION_AMOUNT_MAX, amount));
       }
       if (modulated && values[`${label}.modulation-evaluation`] === 'baked-cube'
-          && Number(presetValues[`${label}.pattern-scale`] ?? 1) > 8)
-        values[`${label}.pattern-scale`] = 8;
+          && Number(presetValues[`${label}.pattern-scale`] ?? 1) > BAKED_MODULATION_SCALE_MAX)
+        values[`${label}.pattern-scale`] = BAKED_MODULATION_SCALE_MAX;
       const store = chainUi.store;
       const addsDeclaration = Object.keys(values).some(id => !store.declares(id));
       const coupled = Object.keys(values).length > 1;
