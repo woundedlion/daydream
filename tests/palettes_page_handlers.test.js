@@ -155,3 +155,22 @@ test('loading a recipe clears a stale hue-key refusal and renders the loaded rec
   assert.equal(status.textContent, '');
   assert.equal(rendered, 'MIRROR');
 });
+
+
+test('hiding a focused Reset Zoom button restores strip keyboard focus', () => {
+  const button = fakeElement('button');
+  let focused = 0;
+  let zoom = true;
+  const doc = {activeElement: button};
+  const sync = handler('syncResetZoomButton', {resetZoomButton: button, zoomed: () => zoom,
+    document: doc, colorStripCanvas: {focus: () => { focused++; }}});
+  sync();
+  assert.equal(focused, 0);
+  zoom = false;
+  sync();
+  assert.equal(focused, 1);
+  assert.equal(button.classList.contains('hidden'), true);
+  doc.activeElement = null;
+  sync();
+  assert.equal(focused, 1);
+});

@@ -525,7 +525,9 @@ function handleResetZoom() {
 
 function syncResetZoomButton() {
   if (resetZoomButton) {
-    resetZoomButton.classList.toggle('hidden', !zoomed());
+    const hidden = !zoomed();
+    if (hidden && document.activeElement === resetZoomButton) colorStripCanvas.focus();
+    resetZoomButton.classList.toggle('hidden', hidden);
   }
 }
 
