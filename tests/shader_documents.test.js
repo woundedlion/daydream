@@ -1929,6 +1929,20 @@ test('Save As writes a new document id and leaves the loaded one alone', async (
     'kaleidoscope-hex-bright-copy2', 'each copy takes an id of its own');
 });
 
+for (const picker of [false, true]) test(`cancelled Save As preserves the next copy number (picker=${picker})`, async () => {
+  const h = await editorWorkbench();
+  h.win.prompt = () => null;
+  if (picker) h.win.showSaveFilePicker = async () => {
+    throw new DOMException('Cancelled', 'AbortError');
+  };
+  assert.equal(await h.controller.saveAs(), false);
+  assert.equal(await h.controller.saveAs(), false);
+  delete h.win.showSaveFilePicker;
+  h.win.prompt = (_message, filename) => filename;
+  assert.equal(await h.controller.saveAs(), true);
+  assert.equal(JSON.parse(h.downloads.at(-1)[1]).document_id, 'kaleidoscope-hex-bright-copy1');
+});
+
 test('a Save As copy carries the edits made since the load', async () => {
   const harness = await editorWorkbench();
   clickPlaneBandEntry(harness, 'warp.wave-shear.v2');

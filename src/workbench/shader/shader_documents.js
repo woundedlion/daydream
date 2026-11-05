@@ -988,8 +988,7 @@ export function createShaderDocumentController({
     const savedDocument = JSON.stringify(currentDocument());
     try {
       const document = exportableDocument();
-      copies += 1;
-      document.document_id = `${document.document_id}-copy${copies}`;
+      document.document_id = `${document.document_id}-copy${copies + 1}`;
       let filename = `${document.document_id}.shader.json`;
       const source = compiler.exportShaderDocumentJson(document);
       if (typeof win.showSaveFilePicker === 'function') {
@@ -1017,6 +1016,7 @@ export function createShaderDocumentController({
         if (!filename.toLowerCase().endsWith('.json')) filename += '.shader.json';
         download(filename, source);
       }
+      copies += 1;
       if (active === savedActive) {
         active.savedDocument = savedDocument;
         showStatus(`Saved ${filename}.`);
