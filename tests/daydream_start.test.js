@@ -51,12 +51,12 @@ test('a dismiss button that mounts after startup still clears the notice', () =>
     assert.match(html, new RegExp(`id=["']${id}["']`), id);
 });
 
-test('the global GUI carries the controls a deep link names', () => {
+test('the global GUI carries session and deep-link controls', () => {
   const { guis } = startApp();
   const root = guis[0];
 
   assert.deepEqual(root.controllers.map((c) => c.property),
-    ['resolution', 'testAll', 'labelAxes', 'cullBackSphere', 'showPip', 'povFidelity',
+    ['resolution', 'testAll', 'paused', 'labelAxes', 'cullBackSphere', 'showPip', 'povFidelity',
       'povResponseScale', 'showSweepBoundary',
       'noBlackColumns', 'poleLod', 'topCap', 'bottomCap']);
   const segments = root.folders.find((f) => f.namespace === 'Segmented POV');
