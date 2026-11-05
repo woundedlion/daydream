@@ -216,9 +216,7 @@ export async function dragBetween(tab, from, to, options = {}) {
   await tab.mouse.up();
 }
 
-// Paths the served set answers with a 404 by design: Chrome's implicit icon
-// fetch on a page that declares none, and the gitignored offline font drop the
-// tool pages link behind an onerror fallback to the font CDN.
+// Optional font CDNs and Chrome's implicit icon request.
 const ABSENT_PATHS = ['favicon.ico'];
 const ABSENT_ORIGINS = new Set([
   'https://fonts.googleapis.com',

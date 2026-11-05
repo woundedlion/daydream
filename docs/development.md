@@ -48,7 +48,7 @@ URL persistence stores the snapshot in `fx.__chainSnapshot`;
 resolution rollback and segment-worker initialization use the same snapshot. Worker
 protocol carries `chainSnapshot`.
 
-Snapshot schema version 4 requires `chain: [{instance, operator}]`,
+Snapshot schema version 5 requires `chain: [{instance, operator}]`,
 `parameters: [{name, value}]`, `animationsPaused` (boolean), and
 `modulation: [{instance, recipe}]`, with one recipe per `color.modulate.v1`
 instance. Modulation fields travel in `modulation`, not `parameters`.

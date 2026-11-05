@@ -36,7 +36,7 @@ const CHANNEL_NAMES = Object.freeze({ R: 'red', G: 'green', B: 'blue' });
 
 /** @type {ReadonlyArray<ProceduralSliderDefinition>} */
 export const PROCEDURAL_SLIDER_DEFINITIONS = Object.freeze([
-  // A (Base): Range [0, 1]
+  // A (Offset): Range [0, 1]
   { param: 'A_R', container: 'A_R_container', label: 'R', color: 'text-red-300', thumb: 'r-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
   { param: 'A_G', container: 'A_G_container', label: 'G', color: 'text-green-500', thumb: 'g-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
   { param: 'A_B', container: 'A_B_container', label: 'B', color: 'text-blue-300', thumb: '', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
