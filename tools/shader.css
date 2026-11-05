@@ -330,7 +330,7 @@
 
 .chain-drag-preview {
   position: fixed;
-  z-index: 1000;
+  z-index: 2200;
   box-sizing: border-box;
   padding: 0.25rem 0.5rem;
   border: 1px solid var(--accent);
