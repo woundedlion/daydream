@@ -232,3 +232,9 @@
     justify-content: flex-start;
   }
 }
+
+@media (max-height: 520px) {
+  :root {
+    --panel-height: 50vh;
+  }
+}
