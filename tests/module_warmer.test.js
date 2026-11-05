@@ -81,6 +81,7 @@ test('a stalled warm is abandoned on its deadline so the spawn still runs',
     const warmer = new ModuleWarmer();
     await warmer.warm({
       baseUrl: 'http://localhost:8000/stalled/src/segments/segment_controller.js',
+      now: () => 0,
       minIntervalMs: 0,
       fetch: () => Promise.resolve({
         arrayBuffer: () => Promise.resolve(EMPTY_WASM.buffer),
@@ -91,9 +92,10 @@ test('a stalled warm is abandoned on its deadline so the spawn still runs',
     /** @type {Array<() => void>} */
     const expire = [];
     let aborted = 0;
-    const warm = warmer.warm({
+    const stalled = {
       baseUrl: 'http://localhost:8000/stalled/src/segments/segment_controller.js',
-      minIntervalMs: 0,
+      now: () => WARM_INTERVAL_MS,
+      minIntervalMs: WARM_INTERVAL_MS,
       timers: {
         setTimeout: (/** @type {() => void} */ fn, /** @type {number} */ ms) => {
           assert.equal(ms, WARM_DEADLINE_MS);
@@ -104,20 +106,32 @@ test('a stalled warm is abandoned on its deadline so the spawn still runs',
       },
       fetch: (/** @type {URL} */ url, /** @type {*} */ options) => {
         assert.ok(url instanceof URL);
-        options.signal.addEventListener('abort', () => { aborted += 1; });
-        return new Promise(() => {});
+        return new Promise((resolve, reject) => {
+          options.signal.addEventListener('abort', () => {
+            aborted += 1;
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        });
       },
-    });
+    };
+    const warm = warmer.warm(stalled);
 
     assert.equal(expire.length, 1, 'the warm armed exactly one deadline');
     expire[0]();
     await warm;
+    await new Promise(resolve => setImmediate(resolve));
 
     assert.equal(aborted, GRAPH.length, 'every stalled re-fetch was aborted');
     assert.equal(warnings.length, 1);
     assert.match(warnings[0], /module warm did not finish within/);
     assert.equal(warmer.module, null,
       'the abandoned warm hands the pool a module it never revalidated');
+    const retried = warmer.warm(stalled);
+    assert.equal(expire.length, 2, 'an aborted warm re-arms within the dedupe window');
+    expire[1]();
+    await retried;
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(aborted, 2 * GRAPH.length);
   });
 
 test('a re-warm inside the dedupe window is skipped', async () => {

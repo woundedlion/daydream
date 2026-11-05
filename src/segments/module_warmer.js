@@ -116,7 +116,7 @@ export class ModuleWarmer {
         if (failed && this.warmEpoch === epoch) {
           this.lastWarmAt = -Infinity;
           publish(null);
-          console.warn('[Segmented] module warm failed', failed.reason);
+          if (!controller.signal.aborted) console.warn('[Segmented] module warm failed', failed.reason);
         }
       });
     } catch (error) {
@@ -127,7 +127,7 @@ export class ModuleWarmer {
     }
     warm = raceDeadline(() => warm, deadlineMs, timers, () => {
       controller.abort();
-      // The binary never arrived, so a module held from an earlier warm can no
+      // The warm did not finish, so a module held from an earlier warm can no
       // longer be claimed to match the one being served.
       publish(null);
       console.warn('[Segmented] module warm did not finish within '
