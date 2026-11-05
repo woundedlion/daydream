@@ -440,7 +440,7 @@ test('the fixed path skips the ids the compiled build bakes in as constants', ()
 
 // Ash Cloud carries a baked constant: AshCloud registers no Camera Spin Speed
 // because CAMERA_SPIN_RATE is a constant.
-test('the fixed apply writes Ash Cloud active controls in document order', () => {
+test('fixed apply orchestration writes matching controls in document order', () => {
   const ashCloud = promotedDocument(PROMOTED['ash-cloud']);
   assert.equal(ashCloud.preset_bank.presets[0].values['modulate.modulation-source'], 'displacement');
   const dormant = new Set(['modulate.pattern-scale', 'modulate.pattern-speed', 'modulate.pattern-contrast']);
@@ -1117,8 +1117,8 @@ const HEX_PATTERN_CATALOG = JSON.stringify({
 
 /**
  * The promoted build's engine surface: its own reference presets and the
- * alias-named controls kaleidoscope_hex_bright's parameter ids map onto, which is what makes
- * it a different engine surface from the chain interpreter's.
+ * alias-named controls derived from the supplied fixture. This orchestration
+ * double does not model the compiled engine's control set.
  * @returns {Object} The engine.
  */
 function compiledBuildEngine(source = KALEIDOSCOPE_HEX_BRIGHT) {

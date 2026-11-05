@@ -3,7 +3,7 @@ import {after, test} from 'node:test';
 import createModule from '../generated/holosphere_wasm.js';
 import {callWorkbenchBinding} from '../src/engine/workbench_bindings.js';
 import {readFileSync} from 'node:fs';
-import {bakedTopologyFields, compileShaderDocument, fixedDerivedBinding} from '../generated/shader/shader_workbench.mjs';
+import {bakedTopologyFields, compileShaderDocument, documentModulationBinding, fixedDerivedBinding} from '../generated/shader/shader_workbench.mjs';
 import {documentFromChainSnapshot, scratchChainDocument} from '../src/workbench/shader/chain_document_store.js';
 import {applyChainDocument} from '../src/workbench/shader/chain_apply.js';
 import {applyFixedShaderDocument} from '../src/workbench/shader/shader_documents.js';
@@ -33,6 +33,27 @@ test('every catalog document preset applies to its compiled engine', () => {
   }
   assert.equal(Object.keys(sources).length, 23);
   assert.equal(applied, 35);
+});
+
+test('Ash Cloud applies its real compiled controls and validates unregistered readonly fields', () => {
+  const catalog = JSON.parse(readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
+  const compiled = compileShaderDocument(readFileSync(new URL('../generated/shader/patterns/ash_cloud.shader.json', import.meta.url), 'utf8'), {catalog});
+  engine.setEffect('ash-cloud');
+  const preset = compiled.document.preset_bank.presets[0];
+  const referenceIds = engine.getPresetIds();
+  const apply = () => applyFixedShaderDocument(engine, module, compiled, preset.preset_id,
+    referenceIds, bakedTopologyFields(catalog), fixedDerivedBinding, catalog);
+  assert.equal(apply(), null);
+  const id = 'modulate.grid-axis-b-x';
+  const binding = documentModulationBinding(compiled.document.descriptor, id);
+  assert.ok(binding);
+  assert.equal(engine.getParameterDefinitions().some(({name}) => name.endsWith('grid-axis-b-x')), false);
+  const definition = engine.getDocumentParameterDefinitions().find(entry =>
+    entry.resource === binding.resource && entry.id === binding.id);
+  assert.equal(definition.readonly, true);
+  assert.equal(Math.fround(preset.values[id]), Math.fround(definition.value));
+  preset.values[id] += 1;
+  assert.match(apply(), /grid-axis-b-x.*must match the fixed build/);
 });
 
 function installModulatedChain() {
