@@ -2345,7 +2345,7 @@ test('Potential Lens term edits retain typed input ranges topology gates and und
   assert.equal(h.store.redo(), true);
   assert.equal(h.store.document().preset_bank.presets[0].values['potential.term-2-amplitude'], 0.8);
   maximum = 0.25;
-  h.strip.syncParameterRanges();
+  h.strip.syncParameterRows();
   const strength = rowFor(h, 'potential', 'potential.strength').querySelector('.chain-param-value');
   assert.equal(strength.max, '0.25');
   strength.value = '1';
@@ -2388,7 +2388,7 @@ test('enum admission metadata updates allowed choices at float32 integer boundar
   assert.equal(select.value, 'octahedral');
   minimum = 1;
   maximum = 8;
-  h.strip.syncParameterRanges();
+  h.strip.syncParameterRows();
   assert.equal(controlIn(rowFor(h, 'lens', 'lens.symmetry')), select);
   assert.deepEqual(select.options.map((option) => option.disabled),
     [true, false, false, false, false, false, false, false, false]);

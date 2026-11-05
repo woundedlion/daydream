@@ -488,7 +488,7 @@ export function createShaderDocumentController({
         return false;
       }
       active.presetId = presetId;
-      chainUi?.strip.syncParameterRanges();
+      chainUi?.strip.syncParameterRows();
       showPreviewStatus();
       showDigest();
       scheduleDeepLink();

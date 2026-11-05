@@ -533,7 +533,7 @@ export function createChainStrip({
    * Updates admitted ranges, topology visibility and read-only diagnostics.
    * @param {boolean} [refreshRanges] - Recompute limits after committed edits.
    */
-  const markDeactivated = (refreshRanges = true) => {
+  const syncParameterRows = (refreshRanges = true) => {
     const chain = store.chain();
     if (refreshRanges)
       admittedRanges = new Map(parameterRanges().map((range) => [range.name, range]));
@@ -618,7 +618,7 @@ export function createChainStrip({
 
   const commitParameter = () => {
     onCommitParameter();
-    markDeactivated();
+    syncParameterRows();
   };
 
   /**
@@ -652,7 +652,7 @@ export function createChainStrip({
       return false;
     }
     values[parameterId] = value;
-    markDeactivated(false);
+    syncParameterRows(false);
     return true;
   };
   /** @type {{parameterId: string, value: number}|null} */
@@ -1056,7 +1056,7 @@ export function createChainStrip({
       if (!pinnedLabels.delete(entry.label)) pinnedLabels.add(entry.label);
       syncPin();
       chip.classList.toggle('chain-chip--expanded', pinnedLabels.has(entry.label));
-      markDeactivated();
+      syncParameterRows();
     });
     header.appendChild(pin);
     if (!crossing) {
@@ -1271,7 +1271,7 @@ export function createChainStrip({
       scrollButton(viewport, 1));
     // Preserve the scroll offset across rebuilds.
     if (scrolled > 0) viewport.scrollTop = scrolled;
-    markDeactivated();
+    syncParameterRows();
 
     const action = focusAction === null ? null : actions.querySelector(focusAction);
     if (action && !action.disabled) {
@@ -1322,7 +1322,7 @@ export function createChainStrip({
 
   return {
     render,
-    syncParameterRanges: markDeactivated,
+    syncParameterRows,
 
     /** @param {Record<string, *>} updates - Committed parameter values. */
     syncParameterValues(updates) {
@@ -1336,7 +1336,7 @@ export function createChainStrip({
         const readout = row.querySelector('.chain-param-value');
         if (readout) readout.value = formatNumericValue(value);
       }
-      markDeactivated();
+      syncParameterRows();
     },
 
     /**
