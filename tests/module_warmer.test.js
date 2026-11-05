@@ -228,6 +228,44 @@ test('a binary the engine refuses is reported, not left to the spawn to discover
     'the rejection is carried, so the operator sees why it failed');
 });
 
+test('superseding a warm aborts stale fetches without reopening the fresh dedupe window', async (t) => {
+  const warmer = new ModuleWarmer();
+  const warnings = [];
+  t.mock.method(console, 'warn', (...args) => warnings.push(args));
+  let staleSignal;
+  let binaryStarted;
+  const started = new Promise((resolve) => { binaryStarted = resolve; });
+  const stale = warmer.warm({
+    baseUrl: 'https://daydream.test/stale/src/segments/segment_worker.js',
+    now: () => 0,
+    fetch: (url, { signal }) => {
+      if (!url.pathname.endsWith('.wasm')) return Promise.resolve({ arrayBuffer: async () => EMPTY_WASM.buffer });
+      staleSignal = signal;
+      binaryStarted();
+      return new Promise((resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new DOMException('superseded', 'AbortError')), { once: true });
+      });
+    },
+  });
+  await started;
+  let freshFetches = 0;
+  const freshOptions = {
+    baseUrl: 'https://daydream.test/fresh/src/segments/segment_worker.js',
+    now: () => 0,
+    fetch: () => { freshFetches++; return Promise.resolve({ arrayBuffer: async () => EMPTY_WASM.buffer }); },
+  };
+  await warmer.warm(freshOptions);
+  await stale;
+  assert.equal(staleSignal.aborted, true);
+  assert.deepEqual(warnings, []);
+  const fresh = warmer.module;
+  assert.ok(fresh instanceof WebAssembly.Module);
+  const count = freshFetches;
+  await warmer.warm(freshOptions);
+  assert.equal(freshFetches, count);
+  assert.equal(warmer.module, fresh);
+});
+
 test('a warm that settles behind a newer one leaves its module alone', async () => {
   const warmer = new ModuleWarmer();
   /** @type {(bytes: ArrayBuffer) => void} */
