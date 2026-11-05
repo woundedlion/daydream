@@ -44,12 +44,15 @@ function enumName(type, value) {
  * @param {number} frames - Renders to draw.
  * @param {number} [width] - Resolution width; the suite default (W).
  * @param {number} [height] - Resolution height; the suite default (H).
+ * @param {{temporal?: boolean, caps?: {top: number, bottom: number}}} [options] - Worker display settings.
  * @returns {Promise<{clip: string, pixels: Uint16Array}>} The clip result's
  *   name and a detached copy of the full canvas readback.
  */
-async function renderWith(effect, rect, frames, width = W, height = H) {
+async function renderWith(effect, rect, frames, width = W, height = H, { temporal = true, caps = {top: 0, bottom: 0} } = {}) {
   const M = await createHolosphereModule({ print() {}, printErr() {} });
   const engine = new M.HolosphereEngine();
+  assert.equal(engine.setDisplayCaps(caps.top, caps.bottom), true);
+  engine.setTemporalSampling(temporal);
   const resolution = enumName(M.ResolutionSetResult, engine.setResolution(width, height));
   assert.ok(resolution === 'RESIZED' || resolution === 'ALREADY_ACTIVE',
     `${width}x${height} must be buildable, got ${resolution}`);
@@ -71,11 +74,12 @@ async function renderWith(effect, rect, frames, width = W, height = H) {
  * @param {number} frames - Renders to draw.
  * @param {number} [width] - Resolution width; the suite default (W).
  * @param {number} [height] - Resolution height; the suite default (H).
+ * @param {{temporal?: boolean, caps?: {top: number, bottom: number}}} [options] - Worker display settings.
  * @returns {Promise<{canvas: Uint16Array, clips: string[], compacts: Uint16Array[],
  *   rects: Array<Object>, readbacks: Uint16Array[]}>} The composited canvas, the
  *   per-segment pieces, and each worker's full-canvas readback.
  */
-async function compositeSegments(effect, total, frames, width = W, height = H) {
+async function compositeSegments(effect, total, frames, width = W, height = H, options = {}) {
   const canvas = new Uint16Array(width * height * 3);
   const clips = [];
   const compacts = [];
@@ -83,7 +87,7 @@ async function compositeSegments(effect, total, frames, width = W, height = H) {
   const readbacks = [];
   for (let id = 0; id < total; id++) {
     const rect = computeSegmentRange(id, total, width, height);
-    const { clip, pixels } = await renderWith(effect, rect, frames, width, height);
+    const { clip, pixels } = await renderWith(effect, rect, frames, width, height, options);
     const compact = new Uint16Array(rect.w * rect.h * 3);
     extractSegment(pixels, compact, width, rect);
     compositeSegment(canvas, compact, width, rect);
@@ -225,4 +229,18 @@ test('two engines on the same message sequence reach the same frame', async () =
   // Every instance seeds from the effect's stable id.
   const twin = await renderWith(CLIPPED_EFFECT, FULL, FRAMES);
   assertSameFrame(twin.pixels, reference.pixels, 'a second WASM instance drew a different frame at ');
+});
+
+test('four segments stitch flat, column-time and capped flat worker surfaces', async () => {
+  for (const effect of [CLIPPED_EFFECT, FULL_FRAME_EFFECT]) {
+    for (const options of [{temporal: false}, {temporal: true},
+      {temporal: false, caps: {top: 12, bottom: 8}}]) {
+      const label = `${effect} ${JSON.stringify(options)}`;
+      const full = await renderWith(effect, FULL, FRAMES, W, H, options);
+      assertImage(full.pixels, W, H, label);
+      const {canvas, clips} = await compositeSegments(effect, 4, FRAMES, W, H, options);
+      assert.deepEqual(clips, Array(4).fill(effect === CLIPPED_EFFECT ? 'APPLIED' : 'FULL_FRAME_KEPT'), label);
+      assertSameFrame(canvas, full.pixels, label);
+    }
+  }
 });
