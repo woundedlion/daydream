@@ -24,7 +24,7 @@ const RECORDER_TIMESLICE_MS = 1000;
 
 // Encoder bitrate a session falls back to when the host leaves bitrateMbps unset
 // or non-positive.
-const DEFAULT_BITRATE_MBPS = 16;
+export const DEFAULT_BITRATE_MBPS = 16;
 
 // Seconds of video the streaming sink may hold pending file open or writes.
 export const WRITE_BACKLOG_SECONDS = 120;

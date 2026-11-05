@@ -8,7 +8,7 @@
  * duration overlay the frame loop writes.
  */
 
-import { MEMORY_BUFFER_LIMIT_BYTES } from "./recorder.js";
+import { DEFAULT_BITRATE_MBPS, MEMORY_BUFFER_LIMIT_BYTES } from "./recorder.js";
 import { createRecordingSettings } from "./recording_settings.js";
 import { errorDetail } from "../shared/banner.js";
 
@@ -56,7 +56,7 @@ export function createRecordingControls({
   const REC_FORMATS = { 'Auto': 'auto', 'MP4': 'mp4', 'WebM': 'webm' };
   const recordingSettings = createRecordingSettings({ getRecorder, warn: showNotice });
   const recSettings = recordingSettings.settings;
-  recordingSettings.define('recQuality', 16, 'bitrate',
+  recordingSettings.define('recQuality', DEFAULT_BITRATE_MBPS, 'bitrate',
     (recorder, v) => { recorder.bitrateMbps = v; });
   recordingSettings.define('recResolution', 'Native', 'resolution',
     (recorder, v) => { recorder.targetHeight = REC_RESOLUTIONS[v]; });
