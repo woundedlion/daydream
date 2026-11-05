@@ -605,3 +605,70 @@ test('deployment MIME and presence checks cover every published engine module', 
   const expected = [...RUNTIME_PATHS].filter((path) => /\.(m?js|wasm)$/.test(path) && published.has(path));
   assert.deepEqual([...new Set(assets[1].trim().split(/\s+/))].sort(), expected.sort());
 });
+
+test('deploy consumes one checksummed engine bundle at the module pin', () => {
+  const workflow = workflowText('engine-bundle.yml');
+  assert.match(workflow, /holosphere-engine-\$PIN/);
+  assert.match(workflow, /head_sha=\$PIN&branch=master&per_page=10/);
+  assert.match(workflow,
+    /select\(\.event == "push" or \.event == "workflow_dispatch"\)/);
+  assert.match(workflow, /sha256sum -c holosphere_engine\.sha256/);
+  assert.match(workflow, /node scripts\/install-engine-bundle\.mjs engine-bundle/);
+  assert.doesNotMatch(workflow, /cmp -s/);
+  assert.doesNotMatch(workflow, /cmake --build|path: engine\s*$/m);
+});
+
+// A served Content-Type needs a live URL, so only the assets behind it can be
+// checked ahead of the deployment; the presence check is that half.
+test('deploy checks the engine assets it stages before it publishes them', () => {
+  const workflow = workflowText('deploy.yml');
+  const staged = workflow.indexOf('name: Verify the staged engine assets');
+  const published = workflow.indexOf('uses: actions/deploy-pages@');
+  const served = workflow.indexOf('name: Verify published engine MIME types');
+  assert.ok(staged >= 0 && published >= 0 && served >= 0,
+    `staged ${staged}, published ${published}, served ${served}`);
+  assert.ok(staged < published, 'the staged assets are checked before publication');
+  assert.ok(published < served, 'a served Content-Type exists only once published');
+});
+
+test('deploy stops waiting when the pinned engine run cannot publish', () => {
+  const workflow = workflowText('engine-bundle.yml');
+  assert.doesNotMatch(workflow, /\|\| true/);
+  assert.match(workflow, /if \[ "\$run_status" = completed \]/);
+  assert.match(workflow, /POV CI for \$PIN concluded \$run_conclusion/);
+  assert.match(workflow, /published no verified engine bundle/);
+});
+
+test('the engine checkout can fetch a pin after master advances', () => {
+  const workflow = workflowText('js-unit-suite.yml');
+  const checkout = workflow.match(
+    /- name: Checkout the pinned engine\n[\s\S]*?(?=\n\s{6}- )/,
+  )?.[0] ?? '';
+  assert.match(checkout, /fetch-depth: 1/);
+  assert.match(checkout, /^\s+ref: \$\{\{ steps\.engine\.outputs\.pin \}\}$/m);
+});
+
+// The engine-parity and hook cases skip without their flags.
+test('the JS unit suite arms the engine-parity and hook cases', () => {
+  const workflow = workflowText('js-unit-suite.yml');
+  const checkout = workflow.match(
+    /- name: Checkout the pinned engine\n[\s\S]*?(?=\n\s{6}- )/,
+  )?.[0] ?? '';
+  assert.match(checkout, /^\s+path: engine$/m);
+  const step = workflow.match(/- name: Test\n[\s\S]*?(?=\n\s{6}- |\s*$)/)?.[0] ?? '';
+  assert.match(step, /^\s+HOLOSPHERE_ENGINE_REQUIRED: '1'$/m);
+  assert.match(step, /^\s+DAYDREAM_HOOK_SH_REQUIRED: '1'$/m);
+  assert.match(step, /^\s+run: npm test$/m);
+});
+
+test('CI checks source parity after installing the selected runtime', () => {
+  const suite = workflowText('js-unit-suite.yml');
+  const install = suite.indexOf('name: Install the verified engine package');
+  const resolve = suite.indexOf('name: Resolve engine pin');
+  const checkout = suite.indexOf('name: Checkout the pinned engine');
+  assert.ok(install >= 0, 'verified package install step exists');
+  assert.ok(resolve >= 0, 'engine pin resolution step exists');
+  assert.ok(checkout >= 0, 'pinned engine checkout step exists');
+  assert.ok(install < resolve);
+  assert.ok(resolve < checkout);
+});
