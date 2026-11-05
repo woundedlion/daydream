@@ -13,7 +13,7 @@ beforeEach((t) => {
 import { runWorkbenchSections, probeColorStageDrag, probeColorCard, probePaletteAndModulations, probeNoiseScaleDrag, probeDocumentActions, probeSnapshotImport, probeParity, probeStartupPersistence, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
 import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
 import {
-  probeKeyboardEdits, probeMobilePanel, probePanel, probePresetName, probeSidebar, probeSliderDrag,
+  probeNumericRange, probeKeyboardEdits, probeMobilePanel, probePanel, probePresetName, probeSidebar, probeSliderDrag,
   probeStageNames, probeTelemetry, probeTouchSlider, probeWarningNote,
 } from '../scripts/panel-probe.mjs';
 import { probeChain, probeNumericInputs } from '../scripts/solids-probe.mjs';
@@ -39,6 +39,7 @@ const PROBES = [
 
   ['panel-probe.mjs', 'probeSliderDrag', probeSliderDrag],
   ['panel-probe.mjs', 'probeKeyboardEdits', probeKeyboardEdits],
+  ['panel-probe.mjs', 'probeNumericRange', probeNumericRange],
   ['panel-probe.mjs', 'probeTouchSlider', probeTouchSlider],
   ['panel-probe.mjs', 'probePresetName', probePresetName],
   ['panel-probe.mjs', 'probeMobilePanel', probeMobilePanel],

@@ -728,6 +728,39 @@ export async function probeKeyboardEdits(tab) {
   return failures;
 }
 
+/** @param {import('puppeteer-core').Page} tab */
+export async function probeNumericRange(tab) {
+  const {failures, check} = checks();
+  await tab.evaluate(async () => {
+    const [{GUI}, {addParamControl}] = await Promise.all([
+      import('lil-gui'), import('./src/ui/effect_param_controls.js')]);
+    const container = document.createElement('div');
+    container.id = 'range-probe';
+    document.body.append(container);
+    const gui = new GUI({container, autoPlace: false});
+    const control = addParamControl(gui, {strength: 0.75},
+      {name: 'strength', value: 0.75, min: -1, max: 1});
+    control.name('Range probe strength');
+  });
+  await tab.waitForSelector('#range-probe input', {visible: true});
+  await tab.focus('#range-probe input');
+  const session = await tab.createCDPSession();
+  try {
+    const {root} = await session.send('DOM.getDocument');
+    const {nodeId} = await session.send('DOM.querySelector', {nodeId: root.nodeId, selector: '#range-probe input'});
+    const {nodes} = await session.send('Accessibility.getPartialAXTree', {nodeId, fetchRelatives: false});
+    const input = nodes[0];
+    check(input?.role?.value === 'textbox' && Number(input.value?.value) === 0.75,
+      'numeric controls retain native textbox and current-value accessibility semantics');
+    check(input?.description?.value === 'Range -1 to 1.',
+      'numeric controls expose their limits in the accessibility description');
+  } finally {
+    await session.detach();
+    await tab.$eval('#range-probe', node => node.remove());
+  }
+  return failures;
+}
+
 if (isMain(import.meta.url)) await runProbe({
   name: 'panel-probe',
   minimumChecks: 63,
@@ -746,6 +779,7 @@ if (isMain(import.meta.url)) await runProbe({
     failures.push(...await probeSliderDrag(tab));
     failures.push(...await probePresetName(tab));
     failures.push(...await probeKeyboardEdits(tab));
+    failures.push(...await probeNumericRange(tab));
     failures.push(...await probeWarningNote(tab, 'desktop'));
     failures.push(...await probeStageNames(tab));
     failures.push(...await probeTelemetry(tab));

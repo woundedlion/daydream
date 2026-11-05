@@ -100,6 +100,13 @@ export function addParamControl(
   if (controller.isContinuous && Number.isFinite(p.min) && Number.isFinite(p.max)
       && /** @type {number} */ (p.min) < /** @type {number} */ (p.max)) {
     controller.paramRange = [p.min, p.max];
+    const widget = focusWidget(controller) ?? controller.domElement;
+    const range = controller.domElement.ownerDocument.createElement('span');
+    range.id = `param-range-${encodeURIComponent(p.name)}`;
+    range.hidden = true;
+    range.textContent = `Range ${p.min} to ${p.max}.`;
+    controller.domElement.appendChild(range);
+    widget.setAttribute('aria-describedby', range.id);
   }
   if (p.warning) {
     const widget = focusWidget(controller) ?? controller.domElement;
@@ -110,7 +117,7 @@ export function addParamControl(
     controller.domElement.appendChild(note);
     controller.domElement.classList.add('param-warning');
     widget.setAttribute('aria-invalid', 'true');
-    widget.setAttribute('aria-describedby', note.id);
+    widget.setAttribute('aria-describedby', [widget.getAttribute('aria-describedby'), note.id].filter(Boolean).join(' '));
   }
   return controller;
 }

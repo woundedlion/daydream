@@ -113,7 +113,7 @@ test('warning ids separate names that differ only in punctuation or case', () =>
   const notes = ['Hue Shift', 'Hue-Shift', 'hue shift'].map((name) => {
     const controller = warned(name);
     const note = controller.domElement.querySelector('.param-warning-note');
-    assert.equal(controller.$input.getAttribute('aria-describedby'), note.id,
+    assert.ok(controller.$input.getAttribute('aria-describedby').split(' ').includes(note.id),
       'the description points at the note this control published');
     return note;
   });
@@ -121,12 +121,12 @@ test('warning ids separate names that differ only in punctuation or case', () =>
   assert.equal(new Set(notes.map((note) => note.id)).size, notes.length);
 });
 
-test('a param without a warning carries no invalid state or description', () => {
+test('a param without a warning carries no invalid state or warning note', () => {
   const gui = fakePanelGui();
   const controller = addParamControl(gui, { Speed: 0.1 }, SPEED);
 
   assert.equal(controller.$input.getAttribute('aria-invalid'), null);
-  assert.equal(controller.$input.getAttribute('aria-describedby'), null);
+  assert.equal(controller.$input.getAttribute('aria-describedby'), 'param-range-Speed');
   assert.equal(controller.domElement.querySelector('.param-warning-note'), null);
 });
 
@@ -137,4 +137,18 @@ test('a boolean carrying option labels stays a toggle', () => {
 
   assert.deepEqual(controller.args, []);
   assert.equal(controller.isBoolean, true);
+});
+
+
+test('numeric range descriptions preserve the native text value semantics', () => {
+  const gui = fakePanelGui();
+  const controller = addParamControl(gui, {strength: 0.75},
+    {name: 'strength', value: 0.75, min: -1, max: 1, warning: 'Careful'});
+  const ids = controller.$input.getAttribute('aria-describedby').split(' ');
+  const range = controller.domElement.children.find(node => node.id === ids[0]);
+  assert.equal(range.textContent, 'Range -1 to 1.');
+  assert.equal(range.hidden, true);
+  assert.equal(ids.length, 2);
+  assert.equal(controller.$input.getAttribute('role'), null);
+  assert.equal(controller.getValue(), 0.75);
 });

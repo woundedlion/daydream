@@ -23,7 +23,7 @@ test('fold advisory paints both signed tails and leaves the admitted value avail
   assert.equal(controller.$input.getAttribute('aria-invalid'), null);
   const note = controller.domElement.querySelector('.param-fold-note');
   assert.match(note.textContent, /0.200/);
-  assert.equal(controller.$input.getAttribute('aria-describedby'), note.id);
+  assert.equal(controller.$input.getAttribute('aria-describedby'), `param-range-flow.strength ${note.id}`);
 });
 
 test('updated estimates move the band and preserve refusal descriptions', () => {
@@ -67,7 +67,7 @@ test('empty, zero and invalid estimates leave unrelated controls usable', () => 
   syncParamAdvisories(controls, [{ name: STRENGTH.name, foldStrength: -0.2 }]);
   assert.equal(strength.domElement.querySelector('.param-fold-note'), null);
   syncParamAdvisories(controls, []);
-  assert.equal(strength.$input.getAttribute('aria-describedby'), null);
+  assert.equal(strength.$input.getAttribute('aria-describedby'), 'param-range-flow.strength');
   assert.equal(strength.getValue(), 0.7);
 });
 
