@@ -1047,20 +1047,7 @@ function wireRowDrag(grip, index, el, list, revision) {
         return;
       }
       renderOps(); // snap the drag preview back
-      queueCommit(async () => {
-        if (revision !== opsRevision) return;
-        const check = await chainIsValid(
-          state.base, movedOps(state.ops, index, toIndex));
-        if (!check.ok) {
-          showGateMsg(`rejected: ${check.message}`);
-          return;
-        }
-        // Re-derived from the live ops: param edits land outside the commit queue.
-        setOps(movedOps(state.ops, index, toIndex));
-        renderOps();
-        showGateMsg('');
-        update();
-      });
+      reorderOp(index, toIndex, revision);
     },
     onCancel: () => {
       dragging = false;

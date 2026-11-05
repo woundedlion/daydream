@@ -604,6 +604,24 @@ test('a row drag retains its grab offset across scrolling and clears on cancella
   assert.equal(drag.onStart({ clientX: 30, clientY: 160 }), false);
 });
 
+test('dropping a row snaps back then uses the shared reorder action', () => {
+  let drag;
+  const calls = [];
+  const context = {wasmModule: {}, DRAG_SLOP_PX: 4,
+    createPointerDrag: options => { drag = options; }, dropSlotGen: 0, dropSlotChecks: new Map(),
+    getDragTargetIndex: () => 2, checkDropSlot: async () => {}, reorderPreviewShift: () => 0,
+    dropTargetIndex: () => 1, renderOps: () => calls.push('render'),
+    reorderOp: (...args) => calls.push(args)};
+  const row = fakeElement('div');
+  const list = {children: [row], scrollTop: 0, scrollLeft: 0,
+    getBoundingClientRect: () => ({top: 0, left: 0})};
+  handler('wireRowDrag', context)(fakeElement('button'), 0, row, list, 7);
+  drag.onStart({clientX: 0, clientY: 0});
+  drag.onMove({clientX: 0, clientY: 20});
+  drag.onEnd({clientX: 0, clientY: 20});
+  assert.deepEqual(calls, ['render', [0, 1, 7]]);
+});
+
 test('a row drag cannot rebuild controls after the engine stands down', () => {
   let drag;
   const context = { wasmModule: {}, DRAG_SLOP_PX: 4,
