@@ -9,6 +9,27 @@ import { captureConsole } from './helpers/fake_console.js';
 
 const handler = pageHandlers(new URL('../src/workbench/palettes/palettes_page.js', import.meta.url));
 
+test('effect recipe changes retain arrow navigation until blur or pointer selection', () => {
+  const select = fakeElement('select');
+  const loaded = [];
+  handler('buildEffectRecipePresets', {
+    document: {getElementById: () => select, createElement: fakeElement},
+    effectPalettePresets: [{name: 'First', recipe: 1}, {name: 'Second', recipe: 2}],
+    loadRecipe: recipe => loaded.push(recipe),
+  })();
+  for (const value of ['0', '1']) {
+    select.value = value;
+    select.dispatch('change');
+    assert.equal(select.value, value);
+  }
+  assert.deepEqual(loaded, [1, 2]);
+  select.dispatch('blur');
+  assert.equal(select.value, '');
+  select.value = '1';
+  select.dispatch('pointerdown');
+  assert.equal(select.value, '');
+});
+
 test('tab switches rebuild the palette when browser URL updates are refused', () => {
   for (const refused of [false, true]) {
     const button = fakeElement();

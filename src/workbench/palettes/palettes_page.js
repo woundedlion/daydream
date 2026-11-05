@@ -293,8 +293,9 @@ function buildEffectRecipePresets() {
   select.addEventListener('change', () => {
     if (select.value === '') return;
     loadRecipe(effectPalettePresets[Number(select.value)].recipe);
-    select.value = '';
   });
+  select.addEventListener('blur', () => { select.value = ''; });
+  select.addEventListener('pointerdown', () => { select.value = ''; });
 }
 
 // Drag-to-zoom state

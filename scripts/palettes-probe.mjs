@@ -270,9 +270,26 @@ export async function probeHueWheel(tab) {
   return failures;
 }
 
+/** @param {import('puppeteer-core').Page} tab @returns {Promise<string[]>} */
+export async function probeEffectRecipeArrows(tab) {
+  const {failures, check} = checks();
+  const selector = '#effect_recipe_preset';
+  await tab.focus(selector);
+  await tab.keyboard.press('ArrowDown');
+  check(await tab.$eval(selector, node => node.value) === '0',
+    'the first arrow selects the first effect recipe');
+  await tab.keyboard.press('ArrowDown');
+  check(await tab.$eval(selector, node => node.value) === '1',
+    'the next arrow reaches the second effect recipe');
+  await tab.keyboard.press('Tab');
+  check(await tab.$eval(selector, node => node.value) === '',
+    'leaving the recipe selector restores its placeholder');
+  return failures;
+}
+
 if (isMain(import.meta.url)) await runProbe({
   name: 'palettes-probe',
-  minimumChecks: 23,
+  minimumChecks: 26,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'the strip zooms and the hue keys drag under a real pointer.',
@@ -285,6 +302,7 @@ if (isMain(import.meta.url)) await runProbe({
       () => (document.getElementById('effect_recipe_preset')?.children.length ?? 0) > 1);
     failures.push(...await probeColorStrip(tab));
     failures.push(...await probeHueWheel(tab));
+    failures.push(...await probeEffectRecipeArrows(tab));
     return failures;
   },
 });
