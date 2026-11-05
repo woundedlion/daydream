@@ -69,6 +69,13 @@ export async function probePad(tab) {
   const { failures, check } = checks();
 
   await tab.select('#presetSelect', ANIMATED_PRESET);
+  await tab.select('#presetSelect', '');
+  check(await activePresets(tab) === 0, 'selecting the placeholder stops the animated preset');
+  const stoppedCode = await tab.$eval('#mobius_code_output', node => node.textContent);
+  await tab.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  check(await tab.$eval('#mobius_code_output', node => node.textContent) === stoppedCode,
+    'the placeholder retains the stopped coefficient values');
+  await tab.select('#presetSelect', ANIMATED_PRESET);
   await tab.waitForFunction(() =>
     document.querySelectorAll('.preset-btn.active').length === 1,
   { timeout: TIMEOUT_MS });

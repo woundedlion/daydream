@@ -471,6 +471,7 @@ const init = () => {
   presetSelect.addEventListener('change', () => {
     const preset = presets.find(p => p.id === presetSelect.value);
     if (preset) startPreset(preset);
+    else stopAnimation();
   });
 
   const onParamChange = () => updateMobiusUniforms();
