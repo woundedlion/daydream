@@ -847,9 +847,10 @@ test('the rendered solids remove glyph clears AA against its op-row fill', () =>
 });
 
 
-test('disabled slider thumbs are muted in separate WebKit and Firefox rules', () => {
+test('disabled slider track and thumbs use inactive cursors and muted fills', () => {
   const css = read('tools', 'tools.css');
   const page = luminance(surface(css, 'body'));
+  assert.match(ruleBody(css, 'input[type=range]:disabled'), /cursor: default/);
   for (const pseudo of ['::-webkit-slider-thumb', '::-moz-range-thumb']) {
     const enabledSelector = `input[type=range]${pseudo}`;
     const disabledSelector = `input[type=range]:disabled${pseudo}`;
