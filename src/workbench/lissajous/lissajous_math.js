@@ -16,8 +16,8 @@ const TWO_PI = 2 * Math.PI;
  */
 export const MAX_RATIONAL_TERM = 8;
 
-// Cap on numerators the range-bounded search walks.
-const MAX_SEARCH_NUMERATOR = 1024;
+// Caps the range-bounded numerator search and the held-ratio closing terms.
+const MAX_SEARCH_TERM = 1024;
 
 /**
  * Greatest common divisor of two non-negative integers (Euclid).
@@ -151,11 +151,11 @@ export const snapToRationalRatio = (activeC, passiveC, maxTerm = MAX_RATIONAL_TE
   // running to 100 over a passive 5 holds every M/N up to 20·maxTerm.
   const reachable = range
     ? Math.ceil((Math.abs(range.max) / Math.abs(passiveC)) * maxTerm) : maxTerm;
-  const maxNumerator = Math.min(MAX_SEARCH_NUMERATOR, Math.max(maxTerm, reachable));
+  const maxNumerator = Math.min(MAX_SEARCH_TERM, Math.max(maxTerm, reachable));
   const { M, N } = findBestRationalRatio(targetRatio, maxTerm, accepts, maxNumerator);
 
   if (direction && !accepts(M / N)) {
-    const own = closing ?? closingRatio(targetRatio, MAX_SEARCH_NUMERATOR);
+    const own = closing ?? closingRatio(targetRatio, MAX_SEARCH_TERM);
     if (own === null) {
       return { snappedActiveC: activeC, m: M, n: N, closingPeriod: null };
     }
