@@ -295,6 +295,22 @@ test('the wheel reads deltaMode and yields when the strip cannot scroll', async 
     'a strip with nothing to scroll leaves the wheel to the page');
 });
 
+test('wheel events over the operator palette remain available to its own scroll list', async () => {
+  const h = await makeStrip();
+  const viewport = h.container.querySelector('.chain-strip-viewport');
+  viewport.clientHeight = 400;
+  viewport.scrollHeight = 1600;
+  viewport.scrollTop = 50;
+  const palette = fakeElement('div');
+  palette.className = 'chain-palette';
+  const entry = fakeElement('button');
+  palette.appendChild(entry);
+  viewport.appendChild(palette);
+  const wheel = viewport.dispatch('wheel', { target: entry, deltaY: 120 });
+  assert.equal(viewport.scrollTop, 50);
+  assert.equal(wheel.defaultPrevented, false);
+});
+
 test('the viewport offset survives the rebuild a committed edit forces', async () => {
   const h = await makeStrip();
   const viewport = h.container.querySelector('.chain-strip-viewport');

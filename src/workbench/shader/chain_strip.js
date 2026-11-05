@@ -1434,6 +1434,7 @@ export function createChainStrip({
     viewport.setAttribute('aria-label', 'Scrollable shader chain');
     viewport.appendChild(strip);
     viewport.addEventListener('wheel', (/** @type {*} */ event) => {
+      if (event.target?.closest?.('.chain-palette')) return;
       const delta = event.deltaY;
       if (delta === 0) return;
       const height = Number(viewport.clientHeight ?? 0);
