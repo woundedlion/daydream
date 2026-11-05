@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { stageGrouping } from '../src/effects/shader_stages.js';
+import { stageControlLabel, stageGrouping } from '../src/effects/shader_stages.js';
 import { kaleidoscopeSmoothParams, kaleidoscopeMeltParams } from './helpers/effect_gui_harness.js';
 
 test('stageGrouping uses registered titles and pipeline order', () => {
@@ -28,4 +28,11 @@ test('stageGrouping assigns unfamiliar labels from engine metadata', () => {
 test('stageGrouping does not infer a group from a familiar label', () => {
   assert.equal(stageGrouping([{name: 'Camera Wander'}, {name: 'Palette Chroma'}, {name: 'Mapping Frequency'}]), null);
   assert.equal(stageGrouping([]), null);
+});
+
+test('stage labels present raw field ids without merging resource names', () => {
+  assert.equal(stageControlLabel('Function', 'weight-mode'), 'Weight Mode');
+  assert.equal(stageControlLabel('Colorize', 'modulation.pattern-scale'), 'Modulation Pattern Scale');
+  assert.equal(stageControlLabel('Colorize', 'modulate.pattern-scale'), 'Modulate Pattern Scale');
+  assert.equal(stageControlLabel('Camera', 'Camera Wander'), 'Wander');
 });

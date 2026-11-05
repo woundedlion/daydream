@@ -3,6 +3,8 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import {titleCase} from '../shared/labels.js';
+
 /**
  * Group engine parameter definitions by their registered pipeline metadata.
  * @param {Array<{name: string, group?: {name: string, title: string, order: number}}>} params - Engine definitions.
@@ -38,5 +40,5 @@ export function stageControlLabel(stage, name) {
     return name.slice('Projection '.length);
   }
   if (stage.startsWith('Planar Warp ') && name.startsWith('Mirror ')) return name.slice('Mirror '.length);
-  return name;
+  return name.split('.').map(titleCase).join(' ');
 }
