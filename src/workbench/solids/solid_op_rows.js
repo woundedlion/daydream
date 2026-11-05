@@ -23,6 +23,7 @@ import { authoredParamRange, unsweepableReason } from './solid_codegen.js';
  * @property {(from: number, to: number) => void} move - Moves the op one slot.
  * @property {(index: number) => void} remove - Drops the op.
  * @property {(index: number, key: string, value: string) => void} setParam - Writes one parameter.
+ * @property {(message: string) => void} explain - Shows the morph-sweep warning.
  */
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -180,9 +181,10 @@ export function buildOpRow(op, index, { opDef, count, on, doc = document }) {
   label.className = 'font-bold';
   label.textContent = `${index + 1}. ${String(op.op).toUpperCase()}`;
 
-  const sweep = doc.createElement('span');
+  const sweep = doc.createElement('button');
+  sweep.type = 'button';
   sweep.className = 'op-unsweepable text-amber-400';
-  sweep.setAttribute('role', 'img');
+  sweep.addEventListener('click', () => on.explain(sweep.getAttribute('aria-label') ?? ''));
   headerLeft.append(handle, upButton, downButton, label, sweep);
 
   const removeButton = buildButton(doc, 'remove-op-btn text-slate-400 hover:text-white',

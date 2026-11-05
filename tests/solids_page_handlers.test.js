@@ -880,4 +880,9 @@ test('saving a camelCase registry recipe warns and flags its card', () => {
   assert.match(messages[0], /already in the engine registry/);
   assert.ok(list.children[0].classList.contains('name-clash'));
   assert.match(list.children[0].title, /engine registry already defines/);
+  const marker = list.children[0].children[0];
+  assert.equal(marker.tagName, 'BUTTON');
+  assert.equal(marker.type, 'button');
+  marker.dispatch('click');
+  assert.equal(messages.at(-1), list.children[0].title);
 });

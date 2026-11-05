@@ -808,10 +808,11 @@ function renderSavedList() {
     }
 
     if (el.classList.contains('name-clash')) {
-      const warning = document.createElement('span');
+      const warning = document.createElement('button');
+      warning.type = 'button';
       warning.textContent = '!';
-      warning.setAttribute('role', 'img');
       warning.setAttribute('aria-label', el.title);
+      warning.addEventListener('click', () => showGateMsg(el.title));
       el.appendChild(warning);
     }
     const deleteButton = document.createElement('button');
@@ -1204,6 +1205,7 @@ function renderOps() {
         move: (from, to) => reorderOp(from, to, revision),
         remove: (at) => removeOp(at, revision),
         setParam: (index, key, value) => updateOpParam(index, key, value, revision),
+        explain: showGateMsg,
       },
     });
 

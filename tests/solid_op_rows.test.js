@@ -35,6 +35,7 @@ function build(op, index = 0, count = 1, opDef = OP_DEFS[op.op]) {
       move: record('move'),
       remove: record('remove'),
       setParam: record('setParam'),
+      explain: record('explain'),
     },
     doc,
   });
@@ -185,13 +186,17 @@ test('a row marks an op the engine morph path declines', () => {
   assert.equal(swept.textContent, '', 'a swept op carries no marker');
   assert.equal(swept.hidden, true);
 
-  const { el } = build({ op: 'expand', params: { t: 0.5 } });
+  const { el, calls } = build({ op: 'expand', params: { t: 0.5 } });
   const flag = el.querySelector('.op-unsweepable');
+  assert.equal(flag.tagName, 'BUTTON');
+  assert.equal(flag.type, 'button');
   assert.equal(flag.hidden, false);
   assert.match(flag.getAttribute('aria-label'), /^expand is not swept by the morph path/,
     'the marker is a glyph, so the reason has to reach assistive tech by name');
   assert.equal(flag.getAttribute('title'), flag.getAttribute('aria-label'),
     'the pointer tooltip and the accessible name must carry the same reason');
+  flag.dispatch('click');
+  assert.deepEqual(calls, [['explain', flag.getAttribute('aria-label')]]);
 });
 
 test('the sweep marker follows a slider across its band', () => {
