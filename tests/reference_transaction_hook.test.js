@@ -189,6 +189,21 @@ describe(
       assert.equal(git(repo, 'rev-parse', 'refs/heads/master'), mid);
     });
 
+    test('real git packs master successfully and refuses its packed deletion', {skip: SKIP}, () => {
+      const packedRepo = join(root, 'packed-master');
+      execFileSync('git', ['init', '-q', '-b', 'master', packedRepo], {env});
+      git(packedRepo, 'commit', '-q', '--allow-empty', '-m', 'packed fixture');
+      const sha = git(packedRepo, 'rev-parse', 'refs/heads/master');
+      const args = ['-C', packedRepo, '-c', `core.hooksPath=${dirname(HOOK)}`];
+      const packed = spawnSync('git', [...args, 'pack-refs', '--all', '--prune'], {env, encoding: 'utf8'});
+      assert.equal(packed.status, 0, packed.stderr);
+      assert.equal(existsSync(join(packedRepo, '.git', 'refs', 'heads', 'master')), false);
+      const deletion = spawnSync('git', [...args, 'update-ref', '-d', 'refs/heads/master'], {env, encoding: 'utf8'});
+      assert.notEqual(deletion.status, 0);
+      assert.match(deletion.stderr, /REFUSED deletion of master/);
+      assert.equal(git(packedRepo, 'rev-parse', 'refs/heads/master'), sha);
+    });
+
     test('the target OID authorizes a rewind and is consumed', { skip: SKIP }, () => {
       writeToken(old);
       assert.equal(runHook([`${ZERO} ${old} refs/heads/master`]).status, 0);
