@@ -616,6 +616,8 @@ export function start({
       if (host.adapter) {
         host.refresh();
         host.adapter.drawFrame();
+        if (segments.ownsDisplay) daydream.resetPovOnNextFrame();
+        else daydream.povSweep?.reset(daydream.pixels);
         effectGui.sync(true);
         if (daydream.dotMesh?.instanceColor) daydream.dotMesh.instanceColor.needsUpdate = true;
       }
