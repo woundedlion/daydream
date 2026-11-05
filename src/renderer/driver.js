@@ -86,9 +86,6 @@ export class LabelPool {
   }
 }
 
-
-
-
 /**
  * Browser-side simulator: drives the three.js scene that renders the LED
  * sphere as instanced dots, on a fixed-timestep sim clock with on-demand
@@ -261,32 +258,19 @@ export class Daydream {
       color: 0xffffff
     });
 
-    // Diametric axis lines at 0.95 of the sphere radius, hidden until toggled on.
-    let xAxisGeometry = new THREE.BufferGeometry().setFromPoints([
-      Daydream.X_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95),
-      Daydream.X_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95)
-    ]);
-    this.xAxis = new THREE.Line(xAxisGeometry, this.axisMaterial);
-    this.xAxis.visible = false;
-
-    let yAxisGeometry = new THREE.BufferGeometry().setFromPoints([
-      Daydream.Y_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95),
-      Daydream.Y_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95)
-    ]);
-    this.yAxis = new THREE.Line(yAxisGeometry, this.axisMaterial);
-    this.yAxis.visible = false;
-
-    let zAxisGeometry = new THREE.BufferGeometry().setFromPoints([
-      Daydream.Z_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95),
-      Daydream.Z_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95)
-    ]);
-    this.zAxis = new THREE.Line(zAxisGeometry, this.axisMaterial);
-    this.zAxis.visible = false;
-
-
-    this.scene.add(this.xAxis);
-    this.scene.add(this.yAxis);
-    this.scene.add(this.zAxis);
+    const axisLine = (/** @type {THREE.Vector3} */ axis) => {
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        axis.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS * 0.95),
+        axis.clone().multiplyScalar(Daydream.SPHERE_RADIUS * 0.95),
+      ]);
+      const line = new THREE.Line(geometry, this.axisMaterial);
+      line.visible = false;
+      this.scene.add(line);
+      return line;
+    };
+    this.xAxis = axisLine(Daydream.X_AXIS);
+    this.yAxis = axisLine(Daydream.Y_AXIS);
+    this.zAxis = axisLine(Daydream.Z_AXIS);
 
     this.mainViewport = { x: 0, y: 0, width: 0, height: 0 };
     this.pipViewport = { x: 0, y: 0, width: 0, height: 0 };
