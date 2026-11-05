@@ -111,9 +111,17 @@ export function installSegmentWorker() {
     }
     if (result === wasmModule.ClipSetResult.NO_EFFECT) {
       awaitingEffect = true;
-      return true;
     }
     return true;
+  }
+
+  /** @param {import('./worker_protocol.js').InitMsg|import('./worker_protocol.js').SetEffectMsg} msg @returns {boolean} */
+  function applyEffectState(msg) {
+    if (typeof msg.presetIndex === 'number') applyPreset(msg.presetIndex, 'synchronizePreset');
+    if (!restoreChainSnapshot(msg.chainSnapshot)) return false;
+    replayParams(msg.params);
+    if (typeof msg.paused === 'boolean') /** @type {HolosphereEngine} */ (engine).setAnimationsPaused(msg.paused);
+    return applyClip();
   }
 
   /**
@@ -289,16 +297,8 @@ export function installSegmentWorker() {
                reason: `setEffect(${msg.effectName}) rejected` });
         return;
       }
-      // Mirrors the engine-driven index without engaging the pause.
-      if (typeof msg.presetIndex === 'number') {
-        applyPreset(msg.presetIndex, 'synchronizePreset');
-      }
-      if (!restoreChainSnapshot(msg.chainSnapshot)) return;
-      replayParams(msg.params);
-      if (typeof msg.paused === 'boolean') engine.setAnimationsPaused(msg.paused);
       if (typeof msg.poleLod === 'number') engine.setPoleLod(msg.poleLod);
-      // A rejected clip leaves no usable render geometry: report nothing ready.
-      if (!applyClip()) return;
+      if (!applyEffectState(msg)) return;
 
       post({ type: 'ready' });
       return;
@@ -328,18 +328,7 @@ export function installSegmentWorker() {
         divergenceWarnings = new Map();
         arenaMetricsWarned = false;
         awaitingEffect = false;
-        // Mirrors the engine-driven index without the pause, as in 'init'.
-        if (typeof msg.presetIndex === 'number') {
-          applyPreset(msg.presetIndex, 'synchronizePreset');
-        }
-        if (!restoreChainSnapshot(msg.chainSnapshot)) break;
-        replayParams(msg.params);
-        if (typeof msg.paused === 'boolean') {
-          engine.setAnimationsPaused(msg.paused);
-        }
-        paramRevision = msg.paramRevision;
-        // A rejected clip leaves no usable render geometry, as in 'init'.
-        if (!applyClip()) break;
+        if (applyEffectState(msg)) paramRevision = msg.paramRevision;
         break;
       }
 
