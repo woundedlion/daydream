@@ -6,6 +6,7 @@ import {
   createEffectActions,
   EXPORT_COPIED,
   EXPORT_FAILED,
+  EXPORT_REFUSED,
   FLASH_MS,
 } from '../src/ui/effect_actions.js';
 
@@ -26,6 +27,7 @@ function actions({
   const fx = { gui: fakePanelGui() };
   const calls = [];
   const warnings = [];
+  const notices = [];
   const state = { presetIndex, active: true };
   const handle = createEffectActions(fx, {
     presets: {
@@ -43,10 +45,11 @@ function actions({
     copyText,
     isActive: (record) => record === fx && state.active,
     logWarn: (...args) => warnings.push(args),
+    showNotice: message => notices.push(message),
   });
   const ctrl = (property) => fx.gui.ctrl(property);
   const status = () => fx.gui.$children.children[0].querySelector('.visually-hidden');
-  return { handle, fx, calls, warnings, state, copyText, ctrl, status };
+  return { handle, fx, calls, warnings, notices, state, copyText, ctrl, status };
 }
 
 test('Reset runs the coordinator callback and nothing else', () => {
@@ -75,7 +78,8 @@ test('an Export the coordinator refuses logs its reason and copies nothing', () 
   assert.deepEqual(a.copyText.copied, []);
   assert.deepEqual(a.warnings, [['Export: blocked']]);
   assert.equal(a.ctrl('export').label, '\u2717');
-  assert.equal(a.status().textContent, EXPORT_FAILED);
+  assert.equal(a.status().textContent, EXPORT_REFUSED);
+  assert.deepEqual(a.notices, ['Export: blocked']);
 });
 
 test('an Export refusal with a cause logs the cause beside the reason', () => {
@@ -92,6 +96,7 @@ test('a failed or rejected copy flashes failure', async () => {
   await refused.ctrl('export').object.export();
   assert.equal(refused.ctrl('export').label, '\u2717');
   assert.deepEqual(refused.warnings, [['Export: clipboard copy failed']]);
+  assert.equal(refused.status().textContent, EXPORT_FAILED);
 
   const error = new Error('denied');
   const rejected = actions({ copyText: fakeCopyText(error) });
@@ -164,7 +169,7 @@ test('navigation on an emptied preset list selects nothing', () => {
   const handle = createEffectActions(fx, {
     presets: { count: () => count, index: () => 0, select: (i) => selects.push(i) > 0 },
     onPresetChange: () => {}, onReset: () => {}, buildExport: () => ({ text: '' }),
-    copyText: fakeCopyText(), isActive: () => true, logWarn: () => {},
+    copyText: fakeCopyText(), isActive: () => true, logWarn: () => {}, showNotice: () => {},
   });
   count = 0;
   assert.equal(handle.movePreset(1), false);
@@ -202,7 +207,7 @@ test('a row that fails mid-build detaches what it built', () => {
   assert.throws(() => createEffectActions({ gui }, {
     presets: { count: () => 0, index: () => 0, select: () => false },
     onPresetChange: () => {}, onReset: () => {}, buildExport: () => ({ text: '' }),
-    copyText: fakeCopyText(), isActive: () => true, logWarn: () => {},
+    copyText: fakeCopyText(), isActive: () => true, logWarn: () => {}, showNotice: () => {},
   }), /add failed/);
   assert.equal(gui.ctrl('reset').domElement.parentNode, gui.$children);
   assert.equal(gui.$children.querySelector('.effect-action-row'), null);
