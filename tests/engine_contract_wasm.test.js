@@ -1004,6 +1004,11 @@ test('the favorites rosters and the seeded default name installable effects', ()
         uninstallable.push(`${label}: ${name}`);
     }
   }
+  const reachable = new Set(Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
+  const unlisted = EFFECT_IDENTITIES.filter(({ display_name }) =>
+    display_name !== 'ShaderChain' && !reachable.has(display_name));
+  assert.deepEqual(unlisted, [], 'every registered effect must be reachable from a favorites list');
+
   assert.deepEqual(unregistered.slice(0, 5), [],
     `${unregistered.length} favorites name effects the engine does not register`);
   assert.deepEqual(uninstallable.slice(0, 5), [],
