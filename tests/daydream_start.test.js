@@ -1,3 +1,4 @@
+import {getActiveURLSync} from '../src/app/state.js';
 //
 // daydream.js's composition root: start(deps) builds the whole app against
 // injected seams (document, page target, navigator, driver, GUI factory,
@@ -123,22 +124,21 @@ test('response timescale is a persistent view control', () => {
   assert.equal(driver.invalidated, true);
 });
 
-test('legacy presentation settings cannot change hydrated fidelity response controls', () => {
+test('hydrated fidelity controls retain their response timescale', () => {
   for (const povFidelity of [false, true]) {
-    for (const povPresentation of ['raw', 'camera', 'visual']) {
-      const { guis, driver } = startApp({
-        hydratedView: { povFidelity, povPresentation, povExposureMs: 187, povResponseScale: 1.3 },
-      });
-      const response = guis[0].controllers.find((c) => c.property === 'povResponseScale');
-      assert.equal(response.disabled, !povFidelity);
-      assert.equal(response.getValue(), 1.3);
-      assert.ok(guis[0].collectUrlKeys().includes('view.povResponseScale'));
-      for (const key of ['povPresentation', 'povExposureMs']) {
-        assert.ok(!guis[0].collectUrlKeys().includes(`view.${key}`));
-        assert.equal(driver[key], undefined);
-      }
-    }
+    const {guis} = startApp({hydratedView: {povFidelity, povResponseScale: 1.3}});
+    const response = guis[0].controllers.find(c => c.property === 'povResponseScale');
+    assert.equal(response.disabled, !povFidelity);
+    assert.equal(response.getValue(), 1.3);
   }
+});
+
+test('legacy presentation query parameters are removed from shared URLs', () => {
+  const {urlWrites} = startApp({search: '?view.povPresentation=raw&view.povExposureMs=187'});
+  getActiveURLSync().flush();
+  const params = new URL(urlWrites.at(-1), 'https://example.test').searchParams;
+  assert.equal(params.has('view.povPresentation'), false);
+  assert.equal(params.has('view.povExposureMs'), false);
 });
 
 test('response availability follows fidelity without resetting its value', () => {
