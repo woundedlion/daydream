@@ -283,3 +283,29 @@ for (const failure of ['none', 'lint', 'suite']) {
   });
 
 }
+
+test('pre-push checks both update snapshots around an intervening deletion', {skip: SKIP}, (t) => {
+  const {root, env, sha} = snapshotFixture(t, {marker: true});
+  writeFileSync(join(root, 'marker'), 'second\n');
+  execFileSync('git', ['-C', root, 'add', 'marker'], {env});
+  execFileSync('git', ['-C', root, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'second'], {env});
+  const second = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {env, encoding: 'utf8'}).trim();
+  const calls = join(root, 'snapshot-calls').replaceAll('\\', '/');
+  const npm = join(root, 'bin', 'npm');
+  writeFileSync(npm, '#!/bin/sh\n'
+    + 'if [ "$1" = ci ]; then mkdir -p node_modules; echo "{}" > node_modules/.package-lock.json; fi\n'
+    + `if [ "$1 $2" = 'run lint' ]; then cat marker >> '${calls}'; fi\n`
+    + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
+    + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n');
+  chmodSync(npm, 0o755);
+  const bin = posixPath(join(root, 'bin'));
+  const result = spawnSync(SH, ['-c', `PATH="${bin}:$PATH"; export PATH; . "$0"`, HOOK], {
+    cwd: root, env, encoding: 'utf8', input: [
+      `refs/heads/first ${sha} refs/heads/first ${'0'.repeat(40)}`,
+      `refs/heads/deleted ${'0'.repeat(40)} refs/heads/deleted ${sha}`,
+      `refs/heads/second ${second} refs/heads/second ${'0'.repeat(40)}`,
+    ].join('\n') + '\n',
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.deepEqual(readFileSync(calls, 'utf8').trim().split('\n'), ['committed', 'second']);
+});
