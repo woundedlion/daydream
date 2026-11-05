@@ -223,7 +223,7 @@ function renderBaseHue() {
   const degrees = recipeModel.baseHueTurns * 360;
   /** @type {HTMLInputElement} */ (document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees)).value = String(degrees);
   /** @type {HTMLElement} */ (document.getElementById('gen_base_hue_value')).textContent =
-    `${Number(degrees.toFixed(1))}°`;
+    `${Number(degrees.toFixed(1)) % 360}°`;
 }
 
 function renderRecipeAvailability() {

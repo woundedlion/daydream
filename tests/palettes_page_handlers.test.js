@@ -174,3 +174,14 @@ test('hiding a focused Reset Zoom button restores strip keyboard focus', () => {
   sync();
   assert.equal(focused, 1);
 });
+
+
+test('base hue rounding wraps the full turn without changing slider precision', () => {
+  const input = {};
+  const readout = {};
+  handler('renderBaseHue', {recipeModel: {baseHueTurns: 359.9999 / 360},
+    PALETTE_CONTROL_IDS: {baseHueDegrees: 'hue'},
+    document: {getElementById: id => id === 'hue' ? input : readout}})();
+  assert.equal(readout.textContent, '0°');
+  assert.equal(Number(input.value), 359.9999);
+});
