@@ -922,6 +922,7 @@ test('a varying axis pins each endpoint against the other so they cannot cross',
 
   assert.equal(state.constant, false);
   assert.equal(state.minimumName, 'Minimum Lightness');
+  assert.equal(state.minimumLabel, 'Minimum');
   assert.deepEqual(
     [state.minimumMin, state.minimumMax, state.maximumMin, state.maximumMax],
     ['0', '0.8', '0.2', '1']);

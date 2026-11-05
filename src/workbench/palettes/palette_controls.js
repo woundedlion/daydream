@@ -489,7 +489,7 @@ export function axisControlState({ curve, minimum, maximum, label, shortLabel })
   const constant = curve === 'CONSTANT';
   return {
     constant,
-    minimumLabel: shortLabel,
+    minimumLabel: constant ? shortLabel : 'Minimum',
     maximumLabel: 'Maximum',
     minimumName: constant ? label : `Minimum ${label}`,
     maximumName: `Maximum ${label}`,
