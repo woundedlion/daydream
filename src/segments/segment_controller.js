@@ -302,9 +302,7 @@ export class SegmentController {
       this.composite(this.#results);
       // No simulation tick stands behind this composite; Three re-uploads the
       // instance colours only on a version bump.
-      const instanceColor = this.driver.dotMesh?.instanceColor;
-      if (instanceColor && isViewLive(instanceColor.array))
-        instanceColor.needsUpdate = true;
+      this.#flagDisplayUpload();
     }
     this.driver.invalidate();
   }
@@ -1102,6 +1100,18 @@ export class SegmentController {
     return this.active && (this.#ready || this.faulted);
   }
 
+  #compositePublished() {
+    const blitted = this.composite(this.#results);
+    this.#pendingFrame = blitted < 0;
+    this.#frameComposited = blitted === this.count;
+    this.updateStats();
+  }
+
+  #flagDisplayUpload() {
+    const instanceColor = this.driver.dotMesh?.instanceColor;
+    if (instanceColor && isViewLive(instanceColor.array)) instanceColor.needsUpdate = true;
+  }
+
   /**
    * Render-loop step (segment mode active): apply the previous frame's composite
    * synchronously, then dispatch the next frame's parallel render fire-and-forget.
@@ -1119,13 +1129,7 @@ export class SegmentController {
 
     // Apply the previous frame's composite synchronously, over driver.render()'s clear.
     if (this.#pendingFrame) {
-      const blitted = this.composite(this.#results);
-      this.updateStats();
-      // Held when there was no display buffer to blit into: the assembled
-      // generation is still in `results` and composites on a later tick.
-      this.#pendingFrame = blitted < 0;
-      // Only a whole generation counts as a frame.
-      this.#frameComposited = blitted === this.count;
+      this.#compositePublished();
     } else if (this.hasPublishedFrame()) {
       // Replay the last published generation without recording it again or updating stats.
       this.composite(this.#results);
@@ -1151,13 +1155,8 @@ export class SegmentController {
           this.#results = done;
           this.#pendingFrame = true;
           if (this.driver.paused && this.active && !this.faulted) {
-            const blitted = this.composite(this.#results);
-            this.#pendingFrame = blitted < 0;
-            this.#frameComposited = blitted === this.count;
-            this.updateStats();
-            const instanceColor = this.driver.dotMesh?.instanceColor;
-            if (instanceColor && isViewLive(instanceColor.array))
-              instanceColor.needsUpdate = true;
+            this.#compositePublished();
+            this.#flagDisplayUpload();
             this.driver.invalidate();
           }
         }
