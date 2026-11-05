@@ -426,7 +426,6 @@ export function createShaderDocumentController({
     const paused = getAnimationsPaused();
     animationToggle.disabled = paused === null;
     animationToggle.setAttribute('aria-pressed', String(paused === true));
-    animationToggle.textContent = 'Pause Presets';
   };
 
   /** @param {CompiledDocument} compiled */
@@ -541,9 +540,9 @@ export function createShaderDocumentController({
 
   /** @param {string} parameterId @returns {boolean} */
   const parameterLive = (parameterId) => {
+    if (active?.compiledSide !== true) return true;
     const descriptor = { chain: chainUi?.store.chainView()
       ?? active?.compiled.document.descriptor.chain ?? [] };
-    if (active?.compiledSide !== true) return true;
     const control = engineControlName(parameterId, liveDefinitions());
     if (control.name !== null) return true;
     if (control.refusal) {

@@ -32,7 +32,7 @@ function normalizedState(value) {
   if (snapshot !== undefined && snapshot?.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION)
     throw new Error(`unsupported shader snapshot version; expected ${CHAIN_SNAPSHOT_SCHEMA_VERSION}`);
   if (snapshot !== undefined
-      && (!snapshot || typeof snapshot !== 'object'
+      && (typeof snapshot !== 'object'
         || !Array.isArray(snapshot.chain)
         || !Array.isArray(snapshot.parameters)
         || !Array.isArray(snapshot.modulation)

@@ -726,7 +726,7 @@ export async function createChainDocumentStore({
         (/** @type {ChainEntry} */ entry) => !disabled.includes(entry.label));
       removeInstances(candidate, disabled);
       dropDegenerateEdges(candidate);
-        const diagnostics = diagnosticsOf(candidate);
+      const diagnostics = diagnosticsOf(candidate);
       if (diagnostics.length > 0) {
         throw new Error('the document without its disabled stages fails validation: '
           + diagnostics.map((/** @type {Diagnostic} */ d) => d.code).join(', '));

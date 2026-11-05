@@ -308,5 +308,5 @@ export function createChainPresentation({ catalog, chain: readChain, legalSequen
     return opOf(neighbour).input === op.input && opOf(neighbour).output === op.output;
   };
 
-  return { opOf, carrierAt, bandLayout, appendGap, replacementEntry, choiceEntries, choiceKey, socketChoices, sharesBand };
+  return { opOf, bandLayout, appendGap, choiceEntries, choiceKey, socketChoices, sharesBand };
 }

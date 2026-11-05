@@ -11,7 +11,7 @@ import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 import { scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
 import {
-  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
+  CHAIN_SNAPSHOT_SCHEMA_VERSION, decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
 } from '../src/workbench/shader/shader_deeplink.js';
 import {
   applyFixedShaderDocument,
@@ -63,6 +63,14 @@ test('shader state hashes round-trip the complete authoring state', async () => 
   assert.equal(await decodeShaderStateHash('#unrelated'), null);
   await assert.rejects(decodeShaderStateHash('#shader=v2.not-gzip'),
     /invalid shader link payload/);
+});
+
+test('shader links reject callable snapshots carrying the current schema version', async () => {
+  const chainSnapshot = Object.assign(() => {}, {
+    schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: [], parameters: [], modulation: [],
+  });
+  await assert.rejects(encodeShaderStateHash({document: SCRATCH,
+    preset: 'one', bypassed: [], paused: false, chainSnapshot}), /invalid shader link snapshot/);
 });
 
 test('v2 shader links retain typed runtime and palette state', async () => {
@@ -635,6 +643,7 @@ function workbenchMounts() {
   scratch.value = '';
   scratch.textContent = 'Scratch Chain';
   elements.get('shader-document-select').appendChild(scratch);
+  elements.get('shader-animation-toggle').textContent = 'Pause Presets';
   return elements;
 }
 
