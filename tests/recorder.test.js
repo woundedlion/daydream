@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { installConsoleCapture } from './helpers/fake_console.js';
 import { fakeElement, installDocument, stashGlobals } from './helpers/fake_dom.js';
 import {
-  MEMORY_BUFFER_LIMIT_BYTES, PICKER_GRACE_SECONDS, selectMimeType, VideoRecorder,
+  MEMORY_BUFFER_LIMIT_BYTES, WRITE_BACKLOG_SECONDS, selectMimeType, VideoRecorder,
 } from '../src/recording/recorder.js';
 
 /** Fixed local wall-clock time so the timestamped file name is exact. */
@@ -1101,7 +1101,7 @@ test('a host hook that throws does not poison the streaming write chain', async 
 
 /**
  * A file that is slow to open holds every chunk in the write chain, bounded at
- * PICKER_GRACE_SECONDS of video at the configured or default bitrate.
+ * WRITE_BACKLOG_SECONDS of video at the configured or default bitrate.
  */
 for (const bitrate of [1, 0]) {
   test(`a stalled file open bounds backlog with configured bitrate ${bitrate}`, async (t) => {
@@ -1130,7 +1130,7 @@ for (const bitrate of [1, 0]) {
     await drainSink();
     assert.equal(recorder.state, 'recording', 'the encoder starts once the picker resolves');
     const sessionChunks = rec.chunks;
-    const held = (expectedBitrate / 8) * PICKER_GRACE_SECONDS - 1_000_000;
+    const held = (expectedBitrate / 8) * WRITE_BACKLOG_SECONDS - 1_000_000;
     recorder.ondataavailable({ data: { size: held } });
     assert.equal(rec.isRecording, true, 'a backlog under the bound keeps recording');
 
@@ -1186,7 +1186,7 @@ for (const stalledAt of ['opening', 'writing']) {
     const finished = trackSinkFinish(rec);
     rec.start('slow-file');
     const recorder = rec.mediaRecorder;
-    const size = rec.bitrateMbps * 1_000_000 / 8 * PICKER_GRACE_SECONDS / 2;
+    const size = rec.bitrateMbps * 1_000_000 / 8 * WRITE_BACKLOG_SECONDS / 2;
     const chunks = Array.from({ length: 5 }, (_, id) => ({ size, id }));
     await drainSink();
     recorder.ondataavailable({ data: chunks[0] });
@@ -1943,7 +1943,7 @@ test('superseded streaming recorder ignores picker cancellation and backlog over
   rec.stop();
   rec.start('third');
   const third = rec.mediaRecorder;
-  second.ondataavailable({ data: { size: (16 * 1_000_000 / 8) * PICKER_GRACE_SECONDS + 1 } });
+  second.ondataavailable({ data: { size: (16 * 1_000_000 / 8) * WRITE_BACKLOG_SECONDS + 1 } });
   assert.equal(rec.mediaRecorder, third);
   assert.equal(rec.isRecording, true);
   assert.deepEqual(errors, []);

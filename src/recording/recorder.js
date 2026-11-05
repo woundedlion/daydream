@@ -27,7 +27,7 @@ const RECORDER_TIMESLICE_MS = 1000;
 const DEFAULT_BITRATE_MBPS = 16;
 
 // Seconds of video the streaming sink may hold pending file open or writes.
-export const PICKER_GRACE_SECONDS = 120;
+export const WRITE_BACKLOG_SECONDS = 120;
 
 // Bytes the in-memory fallback sink may accumulate before it ends the session.
 export const MEMORY_BUFFER_LIMIT_BYTES = 512_000_000;
@@ -561,7 +561,7 @@ export class VideoRecorder {
   /**
    * Builds the per-session data sink. With the File System Access API present,
    * streams each chunk to a user-chosen file; chunks awaiting file opening or
-   * writes are bounded at PICKER_GRACE_SECONDS of video at the
+   * writes are bounded at WRITE_BACKLOG_SECONDS of video at the
    * latched bitrate, past which the session stops and reports. Otherwise it
    * accumulates chunks for a single blob download at stop, bounded at
    * MEMORY_BUFFER_LIMIT_BYTES. The save dialog is raised here, under start()'s
@@ -606,7 +606,7 @@ export class VideoRecorder {
     let aborted = false;
     let backlogBytes = 0;
     let overflowed = false;
-    const maxBacklogBytes = (bitrateMbps * 1_000_000 / 8) * PICKER_GRACE_SECONDS;
+    const maxBacklogBytes = (bitrateMbps * 1_000_000 / 8) * WRITE_BACKLOG_SECONDS;
     const hold = this.memorySink(recorder, chunks, 'the streaming save was unavailable');
     const opened = globalThis.showSaveFilePicker({
       suggestedName: filename,
@@ -642,7 +642,7 @@ export class VideoRecorder {
             this.reportFailure(
               'the streaming save could not keep up '
               + `while ${Math.round(maxBacklogBytes / 1_000_000)} MB of video `
-              + `(${PICKER_GRACE_SECONDS}s at ${bitrateMbps} Mbps) piled up in memory. `
+              + `(${WRITE_BACKLOG_SECONDS}s at ${bitrateMbps} Mbps) piled up in memory. `
               + 'Queued video will be saved if writing completes.');
           }
           return;
