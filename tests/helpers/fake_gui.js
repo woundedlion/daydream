@@ -34,10 +34,8 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
     valueSets: [],
     replayOnChange: false,
     acceptedUrlValues: [],
-    handler: null,
     handlers: [],
     value: undefined,
-    calls: [],
     domElement,
     [`$${kind}`]: widget,
     getValue() { return object[property]; },
@@ -51,7 +49,6 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
           const results = controller.handlers.map((handler) => handler(value));
           return results.some((result) => result?.then) ? Promise.all(results) : undefined;
         };
-      controller.handler = controller.changed;
       if (controller.replayOnChange) fn(controller.getValue());
       return controller;
     },

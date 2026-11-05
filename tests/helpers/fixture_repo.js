@@ -48,7 +48,7 @@ const findShell = (name) => {
 };
 
 /** @returns {string|null} POSIX shell interpreter. */
-export const findSh = () => findShell('sh');
+const findSh = () => findShell('sh');
 /** @returns {string|null} Bash interpreter. */
 export const findBash = () => findShell('bash');
 

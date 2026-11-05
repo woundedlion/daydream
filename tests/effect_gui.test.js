@@ -567,9 +567,9 @@ test('a readonly param is a session control with no engine write-back', () => {
   h.panel.build();
 
   assert.equal(h.gui().ctrl('Frames').session, true);
-  assert.equal(h.gui().ctrl('Frames').handler, null);
+  assert.equal(h.gui().ctrl('Frames').changed, undefined);
   assert.equal(h.gui().ctrl('Speed').session, undefined);
-  assert.equal(typeof h.gui().ctrl('Speed').handler, 'function');
+  assert.equal(typeof h.gui().ctrl('Speed').changed, 'function');
 });
 
 test('readonly enum type-ahead cannot move the visible selection', () => {

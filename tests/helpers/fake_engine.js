@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 
 import { CLASS_METHODS } from '../../generated/engine_contract.mjs';
 
-export const SHADER_CHAIN_BINDING_METHODS = CLASS_METHODS.ShaderChainBindings;
+const SHADER_CHAIN_BINDING_METHODS = CLASS_METHODS.ShaderChainBindings;
 
 export const ParamSetResult = enumeration('ParamSetResult');
 export const ClipSetResult = enumeration('ClipSetResult');
