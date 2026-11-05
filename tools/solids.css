@@ -433,6 +433,12 @@ body {
 
   #main {
     order: 1;
+    flex: none;
+    height: auto;
+  }
+
+  #canvas-container {
+    flex: none;
     height: 60vh;
   }
 
