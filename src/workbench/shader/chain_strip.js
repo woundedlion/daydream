@@ -41,6 +41,7 @@ import { createPointerDrag } from '../../shared/pointer_drag.js';
  * @typedef {{
  *   chain: () => ChainEntry[],
  *   selectedLabel: () => string|null,
+ *   declares: (id: string) => boolean,
  *   setSelectedLabel: (label: string|null) => boolean,
  *   bypassedLabels: () => string[],
  *   setBypassed: (label: string, on: boolean) => EditResult,
@@ -427,9 +428,10 @@ export function createChainStrip({
   const resetParameters = (label) => {
     commitSliderEdit();
     const defaults = Object.fromEntries(declarations
-      .filter((parameter) => parameter.id.startsWith(`${label}.`) && parameterLive(parameter.id))
+      .filter((parameter) => parameter.id.startsWith(`${label}.`) && store.declares(parameter.id) && parameterLive(parameter.id))
       .map((parameter) => [parameter.id, parameter.default]));
-    if (Object.keys(defaults).length === 0) return;
+    if (Object.keys(defaults).length === 0
+        || Object.entries(defaults).every(([id, value]) => values[id] === value)) return;
     const targetPreset = presetId() ?? store.document().preset_bank.presets[0]?.preset_id;
     if (!targetPreset) return;
     store.endValueRun();

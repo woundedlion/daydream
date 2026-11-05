@@ -214,7 +214,7 @@ test('a card reset restores only the active preset and is one undoable action', 
   h.strip.render();
   const before = h.store.document();
   const defaults = Object.fromEntries(h.store.parameterDeclarations()
-    .filter((parameter) => parameter.id.startsWith('camera.'))
+    .filter((parameter) => parameter.id.startsWith('camera.') && h.store.declares(parameter.id))
     .map((parameter) => [parameter.id, parameter.default]));
   chipByLabel(h, 'camera').querySelector('.chain-chip-reset').dispatch('click');
   const after = h.store.document();
@@ -2528,4 +2528,18 @@ test('the Palette selector supports every family with family-specific controls',
       assert.equal(controlIn(row).getAttribute('aria-label'), expected);
     }
   }
+});
+
+test('resetting declared defaults leaves the document and undo application untouched', async () => {
+  const h = await makeStrip();
+  const preset = h.store.document().preset_bank.presets[0].preset_id;
+  const defaults = Object.fromEntries(h.store.parameterDeclarations()
+    .filter(parameter => parameter.id.startsWith('camera.') && h.store.declares(parameter.id))
+    .map(parameter => [parameter.id, parameter.default]));
+  assert.equal(h.store.setPresetValues(preset, defaults).ok, true);
+  h.strip.render();
+  const before = h.store.document();
+  chipByLabel(h, 'camera').querySelector('.chain-chip-reset').dispatch('click');
+  assert.deepEqual(h.store.document(), before);
+  assert.equal(h.applied.length, 0);
 });
