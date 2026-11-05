@@ -1292,7 +1292,12 @@ export function createShaderDocumentController({
     if (!(win.location?.hash ?? '').startsWith('#shader=')) return;
     try {
       const linked = await decodeShaderStateHash(win.location.hash);
-      if (linked && allowSourceChange() && !await loadLinkedSource(linked))
+      if (!linked) return;
+      if (!allowSourceChange()) {
+        scheduleDeepLink();
+        return;
+      }
+      if (!await loadLinkedSource(linked))
         throw new Error(status.textContent || 'the linked state was refused');
     } catch (error) {
       showError(`The shader link could not be restored: ${errorDetail(error)}.`);

@@ -3291,3 +3291,20 @@ test('hash navigation loads a new shader and disposal removes its listener', asy
   ownedEditors.delete(h.controller);
   assert.equal(h.win.listenerCount('hashchange'), 0);
 });
+
+test('declined hash navigation restores the kept edits in the session link', async () => {
+  const h = await editorWorkbench();
+  stageEditor(h, 'sample')('sample.pattern-freq', 3.5);
+  await h.controller.flushDeepLink();
+  const keptHash = h.win.location.hash;
+  let confirmations = 0;
+  h.win.confirm = () => { confirmations += 1; return false; };
+  const document = structuredClone(SCRATCH);
+  h.win.location.hash = await encodeShaderStateHash({document,
+    preset: document.preset_bank.presets[0].preset_id, bypassed: [], paused: false});
+  assert.notEqual(h.win.location.hash, keptHash);
+  await h.win.listeners.find(listener => listener.type === 'hashchange').handler();
+  await h.controller.flushDeepLink();
+  assert.equal(confirmations, 1);
+  assert.equal(h.win.location.hash, keptHash);
+});
