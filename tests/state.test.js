@@ -1145,6 +1145,20 @@ test('URLSync discards a failed transaction before restoring full-config hydrati
   }
 });
 
+test('URLSync discard disarms an active retry and restores its full retry budget', (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const {timer} = installRefusingHistoryWindow('rate limit');
+  const state = new AppState({effect: 'ShapeShifter'});
+  const sync = new URLSync(state, ['effect']);
+  state.set('effect', 'Moire');
+  timer.fire();
+  sync.discardPending();
+  assert.equal(timer.armed(), false);
+  state.set('effect', 'ShapeShifter');
+  for (let attempt = 0; attempt < URL_FLUSH_MAX_RETRIES - 1; attempt += 1) timer.fire();
+  assert.equal(timer.armed(), true);
+});
+
 test('URLSync.reset collapses into the pending debounced flush', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
