@@ -172,13 +172,14 @@ const WAVE_COLORS = ['#EF4444', '#22C55E', '#3B82F6'];
  * @param {HTMLCanvasElement} opts.canvas - The graph canvas.
  * @param {CanvasRenderingContext2D} opts.ctx - Its 2D context.
  * @param {WavePalette} opts.palette - The palette to plot.
+ * @param {{min:number,max:number}} [opts.range] - Graph value range.
  * @returns {void}
  */
-export function drawWaveGraph({ canvas, ctx, palette }) {
+export function drawWaveGraph({ canvas, ctx, palette, range }) {
   if (!ctx) return;
   const { width, height } = fitCanvasToDisplay(canvas, ctx);
 
-  const { yTop, yBottom, toY } = waveGraphBand(height);
+  const { yTop, yBottom, toY } = waveGraphBand(height, range);
 
   ctx.fillStyle = '#1E293B';
   ctx.fillRect(0, 0, width, height);

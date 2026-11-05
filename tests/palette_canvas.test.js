@@ -302,3 +302,14 @@ test('a partly laid-out strip retains both backing dimensions', () => {
     assert.equal(h.palette.getCalls, 8);
   }
 });
+
+
+test('wave graph reference lines follow a supplied generated-value range', () => {
+  const ctx = fakeContext();
+  const range = {min: -0.05, max: 1.05};
+  drawWaveGraph({canvas: {width: 16, height: 100}, ctx, palette: fakePalette(), range});
+  const {toY} = waveGraphBand(100, range);
+  for (const value of [0, 1]) {
+    assert.ok(ctx.ops.some(([name, x, y]) => name === 'moveTo' && x === 0 && y === toY(value)));
+  }
+});

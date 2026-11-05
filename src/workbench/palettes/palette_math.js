@@ -398,15 +398,16 @@ export function mapValue(value, fromMin, fromMax, toMin, toMax) {
 export const WAVE_GRAPH_VALUE_RANGE = { min: -1, max: 2 };
 
 /**
- * Maps WAVE_GRAPH_VALUE_RANGE onto a wave-graph canvas of the given height: the
+ * Maps a value range onto a wave-graph canvas of the given height: the
  * band between 10% and 90% of the height, value increasing upward.
  * @param {number} height - Canvas height in pixels.
+ * @param {{min:number,max:number}} [range] - Values at the lower and upper edges.
  * @returns {{yTop: number, yBottom: number, toY: (value: number) => number}} The band's canvas-y edges (yTop is the max-value edge) and the value-to-canvas-y map.
  */
-export function waveGraphBand(height) {
+export function waveGraphBand(height, range = WAVE_GRAPH_VALUE_RANGE) {
   const yTop = height * 0.1;
   const yBottom = height * 0.9;
-  const { min, max } = WAVE_GRAPH_VALUE_RANGE;
+  const { min, max } = range;
   return {
     yTop,
     yBottom,

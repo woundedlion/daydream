@@ -555,7 +555,8 @@ function drawPaletteWaveGraph() {
   }
   if (!plotted) return;
   drawWaveGraph({ canvas: waveGraphCanvas,
-    ctx: /** @type {CanvasRenderingContext2D} */ (waveGraphCtx), palette: plotted });
+    ctx: /** @type {CanvasRenderingContext2D} */ (waveGraphCtx), palette: plotted,
+    ...(activeTab === 'generative' ? {range: {min: -0.05, max: 1.05}} : {}) });
   waveGraphCanvas.setAttribute('aria-label', waveGraphLabel(visiblePhaseRange()));
 }
 

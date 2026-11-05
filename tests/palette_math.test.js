@@ -463,3 +463,11 @@ test('a requested single stop is clamped to both gradient endpoints', () => {
 
   assert.equal(gradient, 'linear-gradient(to right, #ffffff, #000000)');
 });
+
+
+test('a padded unit graph range gives generated channels most of the band', () => {
+  const {toY} = waveGraphBand(300, {min: -0.05, max: 1.05});
+  assert.ok(toY(0) > 250);
+  assert.ok(toY(1) < 50);
+  assert.equal(toY(0.5), 150);
+});
