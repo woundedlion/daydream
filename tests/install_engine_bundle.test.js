@@ -1,6 +1,7 @@
 import { after, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import fs, { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import {syncBuiltinESMExports} from 'node:module';
 import { join } from 'node:path';
 import { installEngineBundle, runtimePath, RUNTIME_PATHS } from '../scripts/install-engine-bundle.mjs';
 import { scratchDir, writeEngineBundle, writeFileAt } from './helpers/fixture_repo.js';
@@ -50,6 +51,7 @@ test('install replaces stale assets and preserves consumer-owned files', (t) => 
   assert.equal(existsSync(join(destination, 'docs/screenshots/nested/obsolete.png')), false);
   for (const path of ['docs/screenshots/notes.txt', 'src/app/daydream.js'])
     assert.equal(existsSync(join(destination, path)), true, path);
+  assert.deepEqual(readdirSync(destination).filter(name => name.startsWith('.hs-tmp-')), []);
 });
 
 test('corrupted generated documentation is rejected before any destination changes', (t) => {
@@ -120,6 +122,32 @@ test('a publication failure restores the complete previous installation', (t) =>
   assert.equal(readFileSync(join(destination, 'generated/shader/patterns/obsolete.shader.json'), 'utf8'), 'obsolete');
   assert.equal(readFileSync(join(destination, 'docs/screenshots/blocked'), 'utf8'), 'consumer-owned');
   assert.equal(existsSync(join(destination, 'generated/holosphere_wasm.js')), false);
+  assert.deepEqual(readdirSync(destination).filter(name => name.startsWith('.hs-tmp-')), []);
+});
+
+test('a failed rollback preserves backup files for recovery', (t) => {
+  const {bundle, destination, write} = fixture(t, files => {
+    files['docs/screenshots/blocked/new.png'] = 'new';
+  });
+  write(destination, 'docs/screenshots/blocked', 'consumer-owned');
+  const rename = fs.renameSync;
+  t.mock.method(fs, 'renameSync', (from, to) => {
+    if (String(from).replaceAll('\\', '/').includes('/backup/'))
+      throw new Error('fixture rollback failure');
+    return rename(from, to);
+  });
+  t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
+  syncBuiltinESMExports();
+  assert.throws(() => installEngineBundle(bundle, destination), error => {
+    assert.ok(error instanceof AggregateError);
+    assert.match(error.message, /recovery files remain/);
+    assert.match(error.errors[1].message, /fixture rollback failure/);
+    return true;
+  });
+  const scratch = readdirSync(destination).filter(name => name.startsWith('.hs-tmp-'));
+  assert.equal(scratch.length, 1);
+  assert.equal(readFileSync(join(destination, scratch[0], 'backup/generated/holosphere_wasm.sha'), 'utf8'),
+    'a'.repeat(40));
 });
 
 test('install initializes a checkout with no previous engine pin', (t) => {
