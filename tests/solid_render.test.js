@@ -350,3 +350,19 @@ test('geodesic face colouring emits one colour per tessellated position', () => 
   assert.ok(mesh.geometry.attributes.position.count > 12);
   assert.equal(mesh.geometry.attributes.color.count, mesh.geometry.attributes.position.count);
 });
+
+
+test('coarse-seed geodesic wire chords stay above the sphere at the overlay radius', () => {
+  for (const mesh of [tetrahedron(), {vertices: [[1,0,0], [0,1,0], [0,0,1]].map(v => new Vector3(...v)), faces: [[0,1,2]]}]) {
+    const {renderer, scene} = setup();
+    renderer.render(mesh, view({showGeodesics: true, showFaces: false}), null);
+    const positions = find(scene, 'LineSegments').geometry.attributes.position.array;
+    assert.ok(positions.length > 3 * 12 * 6);
+    for (let i = 0; i < positions.length; i += 6) {
+      const a = positions.slice(i, i + 3);
+      const b = positions.slice(i + 3, i + 6);
+      assert.ok(Math.hypot(...a) > 1.00199 && Math.hypot(...a) < 1.00201);
+      assert.ok(Math.hypot(...a.map((v, axis) => (v + b[axis]) / 2)) > 1);
+    }
+  }
+});

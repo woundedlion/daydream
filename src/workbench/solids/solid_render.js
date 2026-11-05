@@ -268,7 +268,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
         const vb = meshData.vertices[bi];
 
         if (view.showGeodesics) {
-          const steps = 12;
+          const steps = Math.max(12, Math.ceil(va.angleTo(vb) / (Math.PI / 60)));
           for (let j = 0; j < steps; j++) {
             const t1 = j / steps;
             const t2 = (j + 1) / steps;
