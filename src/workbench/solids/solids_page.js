@@ -10,10 +10,7 @@ import { initScene, copyWithFeedback, showFatalError, bootstrapTool, formatKB } 
 import { standDownIfHalted } from '../../shared/engine_halt.js';
 import {
   OP_DEFS, MAX_RECIPE_STEPS,
-  SAVED_SOLIDS_MAX,
-  captureSavedSolidThumbnail,
-  queueSavedSolidRestore,
-  savedChainShapeError, savedSolidExportError,
+  savedChainShapeError,
   CATALAN_BASES,
   formatSolidName,
   generateFuncAndRecipe,
@@ -27,6 +24,9 @@ import {
   movedOps,
   opTopologyKey,
 } from './solid_codegen.js';
+import { SAVED_SOLIDS_KEY, SAVED_SOLIDS_MAX, captureSavedSolidThumbnail, queueSavedSolidRestore,
+  loadSavedSolids, persistSavedSolids as persistSavedStore, mergeSavedSolids }
+  from './solid_saved_store.js';
 import { fanTriangulateFace, uniqueEdges } from './solid_geometry.js';
 import { buildBaseMesh, buildChainMesh } from './solid_build.js';
 import { registryDisplayName, generateRegistryCpp, validateRegistryFaces } from './solid_registry_codegen.js';
@@ -521,41 +521,15 @@ function wireCanvasTap(canvasEl) {
   onPageTeardown(() => { tap.stop(); tap.remove(); });
 }
 
-const SAVED_SOLIDS_KEY = 'daydream.savedSolids.v1';
-const REJECTED_SOLIDS_KEY = 'daydream.savedSolids.rejected.v1';
 const SAVED_THUMB_SIZE = 256;
-function loadSavedSolids() {
-  const entries = [], rejected = [];
-  let reason = '';
-  let raw;
-  try {
-    raw = localStorage.getItem(SAVED_SOLIDS_KEY) || '[]';
-    const parsed = JSON.parse(raw);
-    for (const entry of Array.isArray(parsed) ? parsed : [parsed]) {
-      const error = entry !== null && typeof entry === 'object' && !Array.isArray(entry)
-        ? savedSolidExportError(entry.base, entry.ops) : 'not a saved-solid object';
-      if (error) {
-        rejected.push(entry);
-        reason ||= error;
-      } else entries.push(entry);
-    }
-  } catch (error) {
-    console.warn('Could not restore saved solids:', error);
-    if (raw !== undefined) rejected.push(raw);
-    reason = 'invalid saved-solid JSON';
-  }
-  return { entries, rejected, notice: rejected.length
-    ? `${rejected.length} saved solid${rejected.length === 1 ? '' : 's'} could not be loaded: ${reason}. Saving attempts a backup of up to 20 rejected entries without thumbnails; oversized data may be truncated or omitted.` : '' };
-}
-
-const savedStorage = loadSavedSolids();
+const savedStorage = loadSavedSolids(localStorage);
 const savedSolids = savedStorage.entries;
 const savedStorageStatus = document.getElementById('savedStorageStatus');
 if (savedStorageStatus) savedStorageStatus.textContent = savedStorage.notice;
 
 function reloadSavedSolids(event) {
   if (event.key !== SAVED_SOLIDS_KEY && event.key !== null) return;
-  const loaded = loadSavedSolids();
+  const loaded = loadSavedSolids(localStorage);
   savedSolids.splice(0, savedSolids.length, ...loaded.entries);
   savedStorage.rejected.push(...loaded.rejected);
   savedStorage.notice = loaded.notice;
@@ -564,33 +538,9 @@ function reloadSavedSolids(event) {
 }
 
 function persistSavedSolids() {
+  const notice = persistSavedStore(localStorage, savedSolids, savedStorage);
   const status = document.getElementById('savedStorageStatus');
-  let notice = savedStorage.notice;
-  try {
-    localStorage.setItem(SAVED_SOLIDS_KEY, JSON.stringify(savedSolids));
-    if (savedStorage.rejected.length) {
-      try {
-        const previous = JSON.parse(localStorage.getItem(REJECTED_SOLIDS_KEY) || '[]');
-        const backup = [...(Array.isArray(previous) ? previous : []), ...savedStorage.rejected]
-          .slice(-20).map((entry) => {
-            if (!entry || typeof entry !== 'object') return String(entry).slice(0, 4096);
-            const data = { ...entry };
-            delete data.thumb;
-            return JSON.stringify(data).length <= 4096 ? data : { truncated: true };
-          });
-        localStorage.setItem(REJECTED_SOLIDS_KEY, JSON.stringify(backup));
-        savedStorage.rejected.length = 0;
-      } catch (error) {
-        console.warn('Could not back up rejected solids:', error);
-        notice = `${savedStorage.notice} Rejected cards could not be backed up.`;
-      }
-    }
-    if (status) status.textContent = notice;
-  } catch (error) {
-    console.warn('Could not persist saved solids:', error);
-    if (status) status.textContent = [savedStorage.notice,
-      'Changes apply to this session only: browser storage refused the write.'].filter(Boolean).join(' ');
-  }
+  if (status) status.textContent = notice;
 }
 
 function exportSavedSolids() {
@@ -600,85 +550,13 @@ function exportSavedSolids() {
   downloadBlob(document, blob, 'daydream-solids.json');
 }
 
-/** Flags a saved card carries, each absent from a card saved before it existed. */
-const SAVED_FLAGS = ['geodesics', 'faces', 'colorize', 'vertices', 'normals', 'indices'];
-
-/**
- * Rebuilds one imported entry as a saved card, field by field.
- * @param {Object} entry - A shape-checked entry from an exported file.
- * @returns {Object} The card to hold in the saved list.
- * @details Only the fields the card and the C++ export read are carried across;
- * a flag the entry does not hold is left absent. A thumbnail is taken only as a
- * data image.
- */
-function importedSavedSolid(entry) {
-  const text = (value) => (typeof value === 'string' ? value : '');
-  const item = {
-    base: entry.base,
-    ops: structuredClone(entry.ops),
-    thumb: text(entry.thumb).startsWith('data:image/') ? entry.thumb : '',
-    title: text(entry.title) || formatSolidName(entry.base),
-    desc: text(entry.desc),
-    stats: text(entry.stats),
-  };
-  for (const flag of SAVED_FLAGS) {
-    if (typeof entry[flag] === 'boolean') item[flag] = entry[flag];
-  }
-  for (const count of ['vCount', 'fCount', 'iCount']) {
-    if (Number.isFinite(entry[count])) item[count] = entry[count];
-  }
-  return item;
-}
-
-/**
- * Merges an exported saved-solids file into the list.
- * @param {string} text - The file's contents.
- * @returns {void}
- * @details Each card is checked with savedSolidExportError before import.
- */
 function importSavedSolids(text) {
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch (error) {
-    showGateMsg(`import rejected: ${error.message}`);
-    return;
-  }
-  if (!Array.isArray(parsed)) {
-    showGateMsg('import rejected: the file holds no list of saved solids');
-    return;
-  }
-
-  let refused = 0;
-  let firstRefusal = null;
-  let full = 0;
-  const before = savedSolids.length;
-  for (const entry of parsed) {
-    const reason = !entry || typeof entry !== 'object' || Array.isArray(entry)
-      ? 'entry is not a saved-solid object' : savedSolidExportError(entry.base, entry.ops);
-    if (reason) {
-      refused++;
-      firstRefusal ??= reason;
-      continue;
-    }
-    if (savedSolids.length >= SAVED_SOLIDS_MAX) {
-      full++;
-      continue;
-    }
-    savedSolids.push(importedSavedSolid(entry));
-  }
-
-  const added = savedSolids.length - before;
-  if (added > 0) {
+  const result = mergeSavedSolids(text, savedSolids);
+  if (result.added > 0) {
     persistSavedSolids();
     renderSavedList();
   }
-  const skipped = [];
-  if (refused > 0) skipped.push(`${refused} invalid entries (${firstRefusal})`);
-  if (full > 0) skipped.push(`${full} past the ${SAVED_SOLIDS_MAX}-card limit`);
-  showGateMsg(`imported ${added} solid${added === 1 ? '' : 's'}`
-    + (skipped.length > 0 ? ` — skipped ${skipped.join(' and ')}` : ''),
-  { persist: skipped.length > 0 });
+  showGateMsg(result.message, { persist: result.persist });
 }
 
 function captureSavedThumbnail() {

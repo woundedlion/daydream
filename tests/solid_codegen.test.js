@@ -1,3 +1,4 @@
+import { SAVED_SOLIDS_MAX, captureSavedSolidThumbnail, queueSavedSolidRestore } from '../src/workbench/solids/solid_saved_store.js';
 import { fakeModule, stubMesh } from './helpers/fake_meshops.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,9 +12,6 @@ const {
   applyOp,
   savedChainShapeError,
   MAX_RECIPE_STEPS,
-  SAVED_SOLIDS_MAX,
-  captureSavedSolidThumbnail,
-  queueSavedSolidRestore,
   formatSolidName,
   pctSuffix,
   generateFuncAndRecipe,

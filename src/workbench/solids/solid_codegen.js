@@ -3,7 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-/** Solids op dispatch, C++ generation, drag-slot math, and saved-card capacity. */
+/** Solids op dispatch, C++ generation, and drag-slot math. */
 
 import {
   COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns, formatFloatCpp, float32Decimal,
@@ -237,33 +237,6 @@ export function savedChainShapeError(base, ops) {
       }
     }
   }
-  return null;
-}
-
-/** Maximum number of thumbnail-bearing solids retained by the page. */
-export const SAVED_SOLIDS_MAX = 40;
-
-/**
- * Captures a saved-solid thumbnail only while the list has capacity.
- * @param {number} savedCount - Current saved-solid count.
- * @param {() => string} capture - Thumbnail capture callback.
- * @returns {{full: boolean, dataURL: ?string}} Capture result and capacity state.
- */
-export function captureSavedSolidThumbnail(savedCount, capture) {
-  if (savedCount >= SAVED_SOLIDS_MAX) return { full: true, dataURL: null };
-  return { full: false, dataURL: capture() };
-}
-
-/**
- * Queues a restore only after its persisted chain passes the shape check.
- * @param {{base: *, ops: *}} item - Persisted saved-solid shape.
- * @param {() => void} queue - Callback that queues the state mutation.
- * @returns {?string} Shape error, or null after the restore is queued.
- */
-export function queueSavedSolidRestore(item, queue) {
-  const error = savedChainShapeError(item.base, item.ops);
-  if (error) return error;
-  queue();
   return null;
 }
 

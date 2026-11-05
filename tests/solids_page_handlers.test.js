@@ -1,3 +1,4 @@
+import { loadSavedSolids, persistSavedSolids as persistSavedStore, mergeSavedSolids, SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY } from '../src/workbench/solids/solid_saved_store.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
@@ -45,7 +46,7 @@ test('storage changes reload saved solids without restoring removed cards', () =
   let entries = [{name: 'other-tab'}];
   let renders = 0;
   const reload = handler('reloadSavedSolids', {SAVED_SOLIDS_KEY: 'saved', savedSolids,
-    savedStorage, savedStorageStatus, loadSavedSolids: () => ({entries,
+    savedStorage, savedStorageStatus, localStorage: {}, loadSavedSolids: () => ({entries,
       rejected: ['invalid'], notice: 'rejected'}), renderSavedList: () => { renders += 1; }});
   reload({key: 'unrelated'});
   assert.equal(renders, 0);
@@ -343,7 +344,7 @@ test('persistence failure is reported and clears after a later successful write'
   const status = { textContent: '' };
   let failing = true;
   const persist = handler('persistSavedSolids', { savedSolids: [], savedStorage: { rejected: [], notice: '' }, SAVED_SOLIDS_KEY: 'saved',
-    console: { warn() {} }, document: { getElementById: () => status },
+    persistSavedStore, document: { getElementById: () => status },
     localStorage: { setItem() { if (failing) throw new Error('quota'); } } });
   persist();
   assert.match(status.textContent, /Changes apply to this session only/);
@@ -501,10 +502,7 @@ test('a topology commit cannot overwrite an edit returning to the same value', a
 });
 
 test('saved solids discard non-object entries', () => {
-  const load = handler('loadSavedSolids', { SAVED_SOLIDS_KEY: 'saved',
-    savedSolidExportError,
-    localStorage: { getItem: () => '[null, 1, false, "bad", [], {"base":"cube","ops":[]}, {"base":"cube","ops":[{"op":"dual","params":{}}]}]' },
-  });
+  const load = (() => loadSavedSolids({ getItem: () => '[null, 1, false, "bad", [], {"base":"cube","ops":[]}, {"base":"cube","ops":[{"op":"dual","params":{}}]}]' }));
   const result = load();
   assert.equal(JSON.stringify(result.entries), '[{"base":"cube","ops":[{"op":"dual","params":{}}]}]');
   assert.equal(result.rejected.length, 6);
@@ -636,7 +634,7 @@ test('saved-solid imports name invalid entries and the first refusal reason', ()
   for (const [entries, reason] of [[ [null, {}], /not a saved-solid object/ ],
     [ [{base: 'cube', ops: [{op: 'truncate', params: {t: 50}}]}], /out-of-range/ ]]) {
     const messages = [];
-    handler('importSavedSolids', { savedSolids: [], SAVED_SOLIDS_MAX: 100,
+    handler('importSavedSolids', { savedSolids: [], mergeSavedSolids, SAVED_SOLIDS_MAX: 100,
       savedSolidExportError, showGateMsg: (message) => messages.push(message),
     })(JSON.stringify(entries));
     assert.match(messages[0], /invalid entries/);
@@ -650,7 +648,7 @@ test('saved-solid imports reject bare seeds while accepting an exportable recipe
   const savedSolids = [];
   const messages = [];
   const persistence = [];
-  const importSavedSolids = handler('importSavedSolids', { savedSolids, SAVED_SOLIDS_MAX: 100,
+  const importSavedSolids = handler('importSavedSolids', { savedSolids, mergeSavedSolids, SAVED_SOLIDS_MAX: 100,
     savedSolidExportError, importedSavedSolid: entry => entry,
     persistSavedSolids() {}, renderSavedList() {},
     showGateMsg: (message, options) => { messages.push(message); persistence.push(options.persist); },
@@ -669,42 +667,40 @@ test('saved-solid imports reject bare seeds while accepting an exportable recipe
 test('stale card backup failure cannot block the primary save', () => {
   const valid = {base: 'cube', ops: [{op: 'dual', params: {}}]};
   const stale = {base: 'cube', ops: [{op: 'truncate', params: {t: 50}}]};
-  const storage = new Map([['saved', JSON.stringify([valid, stale])], ['rejected', '[{"older":true}]']]);
+  const storage = new Map([[SAVED_SOLIDS_KEY, JSON.stringify([valid, stale])], [REJECTED_SOLIDS_KEY, '[{"older":true}]']]);
   const writes = [];
   let refusingBackup = true;
   const localStorage = {getItem: key => storage.get(key), setItem(key, value) {
     writes.push(key);
-    if (key === 'rejected' && refusingBackup) throw new Error('quota');
+    if (key === REJECTED_SOLIDS_KEY && refusingBackup) throw new Error('quota');
     storage.set(key, value);
   }};
-  const savedStorage = handler('loadSavedSolids', {localStorage, SAVED_SOLIDS_KEY: 'saved', savedSolidExportError})();
+  const savedStorage = loadSavedSolids(localStorage);
   assert.equal(savedStorage.entries.length, 1);
   assert.equal(savedStorage.rejected.length, 1);
   assert.match(savedStorage.notice, /1 saved solid could not be loaded.*out-of-range/);
   assert.match(savedStorage.notice, /up to 20 rejected entries without thumbnails; oversized data may be truncated or omitted/);
   const status = {textContent: savedStorage.notice};
-  const persist = handler('persistSavedSolids', {savedStorage, savedSolids: savedStorage.entries,
-    localStorage, SAVED_SOLIDS_KEY: 'saved', REJECTED_SOLIDS_KEY: 'rejected',
-    document: {getElementById: () => status}, console: {warn() {}}});
+  const persist = () => { status.textContent = persistSavedStore(localStorage, savedStorage.entries, savedStorage); };
   persist();
-  assert.deepEqual(JSON.parse(storage.get('saved')), [valid]);
-  assert.deepEqual(writes, ['saved', 'rejected']);
+  assert.deepEqual(JSON.parse(storage.get(SAVED_SOLIDS_KEY)), [valid]);
+  assert.deepEqual(writes, [SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY]);
   assert.equal(status.textContent, `${savedStorage.notice} Rejected cards could not be backed up.`);
   assert.equal(savedStorage.rejected.length, 1);
   refusingBackup = false;
   persist();
-  assert.deepEqual(writes, ['saved', 'rejected', 'saved', 'rejected']);
-  assert.deepEqual(JSON.parse(storage.get('saved')), [valid]);
-  assert.deepEqual(JSON.parse(storage.get('rejected')), [{older: true}, stale]);
+  assert.deepEqual(writes, [SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY, SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY]);
+  assert.deepEqual(JSON.parse(storage.get(SAVED_SOLIDS_KEY)), [valid]);
+  assert.deepEqual(JSON.parse(storage.get(REJECTED_SOLIDS_KEY)), [{older: true}, stale]);
   assert.equal(savedStorage.rejected.length, 0);
   assert.equal(status.textContent, savedStorage.notice);
   persist();
-  assert.deepEqual(JSON.parse(storage.get('rejected')), [{older: true}, stale], 'later writes do not duplicate the backup');
+  assert.deepEqual(JSON.parse(storage.get(REJECTED_SOLIDS_KEY)), [{older: true}, stale], 'later writes do not duplicate the backup');
 });
 
 test('a fully valid saved list needs no recovery notice or rejected backup', () => {
   const localStorage = {getItem: () => '[{"base":"cube","ops":[{"op":"dual","params":{}}]}]'};
-  const loaded = handler('loadSavedSolids', {localStorage, SAVED_SOLIDS_KEY: 'saved', savedSolidExportError})();
+  const loaded = loadSavedSolids(localStorage);
   assert.equal(loaded.entries.length, 1);
   assert.equal(loaded.rejected.length, 0);
   assert.equal(loaded.notice, '');
