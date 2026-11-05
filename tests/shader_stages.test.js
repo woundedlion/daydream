@@ -11,7 +11,7 @@ test('stageGrouping uses registered titles and pipeline order', () => {
   assert.equal(grouping.titles.get('Function'), 'Tessellation');
   assert.equal(grouping.assignments.size, params.length);
   const other = stageGrouping(kaleidoscopeSmoothParams());
-  assert.equal(other.titles.get('Planar Warp 2'), 'Mirror Tile');
+  assert.equal(other.titles.get('Planar Warp 2'), 'Mirror + Affine');
 });
 
 test('stageGrouping assigns unfamiliar labels from engine metadata', () => {

@@ -219,12 +219,12 @@ test('KaleidoscopeSmooth controls use the fixed pipeline modes as folders', () =
   assert.deepEqual([...new Set(assignments.values())].sort(),
     [...KALEIDOSCOPE_SMOOTH_STAGE_ORDER].sort());
   assert.deepEqual(h.gui().folders.map((folder) => folder.name),
-    ['Camera', 'Spin + Wander', 'Stereographic', 'Mirror Tile', 'Grid',
+    ['Camera', 'Spin + Wander', 'Stereographic', 'Mirror + Affine', 'Grid',
       'Generated Analogous']);
   assert.equal(h.gui().ctrl('Camera Wander').folder, 'Camera');
   assert.equal(h.gui().ctrl('Projection Spin Speed').folder, 'Spin + Wander');
   assert.equal(h.gui().ctrl('Singularity Fade').folder, 'Stereographic');
-  assert.equal(h.gui().ctrl('Mirror Cell Y').folder, 'Mirror Tile');
+  assert.equal(h.gui().ctrl('Mirror Cell Y').folder, 'Mirror + Affine');
   assert.equal(h.gui().ctrl('Mirror Cell Y').label, 'Cell Y');
   assert.equal(h.gui().ctrl('Pattern Mix').folder, 'Grid');
   assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Generated Analogous');

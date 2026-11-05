@@ -108,7 +108,7 @@ export function kaleidoscopeSmoothParams() {
       {name: 'Projection', title: 'Stereographic', order: 4},
       {name: 'Projection Frame', title: 'Spin + Wander', order: 3},
       {name: 'Camera', title: 'Camera', order: 0},
-      {name: 'Planar Warp 2', title: 'Mirror Tile', order: 6},
+      {name: 'Planar Warp 2', title: 'Mirror + Affine', order: 6},
       {name: 'Colorize', title: 'Generated Analogous', order: 10},
     ];
     const index = i < 4 ? 0 : i === 4 ? 1 : i < 7 ? 2 : i === 7 ? 3 : i < 23 ? 4 : 5;
