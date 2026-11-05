@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { installEngineBundle } from '../scripts/install-engine-bundle.mjs';
+import { installEngineBundle, RUNTIME_PATHS } from '../scripts/install-engine-bundle.mjs';
 import { sitePaths, stageSite, verifiedEnginePaths } from '../scripts/stage-site.mjs';
 import { isolatedGitEnv, scratchDir, writeEngineBundle, writeFileAt } from './helpers/fixture_repo.js';
 
@@ -34,12 +34,7 @@ function fixture(t, readme = 'new README.md') {
   git('add', '--', 'src/app/daydream.js', 'site_manifest.txt', 'generated/shader/patterns/old.shader.json', 'generated/holosphere_wasm.sha');
   git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
   const pair = { daydream: git('rev-parse', 'HEAD'), holosphere: 'b'.repeat(40) };
-  const files = Object.fromEntries(['generated/holosphere_wasm.d.ts', 'generated/holosphere_bindings.d.ts', 'generated/engine_types.d.ts',
-    'generated/engine_contract.mjs', 'generated/segment_geometry.js', 'generated/segment_geometry.d.ts', 'README.md', 'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm',
-    'generated/holosphere_wasm.wasm.sha256', 'generated/holosphere_wasm.toolchain', 'generated/pov_segment_map.json',
-    'generated/shader/shader_workbench.mjs', 'generated/shader/sha256.mjs', 'generated/shader/engine_catalog.json',
-    'generated/shader/composed_effect_roster.mjs',
-    'generated/shader/patterns/catalog.json',
+  const files = Object.fromEntries([...RUNTIME_PATHS,
     'generated/shader/patterns/new.shader.json', 'docs/screenshots/new.png'].map((path) => [path, 'new ' + path]));
   files['generated/holosphere_wasm.sha'] = pair.holosphere;
   files['README.md'] = readme;
