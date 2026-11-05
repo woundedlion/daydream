@@ -1854,16 +1854,22 @@ test('compiled Twist stage edits resolve an arbitrary instance label', async () 
   assert.equal(savedValues(harness)['whorl.twist-angle'], 7.25);
 });
 
-test('a compiled edit refuses an unregistered control', async () => {
+test('an accepted compiled edit clears the previous refusal', async () => {
   const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
   harness.elements.get('shader-parity-toggle').dispatch('click');
   const definitions = harness.compiledEngine.getParameterDefinitions();
+  const original = [...definitions];
   definitions.length = 0;
   harness.compiledEngine.writes.length = 0;
   stageEditor(harness, 'warp2')('warp2.speed', 0.01);
   assert.deepEqual(harness.compiledEngine.writes, []);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /no engine parameter matches "warp2.speed"/);
+  definitions.push(...original);
+  stageEditor(harness, 'warp2')('warp2.speed', 0.01);
+  assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
+  assert.match(harness.elements.get('shader-document-status').textContent, /compiled build/);
+  assert.equal(harness.elements.get('shader-document-error').textContent, '');
 });
 
 test('a descriptor edit under the compiled build returns the preview to the interpreter', async () => {

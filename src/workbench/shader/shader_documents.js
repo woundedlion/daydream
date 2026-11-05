@@ -458,6 +458,16 @@ export function createShaderDocumentController({
     presetSelect.disabled = presetSelect.options.length === 0;
   };
 
+  const showPreviewStatus = () => {
+    if (!active) return;
+    const title = active.compiled.document.effect_metadata?.display_name
+      ?? active.compiled.document.document_id;
+    const preset = presetSelect.selectedOptions[0]?.textContent ?? active.presetId;
+    const side = !parityArmed() ? ''
+      : active.compiledSide ? ' · compiled build' : ' · interpreter';
+    showStatus(`${title} · ${preset}${side}`);
+  };
+
   /** @param {string} presetId */
   const applyPreset = (presetId) => {
     try {
@@ -496,12 +506,7 @@ export function createShaderDocumentController({
       }
       active.presetId = presetId;
       chainUi?.strip.syncParameterRanges();
-      const title = active.compiled.document.effect_metadata?.display_name
-        ?? active.compiled.document.document_id;
-      const preset = presetSelect.selectedOptions[0]?.textContent ?? presetId;
-      const side = !parityArmed() ? ''
-        : active.compiledSide ? ' · compiled build' : ' · interpreter';
-      showStatus(`${title} · ${preset}${side}`);
+      showPreviewStatus();
       showDigest();
       scheduleDeepLink();
       return true;
@@ -673,6 +678,7 @@ export function createShaderDocumentController({
       }
       if (Object.keys(values).length > 1) chainUi.strip.syncParameterValues(values);
       chainUi.strip.syncHistory();
+      if (status.dataset.status === 'error') showPreviewStatus();
       scheduleDeepLink();
       return true;
     } catch (error) {
