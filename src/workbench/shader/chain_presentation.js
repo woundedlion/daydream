@@ -107,8 +107,6 @@ export function modulationParameterHidden(field, value) {
 
 /** @param {string} field @param {(field: string) => *} value @returns {boolean} */
 export function colorParameterHidden(field, value) {
-  if (MODULATION_PARAMETER_GROUPS.some(
-    (group) => group.fields.includes(field))) return true;
   const type = value('palette-type') ?? 'cycling-generated';
   if (field === 'palette-mode') return type !== 'cycling-generated';
   if (['palette-harmony', 'palette-hue', 'palette-spread', 'palette-lightness',

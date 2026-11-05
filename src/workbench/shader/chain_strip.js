@@ -548,9 +548,7 @@ export function createChainStrip({
       }
       palette = null;
       const after = store.chain();
-      const focusLabel = choice.operators.length === 0
-        ? (after[index]?.label ?? after[index - 1]?.label ?? null)
-        : (after[choice.start]?.label ?? null);
+      const focusLabel = after[choice.start]?.label ?? null;
       if (kind === 'insert') store.setSelectedLabel(focusLabel);
       if (focusLabel !== null) pinnedLabels.add(focusLabel);
       commit(focusLabel);
@@ -768,10 +766,10 @@ export function createChainStrip({
           minimum = Math.max(minimum, range.min);
           maximum = Math.min(maximum, range.max);
         }
-        if ((color || modulation) && field === 'pattern-scale'
+        if (modulation && field === 'pattern-scale'
             && values[`${label}.modulation-evaluation`] === 'baked-cube')
           maximum = Math.min(maximum, 8);
-        if ((color || modulation) && field === 'modulation-amount'
+        if (modulation && field === 'modulation-amount'
             && values[`${label}.modulation-mechanic`] !== 'hue-rotation') {
           minimum = Math.max(minimum, 0);
           maximum = Math.min(maximum, 1);

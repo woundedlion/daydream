@@ -89,7 +89,5 @@ test('palette families reveal their own controls and keep mapping brightness and
     for (const field of ['palette-type', 'palette-chroma', 'palette-mapping', 'mapping-frequency',
       'brightness-envelope', 'value-opacity-low', 'value-opacity-high'])
       assert.equal(colorParameterHidden(field, value), false, `${type}: ${field}`);
-    for (const field of ['modulation-source', 'pattern-speed'])
-      assert.equal(colorParameterHidden(field, value), true, `${type}: ${field}`);
   }
 });
