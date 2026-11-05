@@ -986,6 +986,23 @@ export function createShaderDocumentController({
     selectedSource = sourceSelect.value;
   };
 
+  /** @param {NonNullable<Awaited<ReturnType<typeof decodeShaderStateHash>>>} linked */
+  const loadLinkedSource = async (linked) => {
+      const effectId = linked.document.effect_id;
+      const entry = [...sourceCatalog.values()].find(
+        (candidate) => candidate.compiled.document.effect_id === effectId);
+      const scratch = effectId === 'scratch';
+      const filename = entry?.filename ?? (scratch ? SCRATCH_FILENAME : 'linked.shader.json');
+      if (await loadSource(linked.document, filename, null, linked)) {
+        active.savedDocument = entry ? JSON.stringify(entry.compiled.document)
+          : scratch ? JSON.stringify(compiler.compileShaderDocument(
+            scratchChainDocument(operatorCatalog), { catalog: operatorCatalog }).document) : null;
+        selectLoadedSource(scratch ? '' : entry?.effectId ?? null, filename, scratch ? '' : 'Linked');
+        return true;
+      }
+    return false;
+  };
+
   const init = async () => {
     try {
       compiler = await importCompiler();
@@ -1034,19 +1051,7 @@ export function createShaderDocumentController({
       linkError = errorDetail(error);
     }
     if (linked) {
-      const effectId = linked.document.effect_id;
-      const entry = [...sourceCatalog.values()].find(
-        (candidate) => candidate.compiled.document.effect_id === effectId);
-      const scratch = effectId === 'scratch';
-      const filename = entry?.filename ?? (scratch ? SCRATCH_FILENAME : 'linked.shader.json');
-      // Named only once the load stands.
-      if (await loadSource(linked.document, filename, null, linked)) {
-        active.savedDocument = entry ? JSON.stringify(entry.compiled.document)
-          : scratch ? JSON.stringify(compiler.compileShaderDocument(
-            scratchChainDocument(operatorCatalog), { catalog: operatorCatalog }).document) : null;
-        selectLoadedSource(scratch ? '' : entry?.effectId ?? null, filename, scratch ? '' : 'Linked');
-        return true;
-      }
+      if (await loadLinkedSource(linked)) return true;
       linkError = status.textContent || 'the linked state was refused';
     }
     if (linkError) {
@@ -1211,6 +1216,18 @@ export function createShaderDocumentController({
     else announce('The descriptor digest could not be copied.');
   };
 
+  const onHashChange = async () => {
+    if (!(win.location?.hash ?? '').startsWith('#shader=')) return;
+    try {
+      const linked = await decodeShaderStateHash(win.location.hash);
+      if (linked && allowSourceChange() && !await loadLinkedSource(linked))
+        throw new Error(status.textContent || 'the linked state was refused');
+    } catch (error) {
+      showError(`The shader link could not be restored: ${errorDetail(error)}.`);
+    }
+  };
+  win.addEventListener?.('hashchange', onHashChange);
+
   sourceSelect.addEventListener('change', onSourceChange);
   presetSelect.addEventListener('change', onPresetChange);
   openButton.addEventListener('click', onOpen);
@@ -1224,6 +1241,7 @@ export function createShaderDocumentController({
   const dispose = () => {
     const finalLinkWrite = flushDeepLink();
     linkDisposed = true;
+    win.removeEventListener?.('hashchange', onHashChange);
     sourceSelect.removeEventListener('change', onSourceChange);
     presetSelect.removeEventListener('change', onPresetChange);
     openButton.removeEventListener('click', onOpen);

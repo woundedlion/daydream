@@ -1175,6 +1175,7 @@ async function editorWorkbench({
     pathname: '/tools/shader.html', search, hash,
   };
   const win = {
+    ...documentEvents(),
     prompt: (_message, filename) => filename,
     location,
     history: {
@@ -3242,4 +3243,20 @@ test('an untouched linked scratch chain keeps its source and saved baseline', as
   await onChange(source)();
   h.controller.save();
   assert.equal(h.downloads.at(-1)[0], 'scratch.shader.json');
+});
+
+test('hash navigation loads a new shader and disposal removes its listener', async () => {
+  const h = await editorWorkbench({ source: null });
+  assert.equal(h.win.listenerCount('hashchange'), 1);
+  const document = structuredClone(SCRATCH);
+  document.preset_bank.presets[0].values['sample.pattern-freq'] = 3.5;
+  h.win.location.hash = await encodeShaderStateHash({ document,
+    preset: document.preset_bank.presets[0].preset_id, bypassed: [], paused: false });
+  await h.win.listeners.find(listener => listener.type === 'hashchange').handler();
+  h.controller.save();
+  assert.equal(JSON.parse(h.downloads.at(-1)[1]).preset_bank.presets[0]
+    .values['sample.pattern-freq'], 3.5);
+  await h.controller.dispose();
+  ownedEditors.delete(h.controller);
+  assert.equal(h.win.listenerCount('hashchange'), 0);
 });
