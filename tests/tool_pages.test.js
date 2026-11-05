@@ -343,7 +343,8 @@ const CLASS_EXEMPTIONS = new Set([
 // daydream.js loads the shader-document graph on both simulator pages, but it
 // creates the chain strip only in the shader-workbench mode.
 const NON_RENDERING_CLASS_SOURCES = new Map([
-  ['index.html', new Set(['src/workbench/shader/chain_strip.js'])],
+  ['index.html', new Set(['src/workbench/shader/chain_strip.js',
+    'src/workbench/shader/chain_palette.js'])],
 ]);
 
 const classSourcesFor = ({ page, scripts }) => scripts
