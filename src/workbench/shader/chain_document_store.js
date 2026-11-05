@@ -9,8 +9,9 @@ import { LABEL_PATTERN, declarationFromCatalogField as parameterFromField }
 import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from './shader_deeplink.js';
 import { MODULATION_OPERATOR, PALETTE_OPERATOR } from './chain_presentation.js';
 
-/** @typedef {{id: string, name: string|null, min: number, max: number, default: *, curve?: string, topology?: false}} CatalogNumericField */
-/** @typedef {{id: string, topology: true, values: string[], default: *}} CatalogTopologyField */
+/** @typedef {{field: string, values: string[]}} CatalogGate */
+/** @typedef {{id: string, name: string|null, min: number, max: number, default: *, curve?: string, topology?: false, gated_by?: CatalogGate}} CatalogNumericField */
+/** @typedef {{id: string, topology: true, values: string[], default: *, gated_by?: CatalogGate}} CatalogTopologyField */
 /** @typedef {CatalogNumericField|CatalogTopologyField} CatalogField */
 /** @typedef {{id: string, name: string|null, input: string, output: string, blocks?: *, params: CatalogField[]}} CatalogOperator */
 /** @typedef {{label: string, operator: string}} ChainEntry */

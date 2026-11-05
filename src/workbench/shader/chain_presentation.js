@@ -6,18 +6,17 @@
 
 import { float32Decimal } from '../../shared/cpp_format.js';
 
-/** @typedef {{id: string, topology?: boolean, values?: string[], gated_by?: {field: string, values: string[]}}} CatalogParameter */
-/** @typedef {{id: string, name: string|null, input: string, output: string, params: CatalogParameter[]}} CatalogOperator */
+/** @typedef {import('./chain_document_store.js').CatalogOperator} CatalogOperator */
 /** @typedef {{carriers: string[], operators: CatalogOperator[]}} OperatorCatalog */
-/** @typedef {{label: string, operator: string}} ChainEntry */
-/** @typedef {{operator: CatalogOperator, legal: boolean, reason?: string}} LegalityEntry */
-/** @typedef {{operators: CatalogOperator[]}} SequenceEntry */
+/** @typedef {import('./chain_document_store.js').ChainEntry} ChainEntry */
+/** @typedef {import('./chain_document_store.js').LegalityEntry} LegalityEntry */
+/** @typedef {import('./chain_document_store.js').SequenceEntry} SequenceEntry */
 /**
  * One offer of the replacement palette or a socket's selector: the span it
  * names and the operator sequence that takes its place.
  * @typedef {{start: number, deleteCount: number, operators: CatalogOperator[]}} SpanChoice
  */
-/** @typedef {{id: string, storage: string, domain: *}} ParameterDeclaration */
+/** @typedef {import('./chain_document_store.js').ParameterDeclaration} ParameterDeclaration */
 /** @typedef {{name: string, fields: string[], source?: string, term?: number}} ParameterGroup */
 /**
  * One carrier's run of the chain: the gap indices that fall inside it, the chain

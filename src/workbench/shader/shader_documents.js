@@ -52,8 +52,10 @@ function snapshotValueEqual(expected, actual) {
     && keys.every((key) => Object.hasOwn(actual, key) && snapshotValueEqual(expected[key], actual[key]));
 }
 
-/** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[], optionValues?: number[]}} ParameterDefinition */
-/** @typedef {{document: *, descriptor_digest?: string, diagnostics?: *, status?: string}} CompiledDocument */
+/** @typedef {import('./chain_apply.js').ParameterDefinition} ParameterDefinition */
+/** @typedef {import('./chain_apply.js').CompiledDocument} CompiledDocument */
+/** @typedef {{effectId: string, descriptorDigest?: string, presetIds: string[]}} OfficialDocument */
+/** @typedef {{compiled: CompiledDocument, filename: string, official: OfficialDocument|null, compiledSide: boolean, presetId: string|null, referencePresetIds: string[], savedDocument?: string|null}} ActiveDocument */
 
 /**
  * Performs one resolved write.
@@ -325,7 +327,7 @@ export function createShaderDocumentController({
 
   /** @type {*} */
   let compiler;
-  /** @type {*|null} */
+  /** @type {ActiveDocument|null} */
   let active = null;
   let selectedSource = '';
   /** @type {Map<string, *>} */
@@ -565,9 +567,11 @@ export function createShaderDocumentController({
     if (!parameterLive(parameterId)) return false;
     try {
       if (chainUi === null || active === null || active.presetId === null) return false;
+      const presetId = active.presetId;
+      const compiledSide = active.compiledSide;
       const document = chainUi.store.document();
       const presetValues = document.preset_bank.presets
-        .find((/** @type {*} */ preset) => preset.preset_id === active.presetId).values;
+        .find((/** @type {*} */ preset) => preset.preset_id === presetId).values;
       const values = { [parameterId]: value };
       const label = parameterId.slice(0, parameterId.indexOf('.'));
       const field = fieldSegment(parameterId);
@@ -586,8 +590,8 @@ export function createShaderDocumentController({
       const store = chainUi.store;
       const addsDeclaration = Object.keys(values).some(id => !store.declares(id));
       const coupled = Object.keys(values).length > 1;
-      const result = chainUi.store.setPresetValues(active.presetId, values, () => {
-        if (addsDeclaration && active.compiledSide) return { ok: true };
+      const result = chainUi.store.setPresetValues(presetId, values, () => {
+        if (addsDeclaration && compiledSide) return { ok: true };
         const engine = getEngine();
         const module = getModule();
         if (!engine || !module) return { ok: true };
@@ -595,8 +599,8 @@ export function createShaderDocumentController({
         const control = engineControlName(parameterId, definitions);
         const paused = getAnimationsPaused();
         let refusal = control.refusal;
-        if (active.compiledSide || (refusal === null && control.name !== null)) {
-          if (coupled && !active.compiledSide) {
+        if (compiledSide || (refusal === null && control.name !== null)) {
+          if (coupled && !compiledSide) {
             const writes = [];
             for (const [id, next] of Object.entries(values)) {
               const write = resolveParameterWrite(definitions, id, next);
@@ -609,7 +613,7 @@ export function createShaderDocumentController({
               if (written !== module.ParamSetResult.APPLIED)
                 refusal = `"${parameterId}" was refused: ${enumConstantName(module.ParamSetResult, written)}`;
             }
-          } else if (active.compiledSide) {
+          } else if (compiledSide) {
             const writes = [];
             const documentWrites = [];
             const documentDefinitions = engine.getDocumentParameterDefinitions?.() ?? [];
@@ -878,7 +882,7 @@ export function createShaderDocumentController({
    */
   const currentDocument = () => chainUi
     ? chainUi.store.document()
-    : structuredClone(active.compiled.document);
+    : structuredClone((/** @type {ActiveDocument} */ (active)).compiled.document);
 
   /**
    * The document Save writes: the current one without its disabled stages.
@@ -887,7 +891,7 @@ export function createShaderDocumentController({
    */
   const exportableDocument = () => chainUi
     ? chainUi.store.exportDocument()
-    : structuredClone(active.compiled.document);
+    : structuredClone((/** @type {ActiveDocument} */ (active)).compiled.document);
 
   const clearLinkTimers = () => {
     if (linkDebounceTimer !== null) clearTimeout(linkDebounceTimer);
@@ -940,7 +944,7 @@ export function createShaderDocumentController({
    */
   const exportDocument = (document, filename) => {
     download(filename, compiler.exportShaderDocumentJson(document));
-    active.savedDocument = JSON.stringify(currentDocument());
+    (/** @type {ActiveDocument} */ (active)).savedDocument = JSON.stringify(currentDocument());
     showStatus(`Saved ${filename}.`);
     return true;
   };
@@ -1055,7 +1059,7 @@ export function createShaderDocumentController({
       const scratch = effectId === 'scratch';
       const filename = entry?.filename ?? (scratch ? SCRATCH_FILENAME : 'linked.shader.json');
       if (await loadSource(linked.document, filename, null, linked)) {
-        active.savedDocument = entry ? JSON.stringify(entry.compiled.document)
+        (/** @type {ActiveDocument} */ (active)).savedDocument = entry ? JSON.stringify(entry.compiled.document)
           : scratch ? JSON.stringify(compiler.compileShaderDocument(
             scratchChainDocument(operatorCatalog), { catalog: operatorCatalog }).document) : null;
         selectLoadedSource(scratch ? '' : entry?.effectId ?? null, filename, scratch ? '' : 'Linked');
@@ -1207,7 +1211,7 @@ export function createShaderDocumentController({
     if (!applyPreset(presetSelect.value)) {
       const refusal = status?.textContent ?? 'The preset could not be applied.';
       presetSelect.value = active?.presetId ?? '';
-      if (active) applyPreset(active.presetId);
+      if (active) applyPreset(/** @type {string} */ (active.presetId));
       showError(refusal);
       return;
     }
@@ -1246,8 +1250,9 @@ export function createShaderDocumentController({
   };
   const onParityToggle = () => {
     if (active === null || !parityArmed()) return;
+    const official = /** @type {OfficialDocument} */ (active.official);
     const compiledSide = !active.compiledSide;
-    const effect = compiledSide ? active.official.effectId : CHAIN_EFFECT;
+    const effect = compiledSide ? official.effectId : CHAIN_EFFECT;
     if (!selectEffect(effect)) {
       announce(`The preview engine rejected effect "${effectDisplayName(effect)}".`);
       return;
@@ -1258,7 +1263,7 @@ export function createShaderDocumentController({
     const presetId = active.presetId ?? presetSelect.value;
     if (!applyPreset(presetId)) {
       const refusal = status?.textContent ?? 'The preset could not be applied.';
-      const previousEffect = compiledSide ? CHAIN_EFFECT : active.official.effectId;
+      const previousEffect = compiledSide ? CHAIN_EFFECT : official.effectId;
       if (!selectEffect(previousEffect)) {
         announce(`The preview engine rejected effect "${effectDisplayName(previousEffect)}".`);
         return;

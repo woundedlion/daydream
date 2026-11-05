@@ -8,7 +8,7 @@ import { callWorkbenchBinding } from '../../engine/workbench_bindings.js';
 import { enumConstantName, optionValue } from '../../effects/param_sync.js';
 
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[], optionValues?: number[]}} ParameterDefinition */
-/** @typedef {{document: *, descriptor_digest?: string}} CompiledDocument */
+/** @typedef {{document: *, descriptor_digest?: string, diagnostics?: import('./chain_document_store.js').Diagnostic[], status?: string}} CompiledDocument */
 
 /**
  * @param {ParameterDefinition[]} definitions

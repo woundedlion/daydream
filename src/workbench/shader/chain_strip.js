@@ -35,8 +35,7 @@ import { createPointerDrag } from '../../shared/pointer_drag.js';
  * edit. Each chip carries its stage's controls inline.
  */
 
-/** @typedef {{severity: string, phase: string, code: string, path: string, message: string}} Diagnostic */
-/** @typedef {{ok: true}|{ok: false, diagnostics: Diagnostic[]}} EditResult */
+/** @typedef {import('./chain_document_store.js').EditResult} EditResult */
 /**
  * The document-store surface the strip drives. Legality queries throw RangeError
  * for invalid indices; mutation methods return EditResult refusals.
