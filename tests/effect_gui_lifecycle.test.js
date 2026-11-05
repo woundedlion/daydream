@@ -4,7 +4,7 @@ import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
-import { EXPORT_COPIED, EXPORT_FAILED, FLASH_MS } from '../src/ui/effect_actions.js';
+import { EXPORT_COPIED, EXPORT_FAILED, EXPORT_REFUSED, FLASH_MS } from '../src/ui/effect_actions.js';
 import {
   chainSnapshot,
   chainSnapshotParams,
@@ -53,9 +53,9 @@ test('the Export outcome is announced in a polite live region', () => {
   assert.equal(status.textContent, '');
 
   h.gui().ctrl('export').object.export();
-  assert.equal(status.textContent, EXPORT_FAILED);
+  assert.equal(status.textContent, EXPORT_REFUSED);
   h.gui().ctrl('export').object.export();
-  assert.equal(status.textContent, `${EXPORT_FAILED}\u200b`);
+  assert.equal(status.textContent, `${EXPORT_REFUSED}\u200b`);
 
   mock.timers.tick(FLASH_MS);
   assert.equal(status.textContent, '',
@@ -110,6 +110,8 @@ test('Export does not fall back to controls from a stale schema', () => {
   assert.deepEqual(h.state.copyText.copied, []);
   assert.equal(h.gui().ctrl('export').label, '\u2717');
   assert.match(h.warnings[0], /no parameter values matching/);
+  assert.equal(exportStatus(h).textContent, EXPORT_REFUSED);
+  assert.match(h.configNotices[0], /no parameter values matching/);
 });
 
 test('Export omits engine-written readonly params from the preset', async () => {
@@ -168,6 +170,9 @@ test('chain Export fails visibly when the typed snapshot is unavailable', () => 
   assert.equal(h.gui().ctrl('export').label, '\u2717');
   assert.deepEqual(h.warnings,
     ['Export: Shader Workbench chain snapshot is unavailable']);
+  assert.equal(exportStatus(h).textContent, EXPORT_REFUSED);
+  assert.deepEqual(h.configNotices,
+    ['Export: Shader Workbench chain snapshot is unavailable']);
 });
 
 test('Export refuses a value stream that has skewed from the panel', () => {
@@ -195,6 +200,7 @@ test('a rejected clipboard copy reports the failure', async () => {
 
   assert.equal(h.gui().ctrl('export').label, '\u2717');
   assert.match(h.warnings[0], /clipboard copy failed/);
+  assert.equal(exportStatus(h).textContent, EXPORT_FAILED);
 });
 
 test('a copy operation that exhausts its fallbacks reports the failure', async () => {
@@ -738,7 +744,7 @@ test('external parameter export refuses missing live values without controller f
   assert.deepEqual([...h.panel.active().controllerByName.keys()], []);
   h.gui().ctrl('export').object.export();
   assert.deepEqual(h.state.copyText.copied, []);
-  assert.equal(exportStatus(h).textContent, EXPORT_FAILED);
+  assert.equal(exportStatus(h).textContent, EXPORT_REFUSED);
   assert.deepEqual(h.warnings,
     ['Export: no parameter values matching the current effect; skipping copy']);
 });

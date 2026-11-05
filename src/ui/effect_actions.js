@@ -26,6 +26,7 @@ import { enumChoices } from "../effects/param_sync.js";
  * @property {(fx: {gui: Gui}) => boolean} isActive - Whether a record is still the
  *   published one.
  * @property {(message: string, error?: unknown) => void} logWarn - Console sink.
+ * @property {(message: string) => void} showNotice - Presents an export refusal.
  */
 /**
  * @typedef {Object} EffectActions
@@ -48,6 +49,7 @@ export const FLASH_MS = 1500;
 // Transient Export button labels.
 export const EXPORT_COPIED = '\u2713 Copied!';
 export const EXPORT_FAILED = '\u2717 Copy failed';
+export const EXPORT_REFUSED = '\u2717 Export failed';
 const EXPORT_ICON = '\u29c9';
 const RESET_ICON = '\u21ba';
 const PREVIOUS_ICON = '\u25c0';
@@ -60,7 +62,7 @@ const NEXT_ICON = '\u25b6';
  * @returns {EffectActions}
  */
 export function createEffectActions(fx, deps) {
-  const { presets, onPresetChange, onReset, buildExport, copyText, isActive, logWarn } = deps;
+  const { presets, onPresetChange, onReset, buildExport, copyText, isActive, logWarn, showNotice } = deps;
   const { gui } = fx;
   /** @type {GuiController[]} */
   let controllers = [];
@@ -135,7 +137,8 @@ export function createEffectActions(fx, deps) {
     if ('error' in result) {
       if (result.cause === undefined) logWarn(result.error);
       else logWarn(result.error, result.cause);
-      flashExport(EXPORT_FAILED);
+      showNotice(result.error);
+      flashExport(EXPORT_REFUSED);
       return;
     }
     return copyAndFlash(result.text);

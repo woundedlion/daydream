@@ -398,6 +398,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       copyText: (text) => /** @type {(text: string) => Promise<boolean>} */ (copyText)(text),
       isActive: (record) => activeEffect === record,
       logWarn,
+      showNotice: showConfigImportNotice,
     });
   }
 
