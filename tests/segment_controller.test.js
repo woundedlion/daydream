@@ -640,7 +640,7 @@ test('setEffect broadcasts the name plus the tuned param snapshot to every worke
   c.getWasmEngine = () => fakeEngine([
     { name: 'Speed', value: 0.5 },
     { name: 'Glow', value: true },
-  ]);
+  ], 6, 3);
 
   const before = c.paramRevision;
   c.setEffect('NewEffect');
@@ -649,6 +649,7 @@ test('setEffect broadcasts the name plus the tuned param snapshot to every worke
     const msgs = w.posted.filter((m) => m.type === 'setEffect');
     assert.equal(msgs.length, 1, 'each worker received exactly one setEffect');
     assert.equal(msgs[0].name, 'NewEffect');
+    assert.equal(msgs[0].presetIndex, 3);
     assert.deepEqual(msgs[0].params, [
       { name: 'Speed', value: 0.5 },
       { name: 'Glow', value: 1.0 },
