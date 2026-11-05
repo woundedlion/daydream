@@ -23,3 +23,13 @@ test('animated snippets throttle formatting and flush the final stopped value', 
   update();
   assert.equal(output.textContent, '3');
 });
+
+test('an axis key leaves the other coefficient component unchanged', () => {
+  const paramObj = { re: 0, im: 0.05 };
+  const keydown = handler('onAxisKeyDown', { paramObj, activePreset: null, maxExtent: 4,
+    snapCoefficientComponent: (v, threshold) => Math.abs(v) < 2 * threshold ? 0 : v,
+    updateUI() {}, onChange() {}, stopAnimation() {} });
+  keydown('re')({ key: 'ArrowRight', shiftKey: true, preventDefault() {} });
+  assert.equal(paramObj.re, 0.2);
+  assert.equal(paramObj.im, 0.05);
+});

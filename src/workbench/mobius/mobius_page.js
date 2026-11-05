@@ -365,12 +365,16 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
     e.preventDefault();
     if (activePreset) stopAnimation();
     const home = e.key === 'Home';
-    let re = home ? 0 : paramObj.re + (axis === 're' ? delta : 0);
-    let im = home ? 0 : paramObj.im + (axis === 'im' ? delta : 0);
-    // Scale the snap band to the key step so a single nudge escapes the
-    // zero band (2*threshold) instead of latching back onto 0.
-    re = snapCoefficientComponent(Math.max(-maxExtent, Math.min(maxExtent, re)), step / 4);
-    im = snapCoefficientComponent(Math.max(-maxExtent, Math.min(maxExtent, im)), step / 4);
+    let re = paramObj.re;
+    let im = paramObj.im;
+    if (home) {
+      re = 0;
+      im = 0;
+    } else if (axis === 're') {
+      re = snapCoefficientComponent(Math.max(-maxExtent, Math.min(maxExtent, re + delta)), step / 4);
+    } else {
+      im = snapCoefficientComponent(Math.max(-maxExtent, Math.min(maxExtent, im + delta)), step / 4);
+    }
     paramObj.re = re;
     paramObj.im = im;
     updateUI();
