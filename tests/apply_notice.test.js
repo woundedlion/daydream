@@ -38,6 +38,7 @@ test('index provides every apply-notice element the sink resolves', () => {
  */
 function makeApplyNotice() {
   const body = fakeElement('div');
+  body.matches = () => false;
   const text = fakeElement('span');
   const dismiss = fakeElement('button');
   body.append(text, dismiss); // index.html nests both inside the body
@@ -241,4 +242,16 @@ test('the notice tolerates a page missing the element', () => {
   notice.clear();
 
   assert.equal(notice.owner(), null);
+});
+
+test('the self-clear waits while the pointer is over the notice', () => {
+  const h = makeApplyNotice();
+  let hovered = true;
+  h.body.matches = selector => selector === ':hover' && hovered;
+  h.notice.show('Effect change was rejected.', 'switch');
+  h.expire();
+  assert.equal(h.body.hidden, false);
+  hovered = false;
+  h.expire();
+  assert.equal(h.body.hidden, true);
 });
