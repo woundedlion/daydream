@@ -385,9 +385,8 @@ export function createApplyPipeline({
    * @returns {boolean} False when the engine rejected the effect.
    */
   function selectEngineEffect() {
-    const engine = getEngine();
+    const engine = /** @type {HolosphereEngine} */ (getEngine());
     const effect = appState.get('effect');
-    if (!engine) return false;
     // Compare against the enum value, never by truthiness (every
     // Module.EffectSetResult value is a truthy object).
     const applied =
