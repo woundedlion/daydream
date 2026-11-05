@@ -60,6 +60,7 @@ import { formatExportParams } from "../shared/export_params.js";
  *   the engine.
  * @property {boolean} warningsDirty - Whether the warnings must be re-read.
  * @property {boolean} advisoriesDirty - Whether an accepted edit needs new fold estimates.
+ * @property {Array<{name:string,foldStrength:number}>|null} advisoryList - Last displayed advisory estimates.
  * @property {number[]|null} advisoryValues - Parameter values used for the displayed fold estimates.
  */
 
@@ -313,7 +314,14 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     for (let index = 0; values && !changed && index < values.length; index += 1)
       changed = !Object.is(values[index], fx.advisoryValues?.[index]);
     if (!fx.advisoriesDirty && !changed) return;
-    syncParamAdvisories(fx.controllerByName, getParameterAdvisories());
+    const advisories = getParameterAdvisories();
+    const previous = fx.advisoryList;
+    if (!previous || previous.length !== advisories.length
+        || advisories.some((entry, index) => entry.name !== previous[index].name
+          || !Object.is(entry.foldStrength, previous[index].foldStrength))) {
+      syncParamAdvisories(fx.controllerByName, advisories);
+      fx.advisoryList = advisories.map(({name, foldStrength}) => ({name, foldStrength}));
+    }
     fx.advisoryValues = values ? Array.from(values) : null;
     fx.advisoriesDirty = false;
   }
@@ -622,6 +630,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       warningsDirty: false,
       advisoriesDirty: true,
       advisoryValues: null,
+      advisoryList: null,
     }));
 
     fx.edits = new EffectPanelEdits(dragTarget, (edited) => persistence.persist(fx.gui, { edited }));

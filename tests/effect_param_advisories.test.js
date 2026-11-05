@@ -102,7 +102,7 @@ test('unchanged frames reuse estimates without querying parameter controls', () 
   h.state.engineValues[0] = 0.8;
   h.panel.sync();
   assert.equal(h.state.advisoryReads, 2);
-  assert.ok(queries > 0);
+  assert.equal(queries, 0);
   h.panel.sync();
   assert.equal(h.state.advisoryReads, 2);
   h.panel.destroy();
@@ -120,5 +120,22 @@ test('accepted edits refresh estimates before the live value stream advances', (
   assert.equal(controller.domElement.style.getPropertyValue('--param-fold-high'), '75%');
   h.panel.sync(false);
   assert.equal(h.state.advisoryReads, 2);
+  h.panel.destroy();
+});
+
+
+test('changed advisory estimates repaint even when their list is reused', () => {
+  const h = makeHarness({params: [STRENGTH], engineValues: [0.7]});
+  h.state.advisories = [{name: STRENGTH.name, foldStrength: 0.2}];
+  h.panel.build();
+  const root = h.panel.active().controllerByName.get(STRENGTH.name).domElement;
+  h.state.advisories[0].foldStrength = 0.5;
+  h.state.engineValues[0] = 0.8;
+  h.panel.sync();
+  assert.equal(root.style.getPropertyValue('--param-fold-high'), '75%');
+  h.state.advisories = [];
+  h.state.engineValues[0] = 0.9;
+  h.panel.sync();
+  assert.equal(root.classList.contains('param-fold-advisory'), false);
   h.panel.destroy();
 });
