@@ -577,7 +577,8 @@
   }
 
   .license-link {
-    display: none;
+    position: static;
+    align-self: flex-end;
   }
 
   .tab {
