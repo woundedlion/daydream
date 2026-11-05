@@ -1,3 +1,4 @@
+import { createEffectPanelView } from '../src/ui/effect_panel_view.js';
 //
 // Pins the behaviour of the lil-gui build package.json pins, driving the real
 // module over tests/helpers/fake_dom.js.
@@ -353,4 +354,29 @@ test('real lil-gui maps the third sparse option to numeric ID six', async () => 
   controller.$select.selectedIndex = 2;
   controller.$select.dispatch('change');
   assert.equal(state.Pattern, 6);
+});
+
+test('the deep-link wrapper exposes the real folder title', async () => {
+  const raw = await realGUI();
+  const gui = new DeepLinkGUI(raw);
+  try { assert.equal(gui.titleElement, raw.$title); } finally { raw.destroy(); }
+});
+
+test('panel rebuild focus returns to root and stage title buttons', () => {
+  installHost();
+  const folder = () => ({ domElement: fakeElement('div'), closed: false,
+    titleElement: fakeElement('button', { connected: true }), open() {}, close() {} });
+  const record = () => ({ gui: folder(), pause: {}, stageFolders: new Map([['source', folder()]]) });
+  const view = createEffectPanelView({ focusedElement: () => document.activeElement,
+    guiContainer: () => null, isMobile: () => false });
+  for (const stage of [false, true]) {
+    const before = record();
+    const after = record();
+    const title = fx => stage ? fx.stageFolders.get('source').titleElement : fx.gui.titleElement;
+    title(before).focus();
+    const captured = view.capture(before);
+    document.activeElement = null;
+    view.restore(after, captured);
+    assert.equal(document.activeElement, title(after));
+  }
 });

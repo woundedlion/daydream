@@ -137,6 +137,9 @@ class DeepLinkGUI {
    * state.
    * @returns {URLSearchParams} The query parameters of this GUI's window.
    */
+  /** @returns {HTMLButtonElement} The folder title button. */
+  get titleElement() { return this.gui.$title; }
+
   urlParams() { return getUrlParams(this.win ?? window); }
 
   /**

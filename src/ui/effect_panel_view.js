@@ -4,7 +4,7 @@
  */
 
 /** @typedef {{property: string, domElement: HTMLElement, $select?: HTMLSelectElement, $input?: HTMLInputElement, $button?: HTMLButtonElement}} PanelController */
-/** @typedef {{domElement: HTMLElement, closed: boolean, open: (open?: boolean) => void, close: () => void}} PanelFolder */
+/** @typedef {{domElement: HTMLElement, titleElement?: HTMLButtonElement, closed: boolean, open: (open?: boolean) => void, close: () => void}} PanelFolder */
 /** @typedef {{gui: PanelFolder, controllerByName?: Map<string, PanelController>, pause: {controller?: PanelController|null}, actions?: {focusTargets: () => Array<[string, PanelController]>}, stageFolders?: Map<string, PanelFolder>}} PanelRecord */
 
 /**
@@ -53,6 +53,13 @@ export function createEffectPanelView({ focusedElement, guiContainer, isMobile }
     for (const [key, controller] of fx.actions?.focusTargets() ?? []) {
       pairs.push([panelControlKey(key), controller]);
     }
+    /** @param {string} key @param {PanelFolder} folder */
+    const titleTarget = (key, folder) => {
+      const title = folder.titleElement;
+      if (title) pairs.push([key, { property: key, domElement: title, $button: title }]);
+    };
+    titleTarget('panel.title', fx.gui);
+    for (const [stage, folder] of fx.stageFolders ?? []) titleTarget(`panel.stage.${stage}`, folder);
     return pairs;
   }
 
