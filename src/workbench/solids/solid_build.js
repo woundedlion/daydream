@@ -80,6 +80,30 @@ export function readbackMesh(wasmMesh, ctx) {
   return { vertices, faces };
 }
 
+/** @param {unknown} error @returns {string} */
+function errorText(error) {
+  return error instanceof Error && error.message ? error.message : String(error);
+}
+
+/** @param {MeshWrapper} wasmMesh @param {MeshBuildContext} ctx @returns {SolidMeshData?} */
+function readbackAndFree(wasmMesh, ctx) {
+  let meshData;
+  try {
+    meshData = readbackMesh(wasmMesh, ctx);
+  } catch (e) {
+    console.error('WASM readback error:', e);
+    if (ctx.onTrap(e)) return null;
+    wasmMesh.delete();
+    ctx.meshOps.clearToolingMemory();
+    ctx.onError(`Mesh readback failed: ${
+      errorText(e)}`);
+    return null;
+  }
+  wasmMesh.delete();
+  ctx.meshOps.clearToolingMemory();
+  return meshData;
+}
+
 /**
  * Builds one registered solid and reads it back. Frees the wrapper and tooling
  * arenas after success or a recoverable readback failure; leaves a halted module alone.
@@ -91,21 +115,7 @@ export function readbackMesh(wasmMesh, ctx) {
 export function buildBaseMesh(name, what, ctx) {
   const wasmMesh = requireMeshResult(ctx.meshOps.fromSolidName(name), what, ctx);
   if (!wasmMesh) return null;
-  let meshData;
-  try {
-    meshData = readbackMesh(wasmMesh, ctx);
-  } catch (e) {
-    console.error('WASM readback error:', e);
-    if (ctx.onTrap(e)) return null;
-    wasmMesh.delete();
-    ctx.meshOps.clearToolingMemory();
-    ctx.onError(`Mesh readback failed: ${
-      e instanceof Error && e.message ? e.message : String(e)}`);
-    return null;
-  }
-  wasmMesh.delete();
-  ctx.meshOps.clearToolingMemory();
-  return meshData;
+  return readbackAndFree(wasmMesh, ctx);
 }
 
 /**
@@ -128,7 +138,7 @@ export function buildChainMesh(base, ops, ctx) {
     if (!mesh) return null;
   } catch (e) {
     console.error('Error creating base solid:', e);
-    if (!ctx.onTrap(e)) ctx.onError(`Base solid "${base}" failed: ${e instanceof Error ? e.message : String(e)}`);
+    if (!ctx.onTrap(e)) ctx.onError(`Base solid "${base}" failed: ${errorText(e)}`);
     return null;
   }
 
@@ -149,7 +159,7 @@ export function buildChainMesh(base, ops, ctx) {
     if (mesh) mesh.delete();
     ctx.meshOps.clearToolingMemory();
     if (failure.reason === 'OK' || failure.reason === 'UNKNOWN') {
-      ctx.onError(`Op error: ${e instanceof Error && e.message ? e.message : String(e)}`);
+      ctx.onError(`Op error: ${errorText(e)}`);
     } else if (failure.fatal) {
       ctx.onFatal(failure.message);
     } else {
@@ -170,23 +180,10 @@ export function buildChainMesh(base, ops, ctx) {
     console.error('WASM classifyFaces error:', e);
     if (ctx.onTrap(e)) return null;
     classifyFailure = `Face classification failed: ${
-      e instanceof Error && e.message ? e.message : String(e)}`;
+      errorText(e)}`;
   }
 
-  let meshData;
-  try {
-    meshData = readbackMesh(mesh, ctx);
-  } catch (e) {
-    console.error('WASM readback error:', e);
-    if (ctx.onTrap(e)) return null;
-    mesh.delete();
-    ctx.meshOps.clearToolingMemory();
-    ctx.onError(`Mesh readback failed: ${
-      e instanceof Error && e.message ? e.message : String(e)}`);
-    return null;
-  }
-  mesh.delete();
-  ctx.meshOps.clearToolingMemory();
+  const meshData = readbackAndFree(mesh, ctx);
   // readbackMesh already reported a rejected readback.
   if (!meshData) return null;
 

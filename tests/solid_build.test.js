@@ -366,3 +366,12 @@ test('fake mesh deletion refuses a double free without balancing a live mesh', (
   second.delete();
   assert.equal(state.live, 0);
 });
+
+
+test('an empty-message base failure still reports the Error name', () => {
+  const {Mod} = fakeModule();
+  const {ctx, errors} = context(Mod);
+  ctx.meshOps = {...ctx.meshOps, fromSolidName() { throw new Error(''); }};
+  assert.equal(quietly(() => buildChainMesh('cube', [], ctx)), null);
+  assert.deepEqual(errors, ['Base solid "cube" failed: Error']);
+});
