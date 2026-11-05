@@ -4,7 +4,7 @@
  */
 
 import { engineHalted } from '../../shared/engine_halt.js';
-import { applyOp, meshOpFailure, opTopologyKey, seedOpParams } from './solid_codegen.js';
+import { applyOp, chainOpName, meshOpFailure, opTopologyKey, seedOpParams } from './solid_codegen.js';
 
 /** @typedef {import('./solid_codegen.js').WasmModule} WasmModule */
 /** @typedef {import('./solid_codegen.js').ChainOp} ChainOp */
@@ -143,7 +143,7 @@ export function createChainValidator(createModule) {
         mesh = Ops.fromSolidName(base);
         if (!mesh) return rejected();
         for (const o of candidate) {
-          what = `Op "${typeof o === 'string' ? o : o.op}"`;
+          what = `Op "${chainOpName(o)}"`;
           const next = applyOp(mesh, o);
           // Read before another checked mesh call clears the flag; getVertices
           // also resets it before reading back the mesh.

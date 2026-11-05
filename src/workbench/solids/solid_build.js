@@ -12,7 +12,7 @@
  * getLastResult(), which the next call overwrites.
  */
 
-import { applyOp, meshOpFailure, requireMeshResult } from './solid_codegen.js';
+import { applyOp, chainOpName, meshOpFailure, requireMeshResult } from './solid_codegen.js';
 
 /** @typedef {import('./solid_codegen.js').ChainOp} ChainOp */
 /** @typedef {import('./solid_codegen.js').MeshWrapper} MeshWrapper */
@@ -135,7 +135,7 @@ export function buildChainMesh(base, ops, ctx) {
   let failing = null;
   try {
     for (const o of ops) {
-      failing = typeof o === 'string' ? o : o.op;
+      failing = chainOpName(o);
       const nextMesh = applyOp(mesh, o);
       mesh.delete();
       mesh = nextMesh;

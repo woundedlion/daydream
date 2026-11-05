@@ -10,7 +10,7 @@
  */
 
 import {
-  applyOp,
+  applyOp, chainOpName,
   meshOpFailure,
   CATALAN_BASES,
   D2R_F32,
@@ -85,13 +85,13 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
       };
       check();
       const primitives = ops.flatMap((op) => {
-        const name = typeof op === 'string' ? op : op.op;
+        const name = chainOpName(op);
         return LOWERING[name]?.(op) ?? [op];
       });
       const swept = primitives.every((primitive) => !unsweepableReason(primitive));
       let previousName = '';
       for (const [index, primitive] of primitives.entries()) {
-        const name = typeof primitive === 'string' ? primitive : primitive.op;
+        const name = chainOpName(primitive);
         if (!mesh) throw new Error(meshOpFailure(mod, 'Registry mesh').message);
         let bridgeFaces = 0;
         if (name === 'dual' || (name === 'kis' && previousName !== 'dual')) {
@@ -101,7 +101,7 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
           for (const count of faces.counts) indices += count;
           const edges = indices / 2;
           const next = primitives[index + 1];
-          const nextName = typeof next === 'string' ? next : next?.op;
+          const nextName = chainOpName(next);
           // Closed genus-zero meshes: ambo has E+2 faces; truncate has 3E edges.
           bridgeFaces = name === 'dual' && nextName !== 'kis' ? edges + 2 : 3 * edges + 2;
         }
@@ -152,7 +152,7 @@ export function upperSnake(name) {
  * @throws {Error} When the op is unknown or a parameterized op arrives without params.
  */
 export function opStepCpp(o) {
-  const opName = typeof o === 'string' ? o : o.op;
+  const opName = chainOpName(o);
   if (!KNOWN_OPS.has(opName)) {
     throw new Error(`opStepCpp: unknown op "${opName}" ` +
       `(expected one of ${[...KNOWN_OPS].join(', ')})`);
@@ -415,7 +415,7 @@ export function generateRegistryCpp(item, baseRecipe = null) {
   }
   const ops = [...(baseRecipe?.ops ?? []), ...item.ops];
   const lowered = ops.reduce((count, op) =>
-    count + primitiveCount(typeof op === 'string' ? op : op.op), 0);
+    count + primitiveCount(chainOpName(op)), 0);
   if (lowered > MAX_BUILD_STEPS) {
     throw new Error(`generateRegistryCpp: the flattened chain lowers to ${lowered} `
       + `primitive steps; IslamicStars supports at most ${MAX_BUILD_STEPS}`);

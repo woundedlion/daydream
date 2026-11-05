@@ -111,7 +111,7 @@ export const MORPH_SWEEP = {
  * @returns {?string} A sentence naming the reason, or null when the step sweeps.
  */
 export function unsweepableReason(o) {
-  const opName = typeof o === 'string' ? o : o?.op;
+  const opName = chainOpName(o);
   if (!(opName in MORPH_SWEEP)) return null;
   const band = MORPH_SWEEP[opName];
   if (!band) {
@@ -168,6 +168,11 @@ export function requireParams(where, opName, o) {
  */
 export function opParams(o) {
   return (typeof o === 'string' ? undefined : o.params) ?? {};
+}
+
+/** @param {ChainOp} op @returns {string} The operation name. */
+export function chainOpName(op) {
+  return typeof op === 'string' ? op : op?.op;
 }
 
 /**
@@ -311,7 +316,7 @@ export const CATALAN_BASES = new Set([
  * lifetime methods (delete, clone).
  */
 export function applyOp(mesh, o) {
-  const opName = typeof o === 'string' ? o : o.op;
+  const opName = chainOpName(o);
   if (!KNOWN_OPS.has(opName)) {
     throw new Error(`applyOp: unknown op "${opName}" — not a Conway/SolidBuilder operator`);
   }
@@ -521,7 +526,7 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
   let chain = '';
 
   item.ops.forEach(o => {
-    const opName = typeof o === 'string' ? o : o.op;
+    const opName = chainOpName(o);
     if (!KNOWN_OPS.has(opName)) {
       throw new Error(`generateFuncAndRecipe: unknown op "${opName}" ` +
         `(expected one of ${[...KNOWN_OPS].join(', ')})`);
@@ -874,7 +879,7 @@ const AMBO_ALIAS_T = 0.5;
  *   lowering.
  */
 export function opTopologyKey(o) {
-  const opName = typeof o === 'string' ? o : o?.op;
+  const opName = chainOpName(o);
   if (!AMBO_ALIASING_OPS.has(opName)) return String(opName);
   return Math.fround(opParams(o).t) === AMBO_ALIAS_T ? `${opName}:ambo` : String(opName);
 }
