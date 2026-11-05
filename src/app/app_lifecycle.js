@@ -19,7 +19,8 @@ import { displayAliasesDiverged, repointDisplayAliases } from '../engine/display
  *   refresh: () => boolean, view: () => Uint16Array|null}} deps.host - The EngineHost
  *   owning the main engine and its view.
  * @param {DisplayDriver} deps.driver - The Daydream driver.
- * @param {{ownsDisplay: boolean, active: boolean, consumeCapture: () => boolean,
+ * @param {{ownsDisplay: boolean, active: boolean, faulted: boolean,
+ *   hasPublishedFrame: () => boolean, consumeCapture: () => boolean,
  *   tick: () => void, updateStats: () => void}} deps.segments - The SegmentController.
  * @param {(advanced: boolean) => void} deps.syncEffectGui - Mirrors engine params
  *   into the panel, told whether the simulation stepped this frame.
@@ -27,7 +28,7 @@ import { displayAliasesDiverged, repointDisplayAliases } from '../engine/display
  *   once-per-page alias divergence report.
  * @returns {{drawFrame: () => void, sync: (advanced: boolean) => void,
  *   getArenaMetrics: () => Object|null, captureReady: (advanced?: boolean) => boolean,
- *   refreshPixelView: () => void}} The adapter.
+ *   refreshPixelView: () => void, retainsDisplay: () => boolean}} The adapter.
  */
 export function createRenderAdapter({
   host,
@@ -38,6 +39,9 @@ export function createRenderAdapter({
 }) {
   let aliasDivergenceLogged = false;
   return {
+    retainsDisplay() {
+      return segments.ownsDisplay && !segments.faulted && !segments.hasPublishedFrame();
+    },
     refreshPixelView() {
       host.refresh();
       const view = host.view();

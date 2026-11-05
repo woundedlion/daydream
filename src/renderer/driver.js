@@ -534,11 +534,12 @@ export class Daydream {
    * this.recorder each newly completed frame the adapter reports capture-ready.
    * @param {{drawFrame: () => void, sync?: (advanced: boolean) => void,
    *   getArenaMetrics?: () => ?Object, captureReady?: (advanced: boolean) => boolean,
-   *   refreshPixelView?: () => void}} adapter - Per-frame render adapter:
+   *   refreshPixelView?: () => void, retainsDisplay?: () => boolean}} adapter - Per-frame render adapter:
    *   drawFrame() paints the pixel buffer,
    *   sync(advanced) reconciles the effect panel and is told whether the sim
    *   stepped this frame, getArenaMetrics() feeds the stats
-   *   overlay, and captureReady() gates the recorder. Optional methods default
+   *   overlay, captureReady() gates the recorder, and retainsDisplay() preserves
+   *   the displayed frame until its replacement is ready. Optional methods default
    *   to permissive when absent.
    */
   render(adapter) {
@@ -671,7 +672,7 @@ export class Daydream {
   /**
    * Advance the simulation one frame when running or single-stepping: clear the
    * pixel buffer, draw the effect, refresh stats.
-   * @param {{drawFrame: () => void}} adapter - Render adapter whose drawFrame() paints the pixel buffer.
+   * @param {{drawFrame: () => void, retainsDisplay?: () => boolean}} adapter - Render adapter whose drawFrame() paints the pixel buffer.
    * @returns {boolean} Whether the simulation actually advanced (false while paused without a queued step), so the caller can gate the recorder on the same decision.
    */
   stepSimulation(adapter) {
@@ -682,7 +683,7 @@ export class Daydream {
 
     // A WASM-detached Uint16Array is still truthy but fill() on it throws; the
     // next drawFrame heals the view.
-    if (isViewLive(this.pixels))
+    if (isViewLive(this.pixels) && !adapter?.retainsDisplay?.())
       this.pixels.fill(0);
 
     const start = this.win.performance.now();

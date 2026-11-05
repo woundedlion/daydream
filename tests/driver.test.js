@@ -551,6 +551,21 @@ test('stepSimulation flags the color upload on a normal frame', () => {
   assert.equal(ctx.dotMesh.instanceColor.version, 1);
 });
 
+test('stepSimulation holds the displayed frame until the adapter can replace it', () => {
+  const ctx = stepCtx(new Uint16Array(4).fill(123));
+  let retain = true;
+  const adapter = {retainsDisplay: () => retain, drawFrame: () => {}};
+  assert.equal(Daydream.prototype.stepSimulation.call(ctx, adapter), true);
+  assert.deepEqual([...ctx.pixels], [123, 123, 123, 123]);
+  retain = false;
+  adapter.drawFrame = () => { ctx.pixels.fill(456); };
+  Daydream.prototype.stepSimulation.call(ctx, adapter);
+  assert.deepEqual([...ctx.pixels], [456, 456, 456, 456]);
+  adapter.drawFrame = () => {};
+  Daydream.prototype.stepSimulation.call(ctx, adapter);
+  assert.deepEqual([...ctx.pixels], [0, 0, 0, 0]);
+});
+
 test('stepSimulation adds no upload flag when a mid-frame heap growth detached the view', () => {
   const ctx = stepCtx(new Uint16Array(4));
   // The draw flags the upload, then a heap growth detaches the view it just

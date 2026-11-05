@@ -57,6 +57,8 @@ function makeAdapter({ ownsDisplay = false, active = false,
   const segments = {
     ownsDisplay,
     active,
+    faulted: false,
+    hasPublishedFrame() { return this.frameComposited; },
     frameComposited,
     consumeCapture() {
       const pending = this.frameComposited;
@@ -73,7 +75,7 @@ function makeAdapter({ ownsDisplay = false, active = false,
     syncEffectGui: (advanced) => calls.push(['effectGui.sync', advanced]),
     logError: (message) => errors.push(message),
   });
-  return { adapter, calls, errors, driver, host, view };
+  return { adapter, calls, errors, driver, host, view, segments };
 }
 
 test('a single-engine frame renders and republishes the view', () => {
@@ -85,6 +87,19 @@ test('a single-engine frame renders and republishes the view', () => {
   assert.equal(a.driver.pixels, a.view);
   // The re-point raises the flag once.
   assert.equal(a.driver.dotMesh.instanceColor.version, 1);
+});
+
+test('the adapter retains the main frame until the first healthy segmented publication', () => {
+  const a = makeAdapter({ownsDisplay: true});
+  assert.equal(a.adapter.retainsDisplay(), true);
+  a.segments.frameComposited = true;
+  assert.equal(a.adapter.retainsDisplay(), false);
+  a.segments.frameComposited = false;
+  a.segments.faulted = true;
+  assert.equal(a.adapter.retainsDisplay(), false);
+  a.segments.faulted = false;
+  a.segments.ownsDisplay = false;
+  assert.equal(a.adapter.retainsDisplay(), false);
 });
 
 test('panel reconciliation forwards whether the simulation stepped', () => {
