@@ -17,11 +17,12 @@ import {
   MOBIUS_GRID_SCALE_R, isDegenerate,
 } from './mobius_transforms.js';
 
+function identityCoefficients() {
+  return {A: {re: 1, im: 0}, B: {re: 0, im: 0}, C: {re: 0, im: 0}, D: {re: 1, im: 0}};
+}
+
 const config = {
-  A: { re: 1.0, im: 0.0 },
-  B: { re: 0.0, im: 0.0 },
-  C: { re: 0.0, im: 0.0 },
-  D: { re: 1.0, im: 0.0 },
+  ...identityCoefficients(),
   MAX_EXTENT: 2.0,
 };
 
@@ -144,7 +145,7 @@ const presets = [
     name: 'Identity',
     desc: 'Reset to default state. f(z) = z',
     animate: false,
-    setup: () => ({ A: { re: 1, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 }, D: { re: 1, im: 0 } })
+    setup: identityCoefficients
   },
   {
     id: 'elliptic',
@@ -479,7 +480,7 @@ const init = () => {
 
   document.getElementById('resetBtn').addEventListener('click', () => {
     stopAnimation();
-    applyConfig({ A: { re: 1, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 }, D: { re: 1, im: 0 } });
+    applyConfig(identityCoefficients());
   });
 
   onPageTeardown(wireCopyBlock({

@@ -36,3 +36,16 @@ test('an axis key leaves the other coefficient component unchanged', () => {
   assert.equal(paramObj.re, 0.2);
   assert.equal(paramObj.im, 0.05);
 });
+
+
+test('identity reset copies fresh coefficients into the pad-owned objects', () => {
+  const identity = handler('identityCoefficients', {});
+  const config = identity();
+  const refs = Object.values(config);
+  config.A.re = 7;
+  const reset = identity();
+  assert.equal(reset.A.re, 1);
+  handler('applyConfig', {config, uiUpdaters: {}, updateMobiusUniforms() {}})(reset);
+  assert.equal(config.A.re, 1);
+  Object.values(config).forEach((value, i) => assert.equal(value, refs[i]));
+});
