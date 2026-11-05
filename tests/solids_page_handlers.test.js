@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
-import { generateFuncAndRecipe, savedChainShapeError, savedSolidExportError, seedOpParams } from '../src/workbench/solids/solid_codegen.js';
+import { authoredParamRange, generateFuncAndRecipe, OP_DEFS, savedChainShapeError, savedSolidExportError, seedOpParams, snapToStep } from '../src/workbench/solids/solid_codegen.js';
 import { registryDisplayName } from '../src/workbench/solids/solid_registry_codegen.js';
 import { createPointerDrag } from '../src/shared/pointer_drag.js';
 import { fakeElement } from './helpers/fake_dom.js';
@@ -408,6 +408,19 @@ test('a refused topology tick repaints the restored chain', async () => {
   await queued();
   assert.equal(state.ops[0].params.t, 0.4);
   assert.deepEqual(painted, [0.4]);
+});
+
+test('typed operation parameters snap and clamp before scheduling the render', () => {
+  const state = {base: 'cube', ops: [{op: 'truncate', params: {t: 0.3}}]};
+  let schedules = 0;
+  const update = handler('updateOpParam', {state, opsRevision: 1, OP_DEFS,
+    authoredParamRange, snapToStep, parameterEdits: new Map(),
+    document: {getElementById: () => ({children: []})},
+    opTopologyKey: () => 'same', scheduleUpdate: () => { schedules += 1; },
+  });
+  update(0, 't', '1000', 1);
+  assert.equal(state.ops[0].params.t, OP_DEFS.truncate.params.t.max);
+  assert.equal(schedules, 1);
 });
 
 test('an accepted topology tick keeps the focused input and publishes after validation', async () => {
