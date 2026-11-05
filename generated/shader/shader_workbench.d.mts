@@ -5,3 +5,4 @@ export function engineControlNames(parameterId: string, descriptor?: {chain?: Ar
 export function documentModulationBinding(descriptor: {chain?: Array<{label: string; operator: string; resource_key?: string}>}, parameterId: string): {resource: string; id: string}|null;
 export const LABEL_PATTERN: RegExp;
 export function declarationFromCatalogField(label: string, field: import("../../src/workbench/shader/chain_document_store.js").CatalogField, operator: string): import("../../src/workbench/shader/chain_document_store.js").ParameterDeclaration;
+export function promotedControlNames(parameterId: string, descriptor?: {chain?: Array<{label: string; operator: string; resource_key?: string}>}, catalog?: object|null): string[];

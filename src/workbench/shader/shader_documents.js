@@ -17,7 +17,7 @@ import {
   createChainDocumentStore, documentFromChainSnapshot, scratchChainDocument,
 } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
-import { BAKED_CONSTANT_IDS, bakedTopologyFields, documentModulationBinding, engineControlNames } from '../../../generated/shader/shader_workbench.mjs';
+import { BAKED_CONSTANT_IDS, bakedTopologyFields, documentModulationBinding, promotedControlNames } from '../../../generated/shader/shader_workbench.mjs';
 import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../../effects/effect_persistence.js';
 import { copyToClipboard } from '../../shared/copy_text.js';
 import { downloadBlob } from '../../shared/download_file.js';
@@ -93,29 +93,9 @@ function writeEngineValue(engine, module, definitions, name, value) {
  * @returns {{name: string|null, refusal: string|null}} Compiled control or refusal.
  */
 function compiledControlFor(parameterId, definitions, baked, descriptor, catalog = null) {
-  const split = parameterId.indexOf('.');
-  const label = parameterId.slice(0, split);
-  const field = parameterId.slice(split + 1);
-  const slot = descriptor?.chain?.find((/** @type {*} */ entry) => entry.label === label);
-  const operator = catalog?.operators?.find((/** @type {*} */ entry) => entry.id === slot?.operator);
-  const schema = operator?.params?.find((/** @type {*} */ entry) => entry.id === field);
-  const key = slot?.operator?.startsWith('sample.') ? 'source'
-    : slot?.operator?.startsWith('project.') ? 'projection'
-      : slot?.operator?.startsWith('colorize.') ? 'color'
-        : slot?.operator?.startsWith('warp.') && ['warp', 'warp1', 'warp2'].includes(label)
-          ? label === 'warp2' ? 'inner_warp' : 'outer_warp' : label;
-  const title = field.split('-').map((part) => part[0]?.toUpperCase() + part.slice(1)).join(' ');
-  const human = [schema?.name, title];
-  const warpSpeed = field === 'speed' && slot?.operator?.startsWith('warp.')
-    ? `Planar Warp ${key === 'outer_warp' ? '1 ' : key === 'inner_warp' ? '2 ' : ''}Speed` : null;
-  if (warpSpeed) human.unshift(warpSpeed);
-  if (field === 'edge-width' && slot?.operator?.startsWith('warp.')) human.unshift('Warp Edge Width');
-  const candidates = [`${key}.${field}`,
-    ...human.filter(Boolean).map((name) => `${key}.${name}`),
-    ...(warpSpeed ? [warpSpeed] : []), ...engineControlNames(parameterId, descriptor),
-    parameterId, field, ...human.filter(Boolean)];
-  const name = candidates.find((candidate) => definitions.some((definition) =>
-    definition.name === candidate && !definition.readonly));
+  const name = promotedControlNames(parameterId, descriptor, catalog)
+    .find((candidate) => definitions.some((definition) =>
+      definition.name === candidate && !definition.readonly));
   if (name) return { name, refusal: null };
   if (BAKED_CONSTANT_IDS.has(parameterId) || baked.has(fieldSegment(parameterId)))
     return { name: null, refusal: null };
