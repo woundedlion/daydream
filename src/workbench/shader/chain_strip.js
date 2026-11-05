@@ -192,11 +192,12 @@ export function createChainStrip({
    * @param {string|null} focusLabel - Chip to hand keyboard focus back to.
    * @param {string|null} [focusControl] - Selector of the chip control to
    *   focus instead of the chip itself.
+   * @param {string|null} [focusAction] - Enabled history button to focus.
    * @returns {true} Always true, for tail-calling.
    */
-  const commit = (focusLabel, focusControl = null) => {
+  const commit = (focusLabel, focusControl = null, focusAction = null) => {
     announce('');
-    render({ focusLabel, focusControl });
+    render({ focusLabel, focusControl, focusAction });
     onApply();
     return true;
   };
@@ -408,9 +409,10 @@ export function createChainStrip({
     onApply();
   };
 
-  const undo = () => {
+  /** @param {string|null} [focusAction] */
+  const undo = (focusAction = null) => {
     if (!store.undo()) return false;
-    return commit(focusedLabel);
+    return commit(focusedLabel, null, focusAction);
   };
 
   /** @param {string} label - The instance whose editable parameters reset. */
@@ -434,9 +436,10 @@ export function createChainStrip({
     commitParameter();
   };
 
-  const redo = () => {
+  /** @param {string|null} [focusAction] */
+  const redo = (focusAction = null) => {
     if (!store.redo()) return false;
-    return commit(focusedLabel);
+    return commit(focusedLabel, null, focusAction);
   };
 
   /**
@@ -1336,10 +1339,10 @@ export function createChainStrip({
    * Rebuilds the whole strip from the store. Keyboard focus is restored to the
    * named chip (or the chip control matching `focusControl`), or to the
    * roving-tabindex chip when the strip held focus before the rebuild.
-   * @param {{focusLabel?: string|null, focusControl?: string|null}} [options]
+   * @param {{focusLabel?: string|null, focusControl?: string|null, focusAction?: string|null}} [options]
    * @returns {void}
    */
-  const render = ({ focusLabel = null, focusControl = null } = {}) => {
+  const render = ({ focusLabel = null, focusControl = null, focusAction = null } = {}) => {
     const active = doc.activeElement ?? null;
     const hadFocus = active !== null && container.contains(active);
     const scrolled = Number(
@@ -1375,12 +1378,12 @@ export function createChainStrip({
     undoButton.type = 'button';
     undoButton.textContent = 'Undo';
     undoButton.disabled = !store.canUndo();
-    undoButton.addEventListener('click', () => undo());
+    undoButton.addEventListener('click', () => undo('.chain-undo'));
     const redoButton = el('button', 'chain-redo');
     redoButton.type = 'button';
     redoButton.textContent = 'Redo';
     redoButton.disabled = !store.canRedo();
-    redoButton.addEventListener('click', () => redo());
+    redoButton.addEventListener('click', () => redo('.chain-redo'));
     actions.appendChild(undoButton);
     actions.appendChild(redoButton);
     history = { undo: undoButton, redo: redoButton };
@@ -1449,6 +1452,11 @@ export function createChainStrip({
     if (scrolled > 0) viewport.scrollTop = scrolled;
     markDeactivated();
 
+    const action = focusAction === null ? null : actions.querySelector(focusAction);
+    if (action && !action.disabled) {
+      action.focus();
+      return;
+    }
     const target = focusLabel !== null ? chipByLabel(focusLabel) : null;
     if (target) {
       focusedLabel = focusLabel;

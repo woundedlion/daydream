@@ -1797,6 +1797,26 @@ test('syncHistory repaints Undo and Redo without rebuilding the strip', async ()
   assert.equal(chipByLabel(h, 'camera'), chip, 'no rebuild: the chips are the same');
 });
 
+test('history buttons retain focus while enabled and fall back to a chip at exhaustion', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'camera').dispatch('click');
+  for (const value of [0.2, 0.3]) {
+    h.store.setPresetValue('hex-twin-wave', 'camera.wander', value);
+    h.store.endValueRun();
+  }
+  h.strip.syncHistory();
+  const undo = h.container.querySelector('.chain-undo');
+  undo.focus();
+  undo.dispatch('click');
+  assert.equal(h.doc.activeElement, h.container.querySelector('.chain-undo'));
+  h.container.querySelector('.chain-undo').dispatch('click');
+  assert.equal(h.doc.activeElement, chipByLabel(h, 'camera'));
+  h.container.querySelector('.chain-redo').dispatch('click');
+  assert.equal(h.doc.activeElement, h.container.querySelector('.chain-redo'));
+  h.container.querySelector('.chain-redo').dispatch('click');
+  assert.equal(h.doc.activeElement, chipByLabel(h, 'camera'));
+});
+
 // The union-schema rule reads the document's declarations and the preset values
 // that gate them.
 test('deactivatedParameterIds follows the engine topology gates', () => {
