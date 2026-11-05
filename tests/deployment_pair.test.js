@@ -67,8 +67,8 @@ test('attempted pairs suppress scheduled retries independently of success', asyn
   assert.equal(calls[1][1].state, 'pending');
 });
 
-for (const event of ['push', 'schedule']) {
-  test(`resolve ${event} retries a failed pair only for pushes`, async (t) => {
+for (const event of ['push', 'workflow_dispatch', 'repository_dispatch', 'schedule']) {
+  test(`resolve ${event}: a failed pair retries on every event except schedule`, async (t) => {
     const root = scratchDir(t, 'deployment-retry-');
     const env = { GITHUB_REPOSITORY: repo, GITHUB_SHA: pair.daydream,
       GITHUB_EVENT_NAME: event, GITHUB_OUTPUT: join(root, 'outputs'),
@@ -79,7 +79,7 @@ for (const event of ['push', 'schedule']) {
       return heads(path);
     });
     assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'),
-      new RegExp(`deploy=${event === 'push'}`));
+      new RegExp(`deploy=${event !== 'schedule'}`));
   });
 }
 
