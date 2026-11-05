@@ -259,6 +259,7 @@ export function fakeDriver() {
     labelAxes: false,
     cullBackSphere: false,
     showPip: false,
+    paused: false,
     povFidelity: false,
     povResponseScale: 1,
     showSweepBoundary: false,

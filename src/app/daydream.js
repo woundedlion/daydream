@@ -559,6 +559,9 @@ export function start({
     });
 
 
+  guiInstance.addSession(daydream, 'paused').name('Pause').listen().onChange((v) => {
+    if (!v) daydream.stepFrames = 0;
+  });
   guiInstance.add(daydream, 'labelAxes').name('Show Axes').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'showPip').name('Show PiP').onChange(() => daydream.invalidate());

@@ -119,6 +119,18 @@ test('a booted render reconciles live panel values', async () => {
   assert.equal(controls.find((control) => control.property === 'Speed').getValue(), 0.75);
 });
 
+test('the View pause control holds rendering and clears queued steps on resume', async () => {
+  const app = await bootedApp({ loadModule: async () => fakeWasmModule() });
+  const pause = app.guis[0].controllers.find((control) => control.property === 'paused');
+  assert.ok(pause);
+  pause.setValue(true);
+  assert.equal(app.driver.paused, true);
+  app.driver.stepFrames = 2;
+  pause.setValue(false);
+  assert.equal(app.driver.paused, false);
+  assert.equal(app.driver.stepFrames, 0);
+});
+
 test('a booted recorder captures at the driver frame rate', async () => {
   const app = await bootedApp({ loadModule: async () => fakeWasmModule() });
   const { recorder } = app.driver;
