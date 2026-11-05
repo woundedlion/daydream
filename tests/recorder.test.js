@@ -1005,7 +1005,7 @@ test('the save picker is offered the timestamped name and the container filter',
   }
 });
 
-test('a mid-stream streaming write failure stops the session and reports truncation', async (t) => {
+test('a mid-stream streaming write failure stops the session and reports an uncommitted save', async (t) => {
   t.after(installRecorderEnv());
   const writes = [];
   let closed = false;
@@ -1016,7 +1016,7 @@ test('a mid-stream streaming write failure stops the session and reports truncat
       if (writeCount === 2) throw new Error('disk full');
       writes.push(d);
     },
-    close: async () => { closed = true; },
+    close: async () => { closed = true; throw new Error('stream errored'); },
   };
   globalThis.showSaveFilePicker = async () => ({ createWritable: async () => writable });
   const captured = installConsoleCapture('error', 'warn');
@@ -1044,10 +1044,10 @@ test('a mid-stream streaming write failure stops the session and reports truncat
   await sinkFinished();
 
   assert.deepEqual(writes, [{ size: 10 }], 'only the pre-failure chunk reached disk');
-  assert.equal(closed, true, 'the writable is closed to flush the on-disk prefix');
+  assert.equal(closed, true, 'closing the errored writable is attempted');
   assert.equal(downloaded, false, 'no blob download of the post-failure tail');
-  assert.ok(captured.messages.some((e) => /truncated/.test(e)),
-    'the truncation is reported to the user');
+  assert.ok(captured.messages.some((e) => /chosen file was not updated/.test(e)),
+    'the uncommitted save is reported to the user');
 });
 
 /**
@@ -1065,7 +1065,7 @@ test('a host hook that throws does not poison the streaming write chain', async 
       if (writeCount === 2) throw new Error('disk full');
       writes.push(d);
     },
-    close: async () => { closed = true; },
+    close: async () => { closed = true; throw new Error('stream errored'); },
   };
   globalThis.showSaveFilePicker = async () => ({ createWritable: async () => writable });
   const captured = installConsoleCapture('error', 'warn');
@@ -1088,12 +1088,12 @@ test('a host hook that throws does not poison the streaming write chain', async 
 
   assert.deepEqual(writes, [{ size: 10 }], 'the pre-failure chunk reached disk');
   assert.equal(closed, true,
-    'the on-disk prefix is still flushed, not stranded behind a rejected chain');
+    'closing is attempted despite the failed host hook');
   assert.equal(downloaded, false, 'no blob download of the post-failure tail');
   assert.ok(captured.messages.some((e) => /host hook exploded/.test(e)),
     'the swallowed host failure is reported');
-  assert.ok(captured.messages.some((e) => /truncated/.test(e)),
-    'the truncation is still reported to the user');
+  assert.ok(captured.messages.some((e) => /chosen file was not updated/.test(e)),
+    'the uncommitted save is reported to the user');
 });
 
 /**
@@ -1859,7 +1859,7 @@ test('a streaming write failure after Stop reaches the save-error UI', async (t)
   const captured = installConsoleCapture('error', 'warn');
   t.after(captured.restore);
   globalThis.showSaveFilePicker = async () => ({ createWritable: async () => ({
-    write: async () => { throw new Error('disk full'); }, close: async () => {},
+    write: async () => { throw new Error('disk full'); }, close: async () => { throw new Error('stream errored'); },
   }) });
   const rec = new VideoRecorder(recordableCanvas());
   const finished = trackSinkFinish(rec);
@@ -1873,7 +1873,7 @@ test('a streaming write failure after Stop reaches the save-error UI', async (t)
   recorder.onstop();
   await finished();
   assert.equal(errors.length, 1);
-  assert.match(errors[0].message, /truncated/);
+  assert.match(errors[0].message, /chosen file was not updated/);
 });
 
 test('superseded recorder guards ignore fallback and memory overflow', async (t) => {

@@ -595,7 +595,6 @@ export class VideoRecorder {
     /** @type {FileSystemWritableFileStream|null} */
     let writable = null;
     let failed = false;
-    let failureReported = false;
     let aborted = false;
     let backlogBytes = 0;
     let overflowed = false;
@@ -665,10 +664,9 @@ export class VideoRecorder {
           } catch (err) {
             failed = true;
             if (this.mediaRecorder === recorder) {
-              failureReported = true;
               this.stop();
               this.reportFailure(
-                'streaming write failed mid-session; recording stopped and the saved file is truncated.',
+                'streaming write failed mid-session; recording stopped.',
                 err);
             }
           }
@@ -694,16 +692,15 @@ export class VideoRecorder {
               else console.warn('VideoRecorder: session produced no data; nothing to download');
               return;
             }
-            // Mid-stream write failed: only the on-disk prefix is contiguous.
-            // Flush it and report truncation.
             if (failed) {
-              if (!failureReported) {
-                failureReported = true;
-                this.onSaveError?.(new Error(
-                  'streaming write failed; the saved file is truncated.'), filename);
+              let message = 'streaming write failed; the saved file is truncated.';
+              try {
+                await writable.close();
+              } catch {
+                message = 'the recording could not be saved; the chosen file was not updated.';
               }
-              try { await writable.close(); } catch { /* writable already errored */ }
-              console.error('VideoRecorder: streaming write failed mid-session; the saved file is truncated to the data written before the failure.');
+              console.error(`VideoRecorder: ${message}`);
+              this.onSaveError?.(new Error(message), filename);
               return;
             }
             // A close() failure can still leave the file unflushed or truncated.
