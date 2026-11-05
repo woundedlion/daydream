@@ -498,12 +498,29 @@ export function createShaderDocumentController({
     return compiledControlFor(parameterId, definitions, bakedFields, active.compiled.document.descriptor, operatorCatalog);
   };
 
+  /** @type {ReturnType<typeof getEngine>} */
+  let definitionEngine = null;
+  /** @type {number|undefined} */
+  let definitionGeneration;
+  /** @type {ParameterDefinition[]} */
+  let cachedDefinitions = [];
+  const liveDefinitions = () => {
+    const engine = getEngine();
+    const generation = engine?.getParamGeneration?.();
+    if (engine !== definitionEngine || generation !== definitionGeneration) {
+      definitionEngine = engine;
+      definitionGeneration = generation;
+      cachedDefinitions = engine?.getParameterDefinitions() ?? [];
+    }
+    return cachedDefinitions;
+  };
+
   /** @param {string} parameterId @returns {boolean} */
   const parameterLive = (parameterId) => {
     const descriptor = { chain: chainUi?.store.chainView()
       ?? active?.compiled.document.descriptor.chain ?? [] };
     if (active?.compiledSide !== true) return true;
-    if (engineControlName(parameterId, getEngine()?.getParameterDefinitions() ?? []).name !== null) return true;
+    if (engineControlName(parameterId, liveDefinitions()).name !== null) return true;
     return !BAKED_CONSTANT_IDS.has(parameterId) && !bakedFields.has(fieldSegment(parameterId))
       && !compiler.fixedDerivedBinding?.(descriptor, parameterId, {});
   };
