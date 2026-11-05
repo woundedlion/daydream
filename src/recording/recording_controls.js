@@ -77,6 +77,8 @@ export function createRecordingControls({
   let recordingShown = false;
 
   let startNotice = '';
+  let sessionError = false;
+  let sessionEmpty = false;
 
   /**
    * Reflects the session state in the canvas styling, duration readout, and record
@@ -110,10 +112,12 @@ export function createRecordingControls({
       return;
     }
     const wasRecording = recordingShown;
+    if (!wasRecording) { sessionError = false; sessionEmpty = false; }
     const isRecording = recorder.toggle(getEffect());
     // A start that never began a session has already reported why through onError;
     // there was no session to stop, and the same owner tag would overwrite it.
     if (!wasRecording && !isRecording) return;
+    if (!isRecording && (sessionError || sessionEmpty)) { showRecording(false); return; }
     // The notice region carries the state change to assistive tech.
     const axisWarning = isRecording && driver.labelAxes
       ? ' Axis labels are page overlays, not canvas pixels; the recording will not carry them.'
@@ -160,7 +164,12 @@ export function createRecordingControls({
           + ` browser; recording as ${label}.${filenameNote}`);
       };
       // A fault ends the session on its own; drop the recording UI and report why.
+      recorder.onEmptySession = () => {
+        sessionEmpty = true;
+        if (!sessionError) showNotice('Recording stopped: no frames were captured, so nothing was saved.');
+      };
       recorder.onError = (err) => {
+        sessionError = true;
         const detail = recorderReason(err);
         showNotice(recordingShown
           ? `Recording stopped: ${detail}`

@@ -138,6 +138,8 @@ export class VideoRecorder {
     // mid-recording; a partial recording may still be saved.
     /** @type {((err: Error) => void)|null} */
     this.onError = null;
+    /** @type {(() => void)|null} */
+    this.onEmptySession = null;
     /** @type {((err: Error, filename: string) => void)|null} Save failure for a completed session. */
     this.onSaveError = null;
     /** @type {((err: Error) => void)|null} Streaming save switched to Downloads. */
@@ -576,7 +578,10 @@ export class VideoRecorder {
         write: this.memorySink(recorder, chunks, 'this browser has no streaming save'),
         finish: () => {
           if (chunks.length) this.download(recorder, chunks, effectName);
-          else console.warn('VideoRecorder: session produced no data; nothing to download');
+          else {
+            console.warn('VideoRecorder: session produced no data; nothing to download');
+            this.onEmptySession?.();
+          }
         },
       };
     }
@@ -689,7 +694,10 @@ export class VideoRecorder {
             // truncated). Download the buffer if there is one.
             if (!writable) {
               if (chunks.length) this.download(recorder, chunks, effectName);
-              else console.warn('VideoRecorder: session produced no data; nothing to download');
+              else {
+                console.warn('VideoRecorder: session produced no data; nothing to download');
+                this.onEmptySession?.();
+              }
               return;
             }
             if (failed) {

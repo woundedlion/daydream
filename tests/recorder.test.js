@@ -631,6 +631,8 @@ test('a buffered session that captured nothing is reported', (t) => {
   const captured = installConsoleCapture('warn');
   t.after(captured.restore);
   const rec = new VideoRecorder(recordableCanvas());
+  let empty = 0;
+  rec.onEmptySession = () => { empty++; };
   const downloads = [];
   rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
 
@@ -642,6 +644,7 @@ test('a buffered session that captured nothing is reported', (t) => {
   assert.equal(downloads.length, 0, 'an empty buffer must not reach the anchor path');
   assert.equal(captured.messages.length, 1);
   assert.match(captured.messages[0], /session produced no data/);
+  assert.equal(empty, 1);
 });
 
 /** The encoder hands over a final chunk between stop() and the stop event. */
@@ -1301,6 +1304,8 @@ test('a streaming session that produces no data never opens the chosen file', as
   const captured = installConsoleCapture('warn');
   t.after(captured.restore);
   const rec = new VideoRecorder(recordableCanvas());
+  let empty = 0;
+  rec.onEmptySession = () => { empty++; };
   const sinkFinished = trackSinkFinish(rec);
   let downloaded = false;
   rec.download = () => { downloaded = true; };
@@ -1318,6 +1323,7 @@ test('a streaming session that produces no data never opens the chosen file', as
   assert.equal(downloaded, false, 'nothing to download');
   assert.ok(captured.messages.some((w) => /no data/.test(w)),
     'the empty session is reported');
+  assert.equal(empty, 1);
 });
 
 /**
