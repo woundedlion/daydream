@@ -1,4 +1,5 @@
 import { enumeration } from './fake_enums.js';
+import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../../src/workbench/shader/shader_deeplink.js';
 // Engine fakes consume the installed, generated binding contract.
 import { canonicalEffectId } from "../../src/effects/effect_identity.js";
 import { readFileSync } from 'node:fs';
@@ -227,7 +228,7 @@ export class FakeChainEngine {
       isValid,
       getProgram: () => isValid() ? structuredClone(this.program) : null,
       getSnapshot: () => isValid() ? {
-        schemaVersion: 5, chain: structuredClone(this.program),
+        schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: structuredClone(this.program),
         parameters: this.definitions.filter((d) => !this.modulation.some((entry) =>
           d.name.startsWith(`${entry.instance}.`) && MODULATION_PATHS[d.name.split('.')[1]]))
           .map((d) => ({name: d.name, value: d.acceptedValue})),
@@ -241,7 +242,7 @@ export class FakeChainEngine {
         if (snapshot === null || typeof snapshot !== 'object' || Array.isArray(snapshot)
             || !Number.isInteger(snapshot.schemaVersion) || snapshot.schemaVersion < 0
             || snapshot.schemaVersion > 0xffffffff) return ChainSnapshotRestoreResult.INVALID_VALUE;
-        if (snapshot.schemaVersion !== 5) return ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
+        if (snapshot.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION) return ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
         if (typeof snapshot.animationsPaused !== 'boolean') return ChainSnapshotRestoreResult.INVALID_VALUE;
         if (!Array.isArray(snapshot.chain) || !Array.isArray(snapshot.parameters) || !Array.isArray(snapshot.modulation))
           return ChainSnapshotRestoreResult.INVALID_VALUE;

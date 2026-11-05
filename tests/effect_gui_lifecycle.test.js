@@ -1,3 +1,4 @@
+import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../src/workbench/shader/shader_deeplink.js';
 import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../src/effects/effect_persistence.js';
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -141,7 +142,7 @@ test('ShaderChain Export names a missing clipboard operation', () => {
   const h = makeHarness({
     params: chainSnapshotParams(),
     chainSnapshotEnabled: true,
-    chainSnapshot: { schemaVersion: 3 },
+    chainSnapshot: { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION },
     copyText: null,
   });
   h.panel.build();

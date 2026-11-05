@@ -4,15 +4,16 @@ import { fakePanelGui } from './fake_app.js';
 import { createEffectGui } from '../../src/ui/effect_gui.js';
 import { fakeElement, installDocument } from './fake_dom.js';
 import { ChainSnapshotRestoreResult, modulationRecipe } from './fake_engine.js';
+import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../../src/workbench/shader/shader_deeplink.js';
 
 export function chainSnapshot(value = 0) {
   return {
-    schemaVersion: 3,
+    schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION,
     modulation: [{instance: 'colorize', recipe: modulationRecipe()}],
     chain: [
       {instance: 'project', operator: 'project.stereographic.v2'},
       {instance: 'sample', operator: 'sample.grid.v4'},
-      {instance: 'colorize', operator: 'colorize.generated-palette.v3'},
+      {instance: 'colorize', operator: 'colorize.generated-palette.v4'},
     ],
     parameters: [{name: 'sample.pattern-freq', value}],
     animationsPaused: true,
@@ -260,8 +261,10 @@ export function makeHarness({
       restore: (snapshot) => {
         restoredChainSnapshots.push(snapshot);
         controllersAtRestore.push(guis.at(-1).controllers.length);
-        return restoreChainSnapshotAccepted && snapshot.schemaVersion === 3
-          ? ChainSnapshotRestoreResult.APPLIED : ChainSnapshotRestoreResult.INVALID_VALUE;
+        if (!restoreChainSnapshotAccepted || !Number.isInteger(snapshot.schemaVersion))
+          return ChainSnapshotRestoreResult.INVALID_VALUE;
+        return snapshot.schemaVersion === CHAIN_SNAPSHOT_SCHEMA_VERSION
+          ? ChainSnapshotRestoreResult.APPLIED : ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
       },
       restoreResults: () => ChainSnapshotRestoreResult,
       showImportNotice: (message) => configNotices.push(message),
