@@ -64,6 +64,9 @@ function buildBanner() {
   return el;
 }
 
+/** @param {string} message @returns {string} */
+const bannerText = (message) => `⚠ ${message}`;
+
 /**
  * Remove only the banner carrying the recovered failure.
  * @param {string} message - The message owned by the recovered operation.
@@ -71,7 +74,7 @@ function buildBanner() {
  */
 export function clearFatalError(message) {
   const el = document.getElementById('fatal-error-overlay');
-  if (el?.querySelector('.fatal-error-message')?.textContent === `\u26a0 ${message}`) el.remove();
+  if (el?.querySelector('.fatal-error-message')?.textContent === bannerText(message)) el.remove();
 }
 
 /**
@@ -84,7 +87,7 @@ export function clearFatalError(message) {
 export function showFatalError(message) {
   const el = document.getElementById('fatal-error-overlay') || buildBanner();
   const slot = /** @type {HTMLElement} */ (el.querySelector('.fatal-error-message'));
-  slot.textContent = `⚠ ${message}`;
+  slot.textContent = bannerText(message);
 }
 
 /**
