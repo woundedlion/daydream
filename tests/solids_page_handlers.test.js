@@ -702,13 +702,14 @@ test('stale card backup failure cannot block the primary save', () => {
   const status = {textContent: savedStorage.notice};
   const persist = () => { status.textContent = persistSavedStore(localStorage, savedStorage.entries, savedStorage); };
   persist();
-  assert.deepEqual(JSON.parse(storage.get(SAVED_SOLIDS_KEY)), [valid]);
-  assert.deepEqual(writes, [SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY]);
+  assert.deepEqual(JSON.parse(storage.get(SAVED_SOLIDS_KEY)), [valid, stale]);
+  assert.deepEqual(loadSavedSolids(localStorage).rejected, [stale]);
+  assert.deepEqual(writes, [REJECTED_SOLIDS_KEY, SAVED_SOLIDS_KEY]);
   assert.equal(status.textContent, `${savedStorage.notice} Rejected cards could not be backed up.`);
   assert.equal(savedStorage.rejected.length, 1);
   refusingBackup = false;
   persist();
-  assert.deepEqual(writes, [SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY, SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY]);
+  assert.deepEqual(writes, [REJECTED_SOLIDS_KEY, SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY, SAVED_SOLIDS_KEY]);
   assert.deepEqual(JSON.parse(storage.get(SAVED_SOLIDS_KEY)), [valid]);
   assert.deepEqual(JSON.parse(storage.get(REJECTED_SOLIDS_KEY)), [{older: true}, stale]);
   assert.equal(savedStorage.rejected.length, 0);

@@ -14,6 +14,22 @@ test('invalid storage survives until a successful bounded rejected backup', () =
   assert.equal(loaded.rejected.length, 0);
 });
 
+test('a corrupt rejected backup is replaced before the primary save discards rejected entries', () => {
+  const stale = {base: 'cube', ops: [{op: 'truncate', params: {t: 50}}]};
+  const values = new Map([[SAVED_SOLIDS_KEY, JSON.stringify([stale])], [REJECTED_SOLIDS_KEY, '{broken']]);
+  const writes = [];
+  const storage = {getItem: key => values.get(key), setItem(key, value) {
+    writes.push(key);
+    values.set(key, value);
+  }};
+  const loaded = loadSavedSolids(storage);
+  persistSavedSolids(storage, loaded.entries, loaded);
+  assert.deepEqual(writes, [REJECTED_SOLIDS_KEY, SAVED_SOLIDS_KEY]);
+  assert.deepEqual(JSON.parse(values.get(REJECTED_SOLIDS_KEY)), [stale]);
+  assert.deepEqual(JSON.parse(values.get(SAVED_SOLIDS_KEY)), []);
+  assert.equal(loaded.rejected.length, 0);
+});
+
 test('imports report malformed files and preserve capacity without mutating their source', () => {
   const entries = Array.from({length: SAVED_SOLIDS_MAX - 1}, () => ({base: 'cube', ops: [{op: 'dual', params: {}}]}));
   const card = {base: 'cube', ops: [{op: 'dual', params: {}}], title: 'Imported'};

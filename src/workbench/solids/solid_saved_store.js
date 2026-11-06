@@ -63,10 +63,15 @@ export function loadSavedSolids(storage) {
 export function persistSavedSolids(storage, savedSolids, savedStorage) {
   let notice = savedStorage.notice;
   try {
-    storage.setItem(SAVED_SOLIDS_KEY, JSON.stringify(savedSolids));
     if (savedStorage.rejected.length) {
       try {
-        const previous = JSON.parse(storage.getItem(REJECTED_SOLIDS_KEY) || '[]');
+        const raw = storage.getItem(REJECTED_SOLIDS_KEY) || '[]';
+        let previous;
+        try {
+          previous = JSON.parse(raw);
+        } catch {
+          previous = [];
+        }
         const backup = [...(Array.isArray(previous) ? previous : []), ...savedStorage.rejected]
           .slice(-20).map((entry) => {
             if (!entry || typeof entry !== 'object') return String(entry).slice(0, 4096);
@@ -81,6 +86,7 @@ export function persistSavedSolids(storage, savedSolids, savedStorage) {
         notice = `${savedStorage.notice} Rejected cards could not be backed up.`;
       }
     }
+    storage.setItem(SAVED_SOLIDS_KEY, JSON.stringify([...savedSolids, ...savedStorage.rejected]));
     return notice;
   } catch (error) {
     console.warn('Could not persist saved solids:', error);
