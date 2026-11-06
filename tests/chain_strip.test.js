@@ -2647,8 +2647,12 @@ test('the Palette selector supports every family with family-specific controls',
     assert.equal(visible('value-opacity-low'), true);
     assert.equal(h.store.document().preset_bank.presets[0].values['colorize.palette-type'], family);
   }
-  assert.equal(controlIn(rowFor(h, 'colorize', 'colorize.palette-harmony')).children.length, 8);
-  assert.equal(controlIn(rowFor(h, 'colorize', 'colorize.palette-name')).children.length, 27);
+  const colorize = h.store.document().descriptor.chain.find(({label}) => label === 'colorize');
+  const operator = CATALOG.operators.find(({id}) => id === colorize.operator);
+  for (const id of ['palette-harmony', 'palette-name']) {
+    assert.equal(controlIn(rowFor(h, 'colorize', `colorize.${id}`)).children.length,
+      operator.params.find((parameter) => parameter.id === id).values.length);
+  }
   h.strip.syncParameterValues({'colorize.palette-type': 'gradient'});
   assert.equal(type.value, 'gradient');
   assert.equal(visible('gradient-start-r'), true);
