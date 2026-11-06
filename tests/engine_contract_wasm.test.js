@@ -431,6 +431,11 @@ test('chain snapshots match fake key sets, decode refusals and runtime round tri
   const max = fake.catalog.budgets;
   for (const snapshot of [null, { schemaVersion: 3 }, missingPause,
     { ...saved, chain: [] }, { ...saved, chain: null }, { ...saved, parameters: null },
+    { ...saved, chain: [null] }, { ...saved, chain: [{instance: 1, operator: 'sphere.rotate.v2'}] },
+    { ...saved, chain: [{instance: 'camera', operator: 1}] },
+    { ...saved, chain: [{instance: 'camera'}] },
+    { ...saved, parameters: [null] }, { ...saved, parameters: [{name: 1, value: 0}] },
+    { ...saved, parameters: [{name: 'camera.wander', value: '0.5'}] },
     { ...saved, runtime: null }, { ...saved, paletteBank: {} },
     { ...saved, chain: Array(max.max_chain_ops + 1).fill(null) },
     { ...saved, parameters: Array(max.max_params + 1).fill(null) },
@@ -458,6 +463,8 @@ test('chain snapshots match fake key sets, decode refusals and runtime round tri
     { ...saved, runtime: [...saved.runtime, entry] },
     { ...saved, runtime: [...saved.runtime, { ...entry, instance: 'unknown' }] },
     { ...saved, runtime: saved.runtime.map((item, index) => index ? item : { ...item, kind: 'phase-clock-v1', state: { phase: 0 } }) },
+    { ...saved, runtime: saved.runtime.map((item) => item.kind !== 'modulation-clock-v1' ? item
+      : {...item, state: {...item.state, initialized: false, phaseTurns: 0.5}}) },
   ]) {
     assert.equal(chainCall(engine, 'restoreSnapshot', snapshot).value, ChainSnapshotRestoreResult.INVALID_VALUE.value);
     assert.equal(chainCall(fake, 'restoreSnapshot', snapshot).value, ChainSnapshotRestoreResult.INVALID_VALUE.value);
@@ -468,6 +475,18 @@ test('chain snapshots match fake key sets, decode refusals and runtime round tri
 
   const fakeDefault = chainCall(fake, 'getSnapshot');
   assert.equal(chainCall(engine, 'restoreSnapshot', fakeDefault).value, ChainSnapshotRestoreResult.APPLIED.value);
+  for (const change of [
+    (recipe) => { recipe.evaluation = 0; recipe.noise.variant = 1; },
+    (recipe) => { recipe.noise.variant = 1; recipe.mechanic.kind = 1; },
+  ]) {
+    const snapshot = structuredClone(saved);
+    change(snapshot.modulation[0].recipe);
+    for (const target of [engine, fake]) {
+      assert.equal(chainCall(target, 'restoreSnapshot', snapshot).value,
+        ChainSnapshotRestoreResult.APPLIED.value);
+      assert.deepEqual(chainCall(target, 'getSnapshot').modulation, snapshot.modulation);
+    }
+  }
   for (const seed of [-0x80000000, -1, 0x7fffffff, -0x80000001, 0x80000000, 3e9]) {
     for (const field of ['recipe', 'spatial', 'noise']) {
       const snapshot = structuredClone(saved);
@@ -510,6 +529,22 @@ test('chain snapshots match fake key sets, decode refusals and runtime round tri
     change(snapshot);
     for (const target of [engine, fake])
       assert.equal(chainCall(target, 'restoreSnapshot', snapshot).value, ChainSnapshotRestoreResult.INVALID_VALUE.value);
+  }
+});
+
+test('a null ripple snapshot wave is refused without throwing or mutating either engine', () => {
+  const fake = new FakeChainEngine();
+  for (const target of [engine, fake]) {
+    target.setEffect('ShaderChain');
+    assert.equal(chainCall(target, 'setShaderChain', [DEFAULT_CHAIN[0],
+      {instance: 'ripple', operator: 'sphere.displace.ripple.v2'}, ...DEFAULT_CHAIN.slice(1)]).code,
+    'APPLIED');
+    const before = chainCall(target, 'getSnapshot');
+    const invalid = structuredClone(before);
+    invalid.runtime.find(({kind}) => kind === 'ripple-burst-v1').state.waves[0] = null;
+    assert.equal(chainCall(target, 'restoreSnapshot', invalid).value,
+      ChainSnapshotRestoreResult.INVALID_VALUE.value);
+    assert.deepEqual(chainCall(target, 'getSnapshot'), before);
   }
 });
 
