@@ -88,6 +88,8 @@ test('the banner dismiss button removes it; a later failure opens a fresh one', 
   const dismiss = bodyEl.children[0].querySelector('.fatal-error-dismiss');
   assert.equal(dismiss.tagName, 'BUTTON');
   assert.equal(dismiss.attributes['aria-label'], 'Dismiss');
+  assert.ok(Number.parseFloat(dismiss.style.minWidth) >= 24);
+  assert.ok(Number.parseFloat(dismiss.style.minHeight) >= 24);
   dismiss.dispatch('click');
   assert.equal(bodyEl.children.length, 0);
 

@@ -54,6 +54,7 @@ function buildBanner() {
   Object.assign(dismiss.style, {
     flex: '0 0 auto', padding: '0 4px', border: '0', background: 'transparent',
     color: 'inherit', font: 'inherit', fontSize: '16px', lineHeight: '1',
+    minWidth: '24px', minHeight: '24px',
     cursor: 'pointer',
   });
   dismiss.addEventListener('click', () => el.remove());
