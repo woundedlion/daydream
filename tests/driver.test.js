@@ -525,6 +525,49 @@ test('dispose leaves no dangling mesh or pixel buffer', () => {
   assert.equal(ctx.pixels, null);
 });
 
+test('dispose during a real Three animation callback cancels the rearmed frame', async () => {
+  const { WebGLAnimation } = await import(
+    'three/src/renderers/webgl/WebGLAnimation.js');
+  const animation = WebGLAnimation();
+  const requests = new Map();
+  let id = 0;
+  animation.setContext({
+    requestAnimationFrame(callback) { requests.set(++id, callback); return id; },
+    cancelAnimationFrame(request) { requests.delete(request); },
+  });
+  const log = [];
+  const ctx = disposeCtx(fakeMesh(log), log);
+  ctx.renderer.setAnimationLoop = () => animation.stop();
+  animation.setAnimationLoop(() => Daydream.prototype.dispose.call(ctx));
+  animation.start();
+  const callback = requests.get(id);
+  requests.delete(id);
+  callback(0);
+  assert.equal(requests.size, 1);
+  await Promise.resolve();
+  assert.equal(requests.size, 0);
+});
+
+test('dot shader injection uses the current Three chunk and refuses a missing one', () => {
+  const ctx = setupCtx(null, []);
+  Daydream.prototype.setupDots.call(ctx);
+  const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.basic.vertexShader };
+  ctx.dotMaterial.onBeforeCompile(shader);
+  for (const name of ['uCameraPos', 'uCullThreshold', 'uColumnFillArc'])
+    assert.equal(shader.uniforms[name], ctx.cullUniforms[name]);
+  assert.match(shader.vertexShader, /transformed\.x \+= sign\(transformed\.x\) \* ext/);
+  assert.match(shader.vertexShader, /instanceColor/);
+  assert.throws(() => ctx.dotMaterial.onBeforeCompile({ uniforms: {}, vertexShader: 'void main() {}' }),
+    /missing the begin_vertex chunk/);
+});
+
+test('dispose clears the stats view', () => {
+  const log = [];
+  const ctx = disposeCtx(fakeMesh(log), log);
+  Daydream.prototype.dispose.call(ctx);
+  assert.ok(log.includes('stats.clear'));
+});
+
 // ---------------------------------------------------------------------------
 // stepSimulation / render: the detached-pixel-view contract
 // ---------------------------------------------------------------------------
@@ -1143,6 +1186,43 @@ test('a held tick honours captureReady before capturing', () => {
   assert.equal(ctx.heldCaptures, 0, 'deferred a capture captureReady refused');
 });
 
+test('running display frames between simulation ticks do not poll the panel', () => {
+  const ctx = renderCtx(new Uint16Array(4), []);
+  ctx.paused = false;
+  ctx.needsRender = false;
+  ctx.advanceFrameClock = () => false;
+  let syncs = 0;
+  Daydream.prototype.render.call(ctx, { drawFrame() {}, sync() { syncs++; } });
+  assert.equal(syncs, 0);
+});
+
+test('render shows axes and labels before the inset view', () => {
+  const log = [];
+  const ctx = renderCtx(new Uint16Array(4), log);
+  ctx.labelAxes = true;
+  ctx.labelPool.activeCount = 1;
+  Daydream.prototype.render.call(ctx, null);
+  for (const axis of [ctx.xAxis, ctx.yAxis, ctx.zAxis]) assert.equal(axis.visible, true);
+  assert.ok(log.indexOf('refreshLabels') < log.indexOf('labelRenderer.render'));
+  assert.ok(log.indexOf('labelRenderer.render') < log.indexOf('renderPip'));
+});
+
+test('stats tolerate absent arena metrics', () => {
+  const calls = [];
+  const ctx = { statsView: { update: (...args) => calls.push(args) } };
+  for (const adapter of [null, {}, { getArenaMetrics: () => undefined }])
+    Daydream.prototype.updateStats.call(ctx, 12, adapter);
+  assert.deepEqual(calls, [[12, null], [12, null], [12, null]]);
+});
+
+test('immediate POV reset passes the displayed pixels and tolerates absent history', () => {
+  const pixels = new Uint8Array([1, 2, 3]);
+  const received = [];
+  Daydream.prototype.resetPovNow.call({pixels, povSweep: {reset: value => received.push(value)}});
+  assert.deepEqual(received, [pixels]);
+  assert.doesNotThrow(() => Daydream.prototype.resetPovNow.call({pixels, povSweep: null}));
+});
+
 // ---------------------------------------------------------------------------
 // renderMainView
 // ---------------------------------------------------------------------------
@@ -1566,6 +1646,21 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
   assert.equal(ctx.classes.has('keyboard-focus'), false);
 });
 
+test('orbit bounds keep cap tops strictly inside both clipping planes at every dot size', () => {
+  const ctx = {controls: {update() { updates++; }}, DOT_SIZE: 2};
+  let updates = 0;
+  for (const size of [0.25, 2, 5]) {
+    ctx.DOT_SIZE = size;
+    Daydream.prototype.updateOrbitLimits.call(ctx);
+    const capRadius = Daydream.SPHERE_RADIUS + size;
+    assert.ok(ctx.controls.minDistance - capRadius > Daydream.CAMERA_NEAR);
+    assert.ok(ctx.controls.maxDistance + capRadius < Daydream.CAMERA_FAR);
+    assert.ok(ctx.controls.minDistance < Daydream.CAMERA_Z);
+    assert.ok(ctx.controls.maxDistance > Daydream.CAMERA_Z);
+  }
+  assert.equal(updates, 3, 'a resolution change reclamps the live orbit');
+});
+
 // ---------------------------------------------------------------------------
 // precomputeMatrices / updateResolution
 // ---------------------------------------------------------------------------
@@ -1803,6 +1898,44 @@ test('updateResolution rebuilds the mesh and buffer at the new grid', () => {
   assert.equal(ctx.needsRender, true);
 });
 
+test('changing latitude endpoints rebuilds cached LED placement', () => {
+  const ctx = matricesCtx(8, 5);
+  Daydream.prototype.precomputeMatrices.call(ctx);
+  const pole = dotAt(ctx, 0).clone();
+  ctx.DISPLAY_NORTH_PHI = 0.02 * Math.PI;
+  ctx.DISPLAY_SOUTH_PHI = 0.98 * Math.PI;
+  Daydream.prototype.precomputeMatrices.call(ctx);
+  assert.equal(ctx.matrixCache.size, 2);
+  assert.ok(dotAt(ctx, 0).distanceTo(pole) > 1);
+  assert.ok(dotAt(ctx, 0).distanceTo(dotAt(ctx, 4)) > 3);
+  assert.ok(dotAt(ctx, 32).distanceTo(dotAt(ctx, 36)) > 3);
+});
+
+test('cap slider changes bound the matrix cache and update live placement', () => {
+  const ctx = matricesCtx(8, 5);
+  ctx.precomputeMatrices = (...args) => Daydream.prototype.precomputeMatrices.call(ctx, ...args);
+  ctx.precomputeMatrices();
+  const colors = ctx.dotMesh.instanceColor;
+  ctx.invalidate = () => { ctx.invalidated = true; };
+  for (let cap = 1; cap < 100; cap++) {
+    const matrixVersion = ctx.dotMesh.instanceMatrix.version;
+    Daydream.prototype.setDisplayGeometry.call(ctx, {
+      DISPLAY_NORTH_PHI: cap / 1000,
+      DISPLAY_SOUTH_PHI: Math.PI - cap / 1000,
+    });
+    assert.ok(ctx.dotMesh.instanceMatrix.version > matrixVersion);
+    assert.ok(ctx.matrixCache.size <= 1);
+    assert.equal(ctx.dotMesh.instanceColor, colors);
+  }
+  assert.equal(ctx.invalidated, true);
+  assert.ok(dotAt(ctx, 0).distanceTo(dotAt(ctx, 4)) > 3);
+  ctx.dotMesh = null;
+  Daydream.prototype.setDisplayGeometry.call(ctx, {
+    DISPLAY_NORTH_PHI: 0, DISPLAY_SOUTH_PHI: Math.PI,
+  });
+  assert.equal(ctx.matrixCache.size, 0);
+});
+
 // ---------------------------------------------------------------------------
 // updateCullUniforms
 // ---------------------------------------------------------------------------
@@ -1872,7 +2005,6 @@ test('updateCullUniforms gap-fills columns for a persisting effect', () => {
   ctx.W = 192;
   Daydream.prototype.updateCullUniforms.call(ctx);
   assert.ok(Math.abs(ctx.cullUniforms.uColumnFillArc.value - arc / 2) < 1e-9);
-
 
 });
 
@@ -1978,6 +2110,18 @@ test('refreshLabels acquires nothing while the axes are hidden', () => {
 
   assert.deepEqual(labelTexts(ctx), []);
   assert.equal(ctx.labelPool.cleanups, 1, 'labels from the previous frame were stranded');
+});
+
+test('refreshLabels culls an axis below the scaled facing cutoff at both orbit distances', () => {
+  const direction = new THREE.Vector3(0.1, 1, 0.4).normalize();
+  for (const distance of [140, 900]) {
+    const ctx = labelCtx(direction.clone().setLength(distance));
+    Daydream.prototype.refreshLabels.call(ctx);
+    const visible = labelTexts(ctx);
+    assert.ok(!visible.includes('X'), 'a raw ratio cutoff would expose X');
+    assert.ok(visible.includes('Y'));
+    assert.ok(visible.includes('Z'));
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -2089,6 +2233,19 @@ test('an unavailable preset leaves the running arrow key unclaimed', () => {
   Daydream.prototype.keydown.call(ctx, arrow, () => false);
 
   assert.equal(arrow.prevented, false);
+});
+
+test('stepOnce always queues at least one frame', () => {
+  let invalidations = 0;
+  const ctx = { paused: true, stepFrames: 0, invalidate() { invalidations += 1; } };
+  Daydream.prototype.stepOnce.call(ctx);
+  assert.equal(ctx.stepFrames, 1);
+  Daydream.prototype.stepOnce.call(ctx);
+  assert.equal(ctx.stepFrames, 1);
+  ctx.stepFrames = 3;
+  Daydream.prototype.stepOnce.call(ctx);
+  assert.equal(ctx.stepFrames, 3);
+  assert.equal(invalidations, 3);
 });
 
 // ---------------------------------------------------------------------------
@@ -2206,165 +2363,4 @@ test('ad-hoc contexts use fields assigned by the driver', () => {
   };
   visit(tree);
   assert.ok(checked > 0);
-});
-
-test('dispose during a real Three animation callback cancels the rearmed frame', async () => {
-  const { WebGLAnimation } = await import(
-    'three/src/renderers/webgl/WebGLAnimation.js');
-  const animation = WebGLAnimation();
-  const requests = new Map();
-  let id = 0;
-  animation.setContext({
-    requestAnimationFrame(callback) { requests.set(++id, callback); return id; },
-    cancelAnimationFrame(request) { requests.delete(request); },
-  });
-  const log = [];
-  const ctx = disposeCtx(fakeMesh(log), log);
-  ctx.renderer.setAnimationLoop = () => animation.stop();
-  animation.setAnimationLoop(() => Daydream.prototype.dispose.call(ctx));
-  animation.start();
-  const callback = requests.get(id);
-  requests.delete(id);
-  callback(0);
-  assert.equal(requests.size, 1);
-  await Promise.resolve();
-  assert.equal(requests.size, 0);
-});
-
-test('running display frames between simulation ticks do not poll the panel', () => {
-  const ctx = renderCtx(new Uint16Array(4), []);
-  ctx.paused = false;
-  ctx.needsRender = false;
-  ctx.advanceFrameClock = () => false;
-  let syncs = 0;
-  Daydream.prototype.render.call(ctx, { drawFrame() {}, sync() { syncs++; } });
-  assert.equal(syncs, 0);
-});
-
-test('dot shader injection uses the current Three chunk and refuses a missing one', () => {
-  const ctx = setupCtx(null, []);
-  Daydream.prototype.setupDots.call(ctx);
-  const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.basic.vertexShader };
-  ctx.dotMaterial.onBeforeCompile(shader);
-  for (const name of ['uCameraPos', 'uCullThreshold', 'uColumnFillArc'])
-    assert.equal(shader.uniforms[name], ctx.cullUniforms[name]);
-  assert.match(shader.vertexShader, /transformed\.x \+= sign\(transformed\.x\) \* ext/);
-  assert.match(shader.vertexShader, /instanceColor/);
-  assert.throws(() => ctx.dotMaterial.onBeforeCompile({ uniforms: {}, vertexShader: 'void main() {}' }),
-    /missing the begin_vertex chunk/);
-});
-
-test('changing latitude endpoints rebuilds cached LED placement', () => {
-  const ctx = matricesCtx(8, 5);
-  Daydream.prototype.precomputeMatrices.call(ctx);
-  const pole = dotAt(ctx, 0).clone();
-  ctx.DISPLAY_NORTH_PHI = 0.02 * Math.PI;
-  ctx.DISPLAY_SOUTH_PHI = 0.98 * Math.PI;
-  Daydream.prototype.precomputeMatrices.call(ctx);
-  assert.equal(ctx.matrixCache.size, 2);
-  assert.ok(dotAt(ctx, 0).distanceTo(pole) > 1);
-  assert.ok(dotAt(ctx, 0).distanceTo(dotAt(ctx, 4)) > 3);
-  assert.ok(dotAt(ctx, 32).distanceTo(dotAt(ctx, 36)) > 3);
-});
-
-test('cap slider changes bound the matrix cache and update live placement', () => {
-  const ctx = matricesCtx(8, 5);
-  ctx.precomputeMatrices = (...args) => Daydream.prototype.precomputeMatrices.call(ctx, ...args);
-  ctx.precomputeMatrices();
-  const colors = ctx.dotMesh.instanceColor;
-  ctx.invalidate = () => { ctx.invalidated = true; };
-  for (let cap = 1; cap < 100; cap++) {
-    const matrixVersion = ctx.dotMesh.instanceMatrix.version;
-    Daydream.prototype.setDisplayGeometry.call(ctx, {
-      DISPLAY_NORTH_PHI: cap / 1000,
-      DISPLAY_SOUTH_PHI: Math.PI - cap / 1000,
-    });
-    assert.ok(ctx.dotMesh.instanceMatrix.version > matrixVersion);
-    assert.ok(ctx.matrixCache.size <= 1);
-    assert.equal(ctx.dotMesh.instanceColor, colors);
-  }
-  assert.equal(ctx.invalidated, true);
-  assert.ok(dotAt(ctx, 0).distanceTo(dotAt(ctx, 4)) > 3);
-  ctx.dotMesh = null;
-  Daydream.prototype.setDisplayGeometry.call(ctx, {
-    DISPLAY_NORTH_PHI: 0, DISPLAY_SOUTH_PHI: Math.PI,
-  });
-  assert.equal(ctx.matrixCache.size, 0);
-});
-
-test('render shows axes and labels before the inset view', () => {
-  const log = [];
-  const ctx = renderCtx(new Uint16Array(4), log);
-  ctx.labelAxes = true;
-  ctx.labelPool.activeCount = 1;
-  Daydream.prototype.render.call(ctx, null);
-  for (const axis of [ctx.xAxis, ctx.yAxis, ctx.zAxis]) assert.equal(axis.visible, true);
-  assert.ok(log.indexOf('refreshLabels') < log.indexOf('labelRenderer.render'));
-  assert.ok(log.indexOf('labelRenderer.render') < log.indexOf('renderPip'));
-});
-
-test('stepOnce always queues at least one frame', () => {
-  let invalidations = 0;
-  const ctx = { paused: true, stepFrames: 0, invalidate() { invalidations += 1; } };
-  Daydream.prototype.stepOnce.call(ctx);
-  assert.equal(ctx.stepFrames, 1);
-  Daydream.prototype.stepOnce.call(ctx);
-  assert.equal(ctx.stepFrames, 1);
-  ctx.stepFrames = 3;
-  Daydream.prototype.stepOnce.call(ctx);
-  assert.equal(ctx.stepFrames, 3);
-  assert.equal(invalidations, 3);
-});
-
-test('stats tolerate absent arena metrics', () => {
-  const calls = [];
-  const ctx = { statsView: { update: (...args) => calls.push(args) } };
-  for (const adapter of [null, {}, { getArenaMetrics: () => undefined }])
-    Daydream.prototype.updateStats.call(ctx, 12, adapter);
-  assert.deepEqual(calls, [[12, null], [12, null], [12, null]]);
-});
-
-test('dispose clears the stats view', () => {
-  const log = [];
-  const ctx = disposeCtx(fakeMesh(log), log);
-  Daydream.prototype.dispose.call(ctx);
-  assert.ok(log.includes('stats.clear'));
-});
-
-
-test('orbit bounds keep cap tops strictly inside both clipping planes at every dot size', () => {
-  const ctx = {controls: {update() { updates++; }}, DOT_SIZE: 2};
-  let updates = 0;
-  for (const size of [0.25, 2, 5]) {
-    ctx.DOT_SIZE = size;
-    Daydream.prototype.updateOrbitLimits.call(ctx);
-    const capRadius = Daydream.SPHERE_RADIUS + size;
-    assert.ok(ctx.controls.minDistance - capRadius > Daydream.CAMERA_NEAR);
-    assert.ok(ctx.controls.maxDistance + capRadius < Daydream.CAMERA_FAR);
-    assert.ok(ctx.controls.minDistance < Daydream.CAMERA_Z);
-    assert.ok(ctx.controls.maxDistance > Daydream.CAMERA_Z);
-  }
-  assert.equal(updates, 3, 'a resolution change reclamps the live orbit');
-});
-
-
-test('refreshLabels culls an axis below the scaled facing cutoff at both orbit distances', () => {
-  const direction = new THREE.Vector3(0.1, 1, 0.4).normalize();
-  for (const distance of [140, 900]) {
-    const ctx = labelCtx(direction.clone().setLength(distance));
-    Daydream.prototype.refreshLabels.call(ctx);
-    const visible = labelTexts(ctx);
-    assert.ok(!visible.includes('X'), 'a raw ratio cutoff would expose X');
-    assert.ok(visible.includes('Y'));
-    assert.ok(visible.includes('Z'));
-  }
-});
-
-
-test('immediate POV reset passes the displayed pixels and tolerates absent history', () => {
-  const pixels = new Uint8Array([1, 2, 3]);
-  const received = [];
-  Daydream.prototype.resetPovNow.call({pixels, povSweep: {reset: value => received.push(value)}});
-  assert.deepEqual(received, [pixels]);
-  assert.doesNotThrow(() => Daydream.prototype.resetPovNow.call({pixels, povSweep: null}));
 });
