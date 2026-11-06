@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createChainPresentation, formatNumericValue, colorParameterHidden } from '../src/workbench/shader/chain_presentation.js';
+import {readFileSync} from 'node:fs';
+import { createChainPresentation, formatNumericValue, colorParameterHidden, deactivatedParameterIds, PALETTE_OPERATOR } from '../src/workbench/shader/chain_presentation.js';
 
 test('numeric readouts retain the shortest binary32 spelling across scales', () => {
   for (const [value, text] of [
@@ -96,11 +97,10 @@ test('terminal color endomorphisms form an ordered band after the palette', () =
 test('palette families reveal their own controls and keep mapping brightness and opacity common', () => {
   const owned = {
     'cycling-generated': ['palette-mode'],
-    generated: ['palette-harmony', 'palette-hue', 'palette-spread', 'palette-lightness',
-      'palette-lightness-range', 'palette-lightness-curve'],
+    generated: ['palette-harmony', 'palette-lightness-curve'],
     procedural: ['palette-name'],
-    gradient: ['gradient-start-r', 'gradient-middle-g', 'gradient-end-b'],
-    mutating: ['palette-name', 'palette-name-b', 'palette-mutation'],
+    gradient: [],
+    mutating: ['palette-name', 'palette-name-b'],
   };
   for (const [type, fields] of Object.entries(owned)) {
     const value = (field) => field === 'palette-type' ? type : undefined;
@@ -109,5 +109,21 @@ test('palette families reveal their own controls and keep mapping brightness and
     for (const field of ['palette-type', 'palette-chroma', 'palette-mapping', 'mapping-frequency',
       'brightness-envelope', 'value-opacity-low', 'value-opacity-high'])
       assert.equal(colorParameterHidden(field, value), false, `${type}: ${field}`);
+  }
+});
+
+test('catalog palette gates own numeric family visibility', () => {
+  const catalog = JSON.parse(readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
+  const operator = catalog.operators.find(({id}) => id === PALETTE_OPERATOR);
+  const gated = operator.params.filter(parameter => parameter.gated_by?.field === 'palette-type');
+  assert.ok(gated.length > 0);
+  const declarations = gated.map(({id}) => ({id: `color.${id}`}));
+  for (const type of operator.params.find(({id}) => id === 'palette-type').values) {
+    const off = deactivatedParameterIds(declarations, {'color.palette-type': type},
+      [{label: 'color', operator: PALETTE_OPERATOR}], catalog);
+    for (const parameter of gated) {
+      assert.equal(off.has(`color.${parameter.id}`), !parameter.gated_by.values.includes(type));
+      assert.equal(colorParameterHidden(parameter.id, () => type), false);
+    }
   }
 });

@@ -2736,6 +2736,18 @@ test('the Palette selector supports every family with family-specific controls',
   }
 });
 
+test('a widened catalog palette gate is reflected in row visibility', async () => {
+  const catalog = structuredClone(CATALOG);
+  const operator = catalog.operators.find(({id}) => id === 'colorize.generated-palette.v4');
+  operator.params.find(({id}) => id === 'palette-hue').gated_by.values.push('gradient');
+  const h = await makeStrip({catalog, writeThrough: true});
+  const type = chipByLabel(h, 'colorize').querySelector('.chain-palette-type');
+  type.value = 'gradient';
+  type.dispatch('change');
+  assert.equal(rowFor(h, 'colorize', 'colorize.palette-hue').hidden, false);
+  assert.equal(rowFor(h, 'colorize', 'colorize.palette-spread').hidden, true);
+});
+
 test('resetting declared defaults leaves the document and undo application untouched', async () => {
   const h = await makeStrip();
   const preset = h.store.document().preset_bank.presets[0].preset_id;

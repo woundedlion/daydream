@@ -109,13 +109,12 @@ export function modulationParameterHidden(field, value) {
 
 /** @param {string} field @param {(field: string) => *} value @returns {boolean} */
 export function colorParameterHidden(field, value) {
-  const type = value('palette-type') ?? 'cycling-generated';
+  const type = value('palette-type');
   if (field === 'palette-mode') return type !== 'cycling-generated';
-  if (['palette-harmony', 'palette-hue', 'palette-spread', 'palette-lightness',
-    'palette-lightness-range', 'palette-lightness-curve'].includes(field)) return type !== 'generated';
+  if (['palette-harmony', 'palette-lightness-curve'].includes(field)) return type !== 'generated';
   if (field === 'palette-name') return !['procedural', 'mutating'].includes(type);
-  if (['palette-name-b', 'palette-mutation'].includes(field)) return type !== 'mutating';
-  return field.startsWith('gradient-') && type !== 'gradient';
+  if (field === 'palette-name-b') return type !== 'mutating';
+  return false;
 }
 
 /**
