@@ -206,6 +206,11 @@ export function fakeColorAttribute(array) {
   };
 }
 
+/** @returns {Object} Driver double carrying both display aliases. */
+export function fakeAliasDriver() {
+  return {pixels: null, dotMesh: {instanceColor: fakeColorAttribute(null)}};
+}
+
 /** Matrix attribute with three.js's write-only needsUpdate/version contract. */
 export function fakeMatrixAttribute(array) {
   let backing = array;

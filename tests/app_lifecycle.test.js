@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement } from './helpers/fake_dom.js';
 import { pageHandlers } from './helpers/page_handlers.js';
-import { fakeColorAttribute } from './helpers/fake_three.js';
+import { fakeAliasDriver } from './helpers/fake_three.js';
 import { repointDisplayAliases } from '../src/engine/display_aliases.js';
 import {
   createRenderAdapter,
@@ -22,17 +22,6 @@ import { EngineHost } from '../src/engine/engine_host.js';
 // Tests for app_lifecycle.js: the composition root's frame, timer, and teardown wiring.
 
 /**
- * Driver double carrying the two display aliases.
- * @returns {Object} The driver double.
- */
-function fakeDriver() {
-  return {
-    pixels: null,
-    dotMesh: { instanceColor: fakeColorAttribute(null) },
-  };
-}
-
-/**
  * Build a render adapter over doubles for the host, driver, and worker pool.
  * @param {Object} [options] - Pool state and the view the host publishes.
  * @returns {Object} The adapter plus its doubles and sinks.
@@ -42,7 +31,7 @@ function makeAdapter({ ownsDisplay = false, active = false,
   const calls = [];
   const errors = [];
   const view = new Uint16Array(4);
-  const driver = fakeDriver();
+  const driver = fakeAliasDriver();
   const host = {
     engine: {
       drawFrame() { calls.push('engine.drawFrame'); },

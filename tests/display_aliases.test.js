@@ -3,19 +3,11 @@
 // shows the previous buffer.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeColorAttribute } from './helpers/fake_three.js';
+import { fakeColorAttribute, fakeAliasDriver } from './helpers/fake_three.js';
 import { displayAliasesDiverged, repointDisplayAliases } from '../src/engine/display_aliases.js';
 
-/**
- * Driver double carrying the two display aliases.
- * @returns {Object} The driver double.
- */
-function fakeDriver() {
-  return { pixels: null, dotMesh: { instanceColor: fakeColorAttribute(null) } };
-}
-
 test('re-pointing aliases the view everywhere and flags the upload', () => {
-  const driver = fakeDriver();
+  const driver = fakeAliasDriver();
   const view = new Uint16Array(4);
 
   repointDisplayAliases(driver, view);
@@ -27,7 +19,7 @@ test('re-pointing aliases the view everywhere and flags the upload', () => {
 });
 
 test('aliases agree only when both reference the same view', () => {
-  const driver = fakeDriver();
+  const driver = fakeAliasDriver();
   const view = new Uint16Array(4);
   repointDisplayAliases(driver, view);
   assert.equal(displayAliasesDiverged(driver, view), false);
