@@ -133,8 +133,7 @@ export class FakeChainEngine {
     this.chainCalls.push(entries);
     const refusal = (code, entryIndex = -1) => ({ status: ChainStatus[code], code, entryIndex });
     if (canonicalEffectId(this.effect) !== canonicalEffectId('ShaderChain')) return refusal('NOT_CHAIN_EFFECT');
-    const malformed = { status: ChainStatus.MALFORMED_PAYLOAD, code: 'MALFORMED_PAYLOAD', entryIndex: -1 };
-    if (!Array.isArray(entries)) return malformed;
+    if (!Array.isArray(entries)) return refusal('MALFORMED_PAYLOAD');
     if (entries.length > this.catalog.budgets.max_chain_ops) return refusal('TOO_LONG');
     for (const [index, entry] of entries.entries()) {
       if (entry === null || typeof entry !== 'object'
@@ -157,7 +156,7 @@ export class FakeChainEngine {
     const definitions = [];
     for (const [index, entry] of entries.entries()) {
       const operator = operators.get(entry.operator);
-      if (!operator) return { status: ChainStatus.UNKNOWN_OPERATOR, code: 'UNKNOWN_OPERATOR', entryIndex: index };
+      if (!operator) return refusal('UNKNOWN_OPERATOR', index);
       for (const field of operator.params) {
         const base = {
           name: `${entry.instance}.${field.id}`,
@@ -427,7 +426,7 @@ export class FakeChainEngine {
     for (const { name, value } of writes) {
       if (!this.definitions.some((definition) => definition.name === name))
         return ParamSetResult.UNKNOWN_PARAM;
-      if (typeof value !== 'number' || !Number.isFinite(value))
+      if (!Number.isFinite(value))
         return ParamSetResult.NON_FINITE;
     }
     const candidate = new FakeChainEngine(this.catalog);

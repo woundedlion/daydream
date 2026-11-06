@@ -28,9 +28,12 @@ test('FakeChainEngine mocks nothing outside the pinned engine surface', () => {
 test('the fake chain engine exposes status identities on every return path', () => {
   const engine = new FakeChainEngine();
   engine.setEffect('ShaderChain');
-  assert.equal(engine.bindings.setShaderChain(null).status, ChainStatus.MALFORMED_PAYLOAD);
-  assert.equal(engine.bindings.setShaderChain([{ instance: 'x', operator: 'unknown' }]).status,
-    ChainStatus.UNKNOWN_OPERATOR);
+  assert.deepEqual(engine.bindings.setShaderChain(null),
+    { status: ChainStatus.MALFORMED_PAYLOAD, code: 'MALFORMED_PAYLOAD', entryIndex: -1 });
+  assert.deepEqual(engine.bindings.setShaderChain([
+    { instance: 'camera', operator: 'sphere.rotate.v2' },
+    { instance: 'x', operator: 'unknown' },
+  ]), { status: ChainStatus.UNKNOWN_OPERATOR, code: 'UNKNOWN_OPERATOR', entryIndex: 1 });
   engine.nextChainResult = { code: 'ARENA_OVERFLOW', entryIndex: -1 };
   assert.equal(engine.bindings.setShaderChain([]).status, ChainStatus.ARENA_OVERFLOW);
   assert.equal(engine.bindings.setShaderChain([]).status, ChainStatus.EMPTY);
