@@ -921,11 +921,12 @@ export class SegmentController {
   }
 
   /**
-   * Select a preset on every worker, latching it so a rebuild lands on it too.
+   * Select a preset on every worker and mirror its index for getPresetIndex().
+   * Rebuilds read the main engine index, which the host selects first.
    * @param {number} index
    * @returns {boolean} False when `index` is not an integer in range for the
-   *   known preset count (nothing is latched or broadcast); true once accepted,
-   *   including on a faulted pool, where it is latched but not broadcast.
+   *   known preset count (nothing is mirrored or broadcast); true once accepted,
+   *   including on a faulted pool, where it is mirrored but not broadcast.
    */
   selectPreset(index) {
     if (!Number.isInteger(index) || this.presetCount == null

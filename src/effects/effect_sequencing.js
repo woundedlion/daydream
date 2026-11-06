@@ -175,7 +175,7 @@ export function switchFailureReport(label, result) {
  * back. Rollback runs with the subscription muted; mute() opens that window for
  * callers who write appState and apply it themselves. Mute windows nest.
  *
- * A rejected resolution switch also re-asserts the URL after the current task.
+ * A rejected resolution switch also re-asserts the URL once the current call stack unwinds.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {{get: Function, set: Function, update: Function, subscribe: Function}}

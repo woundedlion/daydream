@@ -117,7 +117,6 @@ function buildParamRow(doc, key, def, value, controlId, opName, index) {
   const number = doc.createElement('input');
   number.type = 'number';
   number.setAttribute('aria-label', `${accessibleName} value`);
-  // slate-300/400 on --slate-800 at 0.6rem clears the 4.5:1 WCAG AA floor.
   number.className = 'w-12 bg-transparent text-right font-mono text-slate-300 focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
   number.min = String(def.min);
   number.max = String(def.max);

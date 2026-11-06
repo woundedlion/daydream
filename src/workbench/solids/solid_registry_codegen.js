@@ -364,7 +364,7 @@ export function registryDisplayName(item, funcName) {
 
 /**
  * Emits the solids.h registry paste for a saved solid: a Category::COMPLEX
- * islamic_registry entry with its generator, OpStep table and Recipe mirror.
+ * islamic_registry entry naming its generator, OpStep table and Recipe mirror.
  * A star base is flattened onto its own seed with its authored chain prepended;
  * a seed without a SEED_* constant gets that constant's definition first.
  * @param {import('./solid_codegen.js').SolidSpec} item - The solid spec (see generateFuncAndRecipe).

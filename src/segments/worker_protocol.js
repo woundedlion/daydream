@@ -114,7 +114,7 @@ export const FAULT_RENDER = -2;
 
 // --- Worker -> Controller (received by the controller) ---------------------
 
-/** Worker has finished bootstrapping (engine instantiated) and can accept work.
+/** Worker has installed its effect and clip and can accept renders.
  * Carries no segId; the per-worker message handler identifies the sender.
  * @typedef {{ type: 'ready' }} ReadyMsg */
 

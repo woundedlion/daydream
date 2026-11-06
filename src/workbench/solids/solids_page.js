@@ -116,7 +116,6 @@ async function init() {
     meshOpsWasm = wasmModule.MeshOps;
 
     const registry = meshOpsWasm.getRegistry();
-    // registry is array of {name, category}
     simpleSolids = [];
     islamicStarPatterns = [];
     registrySolidNames = new Set();
@@ -124,7 +123,7 @@ async function init() {
     for (let i = 0; i < registry.length; i++) {
       const item = registry[i];
       const name = item.name;
-      const cat = item.category; // "Simple" or "Complex"
+      const cat = item.category;
 
       registrySolidNames.add(name);
       if (cat === "Complex") {
@@ -255,8 +254,6 @@ async function init() {
 
   document.getElementById('saveBtn').addEventListener('click', saveSolid);
 
-  // Static control buttons. The add-op grid uses one delegated listener that
-  // resolves the clicked button with closest().
   document.getElementById('clearOpsBtn').addEventListener('click', resetOps);
   document.getElementById('exportSavedBtn').addEventListener('click', exportSavedSolids);
   const importFile = document.getElementById('importSavedFile');
@@ -322,7 +319,6 @@ async function generateThumbnails(signal) {
   offScene.add(light);
   offScene.add(ambient);
 
-  // Material for thumbnails
   const mat = new THREE.MeshPhongMaterial({
     color: 0x3b82f6,
     flatShading: true,
@@ -332,11 +328,9 @@ async function generateThumbnails(signal) {
 
   try {
     for (const key of thumbKeys) {
-      // Yield between thumbnails.
       await new Promise(resolve => setTimeout(resolve));
       if (signal.aborted || !meshOpsWasm) break;
 
-      // Reset to just the lights.
       offScene.clear();
       offScene.add(light);
       offScene.add(ambient);
@@ -400,7 +394,6 @@ async function generateThumbnails(signal) {
         highlightBaseSolid();
       }
 
-      // Free the per-iteration geometry GPU buffers.
       geo.dispose();
       lineGeo.dispose();
     }
@@ -605,7 +598,6 @@ function saveSolid() {
 
   const title = formatSolidName(state.base);
 
-  // Derive the edge count from the readback copy.
   const vCount = currentMesh.vertices.length;
   const fCount = currentMesh.faces.length;
   const eCount = uniqueEdges(currentMesh.faces, vCount).length;
@@ -622,7 +614,7 @@ function saveSolid() {
 
   const item = {
     base: state.base,
-    ops: structuredClone(state.ops), // Deep copy (ops are plain data)
+    ops: structuredClone(state.ops),
     geodesics: state.showGeodesics,
     faces: state.showFaces,
     colorize: state.colorizeFaces,
@@ -863,7 +855,7 @@ function restoreSolid(item) {
 function applyRestore(item) {
   showGateMsg('');
   state.base = item.base;
-  setOps(structuredClone(item.ops)); // Deep copy (ops are plain data)
+  setOps(structuredClone(item.ops));
   // A flag the card lacks lands on the page default.
   const flag = (value, fallback) => !!(value ?? fallback);
   state.showGeodesics = flag(item.geodesics, true);

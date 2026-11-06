@@ -299,7 +299,7 @@ test('every preset generator is the identity at t=0', () => {
 });
 
 /**
- * The two scaling presets wrap their log-scale parameter at gridScaleR = 1.5, so
+ * The two scaling presets wrap their log-scale parameter at 1/MOBIUS_GRID_SCALE_R, so
  * the flow is seamless: one period later the coefficient magnitudes repeat.
  * Loxodromic keeps rotating, so only the magnitudes are periodic.
  */

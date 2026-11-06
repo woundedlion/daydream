@@ -528,13 +528,10 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
       chain += `.${opName}(${formatFloatCpp(params.t)})`;
       nameParts.push(`_${opName}${pctSuffix(params.t)}`);
     } else {
-      // Parameterless ops.
       chain += `.${opName}()`;
       nameParts.push(`_${opName}`);
     }
 
-    // After the per-op emit, so the finiteness, count and negative-suffix
-    // checks name their own defect.
     const banded = outOfRangeParam(opName, params);
     if (banded) {
       throw new Error(`generateFuncAndRecipe: ${opName} param "${banded.key}" must be `

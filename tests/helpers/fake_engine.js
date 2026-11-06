@@ -1,9 +1,9 @@
 import { enumeration } from './fake_enums.js';
 import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../../src/workbench/shader/shader_deeplink.js';
-// Engine fakes consume the installed, generated binding contract.
 import { canonicalEffectId } from "../../src/effects/effect_identity.js";
 import { readFileSync } from 'node:fs';
 
+// Engine fakes consume the installed, generated binding contract.
 import { CLASS_METHODS } from '../../generated/engine_contract.mjs';
 
 const SHADER_CHAIN_BINDING_METHODS = CLASS_METHODS.ShaderChainBindings;

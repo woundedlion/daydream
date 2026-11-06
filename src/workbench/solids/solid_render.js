@@ -132,7 +132,6 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
     render(meshData, view, faceClassIds) {
       const faceClasses = (view.colorizeFaces && view.showFaces) ? faceClassIds : null;
 
-      // Null each handle after disposal so an unbuilt object is not re-disposed.
       mainMesh = discard(mainMesh);
       edgeLines = discard(edgeLines);
       vertPoints = discard(vertPoints);
@@ -260,7 +259,6 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
 
       /** @type {number[]} */
       const linePositions = [];
-      // Two scratch vectors serve every edge.
       const arcStart = new THREE.Vector3();
       const arcEnd = new THREE.Vector3();
       for (const [ai, bi] of edges) {
