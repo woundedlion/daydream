@@ -61,6 +61,9 @@ Numeric controls follow each declaration's interpolation kind. `LOG_POSITIVE`
 sliders use logarithmic positions and multiplicative arrow nudges; their numeric
 readouts and accessible value text show parameter values. Live admission limits
 bound both representations without replacing the controls.
+Declaring a new parameter while previewing the compiled build returns the preview
+to the interpreter and disarms parity. A slider keeps its mounted control through
+the drag; its parameter panel refreshes on commit.
 Each layer owns its recipe and source clock; displacement is one of the available
 sources. The Palette header selects the palette family; mapping, brightness
 and opacity belong to its parameter panel. Legacy embedded hue shift

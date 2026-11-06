@@ -338,6 +338,7 @@ export function createShaderDocumentController({
   let bakedFields = new Set();
   /** @type {{store: *, strip: *}|null} */
   let chainUi = null;
+  let rebuildAfterParameterCommit = false;
   /** @type {number} Save As copies this session, which their ids count off. */
   let copies = 0;
   let linkGeneration = 0;
@@ -365,6 +366,9 @@ export function createShaderDocumentController({
   };
   /** @param {string} message */
   const showStatus = (message) => writeStatus(message, false);
+  const showParityDropStatus = () => showStatus(
+    'The edit changed the descriptor: the preview is back on the '
+    + 'interpreter and the parity toggle is disarmed.');
   /** @param {string} message */
   const showError = (message) => writeStatus(message, true);
 
@@ -505,6 +509,7 @@ export function createShaderDocumentController({
     if (chainUi === null) return;
     chainUi.strip.destroy();
     chainUi = null;
+    rebuildAfterParameterCommit = false;
     setParamFilter(null);
   };
 
@@ -661,7 +666,10 @@ export function createShaderDocumentController({
       if (addsDeclaration) {
         const dropped = syncParity();
         applyPreset(active.presetId);
-        if (dropped) chainUi.strip.render();
+        if (dropped) {
+          rebuildAfterParameterCommit = true;
+          showParityDropStatus();
+        }
       }
       if (Object.keys(values).length > 1) chainUi.strip.syncParameterValues(values);
       chainUi.strip.syncHistory();
@@ -697,10 +705,8 @@ export function createShaderDocumentController({
         const dropped = syncParity();
         applyPreset(active?.presetId ?? presetSelect.value);
         if (dropped) {
-          // Re-enables the bypass toggles on the interpreter.
           chainUi?.strip.render();
-          showStatus('The edit changed the descriptor: the preview is back on the '
-            + 'interpreter and the parity toggle is disarmed.');
+          showParityDropStatus();
         }
       },
       presetId: () => active?.presetId ?? null,
@@ -708,7 +714,13 @@ export function createShaderDocumentController({
       parameterLive,
       parameterRanges: () => chainUi?.store === store && active?.compiledSide !== true
         ? callWorkbenchBinding(getEngine(), 'getShaderChainParameterRanges', [], []) : [],
-      onCommitParameter: () => { void flushDeepLink(); },
+      onCommitParameter: () => {
+        if (rebuildAfterParameterCommit) {
+          rebuildAfterParameterCommit = false;
+          chainUi?.strip.render();
+        }
+        void flushDeepLink();
+      },
       bypassAvailable: () => active?.compiledSide !== true,
     }));
     setParamFilter({ external: true });

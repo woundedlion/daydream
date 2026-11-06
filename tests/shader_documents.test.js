@@ -2622,6 +2622,29 @@ test('refused replacement restores the previous compiled preset after switching 
   assert.match(harness.elements.get('shader-document-status').textContent, /missing-stage/);
 });
 
+test('a compiled slider declaration keeps its control through release and explains the parity drop', async () => {
+  const harness = await editorWorkbench({patternCatalog: HEX_PATTERN_CATALOG});
+  const mount = harness.elements.get('chain-strip');
+  const sliderFor = () => mount.querySelectorAll('.chain-param')
+    .find((row) => row.dataset.parameter === 'sample.edge-width').querySelector('.chain-param-control');
+  harness.elements.get('shader-parity-toggle').dispatch('click');
+  const slider = sliderFor();
+  for (const value of [0.25, 0.3]) {
+    slider.value = String(value);
+    slider.dispatch('input');
+    harness.animationFrames.flush();
+    assert.equal(sliderFor() === slider, true, 'the slider stays mounted during the drag');
+    assert.ok(harness.engine.writes.some(([name, written]) =>
+      name === 'sample.edge-width' && written === value));
+  }
+  assert.equal(harness.selections.at(-1), 'shader-chain');
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /back on the interpreter.*parity toggle is disarmed/);
+  slider.dispatch('change');
+  assert.equal(sliderFor() === slider, false, 'the panel refreshes after release');
+  assert.equal(Number(sliderFor().value), 0.3);
+});
+
 for (const compiled of [false, true]) {
   test(`an omitted parameter edit declares it and updates parity from ${compiled ? 'compiled' : 'interpreter'} preview`, async () => {
     const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
