@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { relativeImports, reachableModules } from './helpers/module_graph.js';
 import { servedPages } from './helpers/site_pages.js';
 import { fakeElement, stashGlobals } from './helpers/fake_dom.js';
 import { buildOpRow } from '../src/workbench/solids/solid_op_rows.js';
@@ -52,36 +53,17 @@ test('every solids visualization switch carries an accessible name', () => {
   }
 });
 
-// Relative module specifiers, covering `import`, `export â€¦ from` and `import()`.
-const SPECIFIER = /(?:from|import)\s*\(?\s*['"](\.[^'"]+\.js)['"]/g;
-
-/**
- * The modules a page ends up loading, its own and the src/ ones alike. The
- * walk follows every relative specifier, so a module a page reaches only
- * through another is found.
- * @param {string} page - Repo-relative page path.
- * @returns {string[][]} Path segments of each module, sorted.
- */
-const scriptsOf = (page) => {
-  const found = new Set();
-  const seen = new Set();
-  const walk = (file) => {
-    if (seen.has(file) || !existsSync(join(REPO, file))) return;
-    seen.add(file);
-    if (file.endsWith('.js')) found.add(file);
-    const src = read(file);
-    // A page's own `src` attributes are page-relative; a module specifier is
-    // relative only when it says so, and a bare one names a vendored package.
-    const specs = file.endsWith('.html')
-      ? [...src.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)]
-        .map(([, s]) => s).filter((s) => !s.includes('://'))
-      : [];
-    for (const [, spec] of src.matchAll(SPECIFIER)) specs.push(spec);
-    for (const spec of specs) walk(posix.join(posix.dirname(file), spec));
-  };
-  walk(page);
-  return [...found].sort().map((f) => f.split('/'));
-};
+/** @param {string} page Repo-relative page path. @returns {string[][]} Reached module paths. */
+const scriptsOf = (page) => [...reachableModules([page], (file) => {
+  const source = read(file);
+  const scripts = file.endsWith('.html')
+    ? [...source.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)]
+      .map(([, spec]) => spec).filter((spec) => !spec.includes('://'))
+      .map((spec) => posix.join(posix.dirname(file), spec))
+    : [];
+  return [...scripts, ...relativeImports(source, file)];
+}, (file) => existsSync(join(REPO, file)))]
+  .filter((file) => /\.m?js$/.test(file)).sort().map((file) => file.split('/'));
 
 /**
  * The existing repository stylesheets a page links.

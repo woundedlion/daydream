@@ -5,6 +5,35 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'espree';
 
 const REPO = fileURLToPath(new URL('../..', import.meta.url));
+const RELATIVE_SPECIFIER = /\b(?:(?:from|import)\s*\(?|new\s+Worker\s*\(\s*new\s+URL\s*\()\s*["'](\.{1,2}\/[^"']+)["']/g;
+
+/**
+ * Text-level relative imports, including dynamic/JSDoc imports and Worker URLs.
+ * @param {string} source @param {string} importer Repo-relative path.
+ * @returns {string[]} Resolved repo-relative paths, in source order.
+ */
+export function relativeImports(source, importer) {
+  return [...source.matchAll(RELATIVE_SPECIFIER)]
+    .map(([, specifier]) => posix.normalize(posix.join(posix.dirname(importer), specifier)));
+}
+
+/**
+ * @param {string[]} entries Entry paths.
+ * @param {(file: string) => string[]} importsOf Resolved dependencies of a path.
+ * @param {(file: string) => boolean} [accept] Whether to enter a path.
+ * @returns {Set<string>} Accepted reachable paths, including entries.
+ */
+export function reachableModules(entries, importsOf, accept = () => true) {
+  const reached = new Set();
+  const queue = [...entries];
+  while (queue.length) {
+    const file = queue.shift();
+    if (reached.has(file) || !accept(file)) continue;
+    reached.add(file);
+    queue.push(...importsOf(file));
+  }
+  return reached;
+}
 
 /**
  * Static import/export-from specifiers of one module source; dynamic `import()`

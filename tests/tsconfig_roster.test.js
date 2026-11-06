@@ -1,5 +1,6 @@
 // Check the typecheck roster against pipeline imports, @ts-check files
 // and eligible src/ modules.
+import { relativeImports, reachableModules } from './helpers/module_graph.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -42,11 +43,6 @@ function readTsconfig() {
   return config;
 }
 
-// Relative module specifiers, covering `import`, `export … from`, a bare
-// side-effect `import`, and the parenthesized form both `import()` and a JSDoc
-// `@typedef {import('./x.js').T}` use.
-const SPECIFIER = /\b(?:(?:from|import)\s*\(?|new\s+Worker\s*\(\s*new\s+URL\s*\()\s*["'](\.{1,2}\/[^"']+)["']/g;
-
 /**
  * The relative-module specifiers one file imports, resolved against the
  * importing file's directory.
@@ -56,14 +52,11 @@ const SPECIFIER = /\b(?:(?:from|import)\s*\(?|new\s+Worker\s*\(\s*new\s+URL\s*\(
 function importsOf(file) {
   const importer = new URL(file, ROOT);
   const source = readFileSync(importer, 'utf8');
-  const found = [];
-  for (const [, spec] of source.matchAll(SPECIFIER)) {
-    const relative = new URL(spec, importer).href.slice(ROOT.href.length);
+  return relativeImports(source, file).map((relative) => {
     const declaration = relative.replace(/\.js$/, '.d.ts');
-    found.push(!existsSync(new URL(relative, ROOT)) && existsSync(new URL(declaration, ROOT))
-      ? declaration : relative);
-  }
-  return found;
+    return !existsSync(new URL(relative, ROOT)) && existsSync(new URL(declaration, ROOT))
+      ? declaration : relative;
+  });
 }
 
 /**
@@ -72,15 +65,7 @@ function importsOf(file) {
  * @returns {Set<string>} The transitive closure, minus what is not checked.
  */
 function reachableFrom(roster) {
-  const seen = new Set();
-  const queue = [...roster];
-  while (queue.length > 0) {
-    const file = queue.shift();
-    if (seen.has(file) || NOT_CHECKED.has(file)) continue;
-    seen.add(file);
-    queue.push(...importsOf(file));
-  }
-  return seen;
+  return reachableModules(roster, importsOf, (file) => !NOT_CHECKED.has(file));
 }
 
 /**
