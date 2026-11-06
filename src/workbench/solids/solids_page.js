@@ -46,8 +46,7 @@ let meshRenderer = null;
 let labelsContainer;
 let createHolosphereModule = null;
 
-const faceMaterial = new THREE.MeshPhongMaterial({
-  color: 0x3b82f6,
+const FACE_MATERIAL_OPTIONS = {
   transparent: true,
   opacity: 0.9,
   side: THREE.DoubleSide,
@@ -55,21 +54,17 @@ const faceMaterial = new THREE.MeshPhongMaterial({
   shininess: 50,
   polygonOffset: true,
   polygonOffsetFactor: 1,
-  polygonOffsetUnits: 1
+  polygonOffsetUnits: 1,
+};
+const faceMaterial = new THREE.MeshPhongMaterial({
+  ...FACE_MATERIAL_OPTIONS,
+  color: 0x3b82f6,
 });
-// Same config as faceMaterial, but sourcing color from the per-vertex
-// topology-class attribute generated when Colorize Faces is on.
+// Colorize Faces reads the per-vertex topology-class attribute.
 const faceColorizeMaterial = new THREE.MeshPhongMaterial({
+  ...FACE_MATERIAL_OPTIONS,
   color: 0xffffff,
   vertexColors: true,
-  transparent: true,
-  opacity: 0.9,
-  side: THREE.DoubleSide,
-  flatShading: true,
-  shininess: 50,
-  polygonOffset: true,
-  polygonOffsetFactor: 1,
-  polygonOffsetUnits: 1
 });
 const vertMaterial = new THREE.PointsMaterial({ color: 0xa5b4fc, size: 0.05 });
 const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
