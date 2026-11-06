@@ -216,12 +216,8 @@ export async function dragBetween(tab, from, to, options = {}) {
   await tab.mouse.up();
 }
 
-// Optional font CDNs and Chrome's implicit icon request.
+// Chrome's implicit icon request.
 const ABSENT_PATHS = ['favicon.ico'];
-const ABSENT_ORIGINS = new Set([
-  'https://fonts.googleapis.com',
-  'https://fonts.gstatic.com',
-]);
 
 /**
  * Watches one tab for everything that went wrong on it: uncaught exceptions,
@@ -248,8 +244,7 @@ export function collectProblems(tab, origin, problems) {
   const absent = (href) => {
     if (href === undefined) return false;
     const url = new URL(href, base);
-    return ABSENT_ORIGINS.has(url.origin) ||
-      (url.origin === base.origin && absentPaths.has(url.pathname));
+    return url.origin === base.origin && absentPaths.has(url.pathname);
   };
   tab.on('console', (message) => {
     if (message.type() !== 'error' || absent(message.location()?.url)) return;

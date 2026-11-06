@@ -309,16 +309,15 @@ test('every served page\'s script-src is exactly its committed token list', () =
   }
 });
 
-test('every tool page directly links the styled font families', () => {
+test('every tool page loads its fonts from the same origin', () => {
   for (const name of PAGES) {
     const csp = cspOf(`tools/${name}.html`);
     const fontLink = headOf(pageSrc(name))
-      .match(/<link\b[^>]*href="https:\/\/fonts\.googleapis\.com\/css2[^"]*"[^>]*>/)?.[0];
+      .match(/<link\b[^>]*href="\.\.\/styles\/fonts\.css"[^>]*>/)?.[0];
     assert.ok(fontLink, `${name}.html links no font stylesheet`);
-    assert.match(fontLink, /family=Inter.*family=JetBrains\+Mono/);
     assert.doesNotMatch(fontLink, /onerror=/);
-    assert.ok(directive(csp, 'style-src').includes('https://fonts.googleapis.com'));
-    assert.ok(directive(csp, 'font-src').includes('https://fonts.gstatic.com'));
+    assert.deepEqual(directive(csp, 'style-src'), ["'self'", "'unsafe-inline'"]);
+    assert.deepEqual(directive(csp, 'font-src'), ["'self'", 'data:']);
   }
 });
 

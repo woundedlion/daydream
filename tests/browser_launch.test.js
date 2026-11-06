@@ -58,8 +58,7 @@ test('the launch flags carry the runner a GPU-less rasterizer', () => {
 });
 
 test('the launch flags put external asset CDNs beyond every probe', () => {
-  assert.ok(BROWSER_ARGS.includes('--host-resolver-rules=MAP cdn.jsdelivr.net ~NOTFOUND, '
-    + 'MAP fonts.googleapis.com ~NOTFOUND, MAP fonts.gstatic.com ~NOTFOUND'),
+  assert.ok(BROWSER_ARGS.includes('--host-resolver-rules=MAP cdn.jsdelivr.net ~NOTFOUND'),
     'the probes are served three.js and lil-gui from their own origin; a page '
       + 'that reached jsdelivr instead would hand a CDN incident the power to '
       + 'red the required gate');
@@ -83,14 +82,14 @@ for (const localAppData of [undefined, 'C:/Users/browser-fixture/AppData/Local']
   });
 }
 
-test('font CDN failures are expected but other request failures are not', () => {
+test('font and script request failures are problems', () => {
   const listeners = new Map();
   const tab = { on: (name, handler) => listeners.set(name, handler) };
   const problems = [];
   collectProblems(tab, 'http://127.0.0.1:8000', problems);
   const failed = listeners.get('requestfailed');
   failed({
-    url: () => 'https://fonts.googleapis.com/css2?family=Inter',
+    url: () => 'http://127.0.0.1:8000/styles/fonts/inter-latin.woff2',
     failure: () => ({ errorText: 'net::ERR_NAME_NOT_RESOLVED' }),
   });
   failed({
@@ -98,6 +97,7 @@ test('font CDN failures are expected but other request failures are not', () => 
     failure: () => ({ errorText: 'net::ERR_NAME_NOT_RESOLVED' }),
   });
   assert.deepEqual(problems, [
+    'request failed: http://127.0.0.1:8000/styles/fonts/inter-latin.woff2 (net::ERR_NAME_NOT_RESOLVED)',
     'request failed: https://example.test/app.js (net::ERR_NAME_NOT_RESOLVED)',
   ]);
 });
@@ -117,7 +117,7 @@ test('console errors, uncaught exceptions and error responses are problems', () 
   logged(message('warning', 'slow frame', `${origin}/daydream.js`));
   logged(message('error', 'Failed to load resource', `${origin}/favicon.ico`));
   logged(message('error', 'Failed to load resource', `${origin}/vendor/fonts/fonts.css`));
-  logged(message('error', 'Failed to load resource', 'https://fonts.gstatic.com/inter.woff2'));
+  logged(message('error', 'Failed to load resource', `${origin}/styles/fonts/inter-latin.woff2`));
   logged(message('error', 'chip render threw', `${origin}/tools/chain_strip.js`));
   logged(message('error', 'TypeError: x is undefined', undefined));
 
@@ -128,16 +128,18 @@ test('console errors, uncaught exceptions and error responses are problems', () 
   responded(response(200, `${origin}/daydream.js`));
   responded(response(404, `${origin}/favicon.ico`));
   responded(response(404, `${origin}/vendor/fonts/fonts.css`));
-  responded(response(404, 'https://fonts.googleapis.com/css2?family=Inter'));
+  responded(response(404, `${origin}/styles/fonts.css`));
   responded(response(404, 'https://example.test/favicon.ico'));
   responded(response(500, `${origin}/tools/shader.html`));
 
   assert.deepEqual(problems, [
     'console error: Failed to load resource',
+    'console error: Failed to load resource',
     'console error: chip render threw',
     'console error: TypeError: x is undefined',
     'uncaught: boom',
     `HTTP 404: ${origin}/vendor/fonts/fonts.css`,
+    `HTTP 404: ${origin}/styles/fonts.css`,
     'HTTP 404: https://example.test/favicon.ico',
     `HTTP 500: ${origin}/tools/shader.html`,
   ]);
