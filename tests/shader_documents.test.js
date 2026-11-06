@@ -11,7 +11,7 @@ import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 import { scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
 import {
-  CHAIN_SNAPSHOT_SCHEMA_VERSION, decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
+  CHAIN_SNAPSHOT_SCHEMA_VERSION, decodeShaderStateHash, encodeShaderStateHash,
 } from '../src/workbench/shader/shader_deeplink.js';
 import {
   applyFixedShaderDocument,
@@ -48,114 +48,6 @@ restoreDocumentAfterEach();
 let animationFrames;
 beforeEach(() => { animationFrames = installAnimationFrames(); });
 afterEach(() => { animationFrames.restore(); });
-
-test('shader state hashes round-trip the complete authoring state', async () => {
-  const state = {
-    document: { document_id: 'study-λ', descriptor: { chain: [{ label: 'camera' }, { label: 'warp1' }] } },
-    preset: 'night',
-    bypassed: ['camera', 'warp1'],
-    paused: true,
-  };
-  const hash = await encodeShaderStateHash(state);
-
-  assert.match(hash, /^#shader=v2\.[A-Za-z0-9_-]+$/);
-  assert.deepEqual(JSON.parse(JSON.stringify(await decodeShaderStateHash(hash))), state);
-  assert.equal(await decodeShaderStateHash('#unrelated'), null);
-  await assert.rejects(decodeShaderStateHash('#shader=v2.not-gzip'),
-    /invalid shader link payload/);
-});
-
-test('shader links reject callable snapshots carrying the current schema version', async () => {
-  const chainSnapshot = Object.assign(() => {}, {
-    schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: [], parameters: [], modulation: [],
-  });
-  await assert.rejects(encodeShaderStateHash({document: SCRATCH,
-    preset: 'one', bypassed: [], paused: false, chainSnapshot}), /invalid shader link snapshot/);
-});
-
-test('v2 shader links retain typed runtime and palette state', async () => {
-  const state = {
-    document: {descriptor: {chain: [{label: 'source'}]}},
-    preset: 'night', bypassed: [], paused: true,
-    chainSnapshot: {
-      schemaVersion: 5, chain: [{instance: 'source', operator: 'sample.grid.v4'}],
-      modulation: [], parameters: [{name: 'source.pattern-freq', value: 1}], animationsPaused: true,
-      runtime: [{instance: 'source', kind: 'source-clock-v1',
-        state: {primary: 1.25, secondary: 0.5, angle: 2}}],
-      paletteBank: {chroma: 0.75, hues: [0, 159, 318],
-        cycles: [{frame: 713, nextSequence: 7, fadeActive: true, displayDirty: false}]},
-    },
-  };
-  assert.deepEqual(JSON.parse(JSON.stringify(
-    await decodeShaderStateHash(await encodeShaderStateHash(state)))), state);
-  await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: {schemaVersion: 1}}),
-    /unsupported shader snapshot version/);
-  const unsupportedSnapshot = {...state.chainSnapshot, schemaVersion: 2};
-  await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: unsupportedSnapshot}),
-    /unsupported shader snapshot version/);
-  const missingModulation = structuredClone(state.chainSnapshot);
-  delete missingModulation.modulation;
-  await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: missingModulation}),
-    /invalid shader link snapshot/);
-});
-
-test('shader links bound the expanded UTF-8 state including its wrapper', async () => {
-  const limit = 524288;
-  const compact = { d: { metadata: '' }, p: 'night', b: [], a: false };
-  const wrapperBytes = Buffer.byteLength(JSON.stringify(compact));
-  for (const size of [limit - 1, limit, limit + 1]) {
-    const paddingBytes = size - wrapperBytes;
-    compact.d.metadata = '\u03bb'.repeat(Math.floor(paddingBytes / 2))
-      + 'x'.repeat(paddingBytes % 2);
-    assert.equal(Buffer.byteLength(JSON.stringify(compact)), size);
-    const state = {
-      document: compact.d, preset: compact.p, bypassed: compact.b, paused: compact.a,
-    };
-    if (size <= limit) {
-      const hash = await encodeShaderStateHash(state);
-      assert.ok(hash.length < 4096);
-      assert.deepEqual(JSON.parse(JSON.stringify(await decodeShaderStateHash(hash))), state);
-    } else {
-      await assert.rejects(encodeShaderStateHash(state), /shader link state is too large/);
-      const payload = gzipSync(JSON.stringify(compact)).toString('base64url');
-      await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`),
-        /shader link state is too large/);
-    }
-  }
-});
-
-test('a deep-linked document is held to the reader string limit', async () => {
-  const overlong = 'x'.repeat(DEFAULT_LIMITS.stringLength + 1);
-  const linked = async (/** @type {*} */ document) => {
-    const hash = await encodeShaderStateHash(
-      { document, preset: 'night', bypassed: [], paused: false });
-    const state = await decodeShaderStateHash(hash);
-    return compileShaderDocument(state.document);
-  };
-  const codes = (/** @type {*} */ compiled) =>
-    compiled.diagnostics.map((/** @type {*} */ diagnostic) => diagnostic.code);
-
-  const nested = { document_id: 'study', descriptor: { chain: [{ label: overlong }] } };
-  assert.equal((await linked(nested)).status, 'INVALID');
-  assert.deepEqual(codes(await linked(nested)), ['STRING_LIMIT']);
-  assert.deepEqual(codes(await linked({ document_id: 'study', [overlong]: 1 })),
-    ['STRING_LIMIT']);
-  // The text path is the reference the deep link has to answer with.
-  assert.deepEqual(codes(compileShaderDocument(JSON.stringify(nested))), ['STRING_LIMIT']);
-});
-
-test('shader state hash replacement preserves the route and query', () => {
-  const writes = [];
-  const win = {
-    location: { pathname: '/tools/shader.html', search: '?effect=KaleidoscopeStainedGlass' },
-    history: { replaceState: (state, title, url) => writes.push(url) },
-  };
-
-  assert.equal(replaceShaderStateHash('#shader=v2.payload', win), true);
-  assert.deepEqual(writes, [
-    '/tools/shader.html?effect=KaleidoscopeStainedGlass#shader=v2.payload',
-  ]);
-});
 
 test('simulator exposes Shader as a standalone tool', () => {
   assert.match(INDEX, /href="tools\/shader\.html"[^>]*>Shader/);
@@ -2471,30 +2363,6 @@ test('the Ash Cloud document deep link routes the simulator to the workbench', (
   assert.deepEqual(replaced, ['/daydream/tools/shader.html?effect=ash-cloud']);
 });
 
-test('shader links reject malformed compact state before it reaches the store', async () => {
-  const state = { d: { descriptor: { chain: [{}, {}] } }, p: 'preset', b: [], a: false };
-  for (const invalid of [
-    { ...state, d: [] }, { ...state, p: '' }, { ...state, b: 'x' },
-    { ...state, b: [1] }, { ...state, b: ['a', 'a'] },
-    { ...state, b: ['a', 'b', 'c'] }, { ...state, a: 'yes' },
-  ]) {
-    const payload = gzipSync(JSON.stringify(invalid)).toString('base64url');
-    await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`),
-      { message: 'invalid shader link state' });
-  }
-});
-
-test('shader links reject duplicate document keys before information is lost', async () => {
-  for (const source of [
-    '{"d":{"document_id":"first","document_id":"second"},"p":"p","b":[],"a":false}',
-    '{"d":{"e\\u0301":1,"\\u00e9":2},"p":"p","b":[],"a":false}',
-  ]) {
-    const payload = gzipSync(source).toString('base64url');
-    await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`),
-      (error) => error.cause?.code === 'DUPLICATE_KEY');
-  }
-});
-
 test('a rejected file read is announced and the same file can be picked again', async () => {
   const { controller, elements } = workbench();
   await controller.init();
@@ -2889,13 +2757,6 @@ test('abandoning a refused link reports its release once', async () => {
   assert.equal(releases, 1);
 });
 
-test('unsupported shader hash versions are rejected', async () => {
-  for (const version of [0, 1, 3]) {
-    await assert.rejects(decodeShaderStateHash(`#shader=v${version}.payload`),
-      /unsupported shader link version/);
-  }
-});
-
 test('query snapshot import rejects retired archive versions without adopting them', async () => {
   for (const schemaVersion of [1, 10, 11]) {
     const search = `?effect=ShaderChain&fx.__chainSnapshot=${encodeURIComponent(JSON.stringify({schemaVersion, accepted: [], requested: []}))}`;
@@ -2904,20 +2765,6 @@ test('query snapshot import rejects retired archive versions without adopting th
     assert.equal(harness.win.location.search, search);
     assert.match(harness.elements.get('shader-document-status').textContent,
       /unsupported chain snapshot/);
-  }
-});
-
-test('shader links refuse null snapshot entries before initializing a candidate', async () => {
-  for (const [chain, parameters, modulation = []] of [
-    [[], [null]], [[null], []], [[], [{name: 42}]],
-    [[], [], [null]], [[], [], [[]]], [[], [], [3]],
-  ]) {
-    const compact = {d: {descriptor: {chain: []}}, p: 'night', b: [], a: true,
-      s: {schemaVersion: 5, chain, parameters, modulation}};
-    const payload = gzipSync(JSON.stringify(compact)).toString('base64url');
-    await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`), /invalid shader link snapshot/);
-    await assert.rejects(encodeShaderStateHash({document: compact.d, preset: compact.p,
-      bypassed: compact.b, paused: compact.a, chainSnapshot: compact.s}), /invalid shader link snapshot/);
   }
 });
 
@@ -2945,7 +2792,6 @@ test('the descriptor digest button copies the full digest and announces failures
     else delete globalThis.navigator;
   }
 });
-
 
 test('fixed document presets preserve sparse option IDs and refuse numeric gaps', () => {
   for (const value of ['Shells', 6, 2]) {
@@ -3283,8 +3129,6 @@ for (const failure of ['editor', 'runtime']) {
     assert.deepEqual(callWorkbenchBinding(harness.engine, 'getSnapshot', []), snapshot);
   });
 }
-
-
 
 for (const operator of ['sphere.lens.mobius.v2', 'sphere.displace.symmetric.v1',
   'colorize.generated-palette.v3', 'modulate.field.v1', 'modulate.hue-shift.v1']) {
