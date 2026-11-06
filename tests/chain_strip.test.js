@@ -967,6 +967,30 @@ test('a refused drag reports its legality failure and leaves the chain unchanged
   assert.equal(header.dispatch('click').defaultPrevented, true);
 });
 
+test('a cancelled header drag does not consume the next parameter checkbox click', async () => {
+  const source = scratchChainDocument(CATALOG, [
+    {label: 'camera', operator: 'sphere.displace.ripple.v2'},
+    {label: 'lens', operator: 'sphere.rotate.v2'},
+    {label: 'project', operator: 'project.stereographic.v2'},
+    {label: 'sample', operator: 'sample.grid.v4'},
+    {label: 'color', operator: 'colorize.generated-palette.v4'},
+  ]);
+  const h = await makeStrip({source, writeThrough: true});
+  dragGeometry(h);
+  const chip = chipByLabel(h, 'camera');
+  const header = chip.querySelector('.chain-chip-header');
+  header.dispatch('pointerdown', dragPointer(25));
+  header.dispatch('pointermove', dragPointer(100));
+  chip.dispatch('keydown', {key: 'Escape'});
+  assert.equal(header.hasPointerCapture(7), false);
+  const toggle = controlIn(rowFor(h, 'camera', 'camera.random-center'));
+  assert.equal(toggle.dispatch('click').defaultPrevented, false);
+  toggle.checked = false;
+  toggle.dispatch('change');
+  assert.deepEqual(h.edits.at(-1), ['camera.random-center', 'off']);
+  assert.deepEqual(h.applied, []);
+});
+
 test('a drag scrolls the pipeline near its edges and honors the final release position', async () => {
   const h = await makeStrip();
   dragGeometry(h);

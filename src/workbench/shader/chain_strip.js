@@ -1089,13 +1089,13 @@ export function createChainStrip({
     header.classList.toggle('chain-chip-header--draggable', movable);
     const consumeDragClick = movable ? wireChipDrag(chip, header, index, op.name) : () => false;
     chip.addEventListener('click', (/** @type {*} */ event) => {
-      if (consumeDragClick()) {
+      const clickedHeader = event.target === chip
+        || event.target?.closest?.('.chain-chip-header') === header;
+      if (clickedHeader && consumeDragClick()) {
         event.preventDefault();
         event.stopPropagation();
         return;
       }
-      const clickedHeader = event.target === chip
-        || event.target?.closest?.('.chain-chip-header') === header;
       if (clickedHeader) select(entry.label);
     });
     chip.addEventListener('keydown', (/** @type {*} */ event) => {
