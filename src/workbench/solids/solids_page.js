@@ -680,6 +680,7 @@ function renderSavedList() {
     if (el.classList.contains('name-clash')) {
       const warning = document.createElement('button');
       warning.type = 'button';
+      warning.className = 'saved-clash-btn text-amber-400';
       warning.textContent = '!';
       warning.setAttribute('aria-label', el.title);
       warning.addEventListener('click', () => showGateMsg(el.title));

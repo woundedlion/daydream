@@ -396,6 +396,17 @@ body {
   margin-top: 0.4rem;
 }
 
+.saved-clash-btn {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 0.2rem;
+  background-color: var(--slate-800);
+  cursor: help;
+}
+
 .action-btn {
   font-size: 0.65rem;
   padding: 0.2rem 0.4rem;
@@ -421,7 +432,7 @@ body {
 
 /* Small screens: stack the columns and let the page scroll. */
 @media (max-width: 900px) {
-  .move-op-btn, .remove-op-btn, .del-btn {
+  .move-op-btn, .remove-op-btn, .del-btn, .saved-clash-btn {
     min-width: 1.5rem;
     min-height: 1.5rem;
   }

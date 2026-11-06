@@ -956,6 +956,8 @@ test('saving clears stale refusals and flags registry name clashes', () => {
   const marker = list.children[0].children[0];
   assert.equal(marker.tagName, 'BUTTON');
   assert.equal(marker.type, 'button');
+  assert.equal(marker.classList.contains('saved-clash-btn'), true);
+  assert.equal(marker.classList.contains('text-amber-400'), true);
   marker.dispatch('click');
   assert.equal(messages.at(-1), list.children[0].title);
   context.savedSolids.length = 0;
