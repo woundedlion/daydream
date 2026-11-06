@@ -338,6 +338,7 @@ test('workflow trigger parsing cannot hide flow or quoted declarations', () => {
 test('shell lint has no workflow-wide excluded diagnostics', () => {
   const suite = workflowText('js-unit-suite.yml');
   assert.doesNotMatch(suite, /shellcheck[^\n]*(?:\s-e\b|--exclude)|SHELLCHECK_OPTS/);
+  assert.doesNotMatch(suite, /actionlint[^\n]*\s-ignore\b/);
 });
 
 test('engine bundle API failures stop the gate instead of entering its poll timeout', () => {
@@ -469,7 +470,7 @@ test('every workflow and required browser or engine gate rejects suppression', (
   for (const name of readdirSync(resolve(REPO, WORKFLOW_DIR)).filter((name) => /\.ya?ml$/.test(name))) {
     const source = workflowText(name);
     assert.doesNotMatch(source, /^\s*continue-on-error:/m, name);
-    assert.doesNotMatch(source, /\|\|\s*true\b/, name);
+    assert.doesNotMatch(source, /\|\|\s*(?:true\b|:(?:\s|$))|^\s*set \+e\b/m, name);
     if (['browser-smoke.yml', 'engine-bundle.yml'].includes(name))
       assert.doesNotMatch(source, /^ {4,8}if:/m, name);
   }
