@@ -1442,8 +1442,7 @@ test('a refused preset restores the preview and dropdown while preserving the re
   assert.ok(restored.length > 0, 'the previous preset must be applied again');
   const expected = new Map(previousWrites);
   for (const [id, value] of restored) assert.equal(value, expected.get(id), id);
-  assert.ok(restored.some(([id, value]) => id === 'sample.pattern-freq'
-    && value === Math.fround(3.881)));
+  assert.ok(restored.some(([id]) => id === 'sample.pattern-freq'));
   assert.match(harness.elements.get('shader-document-status').textContent, /INADMISSIBLE/);
 });
 

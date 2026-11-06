@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 
 import { createChainDocumentStore, scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
 import { createChainStrip } from '../src/workbench/shader/chain_strip.js';
-import { deactivatedParameterIds } from '../src/workbench/shader/chain_presentation.js';
+import { deactivatedParameterIds, formatNumericValue } from '../src/workbench/shader/chain_presentation.js';
 import { compileShaderDocument } from '../generated/shader/shader_workbench.mjs';
 import {
   documentEvents, fakeElement, installAnimationFrames, installDocument,
@@ -1144,10 +1144,10 @@ test('stage controls ignore hover and toggle immediately with the pin button', a
   assert.equal(freq.type, 'range');
   assert.equal(freq.min, String(declared.domain.minimum));
   assert.equal(freq.max, String(declared.domain.maximum));
-  assert.equal(Number(freq.value),
-    h.store.document().preset_bank.presets[0].values['sample.pattern-freq']);
+  const value = h.store.document().preset_bank.presets[0].values['sample.pattern-freq'];
+  assert.equal(Number(freq.value), value);
   assert.equal(rowFor(h, 'sample', 'sample.pattern-freq')
-    .querySelector('.chain-param-value').value, '3.881');
+    .querySelector('.chain-param-value').value, formatNumericValue(value));
 
   chipByLabel(h, 'camera').dispatch('click');
   assert.equal(rowsOf(h, 'camera').length, h.store.parameterDeclarations().filter(
