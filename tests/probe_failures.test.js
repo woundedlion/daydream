@@ -252,12 +252,13 @@ for (const [file, name, interaction] of PROBES) {
 }
 
 test('a probe module is inert until node is pointed at it', () => {
-  for (const [file] of PROBES) {
-    const url = new URL(`../scripts/${file}`, import.meta.url).href;
-    assert.equal(isMain(url), false, `${file} would have driven a browser on import`);
+  const modules = scriptModules();
+  for (const file of new Set(PROBES.map(([file]) => file))) {
+    const source = modules.get(file);
+    assert.match(source, /^if \(isMain\(import\.meta\.url\)\) await runProbe\(/m, file);
+    assert.equal([...source.matchAll(/\brunProbe\s*\(/g)].length, 1,
+      `${file} has an additional browser launch`);
   }
-  // argv[1] under `node --test` is this file, which is what makes the
-  // guard true for a probe run directly and false for an imported one.
   assert.equal(isMain(import.meta.url), true);
 });
 
