@@ -8,9 +8,12 @@ import {
   balancedColumnRows,
   sortItems,
   navTargetIndex,
+  typeaheadIndex,
   scrollArrowState,
 } from "./sidebar_logic.js";
 import { formatKB } from "../shared/kb_format.js";
+
+const TYPEAHEAD_RESET_MS = 500;
 
 /**
  * Options per column in the option list: the row count of a column-flow grid
@@ -51,6 +54,8 @@ export class EffectSidebar {
     this.items = [];
     /** @type {number|null} Measured lazily; see onKeyDown. */
     this.gridStride = null;
+    this.typeaheadQuery = '';
+    this.typeaheadAt = 0;
     /** @type {string|null} */
     this.activeName = null;
     /** @type {{key: 'name'|'size', dir: 'asc'|'desc'}} */
@@ -161,6 +166,7 @@ export class EffectSidebar {
     this.listEl.style.gridTemplateRows =
       `repeat(${balancedColumnRows(names.length)}, auto)`;
     this.gridStride = null;
+    this.typeaheadQuery = '';
 
     names.forEach(name => {
       const label = effectDisplayName(name);
@@ -397,9 +403,9 @@ export class EffectSidebar {
 
   /**
    * Keyboard navigation handler: arrow keys move focus between options (wrapping
-   * at the ends and updating the roving tabindex), and Enter/Space selects the
-   * focused effect. Up/Down step one option; Left/Right step one column, which is
-   * also one option wherever the list is a single column.
+   * at the ends and updating the roving tabindex), printable prefixes find
+   * effect names, and Enter/Space activates an option. Up/Down step one option;
+   * Left/Right step one column, also one option in a single-column list.
    * @param {KeyboardEvent} e - The keydown event from the list element.
    */
   onKeyDown(e) {
@@ -409,18 +415,34 @@ export class EffectSidebar {
 
     const focused = /** @type {HTMLElement|null} */ (this.doc.activeElement);
     const idx = focused ? btns.indexOf(focused) : -1;
+    const now = e.timeStamp;
+    if (now - this.typeaheadAt > TYPEAHEAD_RESET_MS) this.typeaheadQuery = '';
 
     this.gridStride ??= columnStride(this.listEl);
     const target = navTargetIndex(idx, btns.length, e.key, this.gridStride);
     if (target !== -1) {
+      this.typeaheadQuery = '';
       e.preventDefault();
       this.setRovingTabbable(btns[target]);
       btns[target].focus();
-    } else if (e.key === 'Enter' || e.key === ' ') {
+    } else if (e.key === 'Enter' || (e.key === ' ' && !this.typeaheadQuery)) {
+      this.typeaheadQuery = '';
       e.preventDefault();
       if (focused && focused.dataset.effect) {
         this.setRovingTabbable(focused);
         this.onSelect(focused.dataset.effect);
+      }
+    } else if (e.key.length === 1) {
+      e.preventDefault();
+      const key = e.key.toLowerCase();
+      this.typeaheadQuery = this.typeaheadQuery === key ? key : this.typeaheadQuery + key;
+      this.typeaheadAt = now;
+      const labels = btns.map(button => effectDisplayName(button.dataset.effect ?? ''));
+      const match = typeaheadIndex(labels, this.typeaheadQuery,
+        this.typeaheadQuery.length === 1 ? idx + 1 : idx);
+      if (match !== -1) {
+        this.setRovingTabbable(btns[match]);
+        btns[match].focus();
       }
     }
   }

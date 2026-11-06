@@ -4,8 +4,20 @@ import {
   balancedColumnRows,
   sortItems,
   navTargetIndex,
+  typeaheadIndex,
   scrollArrowState,
 } from '../src/ui/sidebar_logic.js';
+
+test('typeahead searches case-insensitive prefixes in display order with wrapping', () => {
+  const labels = ['Comets', 'ShapeShifter', 'Snow'];
+  assert.equal(typeaheadIndex(labels, 's', 0), 1);
+  assert.equal(typeaheadIndex(labels, 'S', 2), 2);
+  assert.equal(typeaheadIndex(labels, 'SH', 2), 1);
+  assert.equal(typeaheadIndex(labels, 'co', 2), 0);
+  assert.equal(typeaheadIndex(labels, 'missing', 0), -1);
+  assert.equal(typeaheadIndex(labels, '', 0), -1);
+  assert.equal(typeaheadIndex([], 's', 0), -1);
+});
 
 const items = () => [
   { name: 'ShapeShifter', size: 3000 },

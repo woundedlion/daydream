@@ -266,11 +266,48 @@ test('the list claims the keys it navigates with and passes the rest through', (
   assert.deepEqual(selected, [], 'navigating is not selecting');
   assert.equal(navigated.defaultPrevented, true);
 
-  const ignored = sidebar.listEl.dispatch('keydown', { key: 'x' });
+  const ignored = sidebar.listEl.dispatch('keydown', { key: 'Escape' });
 
-  assert.equal(ignored.defaultPrevented, false, 'typing still reaches the page');
+  assert.equal(ignored.defaultPrevented, false, 'unhandled keys still reach the page');
   assert.equal(document.activeElement, sidebar.buttons.get('B'), 'focus did not move');
   assert.deepEqual(selected, []);
+});
+
+test('typeahead cycles initials, extends prefixes and resets after inactivity without selecting', () => {
+  const {sidebar, selected} = makeSidebar();
+  sidebar.setEffects(['Comets', 'ShapeShifter', 'Snow'], {});
+  sidebar.buttons.get('Comets').focus();
+  const key = (value, timeStamp) => sidebar.listEl.dispatch('keydown', {key: value, timeStamp});
+  key('S', 0);
+  assert.equal(document.activeElement, sidebar.buttons.get('ShapeShifter'));
+  key('s', 100);
+  assert.equal(document.activeElement, sidebar.buttons.get('Snow'));
+  key('s', 200);
+  assert.equal(document.activeElement, sidebar.buttons.get('ShapeShifter'));
+  key('h', 250);
+  assert.equal(document.activeElement, sidebar.buttons.get('ShapeShifter'));
+  key('c', 751);
+  assert.equal(document.activeElement, sidebar.buttons.get('Comets'));
+  assert.equal(sidebar.tabbableBtn, sidebar.buttons.get('Comets'));
+  assert.equal(key(' ', 752).defaultPrevented, true);
+  assert.deepEqual(selected, []);
+  key(' ', 1253);
+  assert.deepEqual(selected, ['Comets']);
+});
+
+test('typeahead includes spaces inside a name and navigation clears its buffer', () => {
+  const {sidebar, selected} = makeSidebar();
+  sidebar.setEffects(['Comets', 'Soft Lines', 'SphericalHarmonics'], {});
+  sidebar.buttons.get('Comets').focus();
+  for (const [index, key] of [...'soft l'].entries())
+    assert.equal(sidebar.listEl.dispatch('keydown', {key, timeStamp: index * 50}).defaultPrevented, true);
+  assert.equal(document.activeElement, sidebar.buttons.get('Soft Lines'));
+  assert.deepEqual(selected, []);
+  sidebar.listEl.dispatch('keydown', {key: 'Home', timeStamp: 300});
+  sidebar.listEl.dispatch('keydown', {key: ' ', timeStamp: 310});
+  assert.deepEqual(selected, ['Comets']);
+  sidebar.listEl.dispatch('keydown', {key: 's', ctrlKey: true, timeStamp: 320});
+  assert.equal(document.activeElement, sidebar.buttons.get('Comets'));
 });
 
 // Only a column-flow grid with resolved rows crosses columns; every other

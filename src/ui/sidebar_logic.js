@@ -75,6 +75,22 @@ export function navTargetIndex(idx, len, key, stride = 1) {
   return -1;
 }
 
+/**
+ * @param {string[]} labels - Option labels in display order.
+ * @param {string} query - Case-insensitive name prefix.
+ * @param {number} from - Inclusive starting index; search wraps at the end.
+ * @returns {number} Matching index, or -1 when no label matches.
+ */
+export function typeaheadIndex(labels, query, from) {
+  if (!query || !labels.length) return -1;
+  const prefix = query.toLowerCase();
+  for (let offset = 0; offset < labels.length; offset++) {
+    const index = (Math.max(0, from) + offset) % labels.length;
+    if (labels[index].toLowerCase().startsWith(prefix)) return index;
+  }
+  return -1;
+}
+
 
 /**
  * Decide which horizontal scroll arrows should be visible. When the content
