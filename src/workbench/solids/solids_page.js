@@ -5,6 +5,7 @@
  * Page module for tools/solids.html.
  */
 import * as THREE from 'three';
+import { buildSavedCard } from './solid_saved_cards.js';
 import { createCommitQueue, createChainValidator, createOpGate } from './solid_validation.js';
 import { initScene, copyWithFeedback, showFatalError, bootstrapTool, formatKB } from '../shared.js';
 import { standDownIfHalted } from '../../shared/engine_halt.js';
@@ -665,87 +666,17 @@ function renderSavedList() {
   });
 
   savedSolids.forEach((item, index) => {
-    const el = document.createElement('div');
-    el.className = 'saved-item relative pr-6';
     const funcName = savedFuncName(item);
-    const cardName = `${funcName ?? item.title} (card ${savedSolids.length - index})`;
     const inRegistry = funcName !== null && registrySolidNames.has(registryDisplayName(item, funcName));
-    if (funcName && (inRegistry || nameCounts.get(funcName) > 1)) {
-      el.classList.add('name-clash');
-      el.title = inRegistry
+    const clashMessage = funcName && (inRegistry || nameCounts.get(funcName) > 1)
+      ? inRegistry
         ? `Exports as ${funcName}, which the engine registry already defines`
-        : `Exports as ${funcName}, which another saved solid also exports`;
-    }
-
-    if (el.classList.contains('name-clash')) {
-      const warning = document.createElement('button');
-      warning.type = 'button';
-      warning.className = 'saved-clash-btn text-amber-400';
-      warning.textContent = '!';
-      warning.setAttribute('aria-label', el.title);
-      warning.addEventListener('click', () => showGateMsg(el.title));
-      el.appendChild(warning);
-    }
-    const deleteButton = document.createElement('button');
-    deleteButton.type = 'button';
-    deleteButton.className = 'action-btn del-btn absolute top-2 right-2 flex items-center justify-center w-5 h-5 text-sm';
-    deleteButton.textContent = '×';
-
-    const restoreButton = document.createElement('button');
-    restoreButton.type = 'button';
-    restoreButton.className = 'saved-restore';
-    restoreButton.disabled = !wasmModule;
-    const image = document.createElement('img');
-    if (typeof item.thumb === 'string' && item.thumb.startsWith('data:image/')) image.src = item.thumb;
-    image.alt = '';
-    const summary = document.createElement('span');
-    summary.className = 'flex justify-between items-start mt-1';
-    const title = document.createElement('span');
-    title.className = 'title capitalize';
-    title.textContent = item.title;
-    const stats = document.createElement('span');
-    stats.className = 'saved-stats text-[0.55rem] font-mono';
-    stats.textContent = item.stats;
-    summary.append(title, stats);
-    const details = document.createElement('span');
-    details.className = 'details block uppercase';
-    details.textContent = item.desc;
-    restoreButton.append(image, summary, details);
-
-    const actions = document.createElement('div');
-    actions.className = 'saved-actions';
-    const actionStack = document.createElement('div');
-    actionStack.className = 'flex flex-col gap-1 w-full';
-    for (const [label, kind, ariaLabel] of [
-      ['Recipe', 'recipe_cpp', 'Copy recipe C++'],
-      ['Registry', 'registry', 'Copy registry C++'],
-    ]) {
-      const row = document.createElement('div');
-      row.className = 'flex gap-1 justify-end';
-      const rowLabel = document.createElement('span');
-      rowLabel.className = 'saved-row-label text-[0.5rem] uppercase font-bold self-center mr-1';
-      rowLabel.textContent = label;
-      const copyButton = document.createElement('button');
-      copyButton.type = 'button';
-      copyButton.className = 'action-btn';
-      copyButton.dataset.copy = kind;
-      copyButton.setAttribute('aria-label', `${ariaLabel} for ${cardName}`);
-      copyButton.textContent = 'C++';
-      row.append(rowLabel, copyButton);
-      actionStack.appendChild(row);
-    }
-    actions.appendChild(actionStack);
-    el.append(deleteButton, restoreButton, actions);
-
-    restoreButton.addEventListener('click', () => restoreSolid(item));
-    deleteButton.setAttribute('aria-label', `Delete ${cardName}`);
-    deleteButton.addEventListener('click', () => {
-      deleteSolid(index);
-    });
-    el.querySelectorAll('[data-copy]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        copyCode(index, btn.dataset.copy, btn);
-      });
+        : `Exports as ${funcName}, which another saved solid also exports`
+      : '';
+    const el = buildSavedCard(item, index, {
+      count: savedSolids.length, funcName, clashMessage, canRestore: Boolean(wasmModule),
+      on: {restore: restoreSolid, remove: deleteSolid, copy: copyCode, explain: showGateMsg},
+      doc: document,
     });
 
     list.insertBefore(el, list.firstChild); // Newest first

@@ -94,6 +94,8 @@ Typing moves focus without loading an effect; Enter or an unbuffered Space selec
 Solid registry exports pair an authored `Recipe` with its `generate_recipe`
 instantiation. A saved star-pattern base can be flattened through Copy registry
 C++; the callable-seed recipe export refuses such bases.
+Saved-solid card DOM is built by `solid_saved_cards.js` with injected document
+and action handlers; the page owns registry collision detection and list order.
 
 After `npm ci` and an engine install, run `npm run lint`, `npm run typecheck`, and
 `npm test`. Test suites live in `tests/`, reusable support code in

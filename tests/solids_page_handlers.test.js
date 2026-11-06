@@ -1,3 +1,4 @@
+import { buildSavedCard } from '../src/workbench/solids/solid_saved_cards.js';
 import { loadSavedSolids, persistSavedSolids as persistSavedStore, mergeSavedSolids, SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY } from '../src/workbench/solids/solid_saved_store.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -973,7 +974,8 @@ test('saving clears stale refusals and flags registry name clashes', () => {
     state: { base: 'truncatedIcosahedron', ops: [{ op: 'hankin', params: { angle: 58 } },
       { op: 'chamfer', params: { t: 0.63 } }] },
     currentMesh: { vertices: [], faces: [] }, currentMeshIsCurrent: true, wasmModule: {},
-    savedSolids: [], savedChainShapeError, generateFuncAndRecipe, registryDisplayName,
+    savedSolids: [], savedChainShapeError, generateFuncAndRecipe, registryDisplayName, buildSavedCard,
+    restoreSolid() {}, deleteSolid() {}, copyCode() {},
     registrySolidNames: new Set(['truncatedIcosahedron_hk58_chamfer63']),
     captureSavedSolidThumbnail: () => ({ dataURL: '' }), captureSavedThumbnail() {},
     uniqueEdges: () => [], structuredClone, formatSolidName: String,

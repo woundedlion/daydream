@@ -107,6 +107,7 @@
     "src/workbench/solids/solid_build.js",
     "src/workbench/solids/solid_codegen.js",
     "src/workbench/solids/solid_saved_store.js",
+    "src/workbench/solids/solid_saved_cards.js",
     "src/workbench/solids/solid_validation.js",
     "src/workbench/solids/solid_geometry.js",
     "src/workbench/solids/solid_op_rows.js",
