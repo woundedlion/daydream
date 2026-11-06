@@ -327,12 +327,37 @@ function engineStructFields(source, name) {
     const text = decl.trim();
     if (!text || text.startsWith('static')) continue;
     if (/^bool\s+operator==\([^)]*\)\s+const\s*=\s*default$/.test(text)) continue;
-    const member = text.match(/^(std::array<[^>]+>|[\w:]+)\s+(\w+)\s*(?:=[\s\S]+|\{\s*\})?$/);
+    const member = text.match(/^(std::array<[^>]+>|[\w:]+)\s+(\w+)\s*(?:=[\s\S]+|\{\s*(?:\.\w+\s*=\s*[\w:]+\s*)?\})?$/);
     assert.ok(member, `unreadable member "${text}" in struct ${name} — the reader is out of date`);
     fields.push({ type: member[1], field: member[2] });
   }
   return fields;
 }
+
+test('the engine struct reader retains fields around a designated default', () => {
+  const source = `struct Recipe {
+  uint8_t schema_version = VERSION;
+  AxisControls lightness{
+      .center = PALETTE_DEFAULT_LIGHTNESS};
+  std::array<float, 4> custom{};
+  float hue_torsion = 0.0f;
+};`;
+  assert.deepEqual(engineStructFields(source, 'Recipe'), [
+    { type: 'uint8_t', field: 'schema_version' },
+    { type: 'AxisControls', field: 'lightness' },
+    { type: 'std::array<float, 4>', field: 'custom' },
+    { type: 'float', field: 'hue_torsion' },
+  ]);
+  for (const declaration of [
+    'AxisControls lightness{.center = DEFAULT;',
+    'AxisControls lightness{.center = };',
+    'AxisControls lightness{DEFAULT};',
+    'float next() const;',
+  ]) {
+    assert.throws(() => engineStructFields(`struct Recipe {\n${declaration}\n};`, 'Recipe'),
+      /unreadable member/, declaration);
+  }
+});
 
 /**
  * Every leaf field below a struct, keyed by the dotted path a C++ assignment
