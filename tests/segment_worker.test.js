@@ -1260,6 +1260,32 @@ test('a refused preset index reaches the frame as a warning', async () => {
   assert.equal(posted.find((p) => p.msg.type === 'frame').msg.warnings, undefined);
 });
 
+test('render after rejected init faults on the missing segment range', async () => {
+  nextCapsRejected = true;
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  assert.ok(engineInstance);
+  posted.length = 0;
+  const captured = await captureTimeouts(async () => { await dispatch({ type: 'render' }); });
+  assert.equal(posted.length, 0);
+  assert.equal(captured.length, 1);
+  assert.throws(() => captured[0](), /render without a configured segment range/);
+});
+
+
+test('worker sampling follows init and live changes before rendering', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
+    effectName: 'Plasma', temporalSampling: true });
+  assert.equal(engineInstance.temporalSampling, true);
+  assert.ok(engineInstance.calls.findIndex(([name]) => name === 'setTemporalSampling')
+    < engineInstance.calls.findIndex(([name]) => name === 'setEffect'));
+  await dispatch({ type: 'setTemporalSampling', enabled: false });
+  assert.equal(engineInstance.temporalSampling, false);
+  await dispatch({ type: 'render' });
+  const sampling = engineInstance.calls.findLastIndex(([name]) => name === 'setTemporalSampling');
+  const draw = engineInstance.calls.findLastIndex(([name]) => name === 'drawFrame');
+  assert.ok(sampling < draw);
+});
+
 // ---------------------------------------------------------------------------
 // Module graph
 // ---------------------------------------------------------------------------
@@ -1332,30 +1358,4 @@ test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {
     + 'worker or glue faults, then re-pin the digest here');
   assert.equal(PROTOCOL_VERSION, PROTOCOL_SHAPE_PIN.version,
     'PROTOCOL_SHAPE_PIN.version tracks PROTOCOL_VERSION; re-pin both together');
-});
-
-test('render after rejected init faults on the missing segment range', async () => {
-  nextCapsRejected = true;
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  assert.ok(engineInstance);
-  posted.length = 0;
-  const captured = await captureTimeouts(async () => { await dispatch({ type: 'render' }); });
-  assert.equal(posted.length, 0);
-  assert.equal(captured.length, 1);
-  assert.throws(() => captured[0](), /render without a configured segment range/);
-});
-
-
-test('worker sampling follows init and live changes before rendering', async () => {
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
-    effectName: 'Plasma', temporalSampling: true });
-  assert.equal(engineInstance.temporalSampling, true);
-  assert.ok(engineInstance.calls.findIndex(([name]) => name === 'setTemporalSampling')
-    < engineInstance.calls.findIndex(([name]) => name === 'setEffect'));
-  await dispatch({ type: 'setTemporalSampling', enabled: false });
-  assert.equal(engineInstance.temporalSampling, false);
-  await dispatch({ type: 'render' });
-  const sampling = engineInstance.calls.findLastIndex(([name]) => name === 'setTemporalSampling');
-  const draw = engineInstance.calls.findLastIndex(([name]) => name === 'drawFrame');
-  assert.ok(sampling < draw);
 });

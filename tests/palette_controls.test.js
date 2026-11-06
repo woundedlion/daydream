@@ -3,9 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const PALETTES_HTML = readFileSync(new URL('../tools/palettes.html', import.meta.url), 'utf8');
-
-const {
+import {
   paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
   createPaletteViewport, axisEndpoints, axisFromEndpoints,
   axisControlState, PALETTE_AXIS_CONTROLS,
@@ -21,8 +19,9 @@ const {
   hitTestHueKeyMarker,
   hueKeyState, customHueKeyState, customHueSweepRepresentable, customHueTurns,
   movedHueKeyOffset,
-} =
-  await import('../src/workbench/palettes/palette_controls.js');
+} from '../src/workbench/palettes/palette_controls.js';
+
+const PALETTES_HTML = readFileSync(new URL('../tools/palettes.html', import.meta.url), 'utf8');
 
 test('palette tab deep links select only known tabs', () => {
   assert.equal(paletteTabFromSearch('?tab=generative'), 'generative');

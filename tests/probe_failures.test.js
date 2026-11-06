@@ -6,10 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import { test, beforeEach } from 'node:test';
 import { installConsoleCapture } from './helpers/fake_console.js';
-beforeEach((t) => {
-  const capture = installConsoleCapture('log');
-  t.after(capture.restore);
-});
+
 import { runWorkbenchSections, probeSphericalSources, probeColorStageDrag, probeColorCard, probePaletteAndModulations, probeNoiseScaleDrag, probeDocumentActions, probeSnapshotImport, probeParity, probeStartupPersistence, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
 import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
 import {
@@ -20,6 +17,11 @@ import { probeChain, probeNumericInputs } from '../scripts/solids-probe.mjs';
 import { probePad } from '../scripts/mobius-probe.mjs';
 import { scratchDir } from './helpers/fixture_repo.js';
 import { stashGlobals } from './helpers/fake_dom.js';
+
+beforeEach((t) => {
+  const capture = installConsoleCapture('log');
+  t.after(capture.restore);
+});
 
 const PROBES = [
   ['workbench-probe.mjs', 'probeSphericalSources', probeSphericalSources],
@@ -505,7 +507,6 @@ test('the parity probe reports a compiled preset refusal after a successful docu
   assert.deepEqual(failures, ['the compiled build takes every authored value (unknown parameter)']);
 });
 
-
 test('palette and modulation probe reports a family whose controls fail to appear', async () => {
   for (const broken of [false, true]) {
     let family = 'cycling-generated';
@@ -567,7 +568,6 @@ test('palette and modulation probe reports a family whose controls fail to appea
       ? ['generated reveals its own palette controls and reaches the live engine'] : []);
   }
 });
-
 
 for (const broken of [false, true]) test(`effect-recipe probe detects repeated arrows and stale placeholder=${broken}`, async () => {
   let index = -1;

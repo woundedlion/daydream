@@ -595,8 +595,7 @@ test('a topology commit cannot overwrite an edit returning to the same value', a
 });
 
 test('saved solids discard non-object entries', () => {
-  const load = (() => loadSavedSolids({ getItem: () => '[null, 1, false, "bad", [], {"base":"cube","ops":[]}, {"base":"cube","ops":[{"op":"dual","params":{}}]}]' }));
-  const result = load();
+  const result = loadSavedSolids({ getItem: () => '[null, 1, false, "bad", [], {"base":"cube","ops":[]}, {"base":"cube","ops":[{"op":"dual","params":{}}]}]' });
   assert.equal(JSON.stringify(result.entries), '[{"base":"cube","ops":[{"op":"dual","params":{}}]}]');
   assert.equal(result.rejected.length, 6);
   assert.match(result.notice, /6 saved solids could not be loaded: not a saved-solid object/);

@@ -2,7 +2,7 @@ import * as paletteEnums from './helpers/fake_palette.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const {
+import {
   ProceduralPalette, GenerativePalette, compilePaletteRecipe,
   mapValue, waveGraphBand, WAVE_GRAPH_VALUE_RANGE,
   proceduralPaletteCpp, proceduralParamsForViewport,
@@ -10,9 +10,9 @@ const {
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
   paletteCompileError, paletteAdjustmentSummary,
   prettyPaletteName, paletteGradientCss,
-} = await import('../src/workbench/palettes/palette_math.js');
-const { defaultPaletteRecipe, PaletteV4 } = await import('../src/workbench/palettes/palette_controls.js');
-const { linearRgbToHex } = await import('../src/shared/color.js');
+} from '../src/workbench/palettes/palette_math.js';
+import { defaultPaletteRecipe, PaletteV4 } from '../src/workbench/palettes/palette_controls.js';
+import { linearRgbToHex } from '../src/shared/color.js';
 
 /** A ramp standing in for a compiled LUT: it exercises indexing, not the compiler. */
 function mockBakeLut() {
@@ -461,7 +461,6 @@ test('a requested single stop is clamped to both gradient endpoints', () => {
 
   assert.equal(gradient, 'linear-gradient(to right, #ffffff, #000000)');
 });
-
 
 test('a padded unit graph range gives generated channels most of the band', () => {
   const {toY} = waveGraphBand(300, {min: -0.05, max: 1.05});

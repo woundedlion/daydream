@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { LISSAJOUS_GOLDENS } from './helpers/lissajous_goldens.js';
 
-const {
+import {
   MAX_RATIONAL_TERM,
   findBestRationalRatio,
   snapToRationalRatio,
@@ -10,8 +10,7 @@ const {
   lissajousCodeString,
   closingDomain,
   domainClosureWarning,
-} =
-  await import('../src/workbench/lissajous/lissajous_math.js');
+} from '../src/workbench/lissajous/lissajous_math.js';
 
 const TWO_PI = 2 * Math.PI;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
@@ -340,7 +339,6 @@ test('domainClosureWarning flags only domains that do not close', () => {
   assert.ok(warning, 'authored 5.909 domain does not close at C₂ = 1.06');
   assert.match(warning, /5\.928/);
 });
-
 
 test('directed rational snap advances from an existing closing ratio', () => {
   const range = { min: 0.01, max: 100 };

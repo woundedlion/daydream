@@ -2,14 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { constructorToObject, glslConstants } from './helpers/source_transpile.js';
 
-const {
+import {
   cmult, cadd, snapCoefficientComponent, mobiusDeterminant, isDegenerate,
   elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble, cayley,
   glslComplexFunctions, glslProjectionFunctions, mobiusCodeString,
   stereo, projectDiv, STEREO_INF, STEREO_POLE_EPS, STEREO_AZIMUTH_EPS,
   STEREO_UNDERFLOW_LIFT,
   MOBIUS_GRID_SCALE_R,
-} = await import('../src/workbench/mobius/mobius_transforms.js');
+} from '../src/workbench/mobius/mobius_transforms.js';
 
 const EPS = 1e-12;
 
@@ -72,7 +72,6 @@ test('cmult computes (a+bi)(c+di)', () => {
 test('cadd computes (a+bi)+(c+di)', () => {
   assertComplex(cadd({ re: 1, im: 2 }, { re: 3, im: -5 }), 4, -3, 'cadd');
 });
-
 
 // --- GLSL/JS parity -------------------------------------------------------
 // glslComplexFunctions' GLSL cmult/cadd, transpiled to JS and compared with the
@@ -148,7 +147,6 @@ test('glslProjectionFunctions constants match the JS exports', () => {
   assert.equal(values.STEREO_AZIMUTH_EPS, STEREO_AZIMUTH_EPS);
   assert.equal(values.STEREO_UNDERFLOW_LIFT, STEREO_UNDERFLOW_LIFT);
 });
-
 
 /**
  * The pole cap is the crossover where the raw quotient reaches the sentinel, not

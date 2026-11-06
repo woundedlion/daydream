@@ -1,11 +1,11 @@
+import { LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
 import { SAVED_SOLIDS_MAX, captureSavedSolidThumbnail, queueSavedSolidRestore } from '../src/workbench/solids/solid_saved_store.js';
 import { fakeModule, stubMesh } from './helpers/fake_meshops.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-
-const {
+import {
   OP_DEFS,
   KNOWN_OPS,
   PARAMETERIZED_OPS,
@@ -31,8 +31,7 @@ const {
   requireMeshResult,
   MORPH_SWEEP,
   unsweepableReason,
-} =
-  await import('../src/workbench/solids/solid_codegen.js');
+} from '../src/workbench/solids/solid_codegen.js';
 
 /**
  * Builds an op whose params object records every key a code path reads, in read
@@ -49,8 +48,6 @@ function recordingOp(op) {
   });
   return { spec: { op, params }, seen };
 }
-
-
 
 /**
  * Verifies the live-preview dispatch reads exactly the params OP_DEFS declares
@@ -780,7 +777,6 @@ test('movedOps returns a reordered deep copy', () => {
   assert.equal(ops[1].params.t, 0.3);
 });
 
-
 /** Verifies the recorded reason is read back by identity and names its remedy. */
 test('meshOpFailure routes each recorded reason', () => {
   const { Mod } = fakeModule({ rejects: new Set(['base:cube']), reason: 'ARENA_EXHAUSTED' });
@@ -979,7 +975,6 @@ test('a full saved-solid list refuses before thumbnail capture', () => {
   assert.equal(captures, 1);
 });
 
-
 /** Verifies opTopologyKey names the parameter only where the engine lowers on it. */
 test('opTopologyKey separates only the params that pick a lowering', () => {
   assert.equal(opTopologyKey({ op: 'truncate', params: { t: 0.5 } }), 'truncate:ambo');
@@ -997,8 +992,7 @@ test('opTopologyKey separates only the params that pick a lowering', () => {
   assert.equal(opTopologyKey('truncate'), 'truncate');
 });
 
-test('restored float32 ambo aliases use the engine topology and bevel lowering', async () => {
-  const { LOWERING } = await import('../src/workbench/solids/solid_registry_codegen.js');
+test('restored float32 ambo aliases use the engine topology and bevel lowering', () => {
   for (const op of ['truncate', 'bevel']) {
     const alias = { op, params: { t: 0.499999995 } };
     assert.equal(savedChainShapeError('cube', [alias]), null);

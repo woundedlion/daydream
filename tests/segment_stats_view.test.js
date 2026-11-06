@@ -4,13 +4,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
-restoreDocumentAfterEach();
-
 import { SLOW_FRAME_MS } from '../src/renderer/frame_constants.js';
 
 import { FAULT_POOL, FAULT_RENDER } from '../src/segments/worker_protocol.js';
 
 import { SegmentStatsView } from '../src/ui/segment_stats_view.js';
+
+restoreDocumentAfterEach();
 
 test('index provides every container the stats view resolves', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');

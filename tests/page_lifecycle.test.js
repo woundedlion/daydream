@@ -2,9 +2,9 @@ import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { installAnimationFrames, restoreWindowAfterEach } from './helpers/fake_dom.js';
 
-const {
+import {
   createFrameScheduler, onPageTeardown, watchMediaMatch,
-} = await import('../src/shared/page_lifecycle.js');
+} from '../src/shared/page_lifecycle.js';
 
 // Frame queue installed fresh per case and restored after.
 let frames;
