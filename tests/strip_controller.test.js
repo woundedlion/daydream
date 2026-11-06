@@ -80,7 +80,10 @@ test('pointer selection zooms either tab and cancellation clears the selection',
   f.setTab('generative');
   f.drag.onStart(point(25)); f.drag.onEnd(point(75));
   assert.deepEqual(f.model.window, {offset:0.25, span:0.5});
-  f.drag.onStart(point(20)); f.drag.onCancel();
+  f.drag.onStart(point(20));
+  f.drag.onMove(point(70));
+  assert.deepEqual(f.draws.at(-1), {start: 0.2, end: 0.7});
+  f.drag.onCancel();
   assert.equal(f.canvas.style.cursor, 'pointer');
   assert.equal(f.draws.at(-1), undefined);
   f.controller.dispose();
