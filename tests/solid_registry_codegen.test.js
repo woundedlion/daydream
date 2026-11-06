@@ -220,11 +220,11 @@ test('no paste line exceeds the column limit solids.h is formatted at', () => {
   for (const base of SIMPLE_SEEDS) {
     for (const ops of chains) {
       for (const line of generateRegistryCpp({ base, ops }).split('\n')) {
-        if (line.length <= 80) continue;
         // clang-format cannot break a line that offers no break: an identifier
         // long enough to overflow on its own overflows there too.
         const atom = line.replace(/^\s*(\* )?/, '');
-        assert.ok(!atom.includes(' ') && (line.trimStart().startsWith('*') || !atom.includes('::')),
+        assert.ok(line.length <= 80
+          || (!atom.includes(' ') && (line.trimStart().startsWith('*') || !atom.includes('::'))),
           `"${line}" is ${line.length} columns for base "${base}"`);
       }
     }
