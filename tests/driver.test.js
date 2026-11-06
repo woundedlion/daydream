@@ -1529,6 +1529,14 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
   assert.deepEqual(keydown('-'), { prevented: true, stopped: true });
   assert.ok(spherical().radius > beforeOut.radius);
 
+  const beforeEqual = spherical().radius;
+  assert.deepEqual(keydown('='), { prevented: true, stopped: true });
+  assert.ok(spherical().radius < beforeEqual);
+
+  const beforeUnderscore = spherical().radius;
+  assert.deepEqual(keydown('_'), { prevented: true, stopped: true });
+  assert.ok(spherical().radius > beforeUnderscore);
+
   ctx.controls.minPolarAngle = 0.2;
   ctx.controls.maxPolarAngle = 0.4;
   ctx.controls.minDistance = 2;
