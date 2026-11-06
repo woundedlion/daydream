@@ -74,9 +74,8 @@ export const hookUnderTest = (name) => {
   };
 };
 
-// A config path that never exists, so no operator setting reaches a fixture: a
-// global core.excludesFile or core.autocrlf would steer ls-files and add, and a
-// global core.hooksPath would install the caller's hooks into the fixtures.
+// Isolated config and XDG paths exclude operator settings, default ignore and
+// attributes files, and hooks.
 const ABSENT_CONFIG = join(tmpdir(), 'daydream-absent-gitconfig', 'absent');
 
 /**
@@ -93,6 +92,7 @@ export const isolatedGitEnv = (base = process.env) => {
     ...env,
     GIT_CONFIG_GLOBAL: ABSENT_CONFIG,
     GIT_CONFIG_SYSTEM: ABSENT_CONFIG,
+    XDG_CONFIG_HOME: dirname(ABSENT_CONFIG),
     GIT_AUTHOR_NAME: 'fixture',
     GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
     GIT_COMMITTER_NAME: 'fixture',
