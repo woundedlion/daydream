@@ -514,7 +514,7 @@ test('palette and modulation probe reports a family whose controls fail to appea
     const amounts = new Map();
     const tab = {
       select: async (selector, value) => { if (selector.includes('palette-type')) family = value; },
-      waitForFunction: async (_callback, _options, label) => {
+      waitForFunction: async (callback, options, label) => {
         if (label === undefined) return undefined;
         assert.equal(label, disabled);
         return {jsonValue: async () => ({

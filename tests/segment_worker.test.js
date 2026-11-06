@@ -990,7 +990,7 @@ test('rebuild retries a coupled write after its prerequisite without reporting d
 
 test('a successful pending replay clears a refused accepted-value warning', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  engineInstance.setParameter = (_name, value) => value === 1
+  engineInstance.setParameter = (name, value) => value === 1
     ? ParamSetResult.INADMISSIBLE : ParamSetResult.APPLIED;
   const capture = installConsoleCapture('error');
   try {

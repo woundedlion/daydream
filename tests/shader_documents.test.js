@@ -1108,7 +1108,7 @@ async function editorWorkbench({
   };
   const win = {
     ...documentEvents(),
-    prompt: (_message, filename) => filename,
+    prompt: (message, filename) => filename,
     location,
     history: {
       replaceState: (state, title, url) => {
@@ -1841,7 +1841,7 @@ for (const picker of [false, true]) test(`cancelled Save As preserves the next c
   assert.equal(await h.controller.saveAs(), false);
   assert.equal(await h.controller.saveAs(), false);
   delete h.win.showSaveFilePicker;
-  h.win.prompt = (_message, filename) => filename;
+  h.win.prompt = (message, filename) => filename;
   assert.equal(await h.controller.saveAs(), true);
   assert.equal(JSON.parse(h.downloads.at(-1)[1]).document_id, 'kaleidoscope-hex-bright-copy1');
 });

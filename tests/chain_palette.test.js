@@ -24,7 +24,7 @@ function paletteFixture() {
     store: {
       chain: () => chain,
       legalInsertions: () => legal ? [{operator, legal: true}] : [],
-      replaceSpan: (_start, _deleteCount, entries) => {
+      replaceSpan: (start, deleteCount, entries) => {
         if (!accepted) return {ok: false, diagnostics: [{message: 'blocked'}]};
         chain.push(...entries);
         return {ok: true};
