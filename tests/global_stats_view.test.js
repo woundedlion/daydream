@@ -225,7 +225,7 @@ test('the view reads only the injected document', () => {
 });
 
 
-test('clear replaces every desktop and mobile metric while retaining its last perf class', () => {
+test('clear replaces every desktop and mobile metric and clears slow-frame styling', () => {
   const {doc, byId} = makeDoc();
   const view = new GlobalStatsView(doc);
   view.update(SLOW_FRAME_MS + 1, metrics());
@@ -234,7 +234,7 @@ test('clear replaces every desktop and mobile metric while retaining its last pe
   view.clear();
   for (const ids of Object.values(STATS_CELL_IDS))
     for (const id of ids) assert.equal(byId[id].textContent, 'Unavailable', id);
-  for (const id of STATS_CELL_IDS.perf) assert.equal(byId[id].className, 'perf-time slow');
+  for (const id of STATS_CELL_IDS.perf) assert.equal(byId[id].className, 'perf-time');
   view.update(1, metrics());
   for (const ids of Object.values(STATS_CELL_IDS))
     for (const id of ids) assert.notEqual(byId[id].textContent, 'Unavailable', id);

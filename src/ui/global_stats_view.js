@@ -35,9 +35,11 @@ export class GlobalStatsView {
 
   /** Mark every stats cell unavailable. @returns {void} */
   clear() {
-    for (const row of Object.values(this.resolveCells())) {
+    const cells = this.resolveCells();
+    for (const row of Object.values(cells)) {
       for (const cell of row) if (cell) cell.textContent = 'Unavailable';
     }
+    for (const cell of cells.perf) if (cell) cell.className = 'perf-time';
   }
 
   /**
