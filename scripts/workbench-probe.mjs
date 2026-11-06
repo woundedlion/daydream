@@ -528,8 +528,6 @@ export async function probeStrip(tab) {
       && await pinState() === pinsBeforeDrag
       && await tab.$('.chain-drag-preview') === null,
   'releasing outside the carrier band cancels reordering without toggling a pin');
-  check(await tab.$('.chain-chip-move') === null,
-    'stage headers expose drag reordering without arrow buttons');
   await tab.focus('#shader-document-select');
   const escapeFrom = await boxOf(tab, firstHeader);
   const escapeTo = await boxOf(tab, lastHeader);

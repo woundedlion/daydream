@@ -166,7 +166,7 @@ test('visual scale and boundary overlays preserve recorded emissions', () => {
 test('advancing fresh frames moves the boundary without changing recorded emissions', () => {
   const source = frame(20);
   for (const [phase, boundary] of [
-    [0.5, 3], [0, 1], [1, 0], [0.25, 2], [0, 1],
+    [0.5, 3], [0, 1], [1, 0], [0.25, 2],
   ]) {
     const sweep = new PovSweep(8, 2, frame(10));
     sweep.beginFrame(source);

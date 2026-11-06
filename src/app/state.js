@@ -30,7 +30,7 @@ export function roundUrlNumber(value) {
  * @returns {string|null} The param string, or null when the value has no URL
  *   representation (null/undefined, or a non-finite number).
  */
-export function canonicalUrlParam(value) {
+function canonicalUrlParam(value) {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number') {
     const rounded = roundUrlNumber(value);

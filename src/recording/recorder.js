@@ -113,7 +113,6 @@ export class VideoRecorder {
     /** @type {MediaRecorder|null} */
     this.mediaRecorder = null;
     /** @type {Blob[]} */
-    this.chunks = [];
     /** @type {MediaStream|null} */
     this.stream = null;
     /** @type {CaptureTrack|null} */
@@ -323,8 +322,6 @@ export class VideoRecorder {
     this.mediaRecorder = recorder;
     this.stream = stream;
     this.track = track;
-    // Alias of the live session buffer, for outside observation only.
-    this.chunks = chunks;
 
     recorder.onstart = () => {
       if (notifyFallback && !ended && this.mediaRecorder === recorder)
@@ -797,7 +794,6 @@ export class VideoRecorder {
     this.freezeElapsed();
     this.starting = false;
     this.mediaRecorder = null;
-    this.chunks = [];
     if (this.stream) {
       this.stream.getTracks().forEach(t => t.stop());
       this.stream = null;

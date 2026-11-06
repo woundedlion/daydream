@@ -122,13 +122,6 @@ class FakeEngine {
     this.presetIndex = index;
     return true;
   }
-  nextPreset() {
-    return this.selectPreset((this.presetIndex + 1) % this.presetCount);
-  }
-  previousPreset() {
-    return this.selectPreset(
-      (this.presetIndex + this.presetCount - 1) % this.presetCount);
-  }
   setTemporalSampling(enabled) {
     this.calls.push(['setTemporalSampling', enabled]);
     this.temporalSampling = enabled;

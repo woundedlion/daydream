@@ -348,6 +348,7 @@ test('refreshPresetState replaces outgoing preset metadata from the main engine'
   c.getWasmEngine = () => ({
     getPresetCount: () => 8,
     getPresetIndex: () => 0,
+    getAnimationsPaused: () => false,
   });
 
   c.refreshPresetState();
@@ -553,6 +554,7 @@ test('snapshot-capable effects rebuild from their exhaustive state', () => {
   const c = makeController({ effect: 'SnapshotEffect' });
   c.getWasmEngine = () => ({
     getShaderChainBindings: () => ({getSnapshot: () => snapshot, delete: () => {}}),
+    getAnimationsPaused: () => true,
     getParameterDefinitions: () => {
       throw new Error('dynamic definitions are not persistence');
     },

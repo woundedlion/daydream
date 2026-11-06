@@ -38,8 +38,6 @@ const EXPECTED_CONSOLE_MESSAGES = {
     /^\[Segmented\] seg \d+ module failed to load \(attempt \d+\/\d+\); rebuilding pool$/,
     /^\[Segmented\] additional worker fault \(seg -?\d+\): /,
     /^\[Segmented\] pool faulted on \d+ consecutive effect-switch rebuilds; /,
-    /^\[Segmented\] shared WASM compile failed; each worker will compile its own$/,
-    /^\[Segmented\] module warm did not finish within \d+s; /,
   ],
   error: [
     /^\[Segmented\] Worker seg \d+ error:/,
@@ -271,13 +269,15 @@ export function deliverFrame(controller, segId, overrides = {}) {
  *   acceptedValue?: number|boolean, readonly?: boolean}>} defs - Param defs.
  * @param {number} [presetCount=0] - Reported preset count.
  * @param {number} [presetIndex=0] - Reported current preset index.
+ * @param {boolean} [animationsPaused=false] - Reported animation-pause state.
  * @returns {{getParameterDefinitions: () => Array, getPresetCount: () => number,
- *   getPresetIndex: () => number}} Fake engine.
+ *   getPresetIndex: () => number, getAnimationsPaused: () => boolean}} Fake engine.
  */
-export function fakeEngine(defs, presetCount = 0, presetIndex = 0) {
+export function fakeEngine(defs, presetCount = 0, presetIndex = 0, animationsPaused = false) {
   return {
     getParameterDefinitions: () => defs,
     getPresetCount: () => presetCount,
     getPresetIndex: () => presetIndex,
+    getAnimationsPaused: () => animationsPaused,
   };
 }

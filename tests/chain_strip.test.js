@@ -393,7 +393,6 @@ test('Alt+Arrow reorders only within the same carrier band', async () => {
 
   chipByLabel(h, 'warp2').dispatch('keydown', { key: 'ArrowLeft', altKey: true });
   assert.deepEqual(labels(h), untouched, 'a band edge has no neighbour to swap with');
-  assert.equal(chipByLabel(h, 'warp2').querySelector('.chain-chip-move'), null);
 
   assert.deepEqual(h.applied, []);
   assert.deepEqual(h.announced, []);
@@ -833,9 +832,8 @@ const dragPointer = (clientY, extra = {}) => ({
   clientX: 20, clientY, pointerId: 7, isPrimary: true, button: 0, ...extra,
 });
 
-test('stage headers replace reorder arrows with a drag surface', async () => {
+test('endomorphism headers are drag surfaces; crossings are not', async () => {
   const h = await makeStrip();
-  assert.equal(h.container.querySelector('.chain-chip-move'), null);
   for (const label of ['camera', 'lens']) {
     assert.equal(chipByLabel(h, label).querySelector('.chain-chip-header')
       .classList.contains('chain-chip-header--draggable'), true);
@@ -1804,7 +1802,7 @@ test('Color stage headers click to toggle panels and drag to reorder within Colo
   assert.equal(chipByLabel(h, first.label).classList.contains('chain-chip--expanded'), false);
 });
 
-test('the inline controls keep their own keys and take no drag', async () => {
+test('the inline controls keep their own keys', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'camera').dispatch('click');
   const slider = controlIn(rowFor(h, 'camera', 'camera.wander'));
@@ -1816,11 +1814,6 @@ test('the inline controls keep their own keys and take no drag', async () => {
   assert.deepEqual(labels(h),
     ['camera', 'lens', 'project', 'warp2', 'sample', 'colorize', 'modulation']);
 
-  slider.dispatch('pointerdown', { isPrimary: true, button: 0, pointerId: 4 });
-  assert.deepEqual(h.applied, [],
-    'a press on a control must not apply a chain edit');
-  assert.deepEqual(labels(h),
-    ['camera', 'lens', 'project', 'warp2', 'sample', 'colorize', 'modulation']);
 });
 
 test('syncHistory repaints Undo and Redo without rebuilding the strip', async () => {

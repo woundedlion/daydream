@@ -132,8 +132,7 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  *   one parameter and reports acceptance.
  * @param {(paused: boolean) => void} deps.engine.setAnimationsPaused -
  *   Freezes/resumes animation-driven params on every engine.
- * @param {() => boolean|undefined} deps.engine.animationsPaused - Reads the
- *   animation-pause state, undefined on a module without the accessor.
+ * @param {() => boolean} deps.engine.animationsPaused - Reads the animation-pause state.
  * @param {() => number} deps.engine.getPresetCount - Number of presets on the
  *   live effect.
  * @param {() => number} deps.engine.getPresetIndex - Selected preset on the live
@@ -375,7 +374,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     }
     persistence.persist(fx.gui);
     fx.actions.showPreset(count, index);
-    fx.pause.show(engineAnimationsPaused() ?? true);
+    fx.pause.show(engineAnimationsPaused());
     valueSync.adoptRequestedEnums(fx, focusedElement() ?? null);
   }
 
@@ -467,14 +466,11 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * toggle's transition carries the adopted state on to the worker pool.
    * @param {{animationState: {pause: boolean}, controller: GuiController|null,
    *   setPaused: (v: boolean) => void}} pause - The effect's pause toggle.
-   * @param {ParameterDefinition} written - The definition of the parameter just written.
    * @returns {void}
    */
-  function adoptEnginePause(pause, written) {
+  function adoptEnginePause(pause) {
     if (!pause.controller) return;
-    // undefined on a module without the accessor
-    const paused = engineAnimationsPaused()
-      ?? (written.animated || pause.animationState.pause);
+    const paused = engineAnimationsPaused();
     if (paused !== pause.animationState.pause) pause.setPaused(paused);
   }
 
@@ -582,7 +578,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
           setWorkerParam(p.name, value);
           fx.advisoriesDirty = true;
         }
-        if (!fx.hydrating) adoptEnginePause(pause, p);
+        if (!fx.hydrating) adoptEnginePause(pause);
         fx.warningsDirty = true;
         return accepted;
       };
@@ -693,8 +689,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     if (rebuildFailureGeneration === generation) return false;
     const wasMounted = Boolean(previous.gui?.domElement?.parentNode);
     const captured = view.capture(previous);
-    const preservedPause = engineAnimationsPaused()
-      ?? Boolean(previous.pause.animationState.pause);
+    const preservedPause = engineAnimationsPaused();
     let next;
     try {
       next = createEffectRecord({
@@ -712,7 +707,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       return false;
     }
 
-    const actualPause = engineAnimationsPaused() ?? preservedPause;
+    const actualPause = engineAnimationsPaused();
     next.pause.setPaused(actualPause);
     next.animationPauseApplied = previous.animationPauseApplied;
 

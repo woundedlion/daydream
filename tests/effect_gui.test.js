@@ -737,23 +737,6 @@ test('the toggle resumes when the engine reports animations running again', () =
   assert.deepEqual(h.writes.filter((w) => w.startsWith('paused')), ['paused:false']);
 });
 
-test('without the pause accessor the panel falls back to the animated flag', () => {
-  const width = { name: 'Width', value: 1, min: 0, max: 2 };
-  const h = makeHarness({ params: [SPEED, width], pauseAccessor: false });
-  h.panel.build();
-  h.panel.applyAnimationPause();
-  h.writes.length = 0;
-
-  h.gui().ctrl('Width').setValue(1.5);
-  assert.equal(h.panel.active().pause.animationState.pause, false);
-  assert.deepEqual(h.writes.filter((w) => w.startsWith('paused')), []);
-
-  h.gui().ctrl('Speed').setValue(0.5);
-
-  assert.equal(h.panel.active().pause.animationState.pause, true);
-  assert.deepEqual(h.writes.filter((w) => w.startsWith('paused')), ['paused:true']);
-});
-
 test('ordinary parameter tuning keeps preset advancement running', () => {
   const STATIC = { name: 'Width', value: 1, min: 0, max: 2 };
   const h = makeHarness({ params: [STATIC], pausesOnWrite: () => false });

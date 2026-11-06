@@ -68,7 +68,7 @@ test('a latched fault terminates the pool so no worker heap stays resident', () 
 test('create posts each worker the whole init payload', () => {
   const c = makeController({ effect: 'Plasma', presets: { lo: { w: 6, h: 3 } } });
   c.getWasmEngine = () => fakeEngine(
-    [{ name: 'Speed', value: 0.5, requestedValue: 0.9, acceptedValue: 0.4 }], 6, 4);
+    [{ name: 'Speed', value: 0.5, requestedValue: 0.9, acceptedValue: 0.4 }], 6, 4, true);
   c.setParameter('Speed', 0.9);
   c.setAnimationsPaused(true);
   c.setPoleLod(1.5);

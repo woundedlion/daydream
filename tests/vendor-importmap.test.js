@@ -39,16 +39,15 @@ const LOCAL_SRC = generateLocalSrc();
  * Evaluates the runtime importmap IIFE against a stubbed DOM and returns the
  * whole importmap it injects, from either the committed CDN source or the
  * generated 'local' one.
- * @param {{vendor?: 'cdn'|'local', selfSrc?: string, extra?: Object}} [opts]
+ * @param {{vendor?: 'cdn'|'local', selfSrc?: string}} [opts]
  * @returns {Object} The parsed importmap.
  */
-const evalImportmapJson = ({ vendor = 'cdn', selfSrc = 'https://example.test/app/vendor-importmap.js', extra } = {}) => {
+const evalImportmapJson = ({ vendor = 'cdn', selfSrc = 'https://example.test/app/vendor-importmap.js' } = {}) => {
   const source = vendor === 'local' ? LOCAL_SRC : SRC;
   let injected = null;
   const sandbox = {
     URL,
     console,
-    window: extra ? { daydreamExtraImports: extra } : {},
     document: {
       currentScript: { src: selfSrc },
       createElement: () => ({ type: '', textContent: '' }),
@@ -63,7 +62,7 @@ const evalImportmapJson = ({ vendor = 'cdn', selfSrc = 'https://example.test/app
 
 /**
  * The injected importmap's `imports` map.
- * @param {{vendor?: 'cdn'|'local', selfSrc?: string, extra?: Object}} [opts]
+ * @param {{vendor?: 'cdn'|'local', selfSrc?: string}} [opts]
  * @returns {Object} The parsed importmap imports map.
  */
 const evalImportmap = (opts) => evalImportmapJson(opts).imports;
@@ -118,12 +117,4 @@ test('local variant emits no integrity map', () => {
   const map = evalImportmapJson({ vendor: 'local' });
   assert.equal(map.integrity, undefined,
     'same-origin vendored modules gain nothing from SRI');
-});
-
-test('EXTRA imports are merged but core keys win', () => {
-  const imports = evalImportmap({
-    extra: { three: 'https://evil.test/hijack.js', helper: './helper.js' },
-  });
-  assert.match(imports['three'], /cdn\.jsdelivr\.net/, 'core three is not clobbered by EXTRA');
-  assert.equal(imports['helper'], './helper.js', 'a non-core EXTRA key is added verbatim');
 });

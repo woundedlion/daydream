@@ -1221,7 +1221,7 @@ export function createShaderDocumentController({
   };
   const onPresetChange = () => {
     if (!applyPreset(presetSelect.value)) {
-      const refusal = status?.textContent ?? 'The preset could not be applied.';
+      const refusal = status.textContent ?? 'The preset could not be applied.';
       presetSelect.value = active?.presetId ?? '';
       if (active) applyPreset(/** @type {string} */ (active.presetId));
       showError(refusal);
@@ -1274,7 +1274,7 @@ export function createShaderDocumentController({
     chainUi?.strip.render();
     const presetId = active.presetId ?? presetSelect.value;
     if (!applyPreset(presetId)) {
-      const refusal = status?.textContent ?? 'The preset could not be applied.';
+      const refusal = status.textContent ?? 'The preset could not be applied.';
       const previousEffect = compiledSide ? CHAIN_EFFECT : official.effectId;
       if (!selectEffect(previousEffect)) {
         announce(`The preview engine rejected effect "${effectDisplayName(previousEffect)}".`);

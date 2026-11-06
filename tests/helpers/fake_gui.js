@@ -119,7 +119,6 @@ export function fakePanelGui({ hydrated = {}, stored = {} } = {}) {
 
 function buildGui(namespace, optionsReplaces, panel, hydrated, stored) {
   const childrenElement = fakeElement('div');
-  childrenElement.ownerDocument = { createElement: (tag) => fakeElement(tag) };
   childrenElement.classList.add('lil-children');
   const gui = {
     namespace,
@@ -213,7 +212,6 @@ function buildGui(namespace, optionsReplaces, panel, hydrated, stored) {
       return keys;
     },
   };
-  gui.domElement.ownerDocument = childrenElement.ownerDocument;
   gui.domElement.appendChild(gui.titleElement);
   gui.domElement.appendChild(childrenElement);
   if (panel) {

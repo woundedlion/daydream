@@ -42,7 +42,6 @@ const sri = (body) => `sha384-${createHash('sha384').update(body).digest('base64
 /** Recreates the fixture's package, import map and source tree. */
 const buildRoot = () => {
   rmSync(root, { recursive: true, force: true });
-  mkdirSync(join(root, 'scripts'), { recursive: true });
   mkdirSync(join(root, 'node_modules'), { recursive: true });
   writeFileSync(join(root, 'package.json'), PKG);
   writeFileSync(join(root, 'vendor-importmap.js'), IMPORTMAP);

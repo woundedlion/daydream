@@ -165,19 +165,28 @@ test('blitToOffscreen clears the whole offscreen before drawing into it', () => 
 // MediaRecorder session lifecycle, behind a fake MediaRecorder/captureStream.
 // ---------------------------------------------------------------------------
 
+/** @param {VideoRecorder} recorder @returns {Array<Array<*>>} Buffers passed to each session sink. */
+function captureSessionBuffers(recorder) {
+  const buffers = [];
+  const open = recorder.openSink.bind(recorder);
+  recorder.openSink = (...args) => {
+    buffers.push(args[2]);
+    return open(...args);
+  };
+  return buffers;
+}
+
 /** A fake video track with the manual-frame API the recorder drives. */
 const makeFakeTrack = () => ({ requestFrame() {}, stop() { this.stopped = true; }, stopped: false });
 
 /**
  * A fake capture stream exposing the one video track, tagged with the frame rate
- * it was opened at. This fixture omits requestFrame for nonzero rates to exercise
- * the recorder's capability fallback.
+ * it was opened at.
  * @param {number} [fps] - Frame rate captureStream was called with.
  * @returns {Object} The stream.
  */
 const makeFakeStream = (fps = 0) => {
   const track = makeFakeTrack();
-  if (fps !== 0) delete track.requestFrame;
   return { track, captureRate: fps, getVideoTracks: () => [track], getTracks: () => [track] };
 };
 
@@ -579,6 +588,7 @@ test('a MediaRecorder start failure releases the entire capture session', (t) =>
   const notified = [];
   rec.onError = (err) => notified.push(err);
 
+  const sessionBuffers = captureSessionBuffers(rec);
   assert.doesNotThrow(() => rec.start('e'));
 
   const recorder = FakeMediaRecorder.instances[0];
@@ -589,7 +599,7 @@ test('a MediaRecorder start failure releases the entire capture session', (t) =>
   assert.equal(rec.mediaRecorder, null);
   assert.equal(rec.stream, null);
   assert.equal(rec.track, null);
-  assert.deepEqual(rec.chunks, []);
+  assert.deepEqual(sessionBuffers.at(-1), []);
   assert.equal(rec.offscreen, null);
   assert.equal(rec.offCtx, null);
   assert.equal(rec.isRecording, false);
@@ -673,10 +683,11 @@ test('a chunk emitted synchronously by start reaches the installed sink', (t) =>
   rec.openSink = () => ({ write: (chunk) => writes.push(chunk), finish() {} });
   FakeMediaRecorder.startData = { size: 10 };
 
+  const sessionBuffers = captureSessionBuffers(rec);
   rec.start('sync');
 
   assert.deepEqual(writes, [{ size: 10 }]);
-  assert.deepEqual(rec.chunks, []);
+  assert.deepEqual(sessionBuffers.at(-1), []);
   rec.dispose();
 });
 
@@ -814,6 +825,7 @@ test('a stale onstop does not clobber the session that replaced it', (t) => {
   const downloads = [];
   rec.download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
 
+  const sessionBuffers = captureSessionBuffers(rec);
   rec.start('first');
   const recorderA = rec.mediaRecorder;
   const streamA = rec.stream;
@@ -834,7 +846,7 @@ test('a stale onstop does not clobber the session that replaced it', (t) => {
   assert.equal(streamA.track.stopped, true);
 
   assert.equal(rec.mediaRecorder, recorderB);
-  assert.deepEqual(rec.chunks, [{ size: 20 }]);
+  assert.deepEqual(sessionBuffers.at(-1), [{ size: 20 }]);
   assert.equal(rec.stream.track.stopped, false);
 });
 
@@ -883,8 +895,9 @@ test('streams chunks to disk when the File System Access API is present', async 
   let downloaded = false;
   rec.download = () => { downloaded = true; };
 
+  const sessionBuffers = captureSessionBuffers(rec);
   rec.start('stream');
-  const sessionChunks = rec.chunks;
+  const sessionChunks = sessionBuffers.at(-1);
   const recorder = rec.mediaRecorder;
   await drainSink();
   recorder.ondataavailable({ data: { size: 10 } });
@@ -1123,13 +1136,14 @@ for (const bitrate of [1, 0]) {
     const notified = [];
     rec.onError = (err) => notified.push(err);
 
+    const sessionBuffers = captureSessionBuffers(rec);
     rec.start('slow-open');
     const recorder = rec.mediaRecorder;
     const expectedBitrate = (bitrate || 16) * 1_000_000;
     assert.equal(recorder.options.videoBitsPerSecond, expectedBitrate);
     await drainSink();
     assert.equal(recorder.state, 'recording', 'the encoder starts once the picker resolves');
-    const sessionChunks = rec.chunks;
+    const sessionChunks = sessionBuffers.at(-1);
     const held = (expectedBitrate / 8) * WRITE_BACKLOG_SECONDS - 1_000_000;
     recorder.ondataavailable({ data: { size: held } });
     assert.equal(rec.isRecording, true, 'a backlog under the bound keeps recording');

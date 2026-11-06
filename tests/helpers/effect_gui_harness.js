@@ -155,8 +155,6 @@ export function exportStatus(h) {
  * @param {(p: Object) => boolean} [options.pausesOnWrite] - The engine's implicit
  *   pause rule, applied by the setEngineParam double: which parameter writes
  *   leave the engine reporting paused animations.
- * @param {boolean} [options.pauseAccessor] - False models a module that does not
- *   export getAnimationsPaused.
  * @param {Function} [options.onEngineParam] - Optional engine-side reaction to
  *   a parameter write, used to model a dynamic descriptor rebind; returning
  *   false models an engine refusal.
@@ -178,7 +176,6 @@ export function makeHarness({
   hydrated = {},
   acceptedStored = {},
   pausesOnWrite = (p) => Boolean(p.animated),
-  pauseAccessor = true,
   onEngineParam = () => {},
   rebuildOnApply = false,
   onSynchronizePreset = () => {},
@@ -237,7 +234,7 @@ export function makeHarness({
         writes.push(`paused:${paused}`);
         engine.paused = paused;
       },
-      animationsPaused: () => (pauseAccessor ? engine.paused : undefined),
+      animationsPaused: () => engine.paused,
       getPresetCount: () => state.presetCount,
       getPresetIndex: () => state.presetIndex,
       synchronizePreset: (index) => {
