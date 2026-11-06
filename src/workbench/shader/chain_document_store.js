@@ -42,13 +42,13 @@ const refusal = (code, path, message) => ({
 export const UNDO_DEPTH = 100;
 
 /**
- * The default scratch chain uses a rotation, stereographic projection and plane-space sampling.
+ * The default scratch chain winds a spherical spiral around the north pole.
  * @type {ReadonlyArray<ChainEntry>}
  */
 export const DEFAULT_SCRATCH_CHAIN = Object.freeze([
   { label: 'rotate', operator: 'sphere.rotate.v2' },
-  { label: 'project', operator: 'project.stereographic.v2' },
-  { label: 'sample', operator: 'sample.grid.v4' },
+  { label: 'project', operator: 'project.equirectangular.v2' },
+  { label: 'sample', operator: 'sample.spiral.v3' },
   { label: 'colorize', operator: PALETTE_OPERATOR },
 ]);
 
@@ -56,7 +56,8 @@ const SCRATCH_PRESET_ID = 'catalog-defaults';
 
 /**
  * Builds the workbench's scratch document: the given chain over catalog
- * operators carrying one preset of the catalog's own defaults. The parameter
+ * operators carrying one preset. The default spiral reads equirectangular
+ * longitude and latitude. The parameter
  * declarations come from the same catalog-field mapping a structural insert
  * backfills with.
  * @param {*} catalog - The operator catalog the document validates against.
@@ -79,6 +80,10 @@ export function scratchChainDocument(catalog, chain = DEFAULT_SCRATCH_CHAIN) {
     }
     for (const field of operator.params) {
       const parameter = parameterFromField(entry.label, field, entry.operator);
+      if (chain === DEFAULT_SCRATCH_CHAIN && field.id === 'coordinate-system'
+        && entry.operator === 'sample.spiral.v3') {
+        parameter.default = 'equirectangular';
+      }
       parameters.push(parameter);
       values[parameter.id] = parameter.default;
     }
@@ -90,7 +95,7 @@ export function scratchChainDocument(catalog, chain = DEFAULT_SCRATCH_CHAIN) {
     effect_id: 'scratch',
     effect_metadata: {
       display_name: 'Scratch Chain',
-      description: "The default chain on the catalog's own defaults.",
+      description: 'A spiral winding around the north pole through Equirectangular.',
     },
     descriptor: {
       chain: chain.map((entry) => ({ ...entry })),

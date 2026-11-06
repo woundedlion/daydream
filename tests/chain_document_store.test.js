@@ -857,7 +857,7 @@ test('chainArenaBytes matches a mixed-alignment golden and validator diagnostic 
     prepared: { size: 3, align: 16 },
     state: { size: 7, align: 4 },
   };
-  alignedOperators.get('project.stereographic.v2').blocks = {
+  alignedOperators.get('project.equirectangular.v2').blocks = {
     param: { size: 2, align: 32 },
   };
   // Block ends: 5, 19, 27; overhead -> 28; projection -> 34; overheads -> 37.
@@ -987,12 +987,15 @@ test('the scratch document compiles clean against the catalog', async () => {
   assert.deepEqual(compiled.diagnostics, []);
   assert.deepEqual(compiled.document.descriptor.chain, [
     { label: 'rotate', operator: 'sphere.rotate.v2' },
-    { label: 'project', operator: 'project.stereographic.v2' },
-    { label: 'sample', operator: 'sample.grid.v4' },
+    { label: 'project', operator: 'project.equirectangular.v2' },
+    { label: 'sample', operator: 'sample.spiral.v3' },
     { label: 'colorize', operator: 'colorize.generated-palette.v4' },
   ]);
   assert.equal(compiled.document.preset_bank.presets.length, 1);
   const values = compiled.document.preset_bank.presets[0].values;
+  assert.equal(values['sample.coordinate-system'], 'equirectangular');
+  assert.equal(values['sample.center-azimuth'], 0);
+  assert.equal(values['sample.center-polar'], 0);
   assert.equal(values['colorize.palette-chroma'], 0.62,
     'the one preset carries the catalog defaults');
   assert.deepEqual(Object.keys(values).sort(),
@@ -1002,8 +1005,10 @@ test('the scratch document compiles clean against the catalog', async () => {
   for (const id of [
     'colorize.phase-oscillation-speed',
   ]) assert.equal(units.get(id), 'turn-per-frame', id);
-  for (const id of ['project.projection-spin-speed', 'sample.speed'])
+  for (const id of ['project.projection-spin-speed'])
     assert.equal(units.get(id), 'radian-per-frame', id);
+  assert.equal(units.get('sample.center-azimuth'), 'radian');
+  assert.equal(units.get('sample.center-polar'), 'radian');
   assert.equal(units.get('colorize.palette-mapping'), 'mode');
 });
 

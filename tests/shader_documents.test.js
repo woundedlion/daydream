@@ -1306,7 +1306,7 @@ test('the scratch document opens as a live, editable chain', async () => {
 
   assert.deepEqual(harness.selections, ['shader-chain']);
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
-    ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v4',
+    ['sphere.rotate.v2', 'project.equirectangular.v2', 'sample.spiral.v3',
       'colorize.generated-palette.v4']);
   assert.deepEqual(stripChips(harness).map((chip) => chip.dataset.label),
     ['rotate', 'project', 'sample', 'colorize']);
@@ -1713,7 +1713,7 @@ test('a malformed shader state link falls back to an editable scratch chain', as
   });
 
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
-    ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v4',
+    ['sphere.rotate.v2', 'project.equirectangular.v2', 'sample.spiral.v3',
       'colorize.generated-palette.v4']);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /shader link could not be restored: Error: invalid shader link payload/i);
