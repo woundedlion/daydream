@@ -30,7 +30,7 @@ test('available browser storage remains the saved-solid storage port', () => {
   assert.deepEqual(resolveSavedSolidsStorage(() => storage), {storage, notice: ''});
 });
 
-test('invalid storage survives until a successful bounded rejected backup', () => {
+test('a rejected entry stays pending until a backup lands', () => {
   const values = new Map([[SAVED_SOLIDS_KEY, '{broken']]);
   const storage = {getItem: key => values.get(key), setItem: (key, value) => values.set(key, value)};
   const loaded = loadSavedSolids(storage);
@@ -39,6 +39,29 @@ test('invalid storage survives until a successful bounded rejected backup', () =
   assert.match(persistSavedSolids(storage, loaded.entries, loaded), /invalid saved-solid JSON/);
   assert.deepEqual(JSON.parse(values.get(REJECTED_SOLIDS_KEY)), ['{broken']);
   assert.equal(loaded.rejected.length, 0);
+});
+
+test('rejected backups retain only recent bounded data without thumbnails', () => {
+  const values = new Map();
+  const storage = {getItem: key => values.get(key), setItem: (key, value) => values.set(key, value)};
+  const cards = Array.from({length: 25}, (_, id) => ({
+    id, base: 'retired', ops: [], thumb: 'data:image/png;base64,thumbnail',
+  }));
+  const oversized = {payload: 'x'.repeat(5000), thumb: 'data:image/png;base64,large'};
+  const rejected = [...cards, oversized, 'y'.repeat(5000)];
+  const state = {notice: '', rejected};
+  persistSavedSolids(storage, [], state);
+  const backup = JSON.parse(values.get(REJECTED_SOLIDS_KEY));
+  assert.equal(backup.length, 20);
+  assert.deepEqual(backup.slice(0, -2).map(({id}) => id), cards.slice(7).map(({id}) => id));
+  assert.ok(backup.slice(0, -2).every((entry) => !Object.hasOwn(entry, 'thumb')));
+  assert.deepEqual(backup.at(-2), {truncated: true});
+  assert.equal(backup.at(-1), 'y'.repeat(4096));
+  assert.equal(cards[0].thumb, 'data:image/png;base64,thumbnail');
+  assert.equal(oversized.payload.length, 5000);
+  assert.equal(oversized.thumb, 'data:image/png;base64,large');
+  assert.deepEqual(state.rejected, []);
+  assert.deepEqual(JSON.parse(values.get(SAVED_SOLIDS_KEY)), []);
 });
 
 test('a corrupt rejected backup is replaced before the primary save discards rejected entries', () => {
