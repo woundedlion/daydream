@@ -204,7 +204,7 @@ const callArgs = (src, open) => {
 /**
  * Class tokens a script puts on the elements it builds, read from
  * `className =`, `classList.add`/`toggle`, `â€¦Class`/`â€¦Classes` options, and
- * the class arguments of `el(tag, classes)` and `makeDiv(classes, id)`. A class assembled any
+ * the class arguments of `el`, `makeDiv`, and `buildButton`. A class assembled any
  * other way goes ungated.
  * @param {string} src - Script source.
  * @returns {Set<string>} Referenced class tokens.
@@ -229,6 +229,9 @@ const scriptClasses = (src) => {
     /\b\w*[Cc]lass(?:es)?\s*[:=]\s*(\[[^\]]*\]|(['"`])[^'"`]*\2)/g)) {
     for (const value of literals(binding)) addTokens(tokens, value);
   }
+  for (const [, , classes] of src.matchAll(/\bbuildButton\(\s*\w+\s*,\s*(['"`])([^'"`]*)\1/g)) {
+    addTokens(tokens, classes);
+  }
   // An `el(tag, classes)` builder's class list is the call's second argument.
   for (const match of src.matchAll(/\bel\(\s*(['"`])[a-z]+\1\s*,/g)) {
     for (const value of literals(callArgs(src, match.index + 2)).slice(1)) {
@@ -238,9 +241,9 @@ const scriptClasses = (src) => {
   return tokens;
 };
 
-test('class discovery includes literal makeDiv class lists', () => {
-  assert.deepEqual([...scriptClasses("makeDiv('complex-plane-inner axis-h', 'id'); makeDiv(className, id);")],
-    ['complex-plane-inner', 'axis-h']);
+test('class discovery includes literal element-builder class lists', () => {
+  assert.deepEqual([...scriptClasses("makeDiv('complex-plane-inner axis-h', 'id'); makeDiv(className, id); buildButton(doc, 'move-op-btn move-op-up', 'up');")],
+    ['complex-plane-inner', 'axis-h', 'move-op-btn', 'move-op-up']);
 });
 
 test('tool pages load no Tailwind CDN code', () => {
@@ -340,7 +343,7 @@ test('tool pages link tailwind.css last so utilities outrank page rules', () => 
 // options are painted by the <select> around them, and --stage is the chip look
 // --socket departs from.
 const CLASS_EXEMPTIONS = new Set([
-  'op-param', 'move-op-up', 'move-op-down', 'remove-op-btn',
+  'op-param', 'move-op-up', 'move-op-down',
   'fatal-error-message', 'fatal-error-dismiss',
   'chain-chip-replace-option', 'chain-chip--stage',
   'chain-palette-type', 'chain-modulation-enabled',
@@ -358,25 +361,45 @@ const classSourcesFor = ({ page, scripts }) => scripts
   .filter((source) => !NON_RENDERING_CLASS_SOURCES.get(page)?.has(source));
 
 test('every served page\'s stylesheets define every class it uses', () => {
+  const referenced = new Set();
+  const styled = new Set();
   for (const { page, sheets, scripts } of SERVED_PAGES) {
     const src = read(page);
     assert.ok(sheets.length > 0, `${page} links no stylesheet in the repo`);
     const defined = new Set(CLASS_EXEMPTIONS);
     for (const sheet of sheets) {
-      for (const name of definedClasses(read(...sheet))) defined.add(name);
+      for (const name of definedClasses(read(...sheet))) {
+        defined.add(name);
+        styled.add(name);
+      }
     }
     for (const [, css] of src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) {
-      for (const cls of definedClasses(css)) defined.add(cls);
+      for (const cls of definedClasses(css)) {
+        defined.add(cls);
+        styled.add(cls);
+      }
     }
     // Dynamic utility names must also exist in the generated stylesheet.
     const sources = [[page, referencedClasses(src)],
       ...classSourcesFor({ page, scripts })
         .map((source) => [source, scriptClasses(read(source))])];
     for (const [source, tokens] of sources) {
+      for (const cls of tokens) referenced.add(cls);
       const missing = [...tokens].filter((c) => !defined.has(c));
       assert.deepEqual(missing, [],
         `${source} uses classes no stylesheet ${page} loads defines: ${missing.join(', ')}`);
     }
+  }
+  for (const cls of CLASS_EXEMPTIONS) {
+    assert.ok(referenced.has(cls), `${cls} is an unreferenced class exemption`);
+    assert.ok(!styled.has(cls), `${cls} has a stylesheet rule and needs no exemption`);
+  }
+  for (const [page, sources] of NON_RENDERING_CLASS_SOURCES) {
+    const entry = SERVED_PAGES.find((entry) => entry.page === page);
+    assert.ok(entry, `${page} is no longer served`);
+    const scripts = new Set(entry.scripts.map((segments) => segments.join('/')));
+    for (const source of sources)
+      assert.ok(scripts.has(source), `${page} no longer loads exempted ${source}`);
   }
 });
 
