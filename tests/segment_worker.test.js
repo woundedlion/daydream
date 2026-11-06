@@ -656,6 +656,9 @@ test('a rejected setResolution leaves segRange and clip untouched', async () => 
   assert.deepEqual(engineInstance.calls.find((c) => c[0] === 'setResolution' && c[1] === 16),
     ['setResolution', 16, 8]);
   assert.deepEqual(engineInstance.clip, clipBefore);
+  const rejection = posted.find(({msg}) => msg.type === 'engineRejected');
+  assert.ok(rejection);
+  assert.match(rejection.msg.reason, /setResolution\(16, 8\) rejected/);
 
   posted.length = 0;
   await dispatch({ type: 'render' });
