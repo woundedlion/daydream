@@ -375,9 +375,10 @@ export function createChainStrip({
   /**
    * Toggles a modulation's authored enabled state or another stage's session bypass.
    * @param {string} label - The instance label.
+   * @param {string|null} [focusControl] - Header control to retain after a pointer toggle.
    * @returns {void}
    */
-  const toggleStage = (label) => {
+  const toggleStage = (label, focusControl = null) => {
     if (store.chain().find((entry) => entry.label === label)?.operator === MODULATION_OPERATOR) {
       const id = `${label}.modulation-enabled`;
       if (!parameterLive(id)) {
@@ -400,7 +401,7 @@ export function createChainStrip({
       return;
     }
     announce('');
-    render({ focusLabel: label, focusControl: '.chain-chip-bypass' });
+    render({ focusLabel: label, focusControl });
     onApply();
   };
 
@@ -1021,7 +1022,6 @@ export function createChainStrip({
       }
       toggle.type = 'button';
       toggle.setAttribute('tabindex', '0');
-      toggle.setAttribute('aria-keyshortcuts', 'b');
       toggle.disabled = !bypassable;
       toggle.setAttribute('aria-pressed', String(isBypassed));
       toggle.setAttribute('aria-label', `Bypass ${op.name} · ${entry.label}`);
@@ -1030,7 +1030,7 @@ export function createChainStrip({
       toggle.textContent = '◉';
       toggle.addEventListener('click', (/** @type {*} */ event) => {
         event.stopPropagation();
-        toggleStage(entry.label);
+        toggleStage(entry.label, '.chain-chip-bypass');
       });
       header.appendChild(toggle);
     }
@@ -1073,7 +1073,6 @@ export function createChainStrip({
       const remove = el('button', 'chain-chip-remove');
       remove.type = 'button';
       remove.setAttribute('tabindex', '0');
-      remove.setAttribute('aria-keyshortcuts', 'Delete Backspace');
       remove.setAttribute('aria-label', `Remove ${op.name} · ${entry.label}`);
       remove.setAttribute('title', 'Delete');
       remove.textContent = '×';

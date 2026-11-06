@@ -749,6 +749,21 @@ test('bypass toggles the program shape without touching the document', async () 
   assert.equal(chipByLabel(h, 'lens').classList.contains('chain-chip--bypassed'), false);
 });
 
+test('keyboard bypass retains chip focus for repeated toggles and arrow navigation', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'lens').focus();
+  h.doc.activeElement.dispatch('keydown', {key: 'b'});
+  assert.equal(h.doc.activeElement === chipByLabel(h, 'lens'), true);
+  assert.deepEqual(h.store.bypassedLabels(), ['lens']);
+  h.doc.activeElement.dispatch('keydown', {key: 'b'});
+  assert.equal(h.doc.activeElement === chipByLabel(h, 'lens'), true);
+  assert.deepEqual(h.store.bypassedLabels(), []);
+  for (const selector of ['.chain-chip-bypass', '.chain-chip-remove'])
+    assert.equal(chipByLabel(h, 'lens').querySelector(selector).getAttribute('aria-keyshortcuts'), null);
+  h.doc.activeElement.dispatch('keydown', {key: 'ArrowRight'});
+  assert.equal(h.doc.activeElement === chipByLabel(h, 'project'), true);
+});
+
 test('a bypass unavailable to the render is disabled, with the reason in text', async () => {
   let compiledSide = false;
   const h = await makeStrip({ bypassAvailable: () => !compiledSide });
