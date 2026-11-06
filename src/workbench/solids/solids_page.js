@@ -1104,11 +1104,11 @@ function updateOpParam(index, key, value, revision) {
   // truncate and bevel short-circuit to ambo at t == 0.5, so a slider tick can
   // change the topology and goes through the gate.
   if (opTopologyKey(state.ops[index]) !== opTopologyKey(candidateOp)) {
-    const candidate = structuredClone(state.ops);
-    candidate[index] = candidateOp;
     scheduleUpdate.cancel();
     queueCommit(async () => {
       if (revision !== opsRevision || parameterEdits.get(editKey) !== edit) return;
+      const candidate = structuredClone(state.ops);
+      candidate[index].params[key] = val;
       const check = await chainIsValid(state.base, candidate);
       if (revision !== opsRevision || parameterEdits.get(editKey) !== edit) return;
       if (check.ok) {

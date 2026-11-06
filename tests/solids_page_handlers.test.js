@@ -2,12 +2,40 @@ import { loadSavedSolids, persistSavedSolids as persistSavedStore, mergeSavedSol
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
-import { authoredParamRange, generateFuncAndRecipe, movedOps, OP_DEFS, savedChainShapeError, savedSolidExportError, seedOpParams, snapToStep } from '../src/workbench/solids/solid_codegen.js';
+import { authoredParamRange, generateFuncAndRecipe, movedOps, opTopologyKey, OP_DEFS, savedChainShapeError, savedSolidExportError, seedOpParams, snapToStep } from '../src/workbench/solids/solid_codegen.js';
 import { registryDisplayName } from '../src/workbench/solids/solid_registry_codegen.js';
 import { createPointerDrag } from '../src/shared/pointer_drag.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
 const handler = pageHandlers(new URL('../src/workbench/solids/solids_page.js', import.meta.url));
+
+test('queued topology edits validate the live result of earlier commits', async () => {
+  const state = {base: 'cube', ops: [
+    {op: 'truncate', params: {t: 0.5}}, {op: 'bevel', params: {t: 0.5}},
+  ]};
+  const queued = [];
+  const checked = [];
+  const messages = [];
+  const updateOpParam = handler('updateOpParam', {
+    state, opsRevision: 1, parameterEdits: new Map(), OP_DEFS,
+    opTopologyKey, authoredParamRange, snapToStep, structuredClone,
+    document: {getElementById: () => ({children: []})},
+    scheduleUpdate: {cancel() {}}, queueCommit: task => queued.push(task),
+    chainIsValid: async (base, candidate) => {
+      checked.push(structuredClone(candidate));
+      return {ok: candidate.filter(op => op.params.t !== 0.5).length <= 1,
+        message: 'combined topology exceeds the limit'};
+    },
+    showGateMsg: message => messages.push(message), renderOps() {}, update() {},
+  });
+  updateOpParam(0, 't', '0.25', 1);
+  updateOpParam(1, 't', '0.25', 1);
+  assert.equal(queued.length, 2);
+  for (const task of queued) await task();
+  assert.deepEqual(checked.map(ops => ops.map(op => op.params.t)), [[0.25, 0.5], [0.25, 0.25]]);
+  assert.deepEqual(state.ops.map(op => op.params.t), [0.25, 0.5]);
+  assert.equal(messages.at(-1), 'rejected: combined topology exceeds the limit');
+});
 
 for (const action of ['addOp', 'removeOp', 'resetOps', 'reorderOp', 'updateOpParam']) {
   test(`successful ${action} clears a stale gate refusal before rendering`, async () => {
