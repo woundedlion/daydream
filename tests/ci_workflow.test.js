@@ -21,10 +21,36 @@ const WORKFLOW_PATH = `${WORKFLOW_DIR}/ci.yml`;
 const DEPLOY_PATH = `${WORKFLOW_DIR}/deploy.yml`;
 const workflowText = (name) => readFileSync(
   resolve(REPO, name.startsWith(WORKFLOW_DIR + '/') ? name : `${WORKFLOW_DIR}/${name}`), 'utf8');
+const workflowFiles = () => readdirSync(resolve(REPO, WORKFLOW_DIR))
+  .filter((name) => /\.ya?ml$/.test(name));
+const packageJson = () => JSON.parse(readFileSync(resolve(REPO, 'package.json'), 'utf8'));
+
+/** @param {string} source @param {string} name @returns {string} A top-level job block. */
+function jobBlock(source, name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const start = new RegExp(`^ {2}${escaped}:[ \t]*(?:#.*)?\r?$`, 'm').exec(source);
+  if (!start) return '';
+  const offset = start.index + start[0].length;
+  const next = source.slice(offset).search(/^(?: {2}[^ \t\r\n#]|[^ \t\r\n#])/m);
+  return source.slice(start.index, next < 0 ? undefined : offset + next);
+}
+
 const workflow = workflowText('ci.yml');
 
+test('job blocks ignore deeper matching keys and stop at the next job', () => {
+  const source = 'jobs:\n  before:\n    env:\n      js-tests: decoy\n'
+    + '  js-tests:\n    needs: gate\n# shared comment\n    runs-on: ubuntu-latest\n'
+    + '  after:\n    needs: unrelated\n';
+  const block = jobBlock(source, 'js-tests');
+  assert.match(block, /^ {2}js-tests:\n/);
+  assert.match(block, /needs: gate/);
+  assert.match(block, /runs-on: ubuntu-latest/);
+  assert.doesNotMatch(block, /decoy|unrelated|after:/);
+  assert.equal(jobBlock(source, 'absent'), '');
+});
+
 test('npm test retains discovery and coverage guards', () => {
-  const scripts = JSON.parse(readFileSync(resolve(REPO, 'package.json'), 'utf8')).scripts;
+  const scripts = packageJson().scripts;
   assert.equal(scripts.pretest, 'node scripts/require-tests.mjs');
   assert.equal(scripts.test, 'node scripts/run-tests.mjs --experimental-test-module-mocks ' +
     '"tests/**/*.test.js" "tests/**/*.test.mjs" "tests/**/*.spec.js" "tests/**/*.spec.mjs"');
@@ -33,7 +59,7 @@ test('npm test retains discovery and coverage guards', () => {
 // The prepare script is the only thing that points git at .githooks, and a
 // hook the index holds without its executable bit is never run.
 test('npm install points git at the tracked hooks, every one executable', () => {
-  const scripts = JSON.parse(readFileSync(resolve(REPO, 'package.json'), 'utf8')).scripts;
+  const scripts = packageJson().scripts;
   assert.equal(scripts.prepare, 'git config core.hooksPath .githooks');
   const hooks = execFileSync('git', ['-C', REPO, 'ls-files', '-s', '--', '.githooks'], { encoding: 'utf8' })
     .trim().split(/\n/).map((line) => line.split(/\s+/));
@@ -71,10 +97,9 @@ test('the reusable suite lints the workflow YAML and the bash inside it', () => 
 });
 
 // Every `node-version:` spelling under .github/workflows, tagged with its file.
-const nodePins = (dir) => readdirSync(resolve(REPO, dir))
-  .filter((file) => /\.ya?ml$/.test(file))
+const nodePins = () => workflowFiles()
   .flatMap((file) => [
-    ...workflowText(`${dir}/${file}`).matchAll(/node-version:\s*'?([^'\s]+)'?/g),
+    ...workflowText(file).matchAll(/node-version:\s*'?([^'\s]+)'?/g),
   ].map((match) => `${file}: ${match[1]}`));
 
 /** @param {string} source @returns {string[]} The workflow's `on:` trigger names. */
@@ -97,7 +122,7 @@ const triggersOf = (source) => {
 // other one is reachable on its own and needs a terminal job on the list.
 test('GATED_WORKFLOWS names every directly triggered workflow', () => {
   assert.deepEqual(triggersOf(workflow), ['push', 'pull_request']);
-  const direct = readdirSync(resolve(REPO, WORKFLOW_DIR)).filter((file) => /\.ya?ml$/.test(file))
+  const direct = workflowFiles()
     .map((file) => `${WORKFLOW_DIR}/${file}`)
     .filter((path) => triggersOf(workflowText(path))
       .some((trigger) => trigger !== 'workflow_call'));
@@ -145,11 +170,11 @@ test('ci-green dependency check rejects an omitted job', () => {
 });
 
 test('every workflow pins the Node version package.json requires', () => {
-  const required = JSON.parse(readFileSync(resolve(REPO, 'package.json'), 'utf8')).engines.node;
+  const required = packageJson().engines.node;
   assert.match(required, /^\d+\.\d+\.\d+$/,
     'package.json engines.node names one full version');
   assert.equal(readFileSync(resolve(REPO, '.nvmrc'), 'utf8').trim(), required);
-  const pins = nodePins(WORKFLOW_DIR);
+  const pins = nodePins();
   assert.ok(pins.length >= 3, 'the workflows still pin the Node version themselves');
   assert.deepEqual(pins.filter((pin) => !pin.endsWith(`: ${required}`)), [],
     `every setup-node pin must read ${required}`);
@@ -193,7 +218,7 @@ test('setup-node pins are scoped to their own step and with mapping', () => {
 
 test('every setup-node action supplies a Node version pin', () => {
   let setups = 0;
-  for (const file of readdirSync(resolve(REPO, WORKFLOW_DIR)).filter((name) => /\.ya?ml$/.test(name))) {
+  for (const file of workflowFiles()) {
     const source = workflowText(file);
     const steps = setupNodeSteps(source);
     setups += steps.length;
@@ -203,8 +228,7 @@ test('every setup-node action supplies a Node version pin', () => {
 });
 
 test('deployment has no job condition that can bypass dependency success', () => {
-  const deploy = workflowText('deploy.yml')
-    .split(/^ {2}deploy:\s*$/m)[1]?.split(/^ {2}\S/m)[0];
+  const deploy = jobBlock(workflowText('deploy.yml'), 'deploy');
   assert.ok(deploy);
   assert.doesNotMatch(deploy, /^ {4}if:/m);
 });
@@ -231,7 +255,7 @@ test('the job scan reads a quoted key and refuses a spelling it cannot', () => {
 });
 
 test('external workflow actions use immutable commit pins', () => {
-  for (const file of readdirSync(resolve(REPO, WORKFLOW_DIR)).filter((name) => /\.ya?ml$/.test(name))) {
+  for (const file of workflowFiles()) {
     const source = workflowText(file);
     for (const match of source.matchAll(/^\s*(?:-\s*)?uses:\s*([^\s#]+)/gm)) {
       const action = match[1];
@@ -294,13 +318,13 @@ test('an absent, empty, or unusable payload is an error', () => {
 });
 
 test('the gating job hands the script every job it needs', () => {
-  const step = workflow.slice(workflow.indexOf('  ci-green:'));
+  const step = jobBlock(workflow, 'ci-green');
   assert.match(step, /RESULTS: \$\{\{ toJSON\(needs\) \}\}/);
   assert.match(step, /node scripts\/verify-ci-green\.mjs/);
 });
 
 test('ci-green runs after failed dependencies', () => {
-  const gate = workflow.split(/^ {2}ci-green:\s*$/m)[1]?.split(/^ {2}\S/m)[0];
+  const gate = jobBlock(workflow, 'ci-green');
   assert.ok(gate);
   assert.match(gate, /^ {4}if: always\(\)\s*$/m);
 
@@ -309,7 +333,7 @@ test('ci-green runs after failed dependencies', () => {
 test('PR suites consume the provenance-gated bundle before CI can pass', () => {
   assert.match(workflow, /uses: \.\/\.github\/workflows\/engine-bundle\.yml/);
   for (const suite of ['js-tests', 'browser']) {
-    const block = workflow.split(`  ${suite}:`)[1].split(/^ {2}[^ ]/m)[0];
+    const block = jobBlock(workflow, suite);
     assert.match(block, /needs: gate/);
     assert.match(block, /engine-sha: \$\{\{ needs\.gate\.outputs\.pin \}\}/);
   }
@@ -385,7 +409,7 @@ test('expiring bundles warn and expired bundles explain fresh dispatch recovery'
 test('engine bundle callers grant Actions read at the bundle gate, not workflow scope', () => {
   for (const path of [WORKFLOW_PATH, DEPLOY_PATH]) {
     const source = workflowText(path);
-    const gate = source.split(/^ {2}gate:\s*$/m)[1]?.split(/^ {2}\S/m)[0];
+    const gate = jobBlock(source, 'gate');
     assert.ok(gate, `${path} has an engine gate`);
     assert.match(gate, /^ {4}permissions:\s*\n {6}contents: read\s*\n {6}actions: read\s*$/m, path);
     assert.match(gate, /uses: \.\/\.github\/workflows\/engine-bundle\.yml/, path);
@@ -467,7 +491,7 @@ test('required suite steps execute without suppression', () => {
 });
 
 test('every workflow and required browser or engine gate rejects suppression', () => {
-  for (const name of readdirSync(resolve(REPO, WORKFLOW_DIR)).filter((name) => /\.ya?ml$/.test(name))) {
+  for (const name of workflowFiles()) {
     const source = workflowText(name);
     assert.doesNotMatch(source, /^\s*continue-on-error:/m, name);
     assert.doesNotMatch(source, /\|\|\s*(?:true\b|:(?:\s|$))|^\s*set \+e\b/m, name);
@@ -496,7 +520,7 @@ test('scheduled deployment runs cannot replace pending manual dispatches', () =>
 
 test('all event types serialize final pair checks, publication and recording in one job', () => {
   const deploy = workflowText('deploy.yml');
-  const job = deploy.split(/^ {2}deploy:\n/m)[1].split(/^ {2}[\w-]+:\n/m)[0];
+  const job = jobBlock(deploy, 'deploy');
   assert.match(job, /^ {4}concurrency:\n {6}group: pages-publication\n {6}cancel-in-progress: false/m);
   const check = job.indexOf('run: node scripts/deployment-pair.mjs check');
   const publish = job.indexOf('uses: actions/deploy-pages@');
@@ -601,24 +625,24 @@ test('deployment MIME and presence checks cover every published engine module', 
 });
 
 test('deploy consumes one checksummed engine bundle at the module pin', () => {
-  const workflow = workflowText('engine-bundle.yml');
-  assert.match(workflow, /holosphere-engine-\$PIN/);
-  assert.match(workflow, /head_sha=\$PIN&branch=master&per_page=10/);
-  assert.match(workflow,
+  const source = workflowText('engine-bundle.yml');
+  assert.match(source, /holosphere-engine-\$PIN/);
+  assert.match(source, /head_sha=\$PIN&branch=master&per_page=10/);
+  assert.match(source,
     /select\(\.event == "push" or \.event == "workflow_dispatch"\)/);
-  assert.match(workflow, /sha256sum -c holosphere_engine\.sha256/);
-  assert.match(workflow, /node scripts\/install-engine-bundle\.mjs engine-bundle/);
-  assert.doesNotMatch(workflow, /cmp -s/);
-  assert.doesNotMatch(workflow, /cmake --build|path: engine\s*$/m);
+  assert.match(source, /sha256sum -c holosphere_engine\.sha256/);
+  assert.match(source, /node scripts\/install-engine-bundle\.mjs engine-bundle/);
+  assert.doesNotMatch(source, /cmp -s/);
+  assert.doesNotMatch(source, /cmake --build|path: engine\s*$/m);
 });
 
 // A served Content-Type needs a live URL, so only the assets behind it can be
 // checked ahead of the deployment; the presence check is that half.
 test('deploy checks the engine assets it stages before it publishes them', () => {
-  const workflow = workflowText('deploy.yml');
-  const staged = workflow.indexOf('name: Verify the staged engine assets');
-  const published = workflow.indexOf('uses: actions/deploy-pages@');
-  const served = workflow.indexOf('name: Verify published engine MIME types');
+  const source = workflowText('deploy.yml');
+  const staged = source.indexOf('name: Verify the staged engine assets');
+  const published = source.indexOf('uses: actions/deploy-pages@');
+  const served = source.indexOf('name: Verify published engine MIME types');
   assert.ok(staged >= 0 && published >= 0 && served >= 0,
     `staged ${staged}, published ${published}, served ${served}`);
   assert.ok(staged < published, 'the staged assets are checked before publication');
@@ -626,15 +650,15 @@ test('deploy checks the engine assets it stages before it publishes them', () =>
 });
 
 test('deploy stops waiting when the pinned engine run cannot publish', () => {
-  const workflow = workflowText('engine-bundle.yml');
-  assert.match(workflow, /if \[ "\$run_status" = completed \]/);
-  assert.match(workflow, /POV CI for \$PIN concluded \$run_conclusion/);
-  assert.match(workflow, /published no verified engine bundle/);
+  const source = workflowText('engine-bundle.yml');
+  assert.match(source, /if \[ "\$run_status" = completed \]/);
+  assert.match(source, /POV CI for \$PIN concluded \$run_conclusion/);
+  assert.match(source, /published no verified engine bundle/);
 });
 
 test('the engine checkout can fetch a pin after master advances', () => {
-  const workflow = workflowText('js-unit-suite.yml');
-  const checkout = workflow.match(
+  const source = workflowText('js-unit-suite.yml');
+  const checkout = source.match(
     /- name: Checkout the pinned engine\n[\s\S]*?(?=\n\s{6}- )/,
   )?.[0] ?? '';
   assert.match(checkout, /fetch-depth: 1/);
@@ -643,12 +667,12 @@ test('the engine checkout can fetch a pin after master advances', () => {
 
 // The engine-parity and hook cases skip without their flags.
 test('the JS unit suite arms the engine-parity and hook cases', () => {
-  const workflow = workflowText('js-unit-suite.yml');
-  const checkout = workflow.match(
+  const source = workflowText('js-unit-suite.yml');
+  const checkout = source.match(
     /- name: Checkout the pinned engine\n[\s\S]*?(?=\n\s{6}- )/,
   )?.[0] ?? '';
   assert.match(checkout, /^\s+path: engine$/m);
-  const step = workflow.match(/- name: Test\n[\s\S]*?(?=\n\s{6}- |\s*$)/)?.[0] ?? '';
+  const step = source.match(/- name: Test\n[\s\S]*?(?=\n\s{6}- |\s*$)/)?.[0] ?? '';
   assert.match(step, /^\s+HOLOSPHERE_ENGINE_REQUIRED: '1'$/m);
   assert.match(step, /^\s+DAYDREAM_HOOK_SH_REQUIRED: '1'$/m);
   assert.match(step, /^\s+run: npm test$/m);
@@ -657,11 +681,11 @@ test('the JS unit suite arms the engine-parity and hook cases', () => {
 test('CI checks source parity after installing the selected runtime', () => {
   const suite = workflowText('js-unit-suite.yml');
   const install = suite.indexOf('name: Install the verified engine package');
-  const resolve = suite.indexOf('name: Resolve engine pin');
+  const resolvePin = suite.indexOf('name: Resolve engine pin');
   const checkout = suite.indexOf('name: Checkout the pinned engine');
   assert.ok(install >= 0, 'verified package install step exists');
-  assert.ok(resolve >= 0, 'engine pin resolution step exists');
+  assert.ok(resolvePin >= 0, 'engine pin resolution step exists');
   assert.ok(checkout >= 0, 'pinned engine checkout step exists');
-  assert.ok(install < resolve);
-  assert.ok(resolve < checkout);
+  assert.ok(install < resolvePin);
+  assert.ok(resolvePin < checkout);
 });
