@@ -21,6 +21,8 @@ validates the package's source pin and owned paths, and overlays it on the
 selected daydream checkout. Unit tests, source parity, browser probes and Pages
 all consume that same package. PR checks use the PR merge checkout and resolve
 Holosphere master once in their engine gate.
+Transient API failures are retried; only successful responses supply run and
+artifact metadata.
 
 Generated WASM glue, binary, provenance files and engine catalog are ignored
 local build outputs. A fresh checkout needs an engine install before running

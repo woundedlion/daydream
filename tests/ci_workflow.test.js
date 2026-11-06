@@ -516,6 +516,7 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
     .replaceAll('/tmp/engine-bundle.zip', '"$FIXTURE_ROOT/bundle.zip"');
   const stubs = `
     sleep() { :; }
+    fail_api() { printf '{"message":"temporary API failure"}'; return 1; }
     python3() { test "$(cat "$FIXTURE_ROOT/bundle.zip")" = bundle; }
     gh() {
       case "$2" in
@@ -531,13 +532,13 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
       printf '%s' "$n" > "$counter"
       case "$kind" in
         query)
-          if [ "$FIRST_FAIL" = true ]; then return 1; fi
-          if [ "$FIRST_FAIL" = transient ] && [ "$n" = 1 ]; then return 1; fi
+          if [ "$FIRST_FAIL" = true ]; then fail_api; return 1; fi
+          if [ "$FIRST_FAIL" = transient ] && [ "$n" = 1 ]; then fail_api; return 1; fi
           if [ "$n" = 1 ]; then return 0; fi
-          if [ "$n" = 2 ]; then return 1; fi
+          if [ "$n" = 2 ]; then fail_api; return 1; fi
           printf '13\\tcompleted\\tfailure\\t%s\\n12\\tcompleted\\tsuccess\\t%s\\n' "$PIN" "$PIN" ;;
         artifact)
-          if [ "$n" -lt 3 ]; then return 1; fi
+          if [ "$n" -lt 3 ]; then fail_api; return 1; fi
           case "$4" in
             *length) printf '1\\n' ;;
             *) printf '42\\tfalse\\t2030-01-01\\n' ;;
@@ -558,6 +559,8 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
     });
     const exhausted = firstFail === true;
     assert.equal(result.status, exhausted ? 1 : 0, result.stderr + result.stdout);
+    assert.doesNotMatch(result.stdout, /"message":/);
+    assert.doesNotMatch(result.stderr, /integer expression expected/);
     assert.equal(readFileSync(join(fixture, 'query'), 'utf8'), exhausted ? '4' : '3');
     if (!exhausted) {
       assert.equal(readFileSync(join(fixture, 'artifact'), 'utf8'), '4');

@@ -60,9 +60,12 @@ jobs:
           PIN: ${{ steps.engine.outputs.pin }}
         run: |
           retry_api() {
-            local attempt
+            local attempt out
             for attempt in 1 2 3 4; do
-              if gh api "$@"; then return 0; fi
+              if out="$(gh api "$@")"; then
+                printf '%s\n' "$out"
+                return 0
+              fi
               if [ "$attempt" -lt 4 ]; then sleep 5; fi
             done
             return 1
