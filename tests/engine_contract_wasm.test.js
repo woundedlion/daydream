@@ -395,6 +395,36 @@ test('applied chain definitions and parameter pause behavior match the fake engi
   }
 });
 
+test('modulation writes and batches match the engine admission and atomicity', () => {
+  const fake = new FakeChainEngine();
+  for (const target of [engine, fake]) {
+    target.setEffect('ShaderChain');
+    assert.equal(chainCall(target, 'setShaderChain', [...DEFAULT_CHAIN,
+      {instance: 'modulation', operator: 'color.modulate.v1'}]).code, 'APPLIED');
+    target.setAnimationsPaused(false);
+    const before = chainCall(target, 'getSnapshot');
+    for (const [field, value] of [['modulation-source', 1], ['pattern-scale', 9],
+      ['pattern-noise-basis', 1], ['pattern-contrast', 1]]) {
+      assert.equal(target.setParameter(`modulation.${field}`, value).value,
+        M.ParamSetResult.INADMISSIBLE.value, field);
+      assert.deepEqual(chainCall(target, 'getSnapshot'), before, field);
+    }
+    assert.equal(chainCall(target, 'setShaderChainParameters', [
+      {name: 'camera.wander', value: 0.4}, {name: 'modulation.pattern-scale', value: 9},
+    ]).value, M.ParamSetResult.INADMISSIBLE.value);
+    assert.deepEqual(chainCall(target, 'getSnapshot'), before);
+    assert.equal(chainCall(target, 'setShaderChainParameters', [
+      {name: 'modulation.modulation-source', value: 1},
+      {name: 'modulation.modulation-evaluation', value: 0},
+    ]).value, M.ParamSetResult.APPLIED.value);
+    const recipe = chainCall(target, 'getSnapshot').modulation[0].recipe;
+    assert.equal(recipe.source, 1);
+    assert.equal(recipe.evaluation, 0);
+    assert.equal(target.getAnimationsPaused(), true);
+  }
+  assert.deepEqual(fake.getParameterDefinitions(), engine.getParameterDefinitions());
+});
+
 test('chain refusal statuses match the fake engine payload contracts', () => {
   const fake = new FakeChainEngine();
   fake.setEffect('ShaderChain');

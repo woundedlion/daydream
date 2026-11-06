@@ -88,8 +88,8 @@ function validModulationRecipe(recipe, definitions, instance) {
  * and an injectable refusal.
  */
 export class FakeChainEngine {
-  constructor() {
-    this.catalog = JSON.parse(CHAIN_CATALOG_TEXT);
+  constructor(catalog = JSON.parse(CHAIN_CATALOG_TEXT)) {
+    this.catalog = catalog;
     this.bindings = {
       setShaderChain: (entries) => this.#setShaderChain(entries),
       setShaderChainParameters: (writes) => this.#setShaderChainParameters(writes),
@@ -303,8 +303,7 @@ export class FakeChainEngine {
             || snapshot.parameters.some((entry) => !entry || typeof entry.name !== 'string'
               || typeof entry.value !== 'number'))
           return ChainSnapshotRestoreResult.INVALID_VALUE;
-        const candidate = new FakeChainEngine();
-        candidate.catalog = this.catalog;
+        const candidate = new FakeChainEngine(this.catalog);
         candidate.effect = 'ShaderChain';
         if (candidate.#setShaderChain(snapshot.chain).code !== 'APPLIED')
           return ChainSnapshotRestoreResult.INVALID_CHAIN;
@@ -381,18 +380,29 @@ export class FakeChainEngine {
   setDocumentParameter() { return ParamSetResult.UNKNOWN_PARAM; }
 
   setParameter(name, value) {
+    return this.#writeParameter(name, value, true);
+  }
+
+  #writeParameter(name, value, validate) {
     const definition = this.definitions.find((d) => d.name === name);
     if (!definition) return ParamSetResult.UNKNOWN_PARAM;
     if (typeof value !== 'number' || !Number.isFinite(value))
       return ParamSetResult.NON_FINITE;
     const accepted = Math.fround(Math.max(definition.min, Math.min(definition.max,
       definition.options ? Math.round(value) : value)));
-    definition.value = accepted;
-    definition.requestedValue = accepted;
-    definition.acceptedValue = accepted;
     const [instance, field] = name.split('.');
     const recipe = this.modulation?.find((entry) => entry.instance === instance)?.recipe;
     const path = MODULATION_PATHS[field];
+    if (validate && recipe && path) {
+      const candidate = structuredClone(recipe);
+      const target = path.slice(0, -1).reduce((value, key) => value[key], candidate);
+      target[path.at(-1)] = field === 'modulation-enabled' ? Boolean(accepted) : accepted;
+      if (!validModulationRecipe(candidate, this.definitions, instance))
+        return ParamSetResult.INADMISSIBLE;
+    }
+    definition.value = accepted;
+    definition.requestedValue = accepted;
+    definition.acceptedValue = accepted;
     if (recipe && path) {
       const target = path.slice(0, -1).reduce((value, key) => value[key], recipe);
       target[path.at(-1)] = field === 'modulation-enabled' ? Boolean(accepted) : accepted;
@@ -420,9 +430,20 @@ export class FakeChainEngine {
       if (typeof value !== 'number' || !Number.isFinite(value))
         return ParamSetResult.NON_FINITE;
     }
-    for (const { name, value } of writes) {
-      this.setParameter(name, value);
-    }
+    const candidate = new FakeChainEngine(this.catalog);
+    candidate.definitions = structuredClone(this.definitions);
+    candidate.modulation = structuredClone(this.modulation);
+    candidate.runtime = structuredClone(this.runtime);
+    candidate.paused = this.paused;
+    for (const { name, value } of writes) candidate.#writeParameter(name, value, false);
+    if (candidate.modulation.some(({instance, recipe}) =>
+      !validModulationRecipe(recipe, candidate.definitions, instance)))
+      return ParamSetResult.INADMISSIBLE;
+    this.definitions = candidate.definitions;
+    this.modulation = candidate.modulation;
+    this.runtime = candidate.runtime;
+    this.paused = candidate.paused;
+    this.writes.push(...candidate.writes);
     return ParamSetResult.APPLIED;
   }
 
