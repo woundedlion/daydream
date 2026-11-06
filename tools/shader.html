@@ -48,9 +48,9 @@
       <div id="shader-document-error" class="visually-hidden" role="alert" aria-live="assertive"></div>
       <div id="global-stats-desktop">
         <table class="global-stats global-stats--desktop">
-          <caption class="visually-hidden">Engine memory and compute</caption>
+          <caption class="visually-hidden">Engine memory and compute. Arena cells read usage | high-water | capacity in KiB; Stack reads high-water | capacity.</caption>
           <thead>
-            <tr class="stats-head"><th scope="col">Scratch A KiB</th><th scope="col">Scratch B KiB</th><th scope="col">Persistent KiB</th><th scope="col">Stack KiB</th><th scope="col">Compute</th></tr>
+            <tr class="stats-head"><th scope="col" title="usage | high-water | capacity in KiB">Scratch A KiB</th><th scope="col" title="usage | high-water | capacity in KiB">Scratch B KiB</th><th scope="col" title="usage | high-water | capacity in KiB">Persistent KiB</th><th scope="col" title="high-water | capacity in KiB">Stack KiB</th><th scope="col">Compute</th></tr>
           </thead>
           <tbody>
             <tr><td id="stat-scratch-a"></td><td id="stat-scratch-b"></td><td id="stat-persistent"></td><td id="stat-stack"></td><td id="perf-stats" class="perf-time"></td></tr>
@@ -60,9 +60,9 @@
     </div>
     <div id="stats-bar" class="stats-bar">
       <table class="global-stats global-stats--mobile">
-        <caption class="visually-hidden">Engine memory and compute</caption>
+        <caption class="visually-hidden">Engine memory and compute. Arena cells read usage | high-water | capacity in KiB; Stack reads high-water | capacity.</caption>
         <thead>
-          <tr class="stats-head"><th scope="col">Scratch A</th><th scope="col">Scratch B</th><th scope="col">Persistent</th><th scope="col">Stack</th><th scope="col">Compute</th></tr>
+          <tr class="stats-head"><th scope="col" title="usage | high-water | capacity in KiB">Scratch A KiB</th><th scope="col" title="usage | high-water | capacity in KiB">Scratch B KiB</th><th scope="col" title="usage | high-water | capacity in KiB">Persistent KiB</th><th scope="col" title="high-water | capacity in KiB">Stack KiB</th><th scope="col">Compute</th></tr>
         </thead>
         <tbody>
           <tr><td id="stat-scratch-a-m"></td><td id="stat-scratch-b-m"></td><td id="stat-persistent-m"></td><td id="stat-stack-m"></td><td id="perf-stats-mobile" class="perf-time"></td></tr>
