@@ -53,7 +53,7 @@ for (const action of ['addOp', 'removeOp', 'resetOps', 'reorderOp', 'updateOpPar
       document: {getElementById: () => ({children: [row, row]}), querySelector: () => null},
       window: {confirm: () => true}, parameterEdits: new Map(), OP_DEFS: {}, structuredClone,
       syncSweepWarning() {},
-      opTopologyKey: op => op.params.t === 0.5, scheduleUpdate: {cancel() {}},
+      opTopologyKey, scheduleUpdate: {cancel() {}},
     };
     const call = handler(action, context);
     if (action === 'addOp') call('kis');
@@ -516,7 +516,7 @@ test('a refused topology tick repaints the restored chain', async () => {
   const context = {
     state, opsRevision: 1, OP_DEFS: {}, structuredClone, parameterEdits: new Map(),
     document: { getElementById: () => ({ children: [] }) },
-    opTopologyKey: (entry) => entry.params.t === 0.5,
+    opTopologyKey,
     scheduleUpdate: { cancel() {} }, queueCommit: (fn) => { queued = fn; },
     chainIsValid: async () => ({ ok: false, message: 'too large' }),
     showGateMsg() {}, renderOps() {}, update: () => painted.push(state.ops[0].params.t),
@@ -549,7 +549,7 @@ test('an accepted topology tick keeps the focused input and publishes after vali
   const context = {
     state, opsRevision: 1, OP_DEFS: {}, structuredClone, parameterEdits: new Map(),
     document: { getElementById: () => ({ children: [] }) },
-    opTopologyKey: (entry) => entry.params.t === 0.5,
+    opTopologyKey,
     scheduleUpdate: { cancel() {} }, queueCommit: (fn) => { queued = fn; },
     chainIsValid: async (base, ops) => {
       assert.equal(ops[0].params.t, 0.5);
@@ -573,7 +573,7 @@ test('a topology commit cannot overwrite an edit returning to the same value', a
   const context = {
     state, opsRevision: 1, OP_DEFS: {}, structuredClone, parameterEdits: new Map(),
     document: { getElementById: () => ({ children: [] }) },
-    opTopologyKey: (entry) => entry.params.t === 0.5,
+    opTopologyKey,
     scheduleUpdate: Object.assign(() => {}, { cancel() {} }),
     queueCommit: (fn) => { queued = fn; },
     chainIsValid: () => new Promise((resolve) => { resolveCheck = resolve; }),
@@ -641,7 +641,7 @@ test('a refused topology tick restores focus to the same parameter input', async
     let rows = [oldRow];
     const context = {state, opsRevision: 1, OP_DEFS: {}, structuredClone, parameterEdits: new Map(),
       document: {activeElement: oldInput, getElementById: () => ({children: [{querySelectorAll: () => rows}]})},
-      opTopologyKey: (op) => op.params.t === 0.5, formatParamValue: String, syncSweepWarning() {},
+      opTopologyKey, formatParamValue: String, syncSweepWarning() {},
       scheduleUpdate: {cancel() {}}, queueCommit: (fn) => { queued = fn; },
       chainIsValid: async () => ({ok: false, message: 'refused'}), showGateMsg() {}, update() {},
       renderOps() { rows = [{dataset: {key: 't'}, querySelector(selector) { assert.equal(selector, `input[type="${type}"]`); return newInput; }}]; }};
