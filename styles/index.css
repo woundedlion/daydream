@@ -955,7 +955,7 @@ div.label {
   right: 8px;
   z-index: 150;
   pointer-events: none;
-  background: rgb(var(--page-bg-rgb) / 0.75);
+  background: rgb(var(--page-bg-rgb) / 0.88);
   border: 1px solid rgb(var(--bright-text-rgb) / 0.15);
   border-radius: 6px;
   padding: 6px 10px;
@@ -1026,7 +1026,6 @@ div.label {
 /* The fault and spawning notices that stand in for the table. */
 .segment-stats .seg-status {
   padding: 6px;
-  font-size: 0.85em;
   color: var(--muted-text);
 }
 

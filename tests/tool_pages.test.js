@@ -714,6 +714,14 @@ function contrast(css, text, surfaces) {
   return (light + 0.05) / (dark + 0.05);
 }
 
+test('segment status text retains AA contrast over a white canvas', () => {
+  const css = `${read('styles', 'index.css')} .white-canvas { background: #fff; }`;
+  for (const selector of ['.segment-stats .seg-status', '.segment-stats .seg-status.seg-fault']) {
+    const ratio = contrast(css, selector, ['.segment-stats', '.white-canvas']);
+    assert.ok(ratio >= AA_CONTRAST, `${selector} contrast is ${ratio.toFixed(2)}:1`);
+  }
+});
+
 test('CSS readers ignore comments and honor later declarations', () => {
   const css = '/* .comment-only {} */ .real { color: #111111; } .real { color: #222222; }';
   assert.deepEqual([...definedClasses(css)], ['real']);
