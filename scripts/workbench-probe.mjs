@@ -990,17 +990,21 @@ export async function probeNoiseScaleDrag(tab) {
   });
   await tab.mouse.move(start.x + 8 + start.fraction * (start.width - 16), start.y);
   await tab.mouse.down();
-  await tab.mouse.move(start.x + start.width * 0.8, start.y, { steps: 15 });
+  await tab.mouse.move(start.x + start.width * 0.9, start.y, { steps: 15 });
   await tab.mouse.up();
   const edited = await tab.$eval(selector, (node) => ({
-    retained: node.dataset.dragProbe === 'noise-scale', value: Number(node.value),
+    retained: node.dataset.dragProbe === 'noise-scale', position: Number(node.value),
+    value: 2 ** Number(node.value),
     scroll: document.querySelector('.chain-strip-viewport').scrollTop,
     status: document.getElementById('shader-document-status').dataset.status,
   }));
   check(edited.retained && Math.abs(edited.scroll - start.scroll) < 1,
     'dragging Noise scale keeps the slider mounted and the column at the same scroll position');
+  const displayed = await tab.$eval(
+    '[data-parameter="modulation.pattern-scale"] .chain-param-value', (node) => Number(node.value));
   check(edited.value > 3 && edited.value <= 8 && edited.status === 'ok',
-    'the Noise scale drag changes the value within the baked sampling limit');
+    `the Noise scale drag changes the value within the baked sampling limit`
+      + ` (position ${edited.position}, scale ${edited.value}, displayed ${displayed}, status ${edited.status})`);
   const parameter = (field) => `[data-parameter="modulation.${field}"]`;
   await tab.select(`${parameter('pattern-noise-variant')} select`, 'octave-contour');
   await tab.select(`${parameter('pattern-noise-basis')} select`, 'fbm3');
