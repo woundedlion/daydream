@@ -17,6 +17,7 @@ import {
 import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
 import { createRecordingControls } from '../src/recording/recording_controls.js';
 import { Daydream } from '../src/renderer/driver.js';
+import { FPS } from '../src/renderer/frame_constants.js';
 import { createSegmentPoolSpawner, createSegmentedPovControls } from '../src/ui/segmented_pov_controls.js';
 import { fakeWasmModule, noticeText, trackedStartApp, segmentCountControl } from './helpers/fake_app.js';
 import { fakeGui } from './helpers/fake_gui.js';
@@ -1258,6 +1259,7 @@ test('fidelity selects engine sampling before first draw and refreshes paused to
     assert.ok(draws.length > 0);
     assert.ok(draws.every((sampling) => sampling === povFidelity));
     const control = app.guis[0].controllers.find((c) => c.property === 'povFidelity');
+    assert.equal(control.label, `POV fidelity (${FPS} Hz)`);
     app.driver.paused = true;
     const before = draws.length;
     control.setValue(!povFidelity);

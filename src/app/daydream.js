@@ -9,6 +9,7 @@ import { GlobalStatsView } from "../ui/global_stats_view.js";
 import { MAX_DISPLAY_CAP_PERCENT, createDisplayCapsBinding } from "../renderer/display_caps.js";
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
 import { Daydream } from "../renderer/driver.js";
+import { FPS } from '../renderer/frame_constants.js';
 import { MOBILE_MEDIA_QUERY } from "../shared/layout.js";
 import { GUI, resetGUI } from "../ui/gui.js";
 import { EffectSidebar } from "../ui/sidebar.js";
@@ -579,7 +580,7 @@ export function start({
   guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'showPip').name('Show PiP').onChange(() => daydream.invalidate());
   let temporalSampling = daydream.povFidelity;
-  const povFidelity = guiInstance.add(daydream, 'povFidelity').name('POV fidelity (16 Hz)');
+  const povFidelity = guiInstance.add(daydream, 'povFidelity').name(`POV fidelity (${FPS} Hz)`);
   const povResponse = guiInstance.add(daydream, 'povResponseScale', 0.5, 2, 0.05).name('Response timescale');
   const syncPovControls = () => {
     if (daydream.povFidelity) povResponse.enable();
