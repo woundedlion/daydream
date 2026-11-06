@@ -46,7 +46,7 @@ test('replacement offers preserve matching instance labels without inventing lab
     [{ operator: 'direct' }]);
 });
 
-test('socket choices prefer the narrowest span and stop collapse at an endomorphism', () => {
+test('socket choices prefer the narrowest span and preserve entry-carrier stages', () => {
   const chain = [entry(rotate), entry(project), entry(sample), entry(color)];
   const calls = [];
   const model = createChainPresentation({ catalog, chain: () => chain,
@@ -57,6 +57,26 @@ test('socket choices prefer the narrowest span and stop collapse at an endomorph
   assert.deepEqual(model.socketChoices(2), [{ start: 2, deleteCount: 1, operators: [direct] }]);
   assert.deepEqual(calls, [[2, 1, 3], [1, 2, 1]]);
   assert.equal(model.sharesBand(0, 1), false);
+});
+
+test('a source can replace a projected band containing several planar stages', () => {
+  const warp = op('warp', 'plane');
+  const chain = [entry(rotate), entry(project), entry(warp, 'warp-a'),
+    entry(warp, 'warp-b'), entry(sample), entry(color)];
+  const calls = [];
+  const model = createChainPresentation({ catalog: { ...catalog, operators: [...catalog.operators, warp] },
+    chain: () => chain,
+    legalSequences: (start, count, max) => {
+      calls.push([start, count, max]);
+      if (start === 4) return [{ operators: [sample] }];
+      if (start === 1) return [{ operators: [direct] }];
+      return [];
+    } });
+  assert.deepEqual(model.socketChoices(4), [
+    { start: 4, deleteCount: 1, operators: [sample] },
+    { start: 1, deleteCount: 4, operators: [direct] },
+  ]);
+  assert.deepEqual(calls, [[4, 1, 3], [1, 4, 1]]);
 });
 
 

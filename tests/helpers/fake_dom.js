@@ -678,10 +678,10 @@ export function fakeElement(tag = 'div', options = {}) {
       get() { return selected; },
       set(value) {
         selected = Boolean(value);
-        const parent = element.parentNode;
+        const parent = element.closest('select');
         if (selected && parent?.tagName === 'SELECT' && !parent.multiple) {
-          for (const sibling of parent.children) {
-            if (sibling !== element && sibling.tagName === 'OPTION') sibling.selected = false;
+          for (const sibling of parent.options) {
+            if (sibling !== element) sibling.selected = false;
           }
         }
       },
@@ -696,7 +696,7 @@ export function fakeElement(tag = 'div', options = {}) {
   }
   // An explicit empty selection persists until the option list changes.
   if (element.tagName === 'SELECT') {
-    const options = () => element.children.filter((n) => n.tagName === 'OPTION');
+    const options = () => element.querySelectorAll('option');
     let clearedOptions = null;
     const selection = () => {
       const current = options();

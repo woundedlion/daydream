@@ -10,7 +10,7 @@ beforeEach((t) => {
   const capture = installConsoleCapture('log');
   t.after(capture.restore);
 });
-import { runWorkbenchSections, probeColorStageDrag, probeColorCard, probePaletteAndModulations, probeNoiseScaleDrag, probeDocumentActions, probeSnapshotImport, probeParity, probeStartupPersistence, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
+import { runWorkbenchSections, probeSphericalSources, probeColorStageDrag, probeColorCard, probePaletteAndModulations, probeNoiseScaleDrag, probeDocumentActions, probeSnapshotImport, probeParity, probeStartupPersistence, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
 import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
 import {
   probeNumericRange, probeKeyboardEdits, probeMobilePanel, probePanel, probePresetName, probeSidebar, probeSliderDrag,
@@ -22,6 +22,7 @@ import { scratchDir } from './helpers/fixture_repo.js';
 import { stashGlobals } from './helpers/fake_dom.js';
 
 const PROBES = [
+  ['workbench-probe.mjs', 'probeSphericalSources', probeSphericalSources],
   ['workbench-probe.mjs', 'probeColorStageDrag', probeColorStageDrag],
   ['workbench-probe.mjs', 'probeColorCard', probeColorCard],
   ['workbench-probe.mjs', 'probePaletteAndModulations', probePaletteAndModulations],

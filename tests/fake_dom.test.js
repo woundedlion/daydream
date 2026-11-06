@@ -755,6 +755,25 @@ test('the <select> views are live over the option children', () => {
   assert.equal(select.value, '');
 });
 
+test('select option groups share one selection across their options', () => {
+  const select = fakeElement('select');
+  const groups = ['planar', 'spherical'].map((name) => {
+    const group = fakeElement('optgroup');
+    const option = fakeElement('option');
+    option.value = name;
+    group.appendChild(option);
+    select.appendChild(group);
+    return group;
+  });
+  assert.deepEqual(select.options.map((option) => option.value), ['planar', 'spherical']);
+  select.value = 'spherical';
+  assert.equal(select.value, 'spherical');
+  assert.equal(select.selectedIndex, 1);
+  groups[0].children[0].selected = true;
+  assert.equal(select.value, 'planar');
+  assert.deepEqual(select.options.map((option) => option.selected), [true, false]);
+});
+
 test('selectedIndex and value are the two writable views of one selection', () => {
   const select = selectOf(['a', 'b', 'c']);
 

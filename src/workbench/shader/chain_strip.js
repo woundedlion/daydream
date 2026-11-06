@@ -83,6 +83,9 @@ const SOCKET_FUNCTIONS = {
   color: { name: 'Palette', accessibleName: 'Palette' },
 };
 
+/** @type {Record<string, string>} */
+const SOURCE_GROUP_NAMES = { sphere: 'Spherical sources', plane: 'Planar sources' };
+
 /**
  * Builds the pipeline strip into a container and wires its gestures.
  * @param {Object} options - The strip's collaborators.
@@ -994,13 +997,27 @@ export function createChainStrip({
       replacement.setAttribute('aria-label', socketFunction.accessibleName);
       const choices = new Map(socketChoices(index).map(
         (choice) => [choiceKey(choice.operators), choice]));
+      const sourceGroups = new Map();
       for (const [key, choice] of paletteType ? [] : choices) {
         const option = el('option', 'chain-chip-replace-option');
         option.value = key;
         option.textContent = choice.operators.map((candidate) => candidate.name)
           .join(' → ');
         option.selected = key === entry.operator;
-        replacement.appendChild(option);
+        const source = choice.operators.at(-1);
+        const groupName = op.output === 'field'
+          ? SOURCE_GROUP_NAMES[source?.input ?? ''] : undefined;
+        let parent = replacement;
+        if (groupName) {
+          if (!sourceGroups.has(groupName)) {
+            const group = el('optgroup', '');
+            group.label = groupName;
+            sourceGroups.set(groupName, group);
+            replacement.appendChild(group);
+          }
+          parent = sourceGroups.get(groupName);
+        }
+        parent.appendChild(option);
       }
       replacement.addEventListener('click', (/** @type {*} */ event) => {
         event.stopPropagation();

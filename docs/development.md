@@ -57,6 +57,11 @@ stages with add, remove, enable and header drag controls. Clicking a stage
 opens or closes its parameter panel; dragging its header reorders it within Color.
 A band's add button inserts its sole legal stage directly; multiple choices open
 a selector.
+The Source selector groups planar and spherical sources by their catalog input
+carrier. A spherical source replaces the projection, planar warps and planar
+source in one undoable edit. The strip hides the skipped Plane band and
+Projection selector. Choosing a planar route restores its projection and source
+with catalog defaults; undo restores the previous route and its authored values.
 Numeric controls follow each declaration's interpolation kind. `LOG_POSITIVE`
 sliders use logarithmic positions and multiplicative arrow nudges; their numeric
 readouts and accessible value text show parameter values. Live admission limits

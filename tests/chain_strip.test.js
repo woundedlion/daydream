@@ -184,6 +184,76 @@ test('endomorphisms carry controls; sockets carry only valid selectors', async (
   assert.deepEqual(controls.map((button) => button.textContent), ['◉', '', '', '×']);
 });
 
+for (const operator of ['sample.spherical-noise.v1', 'sample.spherical-cells.v1']) {
+  test(`${operator} replaces projection and planar warps with one undoable source selection`, async () => {
+    assert.ok(CATALOG.operators.some((candidate) => candidate.id === operator));
+    const h = await makeStrip();
+    const before = h.store.document();
+    const source = chipByLabel(h, 'sample').querySelector('.chain-chip-replace');
+    const spherical = source.querySelectorAll('optgroup')
+      .find((group) => group.label === 'Spherical sources');
+    assert.deepEqual(spherical.children.map((option) => option.value),
+      CATALOG.operators.filter((candidate) => candidate.input === 'sphere'
+        && candidate.output === 'field').map((candidate) => candidate.id));
+    assert.equal(source.value, 'sample.twin-wave.v3');
+    source.value = operator;
+    source.dispatch('change');
+
+    assert.deepEqual(h.store.chain().map((entry) => entry.operator), [
+      ...before.descriptor.chain.slice(0, PROJECT).map((entry) => entry.operator),
+      operator,
+      ...before.descriptor.chain.slice(5).map((entry) => entry.operator),
+    ]);
+    assert.deepEqual(h.container.querySelectorAll('.chain-band').map((band) => band.dataset.carrier),
+      ['sphere', 'field', 'color']);
+    assert.equal(chipByLabel(h, 'project'), undefined);
+    assert.equal(chipByLabel(h, 'warp2'), undefined);
+    assert.equal(h.container.querySelectorAll('.chain-chip-replace')
+      .some((select) => select.getAttribute('aria-label') === 'Projection'), false);
+    assert.equal(h.applied.length, 1);
+    const after = h.store.document();
+    assert.deepEqual(h.store.compile().status, 'VALID');
+    const active = h.store.chain().find((entry) => entry.operator === operator);
+    assert.equal(chipByLabel(h, active.label).querySelector('.chain-chip-replace').value, operator);
+
+    h.container.querySelector('.chain-undo').dispatch('click');
+    assert.deepEqual(h.store.document(), before);
+    assert.ok(chipByLabel(h, 'project'));
+    assert.ok(chipByLabel(h, 'warp2'));
+    assert.ok(bandFor(h, 'plane'));
+    h.container.querySelector('.chain-redo').dispatch('click');
+    assert.deepEqual(h.store.document(), after);
+    assert.equal(bandFor(h, 'plane'), undefined);
+  });
+}
+
+test('a spherical source selector can restore a planar route and undo it', async () => {
+  const source = scratchChainDocument(CATALOG, [
+    { label: 'camera', operator: 'sphere.rotate.v2' },
+    { label: 'source', operator: 'sample.spherical-noise.v1' },
+    { label: 'colorize', operator: 'colorize.generated-palette.v4' },
+  ]);
+  const h = await makeStrip({source});
+  const before = h.store.document();
+  const select = chipByLabel(h, 'source').querySelector('.chain-chip-replace');
+  const key = 'project.equirectangular.v2 sample.spiral.v3';
+  const planar = select.querySelectorAll('optgroup').find((group) => group.label === 'Planar sources');
+  assert.ok(planar.children.some((option) => option.value === key));
+  select.value = key;
+  select.dispatch('change');
+  assert.deepEqual(h.store.chain().map((entry) => entry.operator), [
+    'sphere.rotate.v2', 'project.equirectangular.v2', 'sample.spiral.v3',
+    'colorize.generated-palette.v4',
+  ]);
+  assert.ok(bandFor(h, 'plane'));
+  assert.equal(h.container.querySelectorAll('.chain-chip-replace')
+    .some((control) => control.getAttribute('aria-label') === 'Projection'), true);
+  assert.equal(h.store.compile().status, 'VALID');
+  h.container.querySelector('.chain-undo').dispatch('click');
+  assert.deepEqual(h.store.document(), before);
+  assert.equal(bandFor(h, 'plane'), undefined);
+});
+
 test('each card exposes a named reset control without expanding or selecting it', async () => {
   const h = await makeStrip();
   for (const chip of chips(h)) {

@@ -1129,10 +1129,77 @@ export async function probeColorStageDrag(tab) {
   return failures;
 }
 
+/** @param {import('puppeteer-core').Page} tab @returns {Promise<string[]>} */
+export async function probeSphericalSources(tab) {
+  const { failures, check } = checks();
+  await tab.select('#shader-document-select', 'kaleidoscope-hex-bright');
+  const sourceSelector = '.chain-chip-replace[aria-label="Source function"]';
+  await tab.waitForFunction((selector) => document.querySelector(selector)?.value === 'sample.twin-wave.v3',
+    {timeout: TIMEOUT_MS}, sourceSelector);
+  const sphereLabels = await tab.$$eval('.chain-band[data-carrier="sphere"] .chain-chip',
+    (nodes) => nodes.map((node) => node.dataset.label).join());
+  const planarRoute = 'project.equirectangular.v2 sample.spiral.v3';
+  for (const operator of ['sample.spherical-noise.v1', 'sample.spherical-cells.v1']) {
+    await tab.select(sourceSelector, operator);
+    const state = await (await tab.waitForFunction(async (expected) => {
+      const {decodeShaderStateHash} = await import('../src/workbench/shader/shader_deeplink.js');
+      const state = await decodeShaderStateHash(location.hash);
+      return state?.chainSnapshot?.chain.some((entry) => entry.operator === expected) && state;
+    }, {timeout: TIMEOUT_MS}, operator)).jsonValue();
+    check(await tab.$('.chain-band[data-carrier="plane"]') === null
+        && await tab.$('.chain-chip-replace[aria-label="Projection"]') === null
+        && await tab.$$eval('.chain-band[data-carrier="sphere"] .chain-chip',
+          (nodes) => nodes.map((node) => node.dataset.label).join()) === sphereLabels,
+    `${operator} hides planar controls and preserves the sphere stages`);
+    check(state.document.descriptor.chain.some((entry) => entry.operator === operator)
+        && !state.chainSnapshot.chain.some((entry) => entry.operator.startsWith('project.')
+          || entry.operator.startsWith('warp.')),
+    `${operator} reaches the live engine snapshot and shared document`);
+    const render = await tab.evaluate(async (snapshot) => {
+      const {default: createModule} = await import('../generated/holosphere_wasm.js');
+      const {restoreChainSnapshot} = await import('../src/engine/workbench_bindings.js');
+      const module = await createModule({print: () => {}});
+      const engine = new module.HolosphereEngine();
+      try {
+        engine.setResolution(96, 20);
+        engine.setEffect('ShaderChain');
+        const restored = restoreChainSnapshot(engine, module, snapshot)
+          === module.ChainSnapshotRestoreResult.APPLIED;
+        if (!restored) return {restored, colors: 0};
+        engine.setTemporalSampling(false);
+        engine.drawFrame();
+        return {restored, colors: new Set(engine.getPixels()).size};
+      } finally {
+        engine.delete();
+      }
+    }, state.chainSnapshot);
+    check(render.restored && render.colors > 8,
+      `${operator} restores and renders a spatially varying frame in the WASM engine`);
+    const saved = await savedDocument(tab);
+    check(saved.descriptor.chain.some((entry) => entry.operator === operator)
+        && !saved.descriptor.chain.some((entry) => entry.operator.startsWith('project.')
+          || entry.operator.startsWith('warp.')),
+    `${operator} saves its direct spherical route`);
+    await tab.select(sourceSelector, planarRoute);
+    check(await tab.$('.chain-band[data-carrier="plane"]') !== null
+        && await tab.$('.chain-chip-replace[aria-label="Projection"]') !== null
+        && await tab.$eval(sourceSelector, (node) => node.value) === 'sample.spiral.v3',
+    `${operator} can return to a projected planar source`);
+    await tab.$eval('.chain-undo', (node) => node.click());
+    await tab.waitForFunction((selector, expected) => document.querySelector(selector)?.value === expected,
+      {timeout: TIMEOUT_MS}, sourceSelector, operator);
+    await tab.$eval('.chain-undo', (node) => node.click());
+    check(await tab.$eval(sourceSelector, (node) => node.value) === 'sample.twin-wave.v3'
+        && await tab.$('.chain-chip[data-label="warp2"]') !== null,
+    `${operator} undo restores the original projection and authored planar warp`);
+  }
+  return failures;
+}
+
 export async function runWorkbenchSections(open, sections = [
   probeDocumentActions, probeStripHistory, probeStrip, probeParity, probeSnapshotImport, probeStartupPersistence,
   probeColorCard,
-  probeNoiseScaleDrag, probePaletteAndModulations, probeColorStageDrag,
+  probeNoiseScaleDrag, probePaletteAndModulations, probeColorStageDrag, probeSphericalSources,
 ]) {
   const failures = [];
   for (const section of sections) {
@@ -1178,7 +1245,7 @@ export async function runWorkbenchSections(open, sections = [
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'workbench-probe',
-  minimumChecks: 118,
+  minimumChecks: 130,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'every pipeline control behaved.',

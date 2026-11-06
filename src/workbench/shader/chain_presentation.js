@@ -280,8 +280,7 @@ export function createChainPresentation({ catalog, chain: readChain, legalSequen
    * What a socket offers in its selector and its replacement palette: the
    * sequences that stand in for the crossing — a longer one re-opening the
    * carrier bands the crossing skips — plus the single operators that swallow
-   * it together with the unbroken run of crossings before it, which is the
-   * collapse of a band the chain no longer stops in.
+   * it together with preceding carrier bands, including their stages.
    * @param {number} index - The crossing's chain index.
    * @returns {SpanChoice[]} The offers, narrowest span first.
    */
@@ -304,7 +303,7 @@ export function createChainPresentation({ catalog, chain: readChain, legalSequen
     offer(index, 1, catalog.carriers.length - 1);
     for (let start = index; start > 0; start -= 1) {
       const previous = opOf(chain[start - 1]);
-      if (previous.input === previous.output) break;
+      if (previous.input === previous.output) continue;
       offer(start - 1, index - start + 2, 1);
     }
     return [...choices.values()];
