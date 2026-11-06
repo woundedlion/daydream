@@ -1021,7 +1021,7 @@ test('the save picker is offered the timestamped name and the container filter',
   }
 });
 
-test('a mid-stream streaming write failure stops the session and reports an uncommitted save', async (t) => {
+for (const closeFails of [true, false]) test(`a rejected streaming write reports ${closeFails ? 'an uncommitted save' : 'a truncated saved file'}`, async (t) => {
   t.after(installRecorderEnv());
   const writes = [];
   let closed = false;
@@ -1032,7 +1032,7 @@ test('a mid-stream streaming write failure stops the session and reports an unco
       if (writeCount === 2) throw new Error('disk full');
       writes.push(d);
     },
-    close: async () => { closed = true; throw new Error('stream errored'); },
+    close: async () => { closed = true; if (closeFails) throw new Error('stream errored'); },
   };
   globalThis.showSaveFilePicker = async () => ({ createWritable: async () => writable });
   const captured = installConsoleCapture('error', 'warn');
@@ -1041,11 +1041,14 @@ test('a mid-stream streaming write failure stops the session and reports an unco
   const sinkFinished = trackSinkFinish(rec);
   let downloaded = false;
   const notified = [];
+  const saveErrors = [];
   rec.download = () => { downloaded = true; };
   rec.onError = (err) => notified.push(err);
+  rec.onSaveError = (err) => saveErrors.push(err);
 
   rec.start('stream');
   const recorder = rec.mediaRecorder;
+  const stream = rec.stream;
   await drainSink();
   recorder.ondataavailable({ data: { size: 10 } });
   recorder.ondataavailable({ data: { size: 20 } }); // this write throws
@@ -1062,8 +1065,12 @@ test('a mid-stream streaming write failure stops the session and reports an unco
   assert.deepEqual(writes, [{ size: 10 }], 'only the pre-failure chunk reached disk');
   assert.equal(closed, true, 'closing the errored writable is attempted');
   assert.equal(downloaded, false, 'no blob download of the post-failure tail');
-  assert.ok(captured.messages.some((e) => /chosen file was not updated/.test(e)),
-    'the uncommitted save is reported to the user');
+  const message = closeFails ? /chosen file was not updated/ : /saved file is truncated/;
+  assert.ok(captured.messages.some((entry) => message.test(entry)));
+  assert.equal(saveErrors.length, 1);
+  assert.match(saveErrors[0].message, message);
+  assert.equal(stream.track.stopped, true);
+  assert.equal(rec.stream, null);
 });
 
 /**
@@ -1772,6 +1779,29 @@ const startAborted = (offscreen) => {
     restore();
   }
 };
+
+test('a throwing format probe notifies and releases its capture stream', (t) => {
+  t.after(installRecorderEnv());
+  const captured = installConsoleCapture('error');
+  t.after(captured.restore);
+  const stream = makeFakeStream(0);
+  const offscreen = {...recordableCanvas(), captureStream: () => stream};
+  installDocument({createElement: () => offscreen});
+  const failure = new Error('format probe unavailable');
+  FakeMediaRecorder.isTypeSupported = () => { throw failure; };
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.format = 'webm';
+  const notified = [];
+  rec.onError = (error) => notified.push(error);
+  assert.doesNotThrow(() => rec.start('probe'));
+  assert.deepEqual(notified, [failure]);
+  assert.ok(captured.messages.some((message) => /format probing failed/.test(message)));
+  assert.equal(FakeMediaRecorder.instances.length, 0);
+  assert.equal(stream.track.stopped, true);
+  assert.equal(rec.isRecording, false);
+  assert.equal(rec.stream, null);
+  assert.equal(rec.offscreen, null);
+});
 
 /**
  * A canvas whose 2D context is unavailable (memory pressure, a context-count
