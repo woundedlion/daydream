@@ -58,35 +58,6 @@ function snapshotValueEqual(expected, actual) {
 /** @typedef {{compiled: CompiledDocument, filename: string, official: OfficialDocument|null, compiledSide: boolean, presetId: string|null, referencePresetIds: string[], savedDocument?: string|null}} ActiveDocument */
 
 /**
- * Performs one resolved write.
- * @param {import('../../../generated/holosphere_wasm.js').HolosphereEngine} engine
- * @param {import('../../../generated/holosphere_wasm.js').HolosphereModule} module - The loaded WASM module, for its ParamSetResult enum.
- *   Every enum value is a truthy object; compare against APPLIED.
- * @param {{name: string, stored: *}} write
- * @returns {string|null} Refusal reason, or null once written.
- */
-function performEngineWrite(engine, module, { name, stored }) {
-  const result = engine.setParameter(name, stored);
-  if (result === module.ParamSetResult.APPLIED) return null;
-  return `"${name}" was refused: ${enumConstantName(module.ParamSetResult, result)}`;
-}
-
-/**
- * Writes one engine parameter.
- * @param {import('../../../generated/holosphere_wasm.js').HolosphereEngine} engine
- * @param {import('../../../generated/holosphere_wasm.js').HolosphereModule} module
- * @param {ParameterDefinition[]} definitions
- * @param {string} name
- * @param {*} value
- * @returns {string|null} Refusal reason, or null once written.
- */
-function writeEngineValue(engine, module, definitions, name, value) {
-  const write = resolveParameterWrite(definitions, name, value);
-  return typeof write === 'string' ? write : performEngineWrite(engine, module, write);
-}
-
-
-/**
  * @param {string} parameterId
  * @param {ParameterDefinition[]} definitions
  * @param {Set<string>} baked
@@ -155,6 +126,37 @@ function performDocumentWrites(engine, module, writes) {
 }
 
 /**
+ * Resolves fixed-build values before any engine or document write is performed.
+ * @param {Record<string, *>} values
+ * @param {ParameterDefinition[]} definitions
+ * @param {*[]} documentDefinitions
+ * @param {*} descriptor
+ * @param {(id: string) => {name: string|null, refusal: string|null}} resolveControl
+ * @param {(id: string, control: {name: string|null, refusal: string|null}) => boolean} skip
+ * @returns {{writes: Array<{name: string, stored: *}>, documentWrites: *[], refusal: string|null}}
+ */
+function resolveFixedWrites(values, definitions, documentDefinitions, descriptor, resolveControl, skip) {
+  const writes = [];
+  const documentWrites = [];
+  for (const [id, value] of Object.entries(values)) {
+    const control = resolveControl(id);
+    if (skip(id, control)) continue;
+    if (control.refusal) {
+      const definition = documentControlFor(descriptor, id, documentDefinitions);
+      if (!definition) return {writes, documentWrites, refusal: control.refusal};
+      const write = resolveDocumentWrite(definition, value);
+      if (typeof write === 'string') return {writes, documentWrites, refusal: write};
+      if (write) documentWrites.push(write);
+    } else if (control.name !== null) {
+      const write = resolveParameterWrite(definitions, control.name, value);
+      if (typeof write === 'string') return {writes, documentWrites, refusal: write};
+      writes.push(write);
+    }
+  }
+  return {writes, documentWrites, refusal: null};
+}
+
+/**
  * @param {import('../../../generated/holosphere_wasm.js').HolosphereEngine} engine @param {import('../../../generated/holosphere_wasm.js').HolosphereModule} module @param {CompiledDocument} compiled
  * @param {string} presetId
  * @param {Set<string>} baked - The topology fields the effect bakes in.
@@ -168,28 +170,12 @@ function applyDocumentValues(engine, module, compiled, presetId, baked, derived,
     .find((/** @type {*} */ candidate) => candidate.preset_id === presetId)
     ?? compiled.document.preset_bank.presets[0];
   const definitions = engine.getParameterDefinitions();
-  const documentDefinitions = engine.getDocumentParameterDefinitions?.() ?? [];
-  const documentWrites = [];
-  /** @type {Array<{name: string, stored: *}>} */
-  const writes = [];
-  for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
-    if (derived.has(parameterId)) continue;
-    const { name, refusal } = compiledControlFor(parameterId, definitions, baked, compiled.document.descriptor, catalog);
-    if (refusal) {
-      const definition = documentControlFor(compiled.document.descriptor, parameterId, documentDefinitions);
-      if (!definition) return refusal;
-      const write = resolveDocumentWrite(definition, value);
-      if (typeof write === 'string') return write;
-      if (write) documentWrites.push(write);
-      continue;
-    }
-    if (name === null) continue;
-    const write = resolveParameterWrite(definitions, name, value);
-    if (typeof write === 'string') return write;
-    writes.push(write);
-  }
-  return performEngineWrites(engine, module, writes)
-    ?? performDocumentWrites(engine, module, documentWrites);
+  const resolved = resolveFixedWrites(preset?.values ?? {}, definitions,
+    engine.getDocumentParameterDefinitions?.() ?? [], compiled.document.descriptor,
+    (id) => compiledControlFor(id, definitions, baked, compiled.document.descriptor, catalog),
+    (id) => derived.has(id));
+  return resolved.refusal ?? performEngineWrites(engine, module, resolved.writes)
+    ?? performDocumentWrites(engine, module, resolved.documentWrites);
 }
 
 /**
@@ -619,31 +605,19 @@ export function createShaderDocumentController({
                 refusal = `"${parameterId}" was refused: ${enumConstantName(module.ParamSetResult, written)}`;
             }
           } else if (compiledSide) {
-            const writes = [];
-            const documentWrites = [];
-            const documentDefinitions = engine.getDocumentParameterDefinitions?.() ?? [];
-            refusal = null;
-            for (const [id, next] of Object.entries(values)) {
-              const resolved = engineControlName(id, definitions);
-              const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, {...presetValues, ...values});
-              if (binding && !liveDerivedControl(id, resolved, definitions, binding)) continue;
-              if (resolved.refusal) {
-                const definition = documentControlFor(document.descriptor, id, documentDefinitions);
-                if (!definition) { refusal = resolved.refusal; break; }
-                const write = resolveDocumentWrite(definition, next);
-                if (typeof write === 'string') { refusal = write; break; }
-                if (write) documentWrites.push(write);
-                continue;
-              }
-              if (resolved.name === null) continue;
-              const write = resolveParameterWrite(definitions, resolved.name, next);
-              if (typeof write === 'string') { refusal = write; break; }
-              writes.push(write);
-            }
-            if (refusal === null) refusal = performEngineWrites(engine, module, writes)
-              ?? performDocumentWrites(engine, module, documentWrites);
-          } else if (control.name !== null)
-            refusal = writeEngineValue(engine, module, definitions, control.name, value);
+            const resolved = resolveFixedWrites(values, definitions,
+              engine.getDocumentParameterDefinitions?.() ?? [], document.descriptor,
+              (id) => engineControlName(id, definitions),
+              (id, control) => {
+                const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, {...presetValues, ...values});
+                return Boolean(binding && !liveDerivedControl(id, control, definitions, binding));
+              });
+            refusal = resolved.refusal ?? performEngineWrites(engine, module, resolved.writes)
+              ?? performDocumentWrites(engine, module, resolved.documentWrites);
+          } else if (control.name !== null) {
+            const write = resolveParameterWrite(definitions, control.name, value);
+            refusal = typeof write === 'string' ? write : performEngineWrites(engine, module, [write]);
+          }
         }
         if (paused !== null) {
           setAnimationsPaused(paused);
