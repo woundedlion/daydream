@@ -773,16 +773,15 @@ async function copyCode(index, lang, btn) {
   }
   const baseIsStar = islamicStarPatterns.includes(item.base);
 
-  // Namespace qualifying the seed call: Platonic bases share `Archimedean::`
-  // (it `using`s Platonic); Catalan bases need their own.
-  const seedNs = baseIsStar
-    ? "IslamicStarPatterns"
-    : (CATALAN_BASES.has(item.base) ? "Catalan" : "Archimedean");
-
   let code;
   let validationError = null;
   try {
     if (lang === 'recipe_cpp') {
+      if (baseIsStar) {
+        showCopyFailure(btn, 'export failed: a star-pattern base requires the Copy registry C++ export');
+        return;
+      }
+      const seedNs = CATALAN_BASES.has(item.base) ? "Catalan" : "Archimedean";
       code = generateRecipeCpp(item, seedNs);
     } else if (lang === 'registry') {
       let baseRecipe = null;
@@ -795,7 +794,7 @@ async function copyCode(index, lang, btn) {
         baseRecipe = meshOpsWasm.getRecipe(item.base);
         if (!baseRecipe) {
           showCopyFailure(btn, `export failed: no authored chain for "${item.base}" — `
-            + 'its Recipe mirror cannot be generated');
+            + 'its registry recipe cannot be generated');
           return;
         }
       }

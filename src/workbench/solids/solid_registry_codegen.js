@@ -5,8 +5,8 @@
 
 /**
  * The solids tool page's registry-paste generator: the C++ text a saved solid
- * contributes to solids.h (a registry Entry, plus the OpStep table and Recipe
- * mirror a Complex entry must carry). Output is pasted verbatim into the engine.
+ * contributes to solids.h: a registry Entry, OpStep table and authored Recipe.
+ * Output is pasted verbatim into the engine.
  */
 
 import {
@@ -265,9 +265,8 @@ function docCommentCpp(text) {
  */
 function fillCpp(tokens, first, rest) {
   return fillColumns(tokens, ' '.repeat(first), ' '.repeat(rest)).map((line) => {
-    if (line.length <= COLUMN_LIMIT || !line.includes('::')) return line;
-    const split = line.lastIndexOf('::', COLUMN_LIMIT - 2) + 2;
-    if (split < 2) return line;
+    if (line.length <= COLUMN_LIMIT || !line.includes('generate_recipe<')) return line;
+    const split = line.indexOf('generate_recipe<') + 'generate_recipe<'.length;
     return `${line.slice(0, split)}\n${' '.repeat(rest + INDENT)}${line.slice(split)}`;
   }).join('\n');
 }
@@ -364,7 +363,7 @@ export function registryDisplayName(item, funcName) {
 
 /**
  * Emits the solids.h registry paste for a saved solid: a Category::COMPLEX
- * islamic_registry entry naming its generator, OpStep table and Recipe mirror.
+ * islamic_registry entry naming its recipe generator, OpStep table and authored Recipe.
  * A star base is flattened onto its own seed with its authored chain prepended;
  * a seed without a SEED_* constant gets that constant's definition first.
  * @param {import('./solid_codegen.js').SolidSpec} item - The solid spec (see generateFuncAndRecipe).
@@ -431,12 +430,12 @@ export function generateRegistryCpp(item, baseRecipe = null) {
   return relaxNotice + seedConstant
     + `// clang-format off\n${docCommentCpp(`Step table for ${funcName}.`)}\n`
     + `${table.prefix}${stepList.join(`,\n${' '.repeat(table.indent)}`)},\n};\n// clang-format on\n`
-    + `${docCommentCpp(`Recipe mirror of IslamicStarPatterns::${funcName}.`)}\n`
+    + `${docCommentCpp(`Authored recipe for ${funcName}.`)}\n`
     + `${recipeDefinitionCpp(recipeName, `SEED_${upperSnake(seedName)}`, stepsName)}\n\n`
     + '// Append this Entry to islamic_registry.\n'
     + fillCpp([
       `{"${displayName}",`,
-      `IslamicStarPatterns::${funcName},`,
+      `generate_recipe<${recipeName}>,`,
       'Category::COMPLEX,',
       `&${recipeName}},`,
     ], INDENT, INDENT + 1);

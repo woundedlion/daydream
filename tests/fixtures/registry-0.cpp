@@ -9,10 +9,10 @@ inline constexpr OpStep CUBE_TRUNCATE33_STEPS[] = {
     {Op::TRUNCATE, 0.33f},
 };
 // clang-format on
-/** Recipe mirror of IslamicStarPatterns::cube_truncate33. */
+/** Authored recipe for cube_truncate33. */
 inline constexpr Recipe CUBE_TRUNCATE33_RECIPE =
     make_recipe(SEED_CUBE, CUBE_TRUNCATE33_STEPS);
 
 // Append this Entry to islamic_registry.
-    {"cube_truncate33", IslamicStarPatterns::cube_truncate33, Category::COMPLEX,
-     &CUBE_TRUNCATE33_RECIPE},
+    {"cube_truncate33", generate_recipe<CUBE_TRUNCATE33_RECIPE>,
+     Category::COMPLEX, &CUBE_TRUNCATE33_RECIPE},

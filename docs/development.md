@@ -88,6 +88,9 @@ Module resource failures and syntax errors show a reload notice even when the
 application's module graph cannot initialize its normal error reporting.
 Returning custom palette hue keys to a harmony resolves the base against the
 selected harmony and spread, keeping its first anchor on the first custom key.
+Solid registry exports pair an authored `Recipe` with its `generate_recipe`
+instantiation. A saved star-pattern base can be flattened through Copy registry
+C++; the callable-seed recipe export refuses such bases.
 
 After `npm ci` and an engine install, run `npm run lint`, `npm run typecheck`, and
 `npm test`. Test suites live in `tests/`, reusable support code in

@@ -78,7 +78,7 @@ function chainStep(op, param = 0, twist = 0) {
   return { op, param, twist };
 }
 
-test('generateRegistryCpp emits a Recipe mirror for a hankin-free chain too', () => {
+test('generateRegistryCpp emits an authored Recipe for a hankin-free chain too', () => {
   const item = { base: 'cube', ops: [{ op: 'truncate', params: { t: 0.33 } }] };
   assert.equal(generateRegistryCpp(item),
     readFileSync(new URL('./fixtures/registry-0.cpp', import.meta.url), 'utf8').trimEnd());
@@ -176,13 +176,21 @@ test('generateRegistryCpp refuses a seed that indexes no simple_registry entry',
     /names no Platonic or Archimedean solid/);
 });
 
-test('generateRegistryCpp emits a step table and Recipe mirror for a hankin chain', () => {
+test('generateRegistryCpp emits a step table and authored Recipe for a hankin chain', () => {
   const item = {
     base: 'dodecahedron',
     ops: [{ op: 'hankin', params: { angle: 62 } }, 'ambo'],
   };
   assert.equal(generateRegistryCpp(item),
     readFileSync(new URL('./fixtures/registry-1.cpp', import.meta.url), 'utf8').trimEnd());
+});
+
+test('a registry Entry instantiates its authored recipe generator', () => {
+  const code = generateRegistryCpp({base: 'icosahedron', ops: [{op: 'hankin', params: {angle: 62}}]});
+  const entry = code.split('// Append this Entry to islamic_registry.')[1].replace(/\s/g, '');
+  assert.equal(entry, '{"icosahedron_hk62",generate_recipe<ICOSAHEDRON_HK62_RECIPE>,Category::COMPLEX,&ICOSAHEDRON_HK62_RECIPE},');
+  assert.match(code, /Authored recipe for icosahedron_hk62\./);
+  assert.doesNotMatch(code, /IslamicStarPatterns::icosahedron_hk62/);
 });
 
 test('generateRegistryCpp wraps a long paste in the tool format', () => {

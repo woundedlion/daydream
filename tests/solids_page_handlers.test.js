@@ -226,6 +226,28 @@ test('copying a star recipe contains bridge errors and reports engine halts', as
   assert.equal(traps.length, 2);
 });
 
+test('recipe copy refuses a star-pattern base before generating or copying code', async () => {
+  const failures = [];
+  const copied = [];
+  let generated = 0;
+  const button = {};
+  const copyCode = handler('copyCode', {
+    savedSolids: [{base: 'dodecahedron_hk62_ambo_hk62', ops: [{op: 'dual', params: {}}]}],
+    savedChainShapeError,
+    registrySolidNames: new Set(['dodecahedron_hk62_ambo_hk62']),
+    islamicStarPatterns: ['dodecahedron_hk62_ambo_hk62'], CATALAN_BASES: new Set(),
+    generateRecipeCpp() { generated++; return 'invalid generator'; },
+    copyWithFeedback: (code) => { copied.push(code); return true; },
+    showCopyFailure: (target, message) => failures.push([target, message]),
+  });
+  await copyCode(0, 'recipe_cpp', button);
+  assert.equal(generated, 0);
+  assert.deepEqual(copied, []);
+  assert.equal(failures.length, 1);
+  assert.equal(failures[0][0], button);
+  assert.match(failures[0][1], /star-pattern base.*Copy registry C\+\+ export/);
+});
+
 for (const [count, index, expected] of [[3, 1, 1], [3, 2, 1], [1, 0, 'add']]) {
   test(`removing op ${index} of ${count} restores keyboard focus`, async () => {
     const state = { ops: Array.from({ length: count }, () => ({ op: 'ambo', params: {} })) };

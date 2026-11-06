@@ -14,8 +14,7 @@ inline constexpr OpStep
 };
 // clang-format on
 /**
- * Recipe mirror of
- * IslamicStarPatterns::truncated_cuboctahedron_truncate33_truncate33_truncate33.
+ * Authored recipe for truncated_cuboctahedron_truncate33_truncate33_truncate33.
  */
 inline constexpr Recipe
     TRUNCATED_CUBOCTAHEDRON_TRUNCATE33_TRUNCATE33_TRUNCATE33_RECIPE =
@@ -25,7 +24,7 @@ inline constexpr Recipe
 
 // Append this Entry to islamic_registry.
     {"truncatedCuboctahedron_truncate33_truncate33_truncate33",
-     IslamicStarPatterns::
-         truncated_cuboctahedron_truncate33_truncate33_truncate33,
+     generate_recipe<
+         TRUNCATED_CUBOCTAHEDRON_TRUNCATE33_TRUNCATE33_TRUNCATE33_RECIPE>,
      Category::COMPLEX,
      &TRUNCATED_CUBOCTAHEDRON_TRUNCATE33_TRUNCATE33_TRUNCATE33_RECIPE},

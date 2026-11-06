@@ -11,11 +11,11 @@ inline constexpr OpStep TRUNCATED_TETRAHEDRON_KIS_GYRO_STEPS[] = {
     {Op::GYRO},
 };
 // clang-format on
-/** Recipe mirror of IslamicStarPatterns::truncated_tetrahedron_kis_gyro. */
+/** Authored recipe for truncated_tetrahedron_kis_gyro. */
 inline constexpr Recipe TRUNCATED_TETRAHEDRON_KIS_GYRO_RECIPE = make_recipe(
     SEED_TRUNCATED_TETRAHEDRON, TRUNCATED_TETRAHEDRON_KIS_GYRO_STEPS);
 
 // Append this Entry to islamic_registry.
     {"truncatedTetrahedron_kis_gyro",
-     IslamicStarPatterns::truncated_tetrahedron_kis_gyro, Category::COMPLEX,
+     generate_recipe<TRUNCATED_TETRAHEDRON_KIS_GYRO_RECIPE>, Category::COMPLEX,
      &TRUNCATED_TETRAHEDRON_KIS_GYRO_RECIPE},

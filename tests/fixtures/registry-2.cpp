@@ -10,10 +10,7 @@ inline constexpr OpStep
         {Op::HANKIN, 59.0f * IslamicStarPatterns::D2R},
 };
 // clang-format on
-/**
- * Recipe mirror of
- * IslamicStarPatterns::truncated_icosahedron_ambo_relax100_truncate01_hk59.
- */
+/** Authored recipe for truncated_icosahedron_ambo_relax100_truncate01_hk59. */
 inline constexpr Recipe
     TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_RECIPE =
         make_recipe(SEED_TRUNCATED_ICOSAHEDRON,
@@ -21,6 +18,7 @@ inline constexpr Recipe
 
 // Append this Entry to islamic_registry.
     {"truncatedIcosahedron_ambo_relax100_truncate01_hk59",
-     IslamicStarPatterns::truncated_icosahedron_ambo_relax100_truncate01_hk59,
+     generate_recipe<
+         TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_RECIPE>,
      Category::COMPLEX,
      &TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_RECIPE},
