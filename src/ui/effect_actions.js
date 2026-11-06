@@ -111,7 +111,7 @@ export function createEffectActions(fx, deps) {
   }
 
   /**
-   * Copy text to the clipboard and report the outcome on the Export label. A
+   * Copy text and report the outcome through Export feedback and notices. A
    * copy that lands after the record was replaced reports nothing.
    * @param {string} text - The text to copy.
    * @returns {Promise<void>} Clipboard completion.
@@ -123,11 +123,15 @@ export function createEffectActions(fx, deps) {
         flashExport(EXPORT_COPIED);
       } else {
         logWarn('Export: clipboard copy failed');
+        showNotice('Export: clipboard copy failed');
         flashExport(EXPORT_FAILED);
       }
     }).catch((err) => {
       logWarn('Export: clipboard copy failed', err);
-      if (isActive(fx)) flashExport(EXPORT_FAILED);
+      if (isActive(fx)) {
+        showNotice('Export: clipboard copy failed');
+        flashExport(EXPORT_FAILED);
+      }
     });
   }
 

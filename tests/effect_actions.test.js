@@ -97,12 +97,14 @@ test('a failed or rejected copy flashes failure', async () => {
   assert.equal(refused.ctrl('export').label, '\u2717');
   assert.deepEqual(refused.warnings, [['Export: clipboard copy failed']]);
   assert.equal(refused.status().textContent, EXPORT_FAILED);
+  assert.deepEqual(refused.notices, ['Export: clipboard copy failed']);
 
   const error = new Error('denied');
   const rejected = actions({ copyText: fakeCopyText(error) });
   await rejected.ctrl('export').object.export();
   assert.equal(rejected.ctrl('export').label, '\u2717');
   assert.deepEqual(rejected.warnings, [['Export: clipboard copy failed', error]]);
+  assert.deepEqual(rejected.notices, ['Export: clipboard copy failed']);
 });
 
 test('a copy that lands after the record was replaced flashes nothing', async () => {
@@ -112,6 +114,7 @@ test('a copy that lands after the record was replaced flashes nothing', async ()
     a.state.active = false;
     await pending;
     assert.equal(a.ctrl('export').label, '\u29c9');
+    assert.deepEqual(a.notices, []);
   }
 });
 
