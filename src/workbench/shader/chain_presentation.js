@@ -125,11 +125,28 @@ export function colorParameterHidden(field, value) {
 export const formatNumericValue = (value) => String(float32Decimal(Number(value)));
 
 /**
+ * @param {ParameterDeclaration|undefined} declaration - A binary32 declaration.
+ * @param {number} value - Parameter value.
+ * @returns {number} Slider coordinate in the declaration's interpolation space.
+ */
+export const numericSliderPosition = (declaration, value) =>
+  declaration?.interpolation?.kind === 'LOG_POSITIVE' ? Math.log2(value) : value;
+
+/**
+ * @param {ParameterDeclaration|undefined} declaration - A binary32 declaration.
+ * @param {number} position - Slider coordinate.
+ * @returns {number} Parameter value at the slider coordinate.
+ */
+export const numericSliderValue = (declaration, position) =>
+  declaration?.interpolation?.kind === 'LOG_POSITIVE' ? 2 ** position : position;
+
+/**
  * @param {ParameterDeclaration} declaration - A binary32 declaration.
- * @returns {number} The increment its numeric readout's arrow keys nudge by.
+ * @returns {number} Slider-coordinate increment for the numeric readout's arrow keys.
  */
 export const nudgeStep = (declaration) => {
-  const span = Number(declaration.domain?.maximum) - Number(declaration.domain?.minimum);
+  const span = numericSliderPosition(declaration, Number(declaration.domain?.maximum))
+    - numericSliderPosition(declaration, Number(declaration.domain?.minimum));
   return span > 0 ? span / READOUT_STEPS : 0;
 };
 

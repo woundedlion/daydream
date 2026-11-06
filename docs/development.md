@@ -57,6 +57,10 @@ stages with add, remove, enable and header drag controls. Clicking a stage
 opens or closes its parameter panel; dragging its header reorders it within Color.
 A band's add button inserts its sole legal stage directly; multiple choices open
 a selector.
+Numeric controls follow each declaration's interpolation kind. `LOG_POSITIVE`
+sliders use logarithmic positions and multiplicative arrow nudges; their numeric
+readouts and accessible value text show parameter values. Live admission limits
+bound both representations without replacing the controls.
 Each layer owns its recipe and source clock; displacement is one of the available
 sources. The Palette header selects the palette family; mapping, brightness
 and opacity belong to its parameter panel. Legacy embedded hue shift

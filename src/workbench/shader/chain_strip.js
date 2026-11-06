@@ -7,7 +7,8 @@
 import {createChainPalette} from './chain_palette.js';
 import { titleCase } from '../../shared/labels.js';
 import {
-  createChainPresentation, deactivatedParameterIds, formatNumericValue, nudgeStep, fieldOf,
+  createChainPresentation, deactivatedParameterIds, formatNumericValue, nudgeStep,
+  numericSliderPosition, numericSliderValue, fieldOf,
   COLOR_PARAMETER_GROUPS, MODULATION_PARAMETER_GROUPS, COLOR_PARAMETER_NAMES,
   POTENTIAL_OPERATOR, POTENTIAL_PARAMETER_GROUPS,
   colorParameterHidden, modulationParameterHidden, PALETTE_OPERATOR, MODULATION_OPERATOR,
@@ -585,8 +586,9 @@ export function createChainStrip({
           maximum = Math.min(maximum, UNIT_MODULATION_AMOUNT_MAX);
         }
         for (const control of row.querySelectorAll('input')) {
-          control.min = String(minimum);
-          control.max = String(maximum);
+          const slider = control.type === 'range';
+          control.min = String(slider ? numericSliderPosition(declaration, minimum) : minimum);
+          control.max = String(slider ? numericSliderPosition(declaration, maximum) : maximum);
         }
       }
       row.hidden = off.has(id)
@@ -638,8 +640,12 @@ export function createChainStrip({
     }
     if (typeof value === 'number') {
       if (control?.type === 'range') {
-        value = Math.min(Number(control.max), Math.max(Number(control.min), value));
-        control.value = String(value);
+        const declaration = declarations.find((parameter) => parameter.id === parameterId);
+        const minimum = numericSliderValue(declaration, Number(control.min));
+        const maximum = numericSliderValue(declaration, Number(control.max));
+        value = Math.min(maximum, Math.max(minimum, value));
+        control.value = String(numericSliderPosition(declaration, value));
+        control.setAttribute('aria-valuetext', formatNumericValue(value));
         rows.get(parameterId).querySelector('.chain-param-value').value = formatNumericValue(value);
       }
     }
@@ -714,14 +720,17 @@ export function createChainStrip({
     const minimum = Number(declaration.domain?.minimum);
     const maximum = Number(declaration.domain?.maximum);
     slider.type = 'range';
-    slider.min = String(minimum);
-    slider.max = String(maximum);
+    slider.min = String(numericSliderPosition(declaration, minimum));
+    slider.max = String(numericSliderPosition(declaration, maximum));
     // Any step grid would re-snap the authored value on first touch.
     slider.step = 'any';
-    slider.value = String(values[declaration.id]);
+    slider.value = String(numericSliderPosition(declaration, values[declaration.id]));
+    slider.setAttribute('aria-valuetext', formatNumericValue(values[declaration.id]));
     slider.addEventListener('input', (/** @type {*} */ event) => {
-      const value = Math.min(Number(slider.max), Math.max(Number(slider.min), Number(event.target.value)));
-      slider.value = String(value);
+      const position = Math.min(Number(slider.max), Math.max(Number(slider.min), Number(event.target.value)));
+      const value = numericSliderValue(declaration, position);
+      slider.value = String(position);
+      slider.setAttribute('aria-valuetext', formatNumericValue(value));
       readout.value = formatNumericValue(value);
       pendingSliderEdit = { parameterId: declaration.id, value };
       scheduleSliderEdit();
@@ -869,8 +878,8 @@ export function createChainStrip({
         readout.value = formatNumericValue(values[declaration.id]);
         const slider = sliderControl(declaration, readout);
         slider.setAttribute('aria-label', name);
-        readout.min = slider.min;
-        readout.max = slider.max;
+        readout.min = String(declaration.domain?.minimum);
+        readout.max = String(declaration.domain?.maximum);
         // Any step grid would report a stored binary32 as stepMismatch.
         readout.step = 'any';
         readout.setAttribute('aria-label', `${name} value`);
@@ -881,11 +890,11 @@ export function createChainStrip({
           const typed = trimmed === '' ? Number.NaN : Number(trimmed);
           const current = Number(values[declaration.id]);
           const value = Number.isFinite(typed)
-            ? Math.min(Number(slider.max), Math.max(Number(slider.min), typed))
+            ? Math.min(Number(readout.max), Math.max(Number(readout.min), typed))
             : current;
           readout.value = formatNumericValue(value);
           if (value === current) return;
-          slider.value = String(value);
+          slider.value = String(numericSliderPosition(declaration, value));
           editParameter(declaration.id, value);
         };
         readout.addEventListener('change', (/** @type {*} */ event) => {
@@ -900,7 +909,8 @@ export function createChainStrip({
           event.preventDefault();
           const shown = readout.value.trim() === '' ? NaN : Number(readout.value);
           const from = Number.isFinite(shown) ? shown : Number(values[declaration.id]);
-          enterValue(String(from + direction * nudgeStep(declaration)));
+          enterValue(String(numericSliderValue(declaration,
+            numericSliderPosition(declaration, from) + direction * nudgeStep(declaration))));
           store.endValueRun();
           commitParameter();
         });
@@ -1331,7 +1341,11 @@ export function createChainStrip({
         if (!row) continue;
         const control = row.querySelector('.chain-param-control');
         if (control.type === 'checkbox') control.checked = value === 'on';
-        else control.value = String(value);
+        else if (control.type === 'range') {
+          const declaration = declarations.find((parameter) => parameter.id === id);
+          control.value = String(numericSliderPosition(declaration, Number(value)));
+          control.setAttribute('aria-valuetext', formatNumericValue(value));
+        } else control.value = String(value);
         const readout = row.querySelector('.chain-param-value');
         if (readout) readout.value = formatNumericValue(value);
       }

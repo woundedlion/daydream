@@ -1255,6 +1255,50 @@ test('live ranges bound sliders and typed values and expand without replacing co
   assert.deepEqual(h.edits.at(-1), ['sample.pattern-freq', 1]);
 });
 
+test('log-positive sliders map octaves and preserve value readouts across edits and live limits', async () => {
+  const source = scratchChainDocument(CATALOG, [
+    {label: 'project', operator: 'project.stereographic.v2'},
+    {label: 'affine', operator: 'warp.affine.v4'},
+    {label: 'sample', operator: 'sample.grid.v4'},
+    {label: 'color', operator: 'colorize.generated-palette.v4'},
+  ]);
+  let ranges = [];
+  const h = await makeStrip({source, writeThrough: true, parameterRanges: () => ranges});
+  const row = rowFor(h, 'affine', 'affine.scale-x');
+  const slider = controlIn(row);
+  const readout = row.querySelector('.chain-param-value');
+  assert.deepEqual([Number(slider.min), Number(slider.max), Number(slider.value)], [-6, 6, 0]);
+  assert.deepEqual([Number(readout.min), Number(readout.max), Number(readout.value)], [1 / 64, 64, 1]);
+  slider.value = '-1';
+  slider.dispatch('input');
+  runFrame();
+  assert.deepEqual(h.edits.at(-1), ['affine.scale-x', 0.5]);
+  assert.equal(Number(readout.value), 0.5);
+  assert.equal(slider.getAttribute('aria-valuetext'), '0.5');
+  slider.dispatch('change');
+  h.strip.syncParameterValues({'affine.scale-x': 2});
+  assert.equal(Number(slider.value), 1);
+  assert.equal(Number(readout.value), 2);
+  assert.equal(slider.getAttribute('aria-valuetext'), '2');
+  readout.value = '0.25';
+  readout.dispatch('change');
+  assert.equal(Number(slider.value), -2);
+  assert.deepEqual(h.edits.at(-1), ['affine.scale-x', 0.25]);
+  readout.dispatch('keydown', {key: 'ArrowUp'});
+  assert.ok(Math.abs(Number(readout.value) / 0.25 - 4096 ** (1 / 1000)) < 1e-7);
+  ranges = [{name: 'affine.scale-x', min: 0.25, max: 4}];
+  h.strip.syncParameterRows();
+  assert.deepEqual([Number(slider.min), Number(slider.max)], [-2, 2]);
+  assert.deepEqual([Number(readout.min), Number(readout.max)], [0.25, 4]);
+  slider.value = '6';
+  slider.dispatch('input');
+  slider.dispatch('change');
+  assert.deepEqual(h.edits.at(-1), ['affine.scale-x', 4]);
+  assert.equal(Number(slider.value), 2);
+  assert.equal(Number(readout.value), 4);
+  assert.equal(controlIn(rowFor(h, 'affine', 'affine.scale-x')), slider);
+});
+
 test('slider drags retain admitted limits until the edit is committed', async () => {
   let queries = 0;
   let maximum = 12;
@@ -1540,7 +1584,7 @@ test('the inline controls read the named preset', async () => {
   const h = await makeStrip({ presetId: 'hex-twin-wave-alt' });
   chipByLabel(h, 'colorize').dispatch('click');
 
-  assert.equal(Number(controlIn(rowFor(h, 'colorize', 'colorize.mapping-frequency'))
+  assert.equal(Number(rowFor(h, 'colorize', 'colorize.mapping-frequency').querySelector('.chain-param-value')
     .value), 2, 'the second preset’s value, not the first’s');
 });
 
@@ -1568,7 +1612,7 @@ test('the Palette card keeps palette controls and Color stages own modulation co
   }
   for (const [field, value] of [['pattern-scale', '2'], ['pattern-speed', '0.0004']]) {
     const control = controlIn(rowFor(h, 'modulation', `modulation.${field}`));
-    control.value = value;
+    control.value = field === 'pattern-scale' ? String(Math.log2(Number(value))) : value;
     control.dispatch('input');
     control.dispatch('change');
     assert.equal(h.store.document().preset_bank.presets[0].values[`modulation.${field}`],
@@ -1634,7 +1678,7 @@ test('Noise scale follows the sampling limit without replacing its controls', as
   const row = rowFor(h, 'modulation', 'modulation.pattern-scale');
   const slider = controlIn(row);
   const readout = row.querySelector('.chain-param-value');
-  assert.equal(slider.max, '8');
+  assert.equal(slider.max, '3');
   assert.equal(readout.max, '8');
   readout.value = '20';
   readout.dispatch('change');
@@ -1642,9 +1686,9 @@ test('Noise scale follows the sampling limit without replacing its controls', as
   const evaluation = controlIn(rowFor(h, 'modulation', 'modulation.modulation-evaluation'));
   evaluation.value = 'direct';
   evaluation.dispatch('change');
-  assert.equal(slider.max, '64');
+  assert.equal(slider.max, '6');
   assert.equal(readout.max, '64');
-  slider.value = '32';
+  slider.value = '5';
   slider.dispatch('input');
   slider.dispatch('change');
   assert.equal(h.store.document().preset_bank.presets[0].values['modulation.pattern-scale'], 32);
@@ -1959,7 +2003,10 @@ test('every catalog operator exposes its parameter controls without declarations
     for (const field of fields) {
       const control = controlIn(rowFor(h, owner, `audit.${field.id}`));
       if (control.type === 'checkbox') assert.equal(control.checked, field.default === 'on', `${operator.name}: ${field.id}`);
-      else assert.equal(String(control.value), String(field.default), `${operator.name}: ${field.id}`);
+      else {
+        const expected = field.curve === 'log-positive' ? Math.log2(field.default) : field.default;
+        assert.equal(String(control.value), String(expected), `${operator.name}: ${field.id}`);
+      }
     }
     if (operator.params.length === 0)
       assert.equal(paramsOf(h, 'audit').querySelector('.chain-strip-note').textContent,

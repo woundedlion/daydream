@@ -2185,12 +2185,14 @@ test('a bypass reshapes the engine program and skips the bypassed parameters', a
 function stageEditor(harness, label) {
   stripChips(harness).find((chip) => chip.dataset.label === label).dispatch('click');
   return (parameterId, value) => {
-    const control = stripChips(harness)
+    const row = stripChips(harness)
       .find((chip) => chip.dataset.label === label)
       .querySelectorAll('.chain-param')
-      .find((row) => row.dataset.parameter === parameterId)
-      .querySelector('.chain-param-control');
-    control.value = String(value);
+      .find((row) => row.dataset.parameter === parameterId);
+    const control = row.querySelector('.chain-param-control');
+    const readout = row.querySelector('.chain-param-value');
+    control.value = String(control.type === 'range' && control.min !== readout.min
+      ? Math.log2(Number(value)) : value);
     const eventType = control.tagName === 'SELECT' ? 'change' : 'input';
     control.dispatch(eventType);
     if (eventType === 'input') harness.animationFrames.flush();
