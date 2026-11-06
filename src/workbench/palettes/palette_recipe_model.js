@@ -73,9 +73,9 @@ function checkedAxis(axis) {
 }
 
 /**
- * One mutable recipe, edited through named operations. Views returned by its
- * getters are valid until the next operation and allocate nothing;
- * `snapshot()` copies the recipe for a caller that keeps it.
+ * One mutable recipe, edited through named operations. The window, axis endpoint,
+ * and custom hue offset views keep their identity for the model's life.
+ * `recipe()` is valid until `loadRecipe()`; `snapshot()` copies the recipe.
  */
 export class PaletteRecipeModel {
   /** @type {PaletteRecipe} */

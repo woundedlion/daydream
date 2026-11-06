@@ -57,14 +57,31 @@ test('a snapshot taken before an operation is unchanged after it', () => {
   assert.notEqual(model.recipe().hue.customTurns[0], 9);
 });
 
-test('a controller built before loadRecipe sees the loaded state', () => {
+test('held reading views keep their identity and update across loadRecipe', () => {
   const model = new PaletteRecipeModel();
-  const controller = { domain: () => model.recipe().domain, base: () => model.baseHueTurns };
+  const recipe = model.recipe();
+  const window = model.window;
+  const offsets = model.customHueOffsets();
+  const lightness = model.axisEndpoints('lightness');
   const preset = PALETTE_RECIPE_PRESETS.isolightSpectralLoop();
+  preset.input = {offset: 0.2, span: 0.6};
+  preset.hue.mode = PaletteV4.hueMode.CUSTOM;
   preset.hue.baseTurns = 0.3;
+  preset.hue.customTurns = [0.3, 0.45, 0.2, 0];
+  preset.lightness.center = 0.4;
+  preset.lightness.range = 0.2;
   model.loadRecipe(preset);
-  assert.equal(controller.domain(), PaletteV4.domain.LOOP);
-  assert.equal(controller.base(), 0.3);
+  assert.equal(model.window, window);
+  assert.equal(model.customHueOffsets(), offsets);
+  assert.equal(model.axisEndpoints('lightness'), lightness);
+  assert.deepEqual({...window}, preset.input);
+  for (const [index, value] of [0, 0.15, -0.1].entries())
+    assert.ok(Math.abs(offsets[index] - value) < 1e-12);
+  assert.ok(Math.abs(lightness.minimum - 0.3) < 1e-12);
+  assert.ok(Math.abs(lightness.maximum - 0.5) < 1e-12);
+  assert.notEqual(model.recipe(), recipe);
+  assert.equal(model.recipe().domain, PaletteV4.domain.LOOP);
+  assert.equal(model.baseHueTurns, 0.3);
 });
 
 test('loading copies the recipe it is given', () => {
