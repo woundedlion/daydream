@@ -713,6 +713,22 @@ select.chain-param-control {
   outline: none;
 }
 
+@media (pointer: coarse), (width <= 900px) {
+  .chain-chip-pin,
+  .chain-chip-reset,
+  .chain-chip-remove,
+  .chain-chip-bypass {
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+  }
+
+  .chain-strip-actions button,
+  .chain-undo,
+  .chain-redo {
+    min-height: 1.5rem;
+  }
+}
+
 @media only screen and (width <= 900px) {
   .chain-chip-params {
     grid-template-columns: minmax(0, 1fr) 3rem;
