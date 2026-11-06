@@ -35,12 +35,12 @@ restoreDocumentAfterEach();
  * A strip over a fresh store on a fresh fixture copy, plus its spies.
  * @param {{presetId?: string|null, bypassAvailable?: () => boolean,
  *   writeThrough?: boolean, parameterLive?: (parameterId: string) => boolean,
- *   acceptParameter?: () => boolean, source?: Object}} [seams] - The preset the inline controls read,
+ *   acceptParameter?: () => boolean, parameterRanges?: () => Object[], source?: Object}} [seams] - The preset the inline controls read,
  *   omitted the strip falls back to the document's first; whether a bypass
  *   reaches what is rendering; and whether inline edits reach the store as the
  *   page writes them; whether a parameter is live in the active build; whether
- *   the page accepts an inline edit (false models a refused write); and the
- *   document the store opens on.
+ *   the page accepts an inline edit (false models a refused write); the
+ *   current parameter ranges; and the document the store opens on.
  * @returns {Promise<Object>} The harness.
  */
 async function makeStrip({

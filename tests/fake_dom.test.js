@@ -1,4 +1,3 @@
-//
 // fake_dom.js's event propagation and value coercion, pinned on their own.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

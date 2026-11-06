@@ -20,14 +20,12 @@ beforeEach(() => {
 /** A valid config; tests override single fields to exercise one guard at a time. */
 const base = { id: 's', label: 'L', min: 0, max: 10, step: 1, value: 5 };
 
-/** Verifies a missing container throws a named error before any validation. */
 test('throws when the container element is absent', () => {
   installDocument({ getElementById: () => null });
   assert.throws(() => createSlider('missing', { ...base, min: 10, max: 0 }, null),
                 /container #missing not found/);
 });
 
-/** Verifies the `!(min < max)` guard rejects an inverted range and a NaN bound. */
 test('throws when min is not less than max (including NaN bounds)', () => {
   assert.throws(() => createSlider('c', { ...base, min: 10, max: 0 }), /min .* must be < max/);
   assert.throws(() => createSlider('c', { ...base, min: 5, max: 5 }), /min .* must be < max/);
@@ -35,33 +33,28 @@ test('throws when min is not less than max (including NaN bounds)', () => {
   assert.throws(() => createSlider('c', { ...base, max: NaN }), /min .* must be < max/);
 });
 
-/** Verifies the `!(step > 0)` guard rejects non-positive and NaN steps. */
 test('throws when step is not greater than zero', () => {
   assert.throws(() => createSlider('c', { ...base, step: 0 }), /step .* must be > 0/);
   assert.throws(() => createSlider('c', { ...base, step: -1 }), /step .* must be > 0/);
   assert.throws(() => createSlider('c', { ...base, step: NaN }), /step .* must be > 0/);
 });
 
-/** Verifies the `!(scale > 0)` guard rejects non-positive and NaN scales. */
 test('throws when scale is not greater than zero', () => {
   assert.throws(() => createSlider('c', { ...base, scale: 0 }), /scale .* must be > 0/);
   assert.throws(() => createSlider('c', { ...base, scale: -2 }), /scale .* must be > 0/);
   assert.throws(() => createSlider('c', { ...base, scale: NaN }), /scale .* must be > 0/);
 });
 
-/** Verifies a step that rounds to 0 in scaled (integer) units is rejected. */
 test('throws when step * scale rounds below 1 in scaled units', () => {
   assert.throws(() => createSlider('c', { ...base, step: 0.4, scale: 1 }),
     /rounds to 0 in scaled units; must be >= 1/);
 });
 
-/** Verifies the value guard rejects a non-finite initial value. */
 test('throws when the initial value is not finite', () => {
   assert.throws(() => createSlider('c', { ...base, value: NaN }), /value .* must be a finite number/);
   assert.throws(() => createSlider('c', { ...base, value: undefined }), /value .* must be a finite number/);
 });
 
-/** Verifies a valid config builds the control and snaps its attributes to scaled units. */
 test('builds a slider, scaling bounds and rounding the step to integer units', () => {
   const { slider, valueSpan } = createSlider('c', { ...base, scale: 10, decimals: 1 }, null);
   assert.equal(slider.min, '0');
@@ -94,7 +87,6 @@ test('building a slider replaces existing container content', () => {
   assert.equal(container.children.length, 3);
 });
 
-/** Verifies input synchronizes both readouts before invoking the caller. */
 test('input updates the readout and aria-valuetext before onInput', () => {
   let observed;
   const { slider, valueSpan } = createSlider(
@@ -186,7 +178,6 @@ test('the step grid is anchored at min and never overshoots max', () => {
   assert.equal(ragged.setValue(-4), 0);
 });
 
-/** Verifies setValue clamps to the configured range instead of moving the thumb off it. */
 test('setValue clamps to the slider range', () => {
   const { slider, valueSpan, setValue } = createSlider(
     'c', { ...base, scale: 10, decimals: 1 }, null);
@@ -199,7 +190,6 @@ test('setValue clamps to the slider range', () => {
   assert.equal(valueSpan.textContent, '0.0');
 });
 
-/** Verifies the visible label is the accessible name when no override is supplied. */
 test('omitting ariaLabel leaves the visible label as the accessible name', () => {
   const { slider } = createSlider('c', base, null);
   assert.equal(slider.getAttribute('aria-label'), null);
@@ -217,7 +207,6 @@ test('ariaLabel names the input and leaves the visible label short', () => {
   assert.equal(container.children[0].textContent, 'R');
 });
 
-/** Verifies an empty ariaLabel is treated as absent rather than set as a blank name. */
 test('an empty ariaLabel sets no attribute', () => {
   const { slider } = createSlider('c', { ...base, ariaLabel: '' }, null);
   assert.equal(slider.getAttribute('aria-label'), null);

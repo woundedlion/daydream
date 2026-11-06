@@ -1,4 +1,3 @@
-//
 // Tests for src/workbench/shader/chain_apply.js, which applies a compiled chain
 // document to the chain engine: setShaderChain, then the preset values by
 // parameter id, then the GUI resync and repaint.

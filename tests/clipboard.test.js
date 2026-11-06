@@ -1,4 +1,3 @@
-//
 // Tests for the clipboard helpers.
 import { test, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -302,7 +301,7 @@ test('wireCopyBlock wires the button and block triggers', async () => {
   let prevented = 0;
   for (const key of ['Enter', ' ', 'Tab']) {
     if (block.dispatch('keydown', { key }).defaultPrevented) prevented++;
-    }
+  }
   assert.equal(prevented, 0);
   assert.deepEqual(writes, Array(2).fill('generated output'));
   await new Promise((resolve) => setImmediate(resolve));

@@ -1,4 +1,3 @@
-//
 // daydream.js's composition root once its WASM module lands, plus the control
 // blocks start() lifts out, driven through their factories.
 //

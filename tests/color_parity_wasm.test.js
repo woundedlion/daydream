@@ -1,11 +1,10 @@
-import {oklchLinearRgb, maxSrgbGamutChroma} from '../src/workbench/palettes/palette_wheel.js';
-//
 // Browser tools' colour, Lissajous and Mobius math parity and goldens,
 // run against the real shipped WASM module.
 //
 // The C++ runs the math in float; the JS ports run it in double, so float
 // outputs are compared within a small tolerance. LUT-quantized palette outputs
 // allow one 16-bit linear LSB for float-versus-double rounding.
+import {oklchLinearRgb, maxSrgbGamutChroma} from '../src/workbench/palettes/palette_wheel.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -80,7 +79,7 @@ test('OKLab golden values (absolute pin)', () => {
 });
 
 /**
- * Verifies palette_controls.js's OKLCh→linear-sRGB port matches the engine's
+ * Verifies palette_wheel.js's OKLCh→linear-sRGB port matches the engine's
  * inverse OKLab transform. The port folds the polar-to-Cartesian step into the
  * same body as the matrix, so it is compared against the engine fed the same
  * (a, b). The sweep covers the wheel at three lightnesses and out to chroma 0.2,

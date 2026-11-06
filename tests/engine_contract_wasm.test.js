@@ -1,9 +1,8 @@
-import { EFFECT_IDENTITIES } from '../generated/engine_contract.mjs';
-import {chainSnapshot} from './helpers/effect_gui_harness.js';
-//
 // Real-engine contract pin for the WASM surface: loads the shipped module and
 // exercises the methods and return shapes FakeEngine models, plus MeshOps and
 // PaletteOps.
+import { EFFECT_IDENTITIES } from '../generated/engine_contract.mjs';
+import {chainSnapshot} from './helpers/effect_gui_harness.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

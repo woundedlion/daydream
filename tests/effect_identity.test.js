@@ -18,11 +18,11 @@ test('unknown names remain available to callers handling an independent catalog'
 });
 
 
-test('identity resolution accepts metadata without a legacy_ids field', async (t) => {
+test('identity resolution follows the installed contract rows', async (t) => {
   t.mock.module(new URL('../generated/engine_contract.mjs', import.meta.url).href, {
     namedExports: {EFFECT_IDENTITIES: [{id: 'study', display_name: 'Study'}]},
   });
-  const identity = await import('../src/effects/effect_identity.js?field-absent');
+  const identity = await import('../src/effects/effect_identity.js?mocked-contract');
   assert.equal(identity.canonicalEffectId('Study'), 'study');
   assert.equal(identity.effectDisplayName('study'), 'Study');
   assert.equal(identity.canonicalEffectId('IndependentStudy'), 'IndependentStudy');

@@ -1,4 +1,3 @@
-//
 // LabelPool's label reuse, against the shared fake element and a
 // parent-tracking scene stub.
 import { test } from 'node:test';

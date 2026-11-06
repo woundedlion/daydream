@@ -284,13 +284,11 @@ beforeEach(() => {
   nextRestoreMissing = false;
 });
 
-/** The worker posts 'booted' at module load. */
 test('worker posts booted at module load', () => {
   assert.equal(bootedAtLoad.length, 1, 'exactly one booted ping emitted at load');
   assert.equal(bootedAtLoad[0].msg.version, PROTOCOL_VERSION, 'booted carries the protocol version');
 });
 
-/** A rejected display-cap write refuses init before other engine calls. */
 test('init reports rejected display caps before configuring the engine', async () => {
   nextCapsRejected = true;
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
@@ -311,7 +309,6 @@ test('init faults on a protocol version mismatch', async () => {
   assert.equal(posted.find((p) => p.msg.type === 'ready'), undefined, 'no ready posted');
 });
 
-/** A render before init faults rather than replying with nothing and stalling the fence. */
 test('render before a completed init faults instead of dropping the reply', async () => {
   const captured = await captureTimeouts(async () => {
     await dispatch({ type: 'render' });
@@ -391,11 +388,7 @@ test('a failed instantiate of a supplied module reports instead of hanging', asy
     + 'engine refused, and keeps handing the same module to every rebuild');
 });
 
-/**
- * A version-mismatched init latches nothing: the worker keeps the segment
- * identity it was built with,
- * for both the frame tag and every later segRange recompute.
- */
+/** Rejected init preserves the segment identity in frame tags and recomputed ranges. */
 test('a version-mismatched init latches no segment identity', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
   const built = engineInstance;
@@ -421,7 +414,6 @@ test('a version-mismatched init latches no segment identity', async () => {
   assert.deepEqual([resized.x0, resized.x1, resized.y0, resized.y1], [8, 16, 4, 8]);
 });
 
-/** init builds the segRange, drives the engine setup in order, and posts ready. */
 test('init applies the segment clip and posts ready', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
 
@@ -434,7 +426,6 @@ test('init applies the segment clip and posts ready', async () => {
   assert.ok(posted.some((p) => p.msg.type === 'ready'), 'ready posted');
 });
 
-/** An init whose setResolution is rejected posts no ready and an explicit engineRejected so the controller faults at once. */
 test('init with a rejected resolution posts engineRejected, not ready', async () => {
   nextResolutionOk = false;
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
@@ -447,7 +438,6 @@ test('init with a rejected resolution posts engineRejected, not ready', async ()
   assert.match(failed.msg.reason, /setResolution\(8, 4\) rejected/);
 });
 
-/** An init whose setEffect is rejected posts no ready, no clip, and an explicit engineRejected. */
 test('init with a rejected effect posts engineRejected, not ready', async () => {
   nextEffectOk = false;
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma',
@@ -464,7 +454,6 @@ test('init with a rejected effect posts engineRejected, not ready', async () => 
   assert.match(failed.msg.reason, /setEffect\(Plasma\) rejected/);
 });
 
-/** An init whose clip is rejected has no render geometry, so it posts no ready. */
 test('init with a rejected clip posts engineRejected, not ready', async () => {
   nextClipOk = false;
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
@@ -493,7 +482,6 @@ test('duplicate init is refused before creating another module', async () => {
   assert.equal(firstEngine.curH, 4);
 });
 
-/** render copies exactly this segment's quadrant rows out of the full buffer. */
 test('render extracts only this segment quadrant from the canvas buffer', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
   posted.length = 0;
@@ -519,7 +507,6 @@ test('render extracts only this segment quadrant from the canvas buffer', async 
   }
 });
 
-/** A returned buffer of the right size is refilled in place; anything else allocates. */
 test('render refills a recycled buffer and allocates on a size mismatch', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
 
@@ -551,7 +538,6 @@ test('render refills a recycled buffer and allocates on a size mismatch', async 
   assert.equal(none.pixels.length, 4 * 2 * 3, 'a render with no recycle still allocates');
 });
 
-/** Arena metrics are marshalled into a plain, transfer-safe object. */
 test('render marshals arena metrics into a plain object', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   posted.length = 0;
@@ -565,7 +551,6 @@ test('render marshals arena metrics into a plain object', async () => {
   });
 });
 
-/** A failing getArenaMetrics is surfaced as null without dropping the frame. */
 test('render still posts a frame when getArenaMetrics throws', async (t) => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   engineInstance.metricsThrows = true;
@@ -578,7 +563,6 @@ test('render still posts a frame when getArenaMetrics throws', async (t) => {
   assert.equal(frame.msg.arenaMetrics, null);
 });
 
-/** A metrics call that trapped the module faults the worker instead of posting its pixels. */
 test('render faults when getArenaMetrics traps the module', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   engineInstance.metricsThrows = true;
@@ -610,7 +594,6 @@ test('render faults on a pixel buffer of the wrong length', async () => {
   assert.throws(() => captured[0](), /pixel buffer length/);
 });
 
-/** A protocol-drift message type fails fast (rethrown to onerror) instead of being silently dropped. */
 test('an unknown message type faults instead of being silently dropped', async () => {
   const captured = await captureTimeouts(async () => {
     await dispatch({ type: 'bogusProtocolDrift' });
@@ -625,7 +608,6 @@ test('an invalid worker message envelope is rejected explicitly', async () => {
   assert.equal(posted.at(-1).msg.reason, 'invalid worker message envelope');
 });
 
-/** Segment 0 mirrors its post-frame param values; other segments send null. */
 test('render streams param values from segment 0 only', async () => {
   await dispatch({
     type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
@@ -687,7 +669,6 @@ test('a rejected setResolution leaves segRange and clip untouched', async () => 
   assert.deepEqual([frame.x0, frame.x1, frame.y0, frame.y1], [4, 8, 2, 4]);
 });
 
-/** A successful resize defers clipping until the following effect rebuild. */
 test('an accepted setResolution defers the clip until setEffect', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
   posted.length = 0;
@@ -759,7 +740,6 @@ test('a same-size setResolution keeps rendering without a setEffect', async () =
   assert.deepEqual([frame.x0, frame.x1, frame.y0, frame.y1], [4, 8, 2, 4]);
 });
 
-/** A structured-clone failure is reported immediately to the controller. */
 test('worker reports inbound message deserialization failures', (t) => {
   const error = { type: 'messageerror' };
   t.mock.method(console, 'error', () => {});
@@ -783,7 +763,6 @@ test('init rejects a missing or empty effect before creating an engine', async (
   }
 });
 
-/** A clip rejection is surfaced immediately instead of rendering full-canvas. */
 test('a rejected clip posts engineRejected', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   posted.length = 0;

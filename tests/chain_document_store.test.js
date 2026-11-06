@@ -1,6 +1,6 @@
-import {modulationRecipe} from './helpers/fake_engine.js';
 // Check transactional chain edits, reconciliation, undo and session bypass
 // against a multi-preset pattern fixture and the pinned engine catalog.
+import {modulationRecipe} from './helpers/fake_engine.js';
 import { test } from 'node:test';
 import * as compiler from '../generated/shader/shader_workbench.mjs';
 import assert from 'node:assert/strict';

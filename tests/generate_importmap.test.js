@@ -1,4 +1,3 @@
-//
 // scripts/generate-importmap.mjs rewrites only the GENERATED VENDOR block of
 // vendor-importmap.js. Driven as a subprocess against a temp fixture so the
 // --root selects its package.json, vendor-importmap.js and tracked source files.

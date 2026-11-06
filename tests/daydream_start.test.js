@@ -1,8 +1,7 @@
-import {getActiveURLSync} from '../src/app/state.js';
-//
 // daydream.js's composition root: start(deps) builds the whole app against
 // injected seams (document, page target, navigator, driver, GUI factory,
 // module loader).
+import {getActiveURLSync} from '../src/app/state.js';
 import { canonicalEffectId } from '../src/effects/effect_identity.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

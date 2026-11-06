@@ -1,4 +1,3 @@
-//
 // The display aliases: the Three.js instanceColor attribute, its array, and the
 // driver's own pixel handle must all reference one WASM view, or the sphere
 // shows the previous buffer.

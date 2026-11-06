@@ -74,7 +74,6 @@ const vertMaterial = new THREE.PointsMaterial({ color: 0xa5b4fc, size: 0.05 });
 const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
 const normalMaterial = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8 });
 
-// Coalesce update() calls into one recompute per animation frame.
 const scheduleUpdate = createFrameScheduler(update);
 const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 
@@ -96,7 +95,6 @@ const state = {
 
 const baseThumbnails = {};
 
-// JS mesh readback for stats, index labels, and internal angles.
 let currentMesh = null;
 let currentMeshIsCurrent = false;
 // Per-face topology class ids for the Colorize Faces toggle, cached from the
@@ -475,7 +473,6 @@ function selectBaseSolid(key, btn) {
 }
 
 function updateToggles() {
-  // The on/off look is the `.toggle-switch.is-on` class.
   const toggleState = {
     toggleRotate: state.autoRotate,
     toggleGeo: state.showGeodesics,
@@ -780,7 +777,6 @@ async function copyCode(index, lang, btn) {
     ? "IslamicStarPatterns"
     : (CATALAN_BASES.has(item.base) ? "Catalan" : "Archimedean");
 
-  // A star-pattern base is not in simple_registry, so the Recipe flattens its chain.
   let code;
   let validationError = null;
   try {
@@ -789,6 +785,7 @@ async function copyCode(index, lang, btn) {
     } else if (lang === 'registry') {
       let baseRecipe = null;
       if (baseIsStar) {
+        // Flatten the star base's authored chain into the registry recipe.
         if (!meshOpsWasm) {
           showCopyFailure(btn, 'export failed: the engine has stood down; reload to export a registry');
           return;
@@ -836,7 +833,6 @@ function showCopyFailure(button, message) {
 }
 
 function restoreSolid(item) {
-  // Cards are shape-checked on load/import; also guard direct callers.
   const shapeError = queueSavedSolidRestore(item, () => queueCommit(async () => {
     // The engine may have changed limits since the save.
     const check = await chainIsValid(item.base, item.ops);
@@ -1421,7 +1417,6 @@ function updateLabels() {
       const i = parseInt(el.dataset.index);
       const v = currentMesh.vertices[i];
       if (v) {
-        // Backface Culling for Labels
         const dot = v.dot(camPos) - v.lengthSq();
 
         if (dot < 0) {
@@ -1445,7 +1440,5 @@ function updateLabels() {
     });
   }
 }
-
-
 
 bootstrapTool(init, 'solids tool');

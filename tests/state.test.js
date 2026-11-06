@@ -335,11 +335,6 @@ function installRefusingHistoryWindow(message, search = '') {
   return { history, timer, written };
 }
 
-/**
- * A tracked key is re-read from state on every flush, so a refused write costs
- * it nothing. An ad-hoc GUI param lives only in the buffer: dropping it there
- * would lose the value with nothing left to re-assert it.
- */
 test('URLSync retains pending reset through refusal and abandons it at exhaustion', (t) => {
   t.mock.method(console, 'warn', () => {});
   const { history, timer, written } = installRefusingHistoryWindow('rate limit', '?effect=ShapeShifter&fx.speed=9');
@@ -359,6 +354,11 @@ test('URLSync retains pending reset through refusal and abandons it at exhaustio
   assert.equal(params.get('fx.speed'), '11');
 });
 
+/**
+ * A tracked key is re-read from state on every flush, so a refused write costs
+ * it nothing. An ad-hoc GUI param lives only in the buffer: dropping it there
+ * would lose the value with nothing left to re-assert it.
+ */
 test('URLSync holds its ad-hoc buffer through a refused history write', () => {
   const { history, timer, written } = installRefusingHistoryWindow('rate limit');
   const captured = installConsoleCapture('warn');

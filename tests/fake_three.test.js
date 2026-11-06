@@ -1,4 +1,3 @@
-//
 // fake_three.js's upload semantics and teardown sink, pinned on their own.
 import { detachedView } from './helpers/fake_buffer.js';
 import { test } from 'node:test';

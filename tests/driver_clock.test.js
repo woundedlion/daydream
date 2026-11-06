@@ -1,4 +1,3 @@
-//
 // Daydream.advanceFrameClock advances at most one frame per call. The ordinary
 // clock clamps the backlog and consumes one interval; POV fidelity drops overdue
 // whole intervals and keeps the sweep phase.

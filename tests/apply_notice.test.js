@@ -1,4 +1,3 @@
-//
 // Tests for the shared notice element: ownership of clears and live-region exposure.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -737,9 +737,7 @@ test('a faulted pool keeps tick() from dispatching another doomed render', () =>
 });
 
 test('a fault latched by composite() mid-tick() does not re-dispatch a doomed render', async () => {
-  // The fence-escaping out-of-bounds result faults inside composite(), so the pool
-  // is clean at tick() entry and only latches partway through — the post-composite
-  // faulted re-check is what stops the second render.
+  // A fault during compositing prevents another render dispatch.
   setDisplayGrid(4, 2);
 
   const c = readyController(2);

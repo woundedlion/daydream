@@ -737,7 +737,7 @@ export function createChainStrip({
   /**
    * The instance label as an editable field. A rename is a document edit
    * through the store; a refusal restores the field.
-   * @param {ChainEntry} entry - The expanded chain entry.
+   * @param {ChainEntry} entry - The chain entry.
    * @returns {*} The rename row.
    */
   const renameRow = (entry) => {
@@ -768,10 +768,10 @@ export function createChainStrip({
   };
 
   /**
-   * The expanded chip's own controls, one row per parameter the store reports
+   * The chip's own controls, one row per parameter the store reports
    * for the instance (authored declarations plus undeclared catalog fields),
    * labeled by the field segment alone: the chip already names the instance.
-   * @param {ChainEntry} entry - The expanded chain entry.
+   * @param {ChainEntry} entry - The chain entry.
    * @param {ParameterDeclaration[]} declared - The instance's parameters.
    * @returns {*} The parameter region.
    */

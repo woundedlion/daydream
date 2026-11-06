@@ -5,7 +5,6 @@
 
 /**
  * Wires a button-controlled flyout with outside-click and Escape dismissal.
- * CSS may additionally expose the panel on hover.
  * @param {object} options - Flyout elements and event target.
  * @param {HTMLElement} options.root - Element receiving the open-state class.
  * @param {HTMLButtonElement} options.trigger - Button controlling the flyout.

@@ -23,7 +23,7 @@ test('pixelEngine mocks only methods the real engine surface pins', () => {
   assert.deepEqual(
     unpinnedEngineMethods(pixelEngine(() => new Uint16Array(4), () => 4)),
     [],
-    'engine_contract_wasm.test.js never checks these against the real module',
+    "absent from the generated engine contract's HolosphereEngine methods",
   );
 });
 

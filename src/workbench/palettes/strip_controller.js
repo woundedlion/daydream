@@ -2,30 +2,36 @@
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
+
+/* Palette strip selection, zoom and color-copy interactions. */
+
 import {copyToClipboard as copyToClipboardDefault} from '../../shared/clipboard.js';
 import {linearRgbToHex} from '../../shared/color.js';
 import {createPointerDrag, innerRect} from '../../shared/pointer_drag.js';
 import {paletteStripView, stripDragIntent} from './palette_controls.js';
 
 /**
- * @param {object} options
- * @param {HTMLCanvasElement} options.canvas
- * @param {ReturnType<typeof import('./palette_controls.js').createPaletteViewport>} options.viewport
- * @param {import('./palette_recipe_model.js').PaletteRecipeModel} options.model
- * @param {() => string} options.getTab
- * @param {() => {get: (phase:number) => number[]}|null} options.getPalette
- * @param {() => {start:number,end:number}} options.visiblePhaseRange
- * @param {(selection?:{start:number,end:number}|null) => void} options.drawColorStrip
- * @param {() => void} options.redrawForViewport
- * @param {(start:number,end:number) => void} options.zoomRecipeWindowControls
- * @param {() => void} options.renderRecipeWindow
- * @param {() => void} options.scheduleUpdate
- * @param {HTMLElement} options.resetZoomButton
- * @param {HTMLElement} options.paletteRangeHeading
- * @param {{root:HTMLElement,swatch:HTMLElement,status:HTMLElement,hex:HTMLElement}} options.feedback
- * @param {typeof copyToClipboardDefault} [options.copy]
- * @param {typeof createPointerDrag} [options.createDrag]
- * @param {{setTimeout:typeof setTimeout, clearTimeout:typeof clearTimeout}} [options.timers]
+ * Binds strip selection, viewport zoom and color-copy feedback.
+ * @param {object} options - Strip elements, model and interaction callbacks.
+ * @param {HTMLCanvasElement} options.canvas - Interactive color strip.
+ * @param {ReturnType<typeof import('./palette_controls.js').createPaletteViewport>} options.viewport - Procedural palette viewport.
+ * @param {import('./palette_recipe_model.js').PaletteRecipeModel} options.model - Editable generative palette recipe.
+ * @param {() => string} options.getTab - Reads the active palette tab.
+ * @param {() => {get: (phase:number) => number[]}|null} options.getPalette - Reads the palette used for color copying.
+ * @param {() => {start:number,end:number}} options.visiblePhaseRange - Reads the displayed phase interval.
+ * @param {(selection?:{start:number,end:number}|null) => void} options.drawColorStrip - Paints the strip and optional drag selection.
+ * @param {() => void} options.redrawForViewport - Redraws after procedural viewport changes.
+ * @param {(start:number,end:number) => void} options.zoomRecipeWindowControls - Sets the recipe window to the selected range.
+ * @param {() => void} options.renderRecipeWindow - Refreshes the recipe window controls.
+ * @param {() => void} options.scheduleUpdate - Schedules a palette preview update.
+ * @param {HTMLElement} options.resetZoomButton - Restores the full phase range.
+ * @param {HTMLElement} options.paletteRangeHeading - Names the displayed phase interval.
+ * @param {{root:HTMLElement,swatch:HTMLElement,status:HTMLElement,hex:HTMLElement}} options.feedback - Color-copy feedback elements.
+ * @param {typeof copyToClipboardDefault} [options.copy] - Copies the selected color text.
+ * @param {typeof createPointerDrag} [options.createDrag] - Binds pointer selection gestures.
+ * @param {{setTimeout:typeof setTimeout, clearTimeout:typeof clearTimeout}} [options.timers] - Schedules and cancels feedback dismissal.
+ * @returns {{copyColor: (position: number, x?: number, y?: number) => Promise<void>,
+ *   updateView: () => void, syncResetZoom: () => void, dispose: () => void}} Strip controls and cleanup.
  */
 export function createStripController({canvas: colorStripCanvas, viewport, model, getTab, getPalette,
   visiblePhaseRange, drawColorStrip, redrawForViewport, zoomRecipeWindowControls, renderRecipeWindow,
@@ -53,11 +59,11 @@ export function createStripController({canvas: colorStripCanvas, viewport, model
   /**
    * Handles the start of a drag or click on the color strip.
    * @param {PointerEvent} event
-   * @returns {boolean|void}
+   * @returns {void}
    */
   function handleDragStart(event) {
 
-    isSelectionActive = true; // Selection is active on start
+    isSelectionActive = true;
     dragStartPosition = getNormalizedX(event);
     dragEndPosition = dragStartPosition;
     colorStripCanvas.style.cursor = 'crosshair';

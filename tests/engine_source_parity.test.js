@@ -1,4 +1,3 @@
-//
 // Source-text parity between the browser tools' hand-transcribed engine values
 // and the C++ headers they are transcribed from, at the engine revision
 // recorded alongside the installed WASM. Dirty installs must be rebuilt from a clean tree.

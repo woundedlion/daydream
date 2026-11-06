@@ -1,4 +1,3 @@
-//
 // gui.js's DeepLinkGUI and URL writers, against a stubbed lil-gui.
 import { fakeTimers } from './helpers/fake_timers.js';
 import { test, mock, afterEach } from 'node:test';
