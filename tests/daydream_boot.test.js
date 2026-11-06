@@ -89,6 +89,29 @@ test('the View pause control holds rendering and clears queued steps on resume',
   assert.equal(app.driver.stepFrames, 0);
 });
 
+test('the effect pause toggle writes both the main engine and segment controller', async (t) => {
+  const module = fakeWasmModule({definitions: [
+    {name: 'Speed', value: 0.2, min: 0, max: 1, animated: true},
+  ]});
+  const enginePauses = [];
+  const poolPauses = [];
+  const setPaused = module.HolosphereEngine.prototype.setAnimationsPaused;
+  t.mock.method(module.HolosphereEngine.prototype, 'setAnimationsPaused', function (paused) {
+    enginePauses.push(paused);
+    return setPaused.call(this, paused);
+  });
+  t.mock.method(SegmentController.prototype, 'setAnimationsPaused', (paused) => poolPauses.push(paused));
+  const app = await bootedApp({loadModule: async () => module});
+  enginePauses.length = 0;
+  poolPauses.length = 0;
+  const pause = app.guis.at(-1).ctrl('pause');
+  pause.setValue(true);
+  pause.setValue(false);
+  assert.deepEqual(enginePauses, [true, false]);
+  assert.deepEqual(poolPauses, [true, false]);
+  assert.equal(module.engine.getAnimationsPaused(), false);
+});
+
 test('a booted recorder captures at the driver frame rate', async () => {
   const app = await bootedApp({ loadModule: async () => fakeWasmModule() });
   const { recorder } = app.driver;

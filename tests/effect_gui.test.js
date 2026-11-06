@@ -718,7 +718,7 @@ test('a write the engine paused by flips the toggle even on a static param', () 
     'the toggle must report the engine state, not the definition\'s animated flag');
   assert.deepEqual(h.writes, [
     'engine:Width=1.5', 'worker:Width=1.5', 'paused:true',
-  ], 'the adopted pause must reach the worker pool too');
+  ], 'the adopted pause reaches the injected pause writer');
 });
 
 test('the toggle resumes when the engine reports animations running again', () => {
@@ -787,7 +787,7 @@ test('a fresh effect explicitly commits the unpaused state', () => {
   assert.deepEqual(h.writes, ['paused:false']);
 });
 
-test('the pause toggle freezes and resumes animations on every engine', () => {
+test('the pause toggle forwards pause and resume through the injected writer', () => {
   const h = makeHarness({ params: [SPEED] });
   h.panel.build();
   h.panel.applyAnimationPause();
