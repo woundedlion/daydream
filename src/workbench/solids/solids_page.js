@@ -25,7 +25,7 @@ import {
   opTopologyKey,
 } from './solid_codegen.js';
 import { SAVED_SOLIDS_KEY, SAVED_SOLIDS_MAX, captureSavedSolidThumbnail, queueSavedSolidRestore,
-  loadSavedSolids, persistSavedSolids as persistSavedStore, mergeSavedSolids }
+  loadSavedSolids, persistSavedSolids as persistSavedStore, mergeSavedSolids, resolveSavedSolidsStorage }
   from './solid_saved_store.js';
 import { fanTriangulateFace, uniqueEdges } from './solid_geometry.js';
 import { buildBaseMesh, buildChainMesh } from './solid_build.js';
@@ -512,23 +512,25 @@ function wireCanvasTap(canvasEl) {
 }
 
 const SAVED_THUMB_SIZE = 256;
-const savedStorage = loadSavedSolids(localStorage);
+const savedStore = resolveSavedSolidsStorage();
+const savedStorage = loadSavedSolids(savedStore.storage);
+savedStorage.notice = [savedStore.notice, savedStorage.notice].filter(Boolean).join(' ');
 const savedSolids = savedStorage.entries;
 const savedStorageStatus = document.getElementById('savedStorageStatus');
 if (savedStorageStatus) savedStorageStatus.textContent = savedStorage.notice;
 
 function reloadSavedSolids(event) {
   if (event.key !== SAVED_SOLIDS_KEY && event.key !== null) return;
-  const loaded = loadSavedSolids(localStorage);
+  const loaded = loadSavedSolids(savedStore.storage);
   savedSolids.splice(0, savedSolids.length, ...loaded.entries);
   savedStorage.rejected.push(...loaded.rejected);
-  savedStorage.notice = loaded.notice;
-  if (savedStorageStatus) savedStorageStatus.textContent = loaded.notice;
+  savedStorage.notice = [savedStore.notice, loaded.notice].filter(Boolean).join(' ');
+  if (savedStorageStatus) savedStorageStatus.textContent = savedStorage.notice;
   renderSavedList();
 }
 
 function persistSavedSolids() {
-  const notice = persistSavedStore(localStorage, savedSolids, savedStorage);
+  const notice = persistSavedStore(savedStore.storage, savedSolids, savedStorage);
   const status = document.getElementById('savedStorageStatus');
   if (status) status.textContent = notice;
 }

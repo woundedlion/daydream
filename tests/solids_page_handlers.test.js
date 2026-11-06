@@ -46,7 +46,7 @@ test('storage changes reload saved solids without restoring removed cards', () =
   let entries = [{name: 'other-tab'}];
   let renders = 0;
   const reload = handler('reloadSavedSolids', {SAVED_SOLIDS_KEY: 'saved', savedSolids,
-    savedStorage, savedStorageStatus, localStorage: {}, loadSavedSolids: () => ({entries,
+    savedStorage, savedStorageStatus, savedStore: {storage: {}, notice: ''}, loadSavedSolids: () => ({entries,
       rejected: ['invalid'], notice: 'rejected'}), renderSavedList: () => { renders += 1; }});
   reload({key: 'unrelated'});
   assert.equal(renders, 0);
@@ -346,7 +346,7 @@ test('persistence failure is reported and clears after a later successful write'
   let failing = true;
   const persist = handler('persistSavedSolids', { savedSolids: [], savedStorage: { rejected: [], notice: '' }, SAVED_SOLIDS_KEY: 'saved',
     persistSavedStore, document: { getElementById: () => status },
-    localStorage: { setItem() { if (failing) throw new Error('quota'); } } });
+    savedStore: {storage: { setItem() { if (failing) throw new Error('quota'); } }} });
   persist();
   assert.match(status.textContent, /Changes apply to this session only/);
   failing = false;

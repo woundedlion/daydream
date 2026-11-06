@@ -34,6 +34,23 @@ export function queueSavedSolidRestore(item, queue) {
 
 export const SAVED_SOLIDS_KEY = 'daydream.savedSolids.v1';
 export const REJECTED_SOLIDS_KEY = 'daydream.savedSolids.rejected.v1';
+
+/**
+ * @param {() => Pick<Storage, 'getItem'|'setItem'>} [readStorage] - Resolves browser storage.
+ * @returns {{storage: Pick<Storage, 'getItem'|'setItem'>, notice: string}} Persistent or session storage.
+ */
+export function resolveSavedSolidsStorage(readStorage = () => localStorage) {
+  try {
+    return {storage: readStorage(), notice: ''};
+  } catch {
+    const values = new Map();
+    return {storage: {
+      getItem: key => values.get(key) ?? null,
+      setItem: (key, value) => { values.set(key, value); },
+    }, notice: 'Changes apply to this session only: browser storage is unavailable.'};
+  }
+}
+
 /** @param {Pick<Storage, "getItem">} storage */
 export function loadSavedSolids(storage) {
   const entries = [], rejected = [];

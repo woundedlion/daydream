@@ -1,7 +1,34 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {loadSavedSolids, mergeSavedSolids, persistSavedSolids, SAVED_SOLIDS_MAX,
-  SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY, importedSavedSolid} from '../src/workbench/solids/solid_saved_store.js';
+  SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY, importedSavedSolid, resolveSavedSolidsStorage} from '../src/workbench/solids/solid_saved_store.js';
+
+test('blocked browser storage resolves once to an isolated session store', (t) => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  t.after(() => {
+    if (original) Object.defineProperty(globalThis, 'localStorage', original);
+    else delete globalThis.localStorage;
+  });
+  let reads = 0;
+  Object.defineProperty(globalThis, 'localStorage', {configurable: true, get() {
+    reads++;
+    throw new DOMException('blocked', 'SecurityError');
+  }});
+  const resolved = resolveSavedSolidsStorage();
+  assert.equal(reads, 1);
+  assert.match(resolved.notice, /session only.*storage is unavailable/);
+  assert.equal(resolved.storage.getItem(SAVED_SOLIDS_KEY), null);
+  const card = {base: 'cube', ops: [{op: 'dual', params: {}}]};
+  persistSavedSolids(resolved.storage, [card], {notice: resolved.notice, rejected: []});
+  assert.deepEqual(loadSavedSolids(resolved.storage).entries, [card]);
+  assert.equal(reads, 1);
+  assert.equal(resolveSavedSolidsStorage().storage.getItem(SAVED_SOLIDS_KEY), null);
+});
+
+test('available browser storage remains the saved-solid storage port', () => {
+  const storage = {getItem: () => null, setItem() {}};
+  assert.deepEqual(resolveSavedSolidsStorage(() => storage), {storage, notice: ''});
+});
 
 test('invalid storage survives until a successful bounded rejected backup', () => {
   const values = new Map([[SAVED_SOLIDS_KEY, '{broken']]);

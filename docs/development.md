@@ -81,6 +81,8 @@ not rolled back.
 Saved solids back up rejected cards before replacing the primary list. A refused
 backup retains those cards in the primary data for recovery on reload. Malformed
 backup JSON is replaced by the current rejected entries.
+If access to browser storage itself throws, the solids page uses an isolated
+in-memory store and displays that changes last for the current session.
 
 After `npm ci` and an engine install, run `npm run lint`, `npm run typecheck`, and
 `npm test`. Test suites live in `tests/`, reusable support code in
