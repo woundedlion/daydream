@@ -706,7 +706,7 @@ test('saved-solid imports name invalid entries and the first refusal reason', ()
     handler('importSavedSolids', { savedSolids: [], mergeSavedSolids, SAVED_SOLIDS_MAX: 100,
       savedSolidExportError, showGateMsg: (message) => messages.push(message),
     })(JSON.stringify(entries));
-    assert.match(messages[0], /invalid entries/);
+    assert.match(messages[0], /invalid entr(y|ies)/);
     assert.match(messages[0], reason);
     assert.doesNotMatch(messages[0], /op table does not recognize/);
   }

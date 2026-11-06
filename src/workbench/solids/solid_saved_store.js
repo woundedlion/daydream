@@ -176,7 +176,7 @@ export function mergeSavedSolids(text, savedSolids) {
 
   const added = savedSolids.length - before;
   const skipped = [];
-  if (refused > 0) skipped.push(`${refused} invalid entries (${firstRefusal})`);
+  if (refused > 0) skipped.push(`${refused} invalid ${refused === 1 ? 'entry' : 'entries'} (${firstRefusal})`);
   if (full > 0) skipped.push(`${full} past the ${SAVED_SOLIDS_MAX}-card limit`);
   return { added, message: `imported ${added} solid${added === 1 ? '' : 's'}`
     + (skipped.length > 0 ? ` — skipped ${skipped.join(' and ')}` : ''),

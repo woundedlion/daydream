@@ -63,7 +63,7 @@ test('imports report malformed files and preserve capacity without mutating thei
   const result = mergeSavedSolids(JSON.stringify([card, card, null]), entries);
   assert.equal(result.added, 1);
   assert.equal(entries.length, SAVED_SOLIDS_MAX);
-  assert.match(result.message, /1 invalid entries.*1 past the 40-card limit/);
+  assert.match(result.message, /1 invalid entry.*1 past the 40-card limit/);
   assert.equal(result.persist, true);
   assert.equal(mergeSavedSolids('{}', entries).added, 0);
   assert.match(mergeSavedSolids('{', entries).message, /import rejected/);
