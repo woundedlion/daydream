@@ -1,4 +1,4 @@
-import { fakeUrlTimer } from './helpers/fake_timers.js';
+import { fakeTimers } from './helpers/fake_timers.js';
 import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
@@ -256,7 +256,7 @@ test('the URL layer reads and writes the window it was handed', () => {
  */
 test('URLSync arms and cancels its debounce on the window it was handed', () => {
   installRecordingWindow('?effect=Global', '/global', '');
-  const timer = fakeUrlTimer();
+  const timer = fakeTimers();
   const injected = {
     location: { search: '', pathname: '/injected', hash: '' },
     history: { replaceState: () => {} },
@@ -314,13 +314,13 @@ test('a refused history write does not propagate out of the URL layer', () => {
  * while `history.refuse` is set and otherwise records the URL.
  * @param {string} message - Message of the refusal error.
  * @param {string} [search] - Initial query string.
- * @returns {{history: {refuse: boolean}, timer: ReturnType<typeof fakeUrlTimer>,
+ * @returns {{history: {refuse: boolean}, timer: ReturnType<typeof fakeTimers>,
  *   written: string[]}} The refusal switch, the timer and the accepted URLs.
  */
 function installRefusingHistoryWindow(message, search = '') {
   const written = [];
   const history = { refuse: true };
-  const timer = fakeUrlTimer();
+  const timer = fakeTimers();
   installWindow({
     location: { pathname: '/sim', search },
     history: {
@@ -547,7 +547,7 @@ test('URLSync suspend disarms the flush the constructor already armed', () => {
 });
 
 test('URLSync resume keeps a suspended retry at the ladder delay', (t) => {
-  const timer = fakeUrlTimer();
+  const timer = fakeTimers();
   t.mock.method(console, 'warn', () => {});
   installWindow({
     location: { search: '?effect=bogus', pathname: '/sim' },

@@ -481,7 +481,7 @@ test('a load that beats the deadline resolves and cancels the timer', async () =
 
   assert.deepEqual(module, { name: 'wasm' });
   assert.equal(timers.cleared.length, 1, 'a live timer would fire into a loaded page');
-  assert.equal(timers.pending.size, 0);
+  assert.equal(timers.armed(), false);
 });
 
 test('a timer handle that carries unref is unref-ed', async () => {
@@ -506,7 +506,7 @@ test('a load failure still rejects with its own error', async () => {
     loadWithDeadline(() => Promise.reject(new Error('fetch blocked')),
       { ms: 10, timers }),
     /fetch blocked/);
-  assert.equal(timers.pending.size, 0, 'the deadline is cancelled either way');
+  assert.equal(timers.armed(), false, 'the deadline is cancelled either way');
 });
 
 test('a load that throws synchronously rejects and cancels the deadline', async () => {
@@ -517,7 +517,7 @@ test('a load that throws synchronously rejects and cancels the deadline', async 
 
   await assert.rejects(rejected, /bad import/,
     'a sync throw escapes past the failure UI instead of reporting through it');
-  assert.equal(timers.pending.size, 0,
+  assert.equal(timers.armed(), false,
     'the armed deadline would fire a second, unrelated fatal 90 s later');
   assert.equal(timers.cleared.length, 1);
 });
@@ -527,7 +527,7 @@ test('a stalled load rejects at the deadline instead of spinning', async () => {
   // The stall this bounds: a fetch that neither resolves nor errors.
   const rejected = loadWithDeadline(() => new Promise(() => {}), { ms: 10, timers });
 
-  assert.equal([...timers.pending.values()][0].ms, 10);
+  assert.equal(timers.delays.at(-1), 10);
   timers.fire();
 
   await assert.rejects(rejected, /did not load within/,

@@ -108,44 +108,16 @@ export async function captureTimeouts(body) {
 }
 
 /**
- * A timer source a case fires by hand.
- * @returns {Object} The stand-in, plus the pending timers and the clears seen.
- */
-export function fakeTimers() {
-  const pending = new Map();
-  let next = 1;
-  return {
-    pending,
-    cleared: [],
-    setTimeout(fn, ms) {
-      const id = next++;
-      pending.set(id, { fn, ms });
-      return id;
-    },
-    clearTimeout(id) {
-      this.cleared.push(id);
-      pending.delete(id);
-    },
-    /** Runs the one pending timer. @returns {void} */
-    fire() {
-      assert.equal(pending.size, 1, 'exactly one timer must be pending');
-      const [id, { fn }] = [...pending][0];
-      pending.delete(id);
-      fn();
-    },
-  };
-}
-
-/**
- * A one-slot timer source a URLSync case fires by hand, shaped to sit on a
- * window stub as the timer surface URLSync arms against.
+ * A one-slot window timer source a case fires by hand.
  * @returns {Object} The stand-in and its scheduled delays.
  */
-export function fakeUrlTimer() {
+export function fakeTimers() {
   const timer = fakeScheduler();
   const delays = [];
   return {
     delays,
+    cleared: timer.cancelled,
+    get handle() { return timer.handle; },
     setTimeout(fn, ms) {
       const handle = timer.schedule(fn, ms);
       delays.push(ms);

@@ -907,18 +907,18 @@ test('cap controls hydrate bounded percentages and retain their URL keys through
 
 test('URL writer owns its injected window timer and cancels it on disposal', () => {
   const timers = fakeTimers();
-  const { pending } = timers;
   const win = installWindow({
     setTimeout: timers.setTimeout.bind(timers),
     clearTimeout: timers.clearTimeout.bind(timers),
   });
   const write = makeUrlParamWriter(win);
   write('x', 1);
-  assert.equal(pending.size, 1);
+  assert.equal(timers.armed(), true);
   write('x', 2);
-  assert.deepEqual([...pending.keys()], [2]);
+  assert.equal(timers.handle, 2);
+  assert.equal(timers.cleared.at(-1), 1);
   write.cancel();
-  assert.equal(pending.size, 0);
+  assert.equal(timers.armed(), false);
 });
 
 test('DeepLinkGUI names unsupported session properties', () => {
@@ -969,7 +969,7 @@ test('a fallback URL writer hands pending keys to a newly registered URLSync', (
   window.clearTimeout = timers.clearTimeout.bind(timers);
   const write = makeUrlParamWriter(window);
   write('first', 1);
-  const fallbackTimer = [...timers.pending.keys()][0];
+  const fallbackTimer = timers.handle;
   const sync = new URLSync(new AppState({}), []);
   write('second', 2);
   assert.ok(timers.cleared.includes(fallbackTimer));

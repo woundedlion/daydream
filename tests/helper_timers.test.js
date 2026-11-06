@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeUrlTimer } from './helpers/fake_timers.js';
+import { fakeTimers } from './helpers/fake_timers.js';
 
-test('URL timer rejects overlapping schedules and ignores stale cancellation handles', () => {
-  const timer = fakeUrlTimer();
+test('window timer rejects overlapping schedules and ignores stale cancellation handles', () => {
+  const timer = fakeTimers();
   let fired = 0;
   const first = timer.setTimeout(() => { fired++; }, 1);
   assert.throws(() => timer.setTimeout(() => {}, 2), /only one timer/);
@@ -18,4 +18,8 @@ test('URL timer rejects overlapping schedules and ignores stale cancellation han
   const third = timer.setTimeout(() => {}, 1);
   timer.clearTimeout(third);
   assert.equal(timer.armed(), false);
+  assert.equal(timer.handle, third);
+  assert.deepEqual(timer.delays, [1, 1, 1]);
+  assert.deepEqual(timer.cleared, [first + 1, first, third]);
+  assert.throws(() => timer.fire(), /scheduled callback/);
 });
