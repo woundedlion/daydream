@@ -32,6 +32,16 @@ test('GridWorms is offered at both display resolutions', () => {
   }
 });
 
+test('resolution favorites share their ordered prefix before explicit extras', () => {
+  const high = favoritesFor('Phantasm (288x144)');
+  const low = favoritesFor('Holosphere (96x20)');
+  const common = high.filter((name) => low.includes(name));
+  assert.equal(common[0], 'BZReactionDiffusion');
+  assert.deepEqual(high.slice(0, common.length), common);
+  assert.deepEqual(low.slice(0, common.length), common);
+  for (const favorites of [high, low]) assert.equal(new Set(favorites).size, favorites.length);
+});
+
 const RESO_EFFECTS = ['ShapeShifter', 'Comets', 'MobiusGrid'];
 
 test('resolveActiveEffect keeps an effect the resolution offers', () => {
