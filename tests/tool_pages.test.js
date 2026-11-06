@@ -533,10 +533,28 @@ const CONTRAST_SURFACES = {
   },
 };
 
+const STATE_SURFACES = {
+  'index.css': {
+    '.tab:hover': [['.tab', ['.tab:hover', '.nav-tabs']]],
+    '.context-lost-reload:hover': [['.context-lost-reload', '.context-lost-reload:hover']],
+  },
+  'tools.css': {
+    '.btn-secondary:hover': [['.btn-secondary', '.btn-secondary:hover']],
+  },
+  'solids.css': Object.fromEntries(
+    ['.thumb-btn:hover', '.thumb-btn.thumb-star:hover', '.thumb-btn.active'].map((selector) =>
+      [selector, [
+        ['.thumb-btn .thumb-label', [selector, 'body']],
+        ['.thumb-name-full', ['.thumb-name-full', selector, 'body']],
+      ]])),
+};
+
 // Sheet -> text rule -> why no pair measures it. An empty reason is no
 // exemption: the sweep falls back to demanding a surface for it.
 const CONTRAST_EXEMPT = {
   'index.css': {
+    '.effect-sidebar::-webkit-scrollbar-thumb:hover, .effect-list::-webkit-scrollbar-thumb:hover':
+      'scrollbar graphics contain no text',
     '.license-link': 'translucent text over the live canvas',
     '.license-link:hover': 'text over the live canvas',
     '.rec-duration': 'text over the live canvas',
@@ -581,8 +599,19 @@ const CONTRAST_EXEMPT = {
       'lil-gui sets --text-color and --background-color in its own vendored stylesheet',
   },
   'solids.css': {
+    '#footer::-webkit-scrollbar-thumb:hover': 'scrollbar graphics contain no text',
     '.drag-handle': 'an SVG grip, not text; SC 1.4.3 is a text criterion',
     '#meshStats': 'translucent readout over the live canvas',
+  },
+  'mobius.css': {
+    '.complex-plane-control:has([aria-orientation="horizontal"]:focus-visible) .axis-h, .complex-plane-control:has([aria-orientation="vertical"]:focus-visible) .axis-v':
+      'focused axis lines contain no text',
+  },
+  'tools.css': {
+    '.toggle-switch.is-on': 'the switch pill contains a knob; its text label is outside',
+    'input[type=range]:disabled': 'disabled slider graphics contain no text',
+    'input[type=range]:disabled::-webkit-slider-thumb': 'disabled slider graphics contain no text',
+    'input[type=range]:disabled::-moz-range-thumb': 'disabled slider graphics contain no text',
   },
 };
 
@@ -619,6 +648,11 @@ const rules = (css) => {
 
 /** Whether a declaration block sets `color` itself, not `background-color`. */
 const declaresColor = (declarations) => /(?:^|;)\s*color\s*:/.test(declarations);
+
+/** A state selector that changes its fill while inheriting text color. */
+const backgroundState = ([selector, declarations]) =>
+  /(?:^|;)\s*background(?:-color)?\s*:/.test(declarations) && !declaresColor(declarations)
+  && /:(?:hover|focus(?:-visible|-within)?|active|disabled|checked)\b|\.(?:active|selected|is-[\w-]+)\b|\[(?:aria|data)-[^\]]+\]/.test(selector);
 
 /**
  * One rule's declaration block, every same-selector rule in the cascade joined
@@ -675,13 +709,20 @@ const fill = (css, selector) => color(css, selector,
 /**
  * A colour literal's channels.
  * @param {string} value - A `#rgb`, `#rrggbb`, `white`, `rgb()`, `rgba()` or
- *   `color-mix(in srgb, #rrggbb N%, transparent)` literal.
+ *   `color-mix(in srgb, #rrggbb N%, #rrggbb|transparent)` literal.
  * @returns {number[]} `[red, green, blue]` over 255, then alpha over 1.
  */
 function channels(value) {
   const literal = value.trim() === 'white' ? '#ffffff' : value.trim();
-  const mixed = literal.match(/^color-mix\(in srgb, (#[0-9a-f]{6}) ([\d.]+)%, transparent\)$/i);
-  if (mixed) return [...channels(mixed[1]).slice(0, 3), Number(mixed[2]) / 100];
+  const mixed = literal.match(/^color-mix\(in srgb, (#[0-9a-f]{6}) ([\d.]+)%, (#[0-9a-f]{6}|transparent)\)$/i);
+  if (mixed) {
+    const first = channels(mixed[1]);
+    const second = mixed[3] === 'transparent' ? [0, 0, 0, 0] : channels(mixed[3]);
+    const weight = Number(mixed[2]) / 100;
+    const alpha = first[3] * weight + second[3] * (1 - weight);
+    return [...first.slice(0, 3).map((value, index) => alpha === 0 ? 0
+      : (value * first[3] * weight + second[index] * second[3] * (1 - weight)) / alpha), alpha];
+  }
   const hex = literal.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)?.[1];
   if (hex) {
     const pairs = hex.length === 3 ? [...hex].map((c) => c + c) : hex.match(/../g);
@@ -751,6 +792,8 @@ test('CSS readers ignore comments and honor later declarations', () => {
   assert.deepEqual(channels('rgb(20 20 20 / 0.95)'), [20, 20, 20, 0.95]);
   assert.deepEqual(channels('#48f'), [68, 136, 255, 1]);
   assert.deepEqual(channels('color-mix(in srgb, #0f172a 92%, transparent)'), [15, 23, 42, 0.92]);
+  assert.deepEqual(channels('color-mix(in srgb, #000000 25%, #ffffff)'), [191.25, 191.25, 191.25, 1]);
+  assert.deepEqual(channels('color-mix(in srgb, #ffffff 0%, transparent)'), [0, 0, 0, 0]);
   assert.deepEqual(rules('@media (width > 1px) { .nested { color: #123456; } }'),
     [['.nested', ' color: #123456; ']]);
 });
@@ -783,12 +826,41 @@ test('every simulator and tool stylesheet colour clears the WCAG AA floor or say
           + `${ratio.toFixed(2)}:1, under the ${AA_CONTRAST}:1 AA floor`);
       }
       const listed = [...Object.keys(surfaces), ...Object.keys(exempt)];
-      assert.deepEqual(listed.filter((selector) => !selectors.includes(selector)), [],
-        `${name} lists rules that declare no color`);
+      const states = rules(read(...sheet)).filter(backgroundState).map(([selector]) => selector);
+      assert.deepEqual(listed.filter((selector) => !selectors.includes(selector) && !states.includes(selector)), [],
+        `${name} lists rules that declare no color or inherited-text state fill`);
     }
   }
   assert.deepEqual([...sweptNames].sort(),
     [...new Set([...Object.keys(CONTRAST_SURFACES), ...Object.keys(CONTRAST_EXEMPT)])].sort());
+  assert.ok(measured > 0);
+});
+
+test('background-only states retain AA contrast with their inherited text', () => {
+  const sweptNames = new Set();
+  let measured = 0;
+  for (const {page, sheets} of SERVED_PAGES) {
+    const cascade = sheets.map((sheet) => read(...sheet)).join('\n');
+    for (const sheet of sheets.filter(([, name]) => name !== 'tailwind.css')) {
+      const name = sheet.at(-1);
+      sweptNames.add(name);
+      const selectors = rules(read(...sheet)).filter(backgroundState).map(([selector]) => selector);
+      const listed = STATE_SURFACES[name] ?? {};
+      for (const selector of selectors) {
+        if (CONTRAST_EXEMPT[name]?.[selector]) continue;
+        assert.ok(listed[selector], `${page}: ${name} state ${selector} has no inherited-text pairing`);
+        for (const [text, surfaces] of listed[selector]) {
+          const ratio = contrast(cascade, text, surfaces);
+          assert.ok(ratio >= AA_CONTRAST,
+            `${name} ${text} in ${selector} measures ${ratio.toFixed(2)}:1`);
+          measured++;
+        }
+      }
+      assert.deepEqual(Object.keys(listed).filter((selector) => !selectors.includes(selector)), [],
+        `${name} lists stale inherited-text state pairings`);
+    }
+  }
+  assert.deepEqual(Object.keys(STATE_SURFACES).filter((name) => !sweptNames.has(name)), []);
   assert.ok(measured > 0);
 });
 
