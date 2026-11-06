@@ -12,6 +12,24 @@ import { hookUnderTest, isolatedGitEnv, scratchDir } from './helpers/fixture_rep
 const HERE = dirname(fileURLToPath(import.meta.url));
 const { hook: HOOK, sh: SH, skip: SKIP, missing: MISSING_SH } = hookUnderTest('pre-push');
 
+const SNAPSHOT_NPM_STEPS = 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
+  + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n';
+
+/** @param {string} root @param {string} name @param {string} body @returns {void} */
+function writeTool(root, name, body) {
+  const path = join(root, 'bin', name);
+  writeFileSync(path, `#!/bin/sh\n${body}\n`);
+  chmodSync(path, 0o755);
+}
+
+/** @param {string} root @param {NodeJS.ProcessEnv} env @param {string} input @returns {Object} Spawn result. */
+function runSnapshotHook(root, env, input) {
+  const bin = posixPath(join(root, 'bin'));
+  return spawnSync(SH, ['-c', `PATH="${bin}:$PATH"; export PATH; . "$0"`, HOOK], {
+    cwd: root, env, encoding: 'utf8', input,
+  });
+}
+
 test('pre-push refuses a push from a tree that cannot run the suites',
   { skip: SKIP }, (t) => {
     const run = runWithTools(scratchDir(t, 'pre-push-hook-'), {});
@@ -33,11 +51,7 @@ function runWithTools(root, tools, input = '') {
   assert.ok(SH, MISSING_SH);
   const bin = join(root, 'bin');
   mkdirSync(bin, { recursive: true });
-  for (const [name, body] of Object.entries(tools)) {
-    const path = join(bin, name);
-    writeFileSync(path, `#!/bin/sh\n${body}\n`);
-    chmodSync(path, 0o755);
-  }
+  for (const [name, body] of Object.entries(tools)) writeTool(root, name, body);
   const env = isolatedGitEnv();
   delete env.NODE_TEST_CONTEXT;
   // MSYS reads PATH as POSIX, so a drive letter would split on its colon.
@@ -88,8 +102,7 @@ function snapshotFixture(t, { marker = false, suiteFailure = false } = {}) {
   git('init', '-q');
   git('add', '.githooks/pre-push', 'scripts', '.gitignore', 'tests', 'package.json', 'package-lock.json',
     'vendor-importmap.js', 'tools/tailwind.css', ...(marker ? ['marker'] : []));
-  git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test',
-    '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
+  git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
   return { root, env, sha: git('rev-parse', 'HEAD').trim() };
 }
 
@@ -202,21 +215,14 @@ for (const installStatus of [0, 19]) {
     { skip: SKIP }, (t) => {
       const { root, env, sha } = snapshotFixture(t);
       const log = join(root, 'calls.log').replace(/\\/g, '/');
-      const npm = join(root, 'bin/npm');
-      writeFileSync(npm, '#!/bin/sh\n'
-        + `printf '%s\\n' "$*" >> "${log}"\n`
+      writeTool(root, 'npm', `printf '%s\\n' "$*" >> "${log}"\n`
         + `if [ "$1" = ci ]; then mkdir -p node_modules; echo '{}' > node_modules/.package-lock.json; exit ${installStatus}; fi\n`
         + 'if [ "$2" = typecheck ]; then [ "$(cat generated/engine_contract.mjs)" = installed-contract ] || exit 29; fi\n'
-        + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
-        + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n');
-      chmodSync(npm, 0o755);
+        + SNAPSHOT_NPM_STEPS);
+
       const changedPackage = '{"private":true}\n';
       writeFileSync(join(root, 'package.json'), changedPackage);
-      const posixBin = posixPath(join(root, 'bin'));
-      const result = spawnSync(SH, ['-c', `PATH="${posixBin}:$PATH"; export PATH; . "$0"`, HOOK], {
-        cwd: root, env, encoding: 'utf8',
-        input: `refs/heads/master ${sha} refs/heads/master ${'0'.repeat(40)}\n`,
-      });
+      const result = runSnapshotHook(root, env, `refs/heads/master ${sha} refs/heads/master ${'0'.repeat(40)}\n`);
       const calls = readFileSync(join(root, 'calls.log'), 'utf8').trim().split('\n');
       assert.equal(calls[0], 'ci --ignore-scripts');
       if (installStatus === 0) {
@@ -236,21 +242,16 @@ for (const failure of ['none', 'lint', 'suite']) {
   test(`pre-push checks the committed snapshot and propagates ${failure} failures`, { skip: SKIP }, (t) => {
     const { root, env, sha } = snapshotFixture(t, { marker: true, suiteFailure: failure === 'suite' });
     const calls = join(root, 'tool-calls').replace(/\\/g, '/');
-    const node = join(root, 'bin/node');
-    writeFileSync(node, `#!/bin/sh\nprintf '%s\\n' "node $*" >> '${calls}'\nexec '${process.execPath.replace(/\\/g, '/')}' "$@"\n`);
-    chmodSync(node, 0o755);
-    const npm = join(root, 'bin/npm');
-    writeFileSync(npm, `#!/bin/sh\nprintf '%s\\n' "npm $*" >> '${calls}'\n` + '[ "$(cat marker)" = committed ] || exit 23\n'
+    writeTool(root, 'node', `printf '%s\\n' "node $*" >> '${calls}'\nexec '${process.execPath.replace(/\\/g, '/')}' "$@"\n`);
+
+    writeTool(root, 'npm', `printf '%s\\n' "npm $*" >> '${calls}'\n` + '[ "$(cat marker)" = committed ] || exit 23\n'
       + (failure === 'lint' ? '[ "$2" = lint ] && exit 31\n' : '')
       + 'if [ "$2" = typecheck ]; then [ "$(cat generated/engine_contract.mjs)" = installed-contract ] || exit 29; fi\n'
-        + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
-      + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n');
-    chmodSync(npm, 0o755);
+      + SNAPSHOT_NPM_STEPS);
+
     writeFileSync(join(root, 'marker'), 'working-tree-only\n');
-    const posixBin = posixPath(join(root, 'bin'));
-    const result = spawnSync(SH, ['-c', `PATH="${posixBin}:$PATH"; export PATH; . "$0"`, HOOK], {
-      cwd: root, env, encoding: 'utf8', input: `refs/heads/master ${sha} refs/heads/master ${'0'.repeat(40)}\n`,
-    });
+
+    const result = runSnapshotHook(root, env, `refs/heads/master ${sha} refs/heads/master ${'0'.repeat(40)}\n`);
     if (failure === 'none') assert.equal(result.status, 0, result.stdout + result.stderr);
     else assert.notEqual(result.status, 0, result.stdout + result.stderr);
     const logged = readFileSync(calls, 'utf8');
@@ -269,21 +270,15 @@ test('pre-push checks both update snapshots around an intervening deletion', {sk
   execFileSync('git', ['-C', root, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'second'], {env});
   const second = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {env, encoding: 'utf8'}).trim();
   const calls = join(root, 'snapshot-calls').replaceAll('\\', '/');
-  const npm = join(root, 'bin', 'npm');
-  writeFileSync(npm, '#!/bin/sh\n'
-    + 'if [ "$1" = ci ]; then mkdir -p node_modules; echo "{}" > node_modules/.package-lock.json; fi\n'
+  writeTool(root, 'npm', 'if [ "$1" = ci ]; then mkdir -p node_modules; echo "{}" > node_modules/.package-lock.json; fi\n'
     + `if [ "$1 $2" = 'run lint' ]; then cat marker >> '${calls}'; fi\n`
-    + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
-    + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n');
-  chmodSync(npm, 0o755);
-  const bin = posixPath(join(root, 'bin'));
-  const result = spawnSync(SH, ['-c', `PATH="${bin}:$PATH"; export PATH; . "$0"`, HOOK], {
-    cwd: root, env, encoding: 'utf8', input: [
-      `refs/heads/first ${sha} refs/heads/first ${'0'.repeat(40)}`,
-      `refs/heads/deleted ${'0'.repeat(40)} refs/heads/deleted ${sha}`,
-      `refs/heads/second ${second} refs/heads/second ${'0'.repeat(40)}`,
-    ].join('\n') + '\n',
-  });
+    + SNAPSHOT_NPM_STEPS);
+
+  const result = runSnapshotHook(root, env, [
+    `refs/heads/first ${sha} refs/heads/first ${'0'.repeat(40)}`,
+    `refs/heads/deleted ${'0'.repeat(40)} refs/heads/deleted ${sha}`,
+    `refs/heads/second ${second} refs/heads/second ${'0'.repeat(40)}`,
+  ].join('\n') + '\n');
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.deepEqual(readFileSync(calls, 'utf8').trim().split('\n'), ['committed', 'second']);
 });
