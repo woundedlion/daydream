@@ -10,8 +10,9 @@
  *
  * Emscripten heap growth detaches the old ArrayBuffer (byteLength 0) while the
  * typed-array view stays truthy.
- * @param {ArrayBufferView|null|undefined} view - The pixel view to test.
- * @returns {view is ArrayBufferView} True for an ArrayBufferView with a nonempty
+ * @template {ArrayBufferView} T
+ * @param {T|null|undefined} view - The pixel view to test.
+ * @returns {view is T} True for an ArrayBufferView with a nonempty
  *   backing buffer; this does not verify WASM ownership.
  */
 export function isViewLive(view) {

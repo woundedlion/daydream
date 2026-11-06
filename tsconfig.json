@@ -3,7 +3,7 @@
     "allowJs": true,
     "checkJs": true,
     "noEmit": true,
-    "noResolve": true,
+    "noResolve": false,
     "noImplicitAny": true,
     "strictNullChecks": true,
     "noImplicitReturns": true,
@@ -18,7 +18,10 @@
       "WebWorker"
     ],
     "skipLibCheck": true,
-    "types": []
+    "types": [],
+    "paths": {
+      "lil-gui": ["./node_modules/lil-gui/dist/lil-gui.esm.d.ts"]
+    }
   },
   "files": [
     "generated/holosphere_wasm.d.ts",
@@ -29,6 +32,13 @@
     "generated/shader/shader_workbench.d.mts",
     "generated/shader/composed_effect_roster.d.mts",
     "src/types/file_system_access.d.ts",
+    "src/app/daydream.js",
+    "src/renderer/driver.js",
+    "src/renderer/geometry.js",
+    "src/ui/gui.js",
+    "src/app/bootstrap.js",
+    "src/app/main.js",
+    "src/workbench/shared.js",
     "src/engine/engine_host.js",
     "src/engine/workbench_bindings.js",
     "src/renderer/frame_constants.js",

@@ -61,6 +61,11 @@ import {
   WORKBENCH_EFFECTS,
 } from "../effects/effect_roster.js";
 
+/** @typedef {import('../../generated/holosphere_wasm.js').HolosphereModule} HolosphereModule */
+/** @typedef {import('../../generated/holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
+/** @typedef {EngineHost & {module: HolosphereModule, engine: HolosphereEngine}} LoadedHost */
+/** @typedef {Daydream & import('../engine/display_aliases.js').DisplayDriver} ReadyDisplay */
+
 // UI layer degrades gracefully (log + keep last good state); lower layers trap.
 
 // Dwell time per effect while "Test All" cycles the test roster.
@@ -95,16 +100,16 @@ export function shaderWorkbenchUrl(location, effect = 'ShaderChain') {
  * pipeline, recording, and the page listeners, then kicks off the WASM load.
  * @param {Object} [dependencies] - Seams the page owns; each defaults to the real one.
  * @param {Document} [dependencies.doc] - Document the controls mount into.
- * @param {Window} [dependencies.win] - Page target for the global listeners.
+ * @param {Window & typeof globalThis} [dependencies.win] - Page target for the global listeners.
  * @param {Navigator} [dependencies.nav] - Read for the segment-pool cap.
  * @param {() => Daydream} [dependencies.createDriver] - Builds the three.js driver.
- * @param {(options: Object, namespace: string) => GUI} [dependencies.createGui] - Builds a namespaced GUI root.
- * @param {() => Promise<Object>} [dependencies.loadModule] - Resolves the WASM module.
+ * @param {(options: ConstructorParameters<typeof GUI>[0], namespace: string) => GUI} [dependencies.createGui] - Builds a namespaced GUI root.
+ * @param {() => Promise<HolosphereModule>} [dependencies.loadModule] - Resolves the WASM module.
  * @returns {Object} The teardown handle; ready settles after module startup or failure reporting.
  */
 export function start({
   doc = globalThis.document,
-  win = globalThis,
+  win = /** @type {Window & typeof globalThis} */ (globalThis),
   nav = globalThis.navigator,
   createDriver = () => new Daydream({
     doc, win, nav, statsView: new GlobalStatsView(doc),
@@ -138,7 +143,11 @@ export function start({
   ///////////////////////////////////////////////////////////////////////////////
 
   const daydream = createDriver();
-  const host = new EngineHost((view) => repointDisplayAliases(daydream, view));
+  /** Display callbacks run after updateResolution() creates its color attribute. */
+  const display = /** @type {ReadyDisplay} */ (daydream);
+  const host = new EngineHost((view) => repointDisplayAliases(display, view));
+  /** Engine callbacks run after the module-ready handler installs both members. */
+  const loaded = /** @type {LoadedHost} */ (host);
 
   ///////////////////////////////////////////////////////////////////////////////
   // Centralized State
@@ -176,18 +185,18 @@ export function start({
   for (const key of ['view.povPresentation', 'view.povExposureMs']) {
     if (routeParams.has(key)) urlSync.setParam(key, null);
   }
-  const availableEffects = (resolution) => shaderWorkbench
+  const availableEffects = (/** @type {string} */ resolution) => shaderWorkbench
     ? WORKBENCH_EFFECTS.map(canonicalEffectId) : favoritesFor(resolution).map(canonicalEffectId);
 
   const segments = new SegmentController({
     resolutionPresets,
     appState,
-    driver: daydream,
+    driver: display,
     getWasmEngine: () => host.engine,
     refreshPixelView: () => host.refresh(),
     getMemoryView: () => host.view(),
-    repointDisplayAliases: (view) => repointDisplayAliases(daydream, view),
-    displayAliasesDiverged: (view) => displayAliasesDiverged(daydream, view),
+    repointDisplayAliases: (view) => repointDisplayAliases(display, view),
+    displayAliasesDiverged: (view) => displayAliasesDiverged(display, view),
     statsView: new SegmentStatsView(doc),
     onFault: () => host.recorder?.abort(
       'the segmented rendering engine failed.'),
@@ -223,16 +232,16 @@ export function start({
    * @returns {boolean} True when the engine accepted the value.
    */
   function setEngineParam(name, value) {
-    const result = host.engine.setParameter(name, value);
-    if (result !== host.module.ParamSetResult.APPLIED) {
+    const result = loaded.engine.setParameter(name, value);
+    if (result !== loaded.module.ParamSetResult.APPLIED) {
       const message = `Parameter "${name}" was rejected: `
-        + `${enumConstantName(host.module.ParamSetResult, result)}.`;
+        + `${enumConstantName(loaded.module.ParamSetResult, result)}.`;
       console.warn(message);
       applyNotice.show(message, PARAM_NOTICE);
     } else {
       applyNotice.show(null, PARAM_NOTICE);
     }
-    return result === host.module.ParamSetResult.APPLIED;
+    return result === loaded.module.ParamSetResult.APPLIED;
   }
 
   /**
@@ -243,23 +252,25 @@ export function start({
    *   pool worker each need their own write.
    */
   function setAnimationsPaused(paused) {
-    host.engine.setAnimationsPaused(paused);
+    loaded.engine.setAnimationsPaused(paused);
     segments.setAnimationsPaused(paused);
   }
 
-  const onApplyNoticeDismiss = (e) => {
+  const onApplyNoticeDismiss = (/** @type {MouseEvent} */ e) => {
     if (e.target === doc.getElementById('apply-notice-dismiss')) {
-      doc.getElementById('canvas')?.focus();
+      /** @type {HTMLCanvasElement|null} */ (doc.getElementById('canvas'))?.focus();
       applyNotice.clear();
     }
   };
   doc.addEventListener('click', onApplyNoticeDismiss);
 
+  /** @type {ReturnType<typeof createAppTeardown>|null} */
   let appTeardown = null;
 
   /**
    * Release the app when a caught failure came from a trapped module, which has
    * no recovery path.
+   * @param {unknown} error - Failure from the module.
    * @returns {boolean} Whether the module is dead and the app was released.
    */
   function abandonOnModuleDeath(error) {
@@ -273,7 +284,7 @@ export function start({
   /**
    * Narrow the resolution dropdown to the rows the engine reports it can build,
    * correcting the active resolution when the hydrated one is not among them.
-   * @param {Object} module - The loaded WASM module.
+   * @param {HolosphereModule} module - The loaded WASM module.
    * @returns {boolean} Whether the module survived the query; false leaves the
    *   app released and the rest of the startup unrun.
    */
@@ -306,6 +317,7 @@ export function start({
   // Initialize WASM
   ///////////////////////////////////////////////////////////////////////////////
 
+  /** @type {import('lil-gui').Controller|null} */
   let testAllController = null;
 
   const testAllTicker = createTestAllTicker({
@@ -316,7 +328,7 @@ export function start({
     engineReady: () => Boolean(host.engine),
   });
 
-  const reportModuleFailure = (err) => {
+  const reportModuleFailure = (/** @type {unknown} */ err) => {
     console.error('Failed to initialize the Holosphere renderer:', err);
     // No engine: the Test All ticker would spin uselessly for the page lifetime.
     testAllTicker.stop();
@@ -337,12 +349,12 @@ export function start({
 
   const moduleLoad = createModuleLoadHandlers({
     teardown: () => appTeardown,
-    start: (module) => {
+    start: (/** @type {HolosphereModule} */ module) => {
       host.module = module;
       if (module.HolosphereEngine.isLive())
         throw new Error('HolosphereEngine is already live.');
       host.engine = new module.HolosphereEngine();
-      host.engine.setTemporalSampling(daydream.povFidelity);
+      loaded.engine.setTemporalSampling(daydream.povFidelity);
 
       // Push the Pole LOD value set while host.engine was null.
       poleLod.replay();
@@ -351,8 +363,8 @@ export function start({
       if (!syncResolutionOptions(module)) return;
 
       const renderAdapter = createRenderAdapter({
-        host,
-        driver: daydream,
+        host: loaded,
+        driver: display,
         segments,
         syncEffectGui: (advanced) => effectGui.sync(advanced),
       });
@@ -406,7 +418,7 @@ export function start({
     console.warn('daydream: #gui-container not found; skipping global GUI mount.');
   }
 
-  const setResolution = (v) => appState.set('resolution', v);
+  const setResolution = (/** @type {string} */ v) => appState.set('resolution', v);
   // Reassigned when syncResolutionOptions narrows the offered rows.
   let resolutionController = guiInstance
     .addSession({ resolution: appState.get('resolution') }, 'resolution', Object.keys(resolutionPresets))
@@ -419,7 +431,7 @@ export function start({
   }
   const sidebar = new EffectSidebar(
     sidebarContainer ?? doc.createElement('div'),
-    (name) => appState.set('effect', name)
+    (/** @type {string} */ name) => appState.set('effect', name)
   );
 
   ///////////////////////////////////////////////////////////////////////////////
@@ -434,26 +446,27 @@ export function start({
 
   // The shader-document controller publishes the chain editor's selected-instance
   // filter through this slot.
+  /** @type {{current: {external: true}|null}} */
   const paramFilterRef = { current: null };
 
   const effectGui = createEffectGui({
     moduleDead: (error) => host.moduleDead(error),
     engine: {
-      getParameterDefinitions: () => host.engine.getParameterDefinitions(),
-      getParameterAdvisories: () => host.engine.getParameterAdvisories(),
+      getParameterDefinitions: () => loaded.engine.getParameterDefinitions(),
+      getParameterAdvisories: () => loaded.engine.getParameterAdvisories(),
       paramGeneration: () => host.paramGeneration(),
-      paramValues: () => host.engine.getParamValues(),
+      paramValues: () => loaded.engine.getParamValues(),
       setParam: setEngineParam,
       setAnimationsPaused,
-      animationsPaused: () => host.engine.getAnimationsPaused(),
-      getPresetCount: () => host.engine.getPresetCount(),
+      animationsPaused: () => loaded.engine.getAnimationsPaused(),
+      getPresetCount: () => loaded.engine.getPresetCount(),
       getPresetIndex: () => segments.ownsDisplay
-        ? (segments.getPresetIndex() ?? host.engine.getPresetIndex())
-        : host.engine.getPresetIndex(),
-      synchronizePreset: (index) => host.engine.getPresetIndex() === index
-        || host.engine.synchronizePreset(index),
+        ? (segments.getPresetIndex() ?? loaded.engine.getPresetIndex())
+        : loaded.engine.getPresetIndex(),
+      synchronizePreset: (index) => loaded.engine.getPresetIndex() === index
+        || loaded.engine.synchronizePreset(index),
       selectPreset: (index) => {
-        if (!host.engine.selectPreset(index)) return false;
+        if (!loaded.engine.selectPreset(index)) return false;
         segments.selectPreset(index);
         return true;
       },
@@ -466,16 +479,16 @@ export function start({
     config: {
       inUse: usesChainSnapshot,
       snapshot: () => getChainSnapshot(host.engine),
-      restore: (snapshot) => restoreChainSnapshot(host.engine, host.module, snapshot),
-      restoreResults: () => host.module.ChainSnapshotRestoreResult,
+      restore: (snapshot) => restoreChainSnapshot(host.engine, loaded.module, snapshot),
+      restoreResults: () => loaded.module.ChainSnapshotRestoreResult,
       showImportNotice: (message) => applyNotice.show(message, CONFIG_NOTICE),
     },
     host: {
       createGui: () => createGui({ autoPlace: false, title: 'Effect' }, 'fx'),
       container: () => shaderWorkbench ? null : doc.getElementById('gui-container'),
       isMobile: () => win.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false,
-      canPausePresets: () => host.engine.getPresetCount() > 1
-        || host.engine.getParameterDefinitions().some((parameter) => parameter.animated),
+      canPausePresets: () => loaded.engine.getPresetCount() > 1
+        || loaded.engine.getParameterDefinitions().some((parameter) => parameter.animated),
       copyText: copyToClipboard,
       applyEffect: () => {
         const rejected = apply.applyEffect() !== ApplyResult.APPLIED;
@@ -494,14 +507,14 @@ export function start({
   const apply = createApplyPipeline({
     appState,
     getEngine: () => host.engine,
-    getModule: () => host.module,
+    getModule: () => loaded.module,
     invalidateEngineView: () => host.invalidateView(),
     presets: resolutionPresets,
     availableEffects,
     effectGui,
     clearEffectParamUrl,
     segments,
-    driver: daydream,
+    driver: display,
     sidebar,
     muteSubscription: (write) => switches.mute(write),
     moduleDead: (error) => host.moduleDead(error),
@@ -529,15 +542,15 @@ export function start({
     moduleDead: (error) => host.moduleDead(error),
     usesChainSnapshot,
     getChainSnapshot: () => getChainSnapshot(host.engine),
-    restoreChainSnapshot: (snapshot) => restoreChainSnapshot(host.engine, host.module, snapshot)
-      === host.module.ChainSnapshotRestoreResult.APPLIED,
+    restoreChainSnapshot: (snapshot) => restoreChainSnapshot(host.engine, loaded.module, snapshot)
+      === loaded.module.ChainSnapshotRestoreResult.APPLIED,
   });
 
   const shaderDocuments = shaderWorkbench ? createShaderDocumentController({
     doc,
     onOriginalLinkReleased: releaseWorkbenchUrl,
     getEngine: () => host.engine,
-    getModule: () => host.module,
+    getModule: () => loaded.module,
     selectEffect: (effect) => {
       const canonical = canonicalEffectId(effect);
       appState.set('effect', canonical);
@@ -553,13 +566,13 @@ export function start({
   }) : null;
 
   testAllController = shaderWorkbench ? null : guiInstance.addSession({ testAll: false }, 'testAll').name('Test All')
-    .onChange((v) => {
+    .onChange((/** @type {boolean} */ v) => {
       if (v) testAllTicker.start();
       else testAllTicker.stop();
     });
 
 
-  guiInstance.addSession(daydream, 'paused').name('Pause').listen().onChange((v) => {
+  guiInstance.addSession(daydream, 'paused').name('Pause').listen().onChange((/** @type {boolean} */ v) => {
     if (!v) daydream.stepFrames = 0;
   });
   guiInstance.add(daydream, 'labelAxes').name('Show Axes').onChange(() => daydream.invalidate());
@@ -585,6 +598,7 @@ export function start({
   povResponse.onChange(() => daydream.invalidate());
   syncPovControls();
   guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions').onChange(() => daydream.invalidate());
+  /** @type {boolean|null} */
   let initialColumnOverride = null;
   let columnOverrideChanged = false;
   const finishColumnDefaults = () => {
@@ -594,7 +608,7 @@ export function start({
     }
     columnDefaultsReady = true;
   };
-  guiInstance.add(daydream, 'noBlackColumns').name('No black columns').listen().onChange((value) => {
+  guiInstance.add(daydream, 'noBlackColumns').name('No black columns').listen().onChange((/** @type {boolean} */ value) => {
     if (!host.engine) initialColumnOverride = value;
     else columnOverrideChanged = true;
     daydream.invalidate();
@@ -605,7 +619,7 @@ export function start({
     onChange: () => daydream.invalidate(),
   });
   guiInstance.add(poleLod.state, 'poleLod', 0, 2, 0.05).name('Pole LOD')
-    .onChange((v) => { poleLod.apply(v); segments.setPoleLod(v); });
+    .onChange((/** @type {number} */ v) => { poleLod.apply(v); segments.setPoleLod(v); });
 
   const displayCaps = createDisplayCapsBinding({
     getEngine: () => host.engine,
@@ -624,6 +638,7 @@ export function start({
     },
   });
   let acceptedCaps = { ...displayCaps.state };
+  /** @type {import('lil-gui').Controller[]} */
   const capControls = [];
   const applyDisplayCaps = () => {
     if (!displayCaps.apply()) {
@@ -650,7 +665,7 @@ export function start({
   const recording = createRecordingControls({
     doc,
     gui: guiInstance,
-    driver: daydream,
+    driver: display,
     getRecorder: () => host.recorder,
     getEffect: () => appState.get('effect'),
     showNotice: (message) => applyNotice.show(message, RECORD_NOTICE),
@@ -694,7 +709,7 @@ export function start({
     host,
     urlSync,
     sidebar,
-    driver: daydream,
+    driver: display,
     segments,
     strandSegmentWork: () => segSpawn?.dispose(),
     removeOverlay: () => recording.removeOverlay(),

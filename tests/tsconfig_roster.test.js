@@ -1,4 +1,4 @@
-// Check the noResolve typecheck roster against pipeline imports, @ts-check files
+// Check the typecheck roster against pipeline imports, @ts-check files
 // and eligible src/ modules.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -108,8 +108,7 @@ test('every module the typecheck roster reaches is itself on the roster', () => 
   const missing = [...reachableFrom(roster)].filter((f) => !roster.includes(f));
 
   assert.deepEqual(missing, [],
-    'an unlisted module is silently `any` under noResolve — add it to '
-    + 'tsconfig.json "files" or the typecheck stops seeing its types');
+    'add each reached module to tsconfig.json files so its coverage is explicit');
 });
 
 test('every `// @ts-check` module is on the typecheck roster', () => {
@@ -147,7 +146,7 @@ test('every not-checked module has a declaration file on the roster', () => {
     assert.ok(roster.includes(declaration),
       `${file} is exempt from the typecheck but a rostered module imports it; `
       + `without ${declaration} on tsconfig.json "files" the import is an `
-      + 'unresolved-module error under noResolve, not a silent `any`');
+      + 'missing checked contract for generated code');
     assert.ok(existsSync(fileURLToPath(new URL(declaration, ROOT))),
       `${fileSources.get(declaration)} "files" lists ${declaration}, which does not exist`);
   }
@@ -170,7 +169,6 @@ test('the typecheck roster stays inside its stated scope', () => {
 });
 
 const SOURCE_EXEMPTIONS = {
-  'src/workbench/shared.js': 'Imports Three.js and the OrbitControls addon, whose types are unavailable under noResolve.',
   'scripts/browser-smoke.mjs': 'Browser automation entry point; browser harness types are not yet declared.',
   'scripts/browser.mjs': 'Browser discovery and launch helpers require typed Puppeteer options.',
   'scripts/check-cdn-integrity.mjs': 'Required CI gate; not yet annotated.',
@@ -186,12 +184,6 @@ const SOURCE_EXEMPTIONS = {
   'scripts/solids-probe.mjs': 'Browser probe callbacks require DOM element narrowing.',
   'scripts/vendor-imports.mjs': 'Import parser helpers require AST node types.',
   'scripts/workbench-probe.mjs': 'Browser probe callbacks require DOM element narrowing.',
-  'src/app/bootstrap.js': 'Imports daydream.js and its untyped Three.js and lil-gui dependencies.',
-  'src/app/daydream.js': 'Application composition depends on driver.js and gui.js, whose third-party types are unavailable under noResolve.',
-  'src/renderer/driver.js': 'Imports Three.js and its renderer addons, whose types are unavailable under noResolve.',
-  'src/renderer/geometry.js': 'Imports Three.js, whose types are unavailable under noResolve.',
-  'src/ui/gui.js': 'Imports lil-gui, whose declarations are unavailable under noResolve.',
-  'src/app/main.js': 'Imports bootstrap.js, which reaches the untyped application composition.',
   'vendor-importmap.js': 'Generated script-tag IIFE; its source and generated variants are checked by vendor-importmap.test.js.',
 };
 

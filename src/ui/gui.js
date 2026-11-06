@@ -13,6 +13,9 @@ import {
   writeUrl,
 } from "../app/state.js";
 
+/** @typedef {import('lil-gui').Controller & {acceptUrlValue?: (value: unknown) => import('lil-gui').Controller}} UrlController */
+/** @typedef {((key: string, value: string|number|boolean|null|undefined) => void) & {cancel: () => void}} UrlWriter */
+
 /**
  * The last query string parsed per window. Repeated reads clone the cached
  * entries without decoding the query string again.
@@ -47,8 +50,8 @@ const getUrlParams = (win = window) => {
  * (`add(obj, prop, $1)`): an array of choices, or an object whose values are the
  * choices. Anything else ($1 a number meaning a slider's min, or absent) is not
  * enumerated.
- * @param {(Array|Object|number|undefined)} options - The third argument passed to lil-gui's add().
- * @returns {(Array|null)} The list of allowed choices, or null when not enumerated.
+ * @param {(unknown[]|Object|number|undefined)} options - The third argument passed to lil-gui's add().
+ * @returns {(unknown[]|null)} The list of allowed choices, or null when not enumerated.
  */
 const optionValues = (options) => {
   if (Array.isArray(options)) return options;
@@ -61,13 +64,14 @@ const optionValues = (options) => {
  * timer, one per DeepLinkGUI subtree. Writes go through the app's URLSync when
  * present, else a fallback writer; they accumulate per key and merge in one
  * flush.
- * @param {Window} [win] - The window this writer reads and rewrites; the
+ * @param {Window|null} [win] - The window this writer reads and rewrites; the
  *   ambient one when omitted.
- * @returns {(key: string, value: (string|number|boolean|null|undefined)) => void}
+ * @returns {UrlWriter}
  *   A writer; `value` null/undefined deletes the key.
  */
 const makeUrlParamWriter = (win = null) => {
-  let urlTimer = null;
+  /** @type {number|undefined} */
+  let urlTimer;
   const pendingUrlWrites = new Map(); // key -> value (null/undefined => delete)
   const commit = () => {
     const target = win ?? window;
@@ -76,12 +80,13 @@ const makeUrlParamWriter = (win = null) => {
     pendingUrlWrites.clear();
     writeUrl(params, target);
   };
+  /** @type {UrlWriter} */
   const writer = (key, value) => {
     const sync = getActiveURLSync();
     if (sync) {
       if (pendingUrlWrites.size) {
         (win ?? window).clearTimeout(urlTimer);
-        urlTimer = null;
+        urlTimer = undefined;
         for (const [k, v] of pendingUrlWrites) sync.setParam(k, v);
         pendingUrlWrites.clear();
       }
@@ -92,11 +97,18 @@ const makeUrlParamWriter = (win = null) => {
     (win ?? window).clearTimeout(urlTimer);
     urlTimer = (win ?? window).setTimeout(commit, URL_FLUSH_DEBOUNCE_MS);
   };
-  writer.cancel = () => { (win ?? window).clearTimeout(urlTimer); urlTimer = null; pendingUrlWrites.clear(); };
+  writer.cancel = () => { (win ?? window).clearTimeout(urlTimer); urlTimer = undefined; pendingUrlWrites.clear(); };
   return writer;
 };
 
 export { makeUrlParamWriter };
+
+/** @param {unknown} value @returns {value is LilGUI} */
+function isGui(value) {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = /** @type {Partial<LilGUI>} */ (value);
+  return Boolean(candidate.domElement && candidate.addFolder);
+}
 
 /**
  * lil-gui wrapper that deep-links controls added through add() and
@@ -106,18 +118,18 @@ export { makeUrlParamWriter };
  */
 class DeepLinkGUI {
   /**
-   * @param {(Object|LilGUI)} options - Either lil-gui constructor options or an
+   * @param {ConstructorParameters<typeof LilGUI>[0]|LilGUI} options - Either lil-gui constructor options or an
    *   existing lil-gui instance to wrap (detected by its domElement/addFolder members).
-   * @param {string} [rootNamespace] - Prefix segment for every deep-link key in
+   * @param {string|null} [rootNamespace] - Prefix segment for every deep-link key in
    *   this root's subtree (e.g. 'fx', 'view'), keeping independent GUI roots out
    *   of one flat key namespace. Omitted for an unnamespaced root.
-   * @param {DeepLinkGUI} [parent] - Enclosing GUI when this is a sub-folder; a
+   * @param {DeepLinkGUI|null} [parent] - Enclosing GUI when this is a sub-folder; a
    *   child shares its root's URL writer instead of owning one.
-   * @param {Window} [win] - The window this subtree reads deep links from and
+   * @param {Window|null} [win] - The window this subtree reads deep links from and
    *   writes them back to; inherited from `parent`, else the ambient one.
    */
   constructor(options, rootNamespace = null, parent = null, win = null) {
-    if (options && options.domElement && options.addFolder) {
+    if (isGui(options)) {
       this.gui = options;
     } else {
       this.gui = new LilGUI(options);
@@ -125,15 +137,18 @@ class DeepLinkGUI {
     this.rootNamespace = rootNamespace;
     this.parent = parent;
     this.folderIndex = 0;
+    /** @type {string|null} */
     this.keySegment = null;
+    /** @type {Set<string>} */
     this.urlKeys = new Set();
+    /** @type {DeepLinkGUI[]} */
     this.children = [];
     this.win = win ?? parent?.win ?? null;
-    this.urlWriter = parent ? parent.urlWriter : makeUrlParamWriter(this.win);
+    this.urlWriter = /** @type {UrlWriter} */ (parent ? parent.urlWriter : makeUrlParamWriter(this.win));
   }
 
   /** @returns {HTMLButtonElement} The folder title button. */
-  get titleElement() { return this.gui.$title; }
+  get titleElement() { return /** @type {HTMLButtonElement} */ (this.gui.$title); }
 
   /**
    * Reads this subtree's deep-link params, folding in the URL writer's pending
@@ -172,6 +187,7 @@ class DeepLinkGUI {
    */
   getKey(prop) {
     const keys = [prop];
+    /** @type {DeepLinkGUI} */
     let curr = this;
     while (curr.parent) {
       if (curr.keySegment) keys.unshift(curr.keySegment);
@@ -191,7 +207,7 @@ class DeepLinkGUI {
     this.urlKeys.add(key);
     const params = this.urlParams();
     if (!params.has(key)) return undefined;
-    const value = parseUrlNumber(params.get(key));
+    const value = parseUrlNumber(params.get(key) ?? '');
     if (value === null) {
       console.warn(`DeepLinkGUI: ignoring non-numeric stored value for "${key}"`);
       return undefined;
@@ -230,19 +246,20 @@ class DeepLinkGUI {
    * persistence and load-time replay, not `onFinishChange`. A synchronous handler may call
    * `controller.acceptUrlValue(value)` to persist an accepted value while the
    * controller continues to display the proposed value.
-   * @param {Object} controller - The lil-gui controller to wrap.
-   * @param {Function} persistUrl - Callback that persists the control's value to the URL.
+   * @param {UrlController} controller - The lil-gui controller to wrap.
+   * @param {(value: unknown) => void} persistUrl - Callback that persists the control's value to the URL.
    * @param {boolean} [applyOnLoad=false] - When true (value hydrated from URL), replay each onChange handler once when it registers so its side effect runs at startup.
-   * @returns {Object} The same controller, for chaining.
+   * @returns {UrlController} The same controller, for chaining.
    */
   attachUrlWriter(controller, persistUrl, applyOnLoad = false) {
+    /** @type {Function[]} */
     const userOnChange = [];
     let urlValue = controller.getValue();
     controller.acceptUrlValue = (value) => {
       urlValue = value;
       return controller;
     };
-    controller.onChange((v) => {
+    controller.onChange((/** @type {unknown} */ v) => {
       urlValue = v;
       for (const fn of userOnChange) fn(v);
       persistUrl(urlValue);
@@ -262,10 +279,12 @@ class DeepLinkGUI {
   /**
    * Adds a control, seeding its value from the URL (when present and valid) and
    * wiring it to write changes back.
-   * @param {Object} object - The object holding the bound property.
-   * @param {string} prop - The property name to control (a function makes it a button).
+   * @template {object} T
+   * @template {keyof T & string} K
+   * @param {T} object - The object holding the bound property.
+   * @param {K} prop - The property name to control (a function makes it a button).
    * @param {...*} args - Forwarded to lil-gui's add() (min/max/step for numbers, or a choices array/object for an enum).
-   * @returns {Object} The created lil-gui controller.
+   * @returns {UrlController} The created lil-gui controller.
    */
   add(object, prop, ...args) {
     return this.addWithHydration(true, object, prop, ...args);
@@ -274,10 +293,12 @@ class DeepLinkGUI {
   /**
    * Adds a deep-linked control without seeding it from the current URL; later
    * edits still write its deep-link key.
-   * @param {Object} object - The object holding the bound property.
-   * @param {string} prop - The property name to control.
+   * @template {object} T
+   * @template {keyof T & string} K
+   * @param {T} object - The object holding the bound property.
+   * @param {K} prop - The property name to control.
    * @param {...*} args - Forwarded to lil-gui's add().
-   * @returns {Object} The created lil-gui controller.
+   * @returns {UrlController} The created lil-gui controller.
    */
   addUnhydrated(object, prop, ...args) {
     return this.addWithHydration(false, object, prop, ...args);
@@ -286,10 +307,12 @@ class DeepLinkGUI {
   /**
    * Common deep-linked control construction.
    * @param {boolean} hydrate - Whether a matching URL value may seed the control.
-   * @param {Object} object - The object holding the bound property.
-   * @param {string} prop - The property name to control.
+   * @template {object} T
+   * @template {keyof T & string} K
+   * @param {T} object - The object holding the bound property.
+   * @param {K} prop - The property name to control.
    * @param {...*} args - Forwarded to lil-gui's add().
-   * @returns {Object} The created lil-gui controller.
+   * @returns {UrlController} The created lil-gui controller.
    */
   addWithHydration(hydrate, object, prop, ...args) {
     const supported = ['number', 'string', 'boolean', 'function'];
@@ -303,36 +326,38 @@ class DeepLinkGUI {
     let urlApplied = false;
     let valClamped = false;
     if (hydrate && !isFunction && params.has(key)) {
+      /** @type {unknown} */
       let val = params.get(key);
       const currentVal = object[prop];
       urlApplied = true;
       if (typeof currentVal === 'number') {
-        const num = parseUrlNumber(val);
+        const num = parseUrlNumber(params.get(key) ?? '');
         if (num === null) {
           console.warn(`DeepLinkGUI: ignoring non-numeric URL value "${params.get(key)}" for "${key}"`);
           val = currentVal;
           urlApplied = false;
           valClamped = true;
         } else {
-          val = num;
+          let numeric = num;
           // lil-gui numeric add() signature is add(obj, prop, min, max, step).
           const min = args[0], max = args[1], step = args[2];
-          const raw = val;
-          if (typeof min === 'number' && val < min) val = min;
-          if (typeof max === 'number' && val > max) val = max;
+          const raw = num;
+          if (typeof min === 'number' && numeric < min) numeric = min;
+          if (typeof max === 'number' && numeric > max) numeric = max;
           // The URL path bypasses lil-gui's step snapping, so snap to a step multiple.
           if (Number.isFinite(step) && step > 0) {
             const anchor = typeof min === 'number' ? min : 0;
-            val = anchor + Math.round((val - anchor) / step) * step;
-            if (typeof min === 'number' && val < min) val = min;
-            if (typeof max === 'number' && val > max) val = max;
+            numeric = anchor + Math.round((numeric - anchor) / step) * step;
+            if (typeof min === 'number' && numeric < min) numeric = min;
+            if (typeof max === 'number' && numeric > max) numeric = max;
           }
           // Ignore multiplication noise on values already aligned to the step.
           const snapTol = Number.isFinite(step) && step > 0 ? Math.abs(step) * 1e-6 : 0;
-          valClamped = Math.abs(val - raw) > snapTol;
+          valClamped = Math.abs(numeric - raw) > snapTol;
+          val = numeric;
         }
       } else if (typeof currentVal === 'boolean') {
-        const flag = parseUrlBoolean(val);
+        const flag = parseUrlBoolean(params.get(key) ?? '');
         if (flag === null) {
           console.warn(`DeepLinkGUI: ignoring unrecognized boolean URL value "${params.get(key)}" for "${key}"`);
           val = currentVal;
@@ -355,10 +380,10 @@ class DeepLinkGUI {
           urlApplied = false;
           valClamped = true;
         } else {
-          object[prop] = allowed[idx];
+          object[prop] = /** @type {T[K]} */ (allowed[idx]);
         }
       } else {
-        object[prop] = val;
+        object[prop] = /** @type {T[K]} */ (val);
       }
     }
 
@@ -369,7 +394,7 @@ class DeepLinkGUI {
 
     if (!isFunction) {
       this.urlKeys.add(key);
-      this.attachUrlWriter(controller, (v) => this.urlWriter(key, v), urlApplied);
+      this.attachUrlWriter(controller, (v) => this.urlWriter(key, /** @type {string|number|boolean|null|undefined} */ (v)), urlApplied);
     }
 
     if (!isFunction && valClamped) {
@@ -387,10 +412,12 @@ class DeepLinkGUI {
   /**
    * Adds a control that is NOT deep-linked: its value is neither seeded from nor
    * written to the URL.
-   * @param {Object} object - The object holding the bound property.
-   * @param {string} prop - The property name to control.
+   * @template {object} T
+   * @template {keyof T & string} K
+   * @param {T} object - The object holding the bound property.
+   * @param {K} prop - The property name to control.
    * @param {...*} args - Forwarded to lil-gui's add().
-   * @returns {Object} The created lil-gui controller.
+   * @returns {UrlController} The created lil-gui controller.
    */
   addSession(object, prop, ...args) {
     const controller = this.gui.add(object, prop, ...args);

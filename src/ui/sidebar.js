@@ -151,8 +151,8 @@ export class EffectSidebar {
    * apply the current sort order, active highlight, and roving tabindex anchor,
    * restoring keyboard focus when it was inside the list.
    * @param {Array<string>} names - Effect names, one button per name.
-   * @param {Record<string, number>} [effectSizes] - Map of effect name to size in bytes; missing or absent entries are treated as 0.
-   * @param {Record<string, number>} [presetCounts] - Map of effect name to
+   * @param {Record<string, number>|null} [effectSizes] - Map of effect name to size in bytes; missing or absent entries are treated as 0.
+   * @param {Record<string, number>|null} [presetCounts] - Map of effect name to
    *   authored preset count; the displayed count has a minimum of 1.
    */
   setEffects(names, effectSizes, presetCounts) {

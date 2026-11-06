@@ -113,6 +113,7 @@ export async function refreshModuleCache({
   }
   // The WASM binary leads, ahead of the deadline; the rest keep load order.
   const queue = [...binaries, ...[...modules].filter((url) => !binaries.has(url))];
+  /** @type {RequestInit} */
   const init = signal ? { cache: 'reload', signal } : { cache: 'reload' };
   const lanes = Array.from(
     { length: Math.min(REFRESH_CONCURRENCY, queue.length) },

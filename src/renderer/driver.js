@@ -12,6 +12,10 @@ import { FPS } from "./frame_constants.js";
 import { PovSweep } from "./pov_sweep.js";
 import { MOBILE_BREAKPOINT_PX } from "../shared/layout.js";
 
+/** @typedef {Omit<THREE.InstancedBufferAttribute, 'array'> & {array: Uint16Array|null}} RgbAttribute */
+/** @typedef {Omit<THREE.InstancedMesh, 'instanceColor'> & {instanceColor: RgbAttribute|null}} RgbMesh */
+/** @typedef {import('../../generated/holosphere_wasm.js').ArenaMetrics} ArenaMetrics */
+
 /**
  * Reuses CSS2DObject label sprites across frames so axis labels can be
  * rebuilt every frame without churning the DOM. acquire() hands out pooled
@@ -28,6 +32,7 @@ export class LabelPool {
     this.scene = scene;
     this.radius = radius;
     this.doc = doc;
+    /** @type {CSS2DObject[]} */
     this.pool = [];
     this.activeCount = 0;
   }
@@ -145,15 +150,15 @@ export class Daydream {
    * @param {Object} [dependencies] - Page seams, the same set start() threads
    *   through the rest of the app; a driver reads no globals of its own.
    * @param {Document} [dependencies.doc] - Document the canvas and overlays live in.
-   * @param {Window|typeof globalThis} [dependencies.win] - Window the pixel
+   * @param {Window & typeof globalThis} [dependencies.win] - Window the pixel
    *   ratio, the reload, the resize observer and the frame timer are read off.
    * @param {Navigator} [dependencies.nav] - Navigator carrying the webdriver flag.
    * @param {boolean} [dependencies.pipOnRight] - Anchor the PiP at the bottom right.
-   * @param {{update: Function, clear: Function}} [dependencies.statsView] - Optional frame metrics view.
+   * @param {Pick<import('../ui/global_stats_view.js').GlobalStatsView, 'update'|'clear'>|null} [dependencies.statsView] - Optional frame metrics view.
    */
   constructor({
     doc = globalThis.document,
-    win = globalThis,
+    win = /** @type {Window & typeof globalThis} */ (globalThis),
     nav = globalThis.navigator,
     statsView = null,
     pipOnRight = false,
@@ -172,19 +177,22 @@ export class Daydream {
     this.DOT_SIZE = Daydream.DEFAULT_DOT_SIZE;
     // Null until precomputeMatrices allocates a zeroed RGB16 placeholder;
     // the engine host then supplies the WASM view.
+    /** @type {Uint16Array|null} */
     this.pixels = null;
     // Composed instance matrices per grid, keyed by resolution and latitude endpoints.
     /** @type {Map<string, Float32Array>} */
     this.matrixCache = new Map();
 
-    this.canvas = this.doc.querySelector("#canvas");
-
-    this.canvasParent = this.canvas?.parentElement;
-    if (!this.canvasParent) {
-      throw new Error(this.canvas
+    const canvas = /** @type {HTMLCanvasElement|null} */ (this.doc.querySelector('#canvas'));
+    const canvasParent = canvas?.parentElement;
+    if (!canvas || !canvasParent) {
+      throw new Error(canvas
         ? "Daydream: #canvas has no parent element to mount the renderer into"
         : "Daydream: #canvas element not found in the document");
     }
+
+    this.canvas = canvas;
+    this.canvasParent = canvasParent;
 
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
@@ -237,6 +245,7 @@ export class Daydream {
     // Injected video capture sink; null disables capture. Must expose
     // captureFrame(), abort(message), and an isRecording flag (which also
     // suppresses the PiP corner).
+    /** @type {import('../recording/recorder.js').VideoRecorder|null} */
     this.recorder = null;
     // Captures owed by advanced ticks whose repaint a detached view held.
     this.heldCaptures = 0;
@@ -254,7 +263,7 @@ export class Daydream {
     this.labelPool = new LabelPool(this.scene, Daydream.SPHERE_RADIUS, this.doc);
 
     // Built by updateResolution(); null means nothing to draw.
-    /** @type {THREE.InstancedMesh|null} */
+    /** @type {RgbMesh|null} */
     this.dotMesh = null;
 
     this.axisMaterial = new THREE.LineBasicMaterial({
@@ -322,12 +331,12 @@ export class Daydream {
     this.canvasParent.appendChild(overlay);
     this.contextLostOverlay = overlay;
 
-    this.onContextLost = (e) => {
+    this.onContextLost = (/** @type {Event} */ e) => {
       e.preventDefault(); // signal intent to handle a restore
       this.contextLost = true;
-      const reason = e.statusMessage || "no reason reported";
+      const reason = /** @type {WebGLContextEvent} */ (e).statusMessage || "no reason reported";
       console.error(`[daydream] WebGL context lost: ${reason}`);
-      this.contextLostDetail.textContent =
+      /** @type {HTMLElement} */ (this.contextLostDetail).textContent =
         `${reason}. The GPU process was likely reset — reload to recover.`;
       overlay.style.display = "flex";
       overlay.focus({ preventScroll: true });
@@ -347,7 +356,7 @@ export class Daydream {
 
     this.canvas.addEventListener("webglcontextlost", this.onContextLost, false);
     this.canvas.addEventListener(
-      "webglcontextrestored", this.onContextRestored, false);
+      "webglcontextrestored", /** @type {EventListener} */ (this.onContextRestored), false);
   }
 
   /**
@@ -371,7 +380,7 @@ export class Daydream {
       this.canvas.classList.remove("keyboard-focus");
     };
 
-    this.onCanvasKeyDown = (e) => {
+    this.onCanvasKeyDown = (/** @type {KeyboardEvent} */ e) => {
       if (e.altKey || e.ctrlKey || e.metaKey) return;
       if (!this.canvas.classList.contains("keyboard-focus")) return;
       if (this.paused && e.key === "ArrowRight" && !e.shiftKey) return;
@@ -416,8 +425,8 @@ export class Daydream {
     };
 
     this.canvas.addEventListener("keydown", this.onCanvasKeyDown);
-    this.canvas.addEventListener("focus", this.onCanvasFocus);
-    this.canvas.addEventListener("blur", this.onCanvasBlur);
+    this.canvas.addEventListener("focus", /** @type {EventListener} */ (this.onCanvasFocus));
+    this.canvas.addEventListener("blur", /** @type {EventListener} */ (this.onCanvasBlur));
   }
 
   /**
@@ -520,7 +529,7 @@ export class Daydream {
    * when the sim stepped, the camera moved, or invalidate() was called. Hands
    * this.recorder each newly completed frame the adapter reports capture-ready.
    * @param {{drawFrame: () => void, sync?: (advanced: boolean) => void,
-   *   getArenaMetrics?: () => ?Object, captureReady?: (advanced: boolean) => boolean,
+   *   getArenaMetrics?: () => ArenaMetrics|null, captureReady?: (advanced: boolean) => boolean,
    *   refreshPixelView?: () => void, retainsDisplay?: () => boolean}} adapter - Per-frame render adapter:
    *   drawFrame() paints the pixel buffer,
    *   sync(advanced) reconciles the effect panel and is told whether the sim
@@ -555,7 +564,7 @@ export class Daydream {
       ? adapter.captureReady(advanced) : advanced;
     if (this.povSweep && !isViewLive(this.pixels)) adapter?.refreshPixelView?.();
     if (this.povResetPending && captureReady && isViewLive(this.pixels)) {
-      this.povSweep?.reset(this.pixels);
+      this.povSweep?.reset(/** @type {Uint16Array} */ (this.pixels));
       this.povResetPending = false;
       this.needsRender = true;
     }
@@ -614,7 +623,7 @@ export class Daydream {
       // counter charges for each. A backlog drains one per repaint instead.
       const owed = this.recorder ? (captureDue ? 1 : 0) + this.heldCaptures : 0;
       this.heldCaptures = owed > 0 ? owed - 1 : 0;
-      if (owed > 0) this.recorder.captureFrame();
+      if (owed > 0) /** @type {import('../recording/recorder.js').VideoRecorder} */ (this.recorder).captureFrame();
       if (this.heldCaptures > 0) this.needsRender = true;
 
       this.refreshLabels();
@@ -625,7 +634,8 @@ export class Daydream {
       this.renderPip();
       this.renderer.setScissorTest(false);
     } finally {
-      if (this.povSweep && colorAttribute) colorAttribute.array = sourcePixels;
+      if (this.povSweep && colorAttribute)
+        colorAttribute.array = /** @type {Uint16Array|null} */ (sourcePixels);
     }
   }
 
@@ -659,7 +669,7 @@ export class Daydream {
   /**
    * Advance the simulation one frame when running or single-stepping: clear the
    * pixel buffer, draw the effect, refresh stats.
-   * @param {{drawFrame: () => void, retainsDisplay?: () => boolean}} adapter - Render adapter whose drawFrame() paints the pixel buffer.
+   * @param {{drawFrame: () => void, retainsDisplay?: () => boolean, getArenaMetrics?: () => ArenaMetrics|null}} adapter - Render adapter whose drawFrame() paints the pixel buffer.
    * @returns {boolean} Whether the simulation actually advanced (false while paused without a queued step), so the caller can gate the recorder on the same decision.
    */
   stepSimulation(adapter) {
@@ -692,7 +702,7 @@ export class Daydream {
 
   /** Replace POV history with the current displayed pixels. */
   resetPovNow() {
-    this.povSweep?.reset(this.pixels);
+    this.povSweep?.reset(/** @type {Uint16Array} */ (this.pixels));
   }
 
   /** Replace POV history when the next complete effect frame is displayed. */
@@ -831,12 +841,13 @@ export class Daydream {
         uColumnFillArc: { value: 0 }
       };
 
+      const uniforms = this.cullUniforms;
       this.dotMaterial.onBeforeCompile = (shader) => {
         if (!shader.vertexShader.includes('#include <begin_vertex>'))
           throw new Error('Dot shader is missing the begin_vertex chunk');
-        shader.uniforms.uCameraPos = this.cullUniforms.uCameraPos;
-        shader.uniforms.uCullThreshold = this.cullUniforms.uCullThreshold;
-        shader.uniforms.uColumnFillArc = this.cullUniforms.uColumnFillArc;
+        shader.uniforms.uCameraPos = uniforms.uCameraPos;
+        shader.uniforms.uCullThreshold = uniforms.uCullThreshold;
+        shader.uniforms.uColumnFillArc = uniforms.uColumnFillArc;
 
         shader.vertexShader = 'uniform vec3 uCameraPos;\nuniform float uCullThreshold;\nuniform float uColumnFillArc;\n' + shader.vertexShader;
 
@@ -890,11 +901,11 @@ export class Daydream {
       Math.PI
     );
 
-    this.dotMesh = new THREE.InstancedMesh(
+    this.dotMesh = /** @type {RgbMesh} */ (new THREE.InstancedMesh(
       this.dotGeometry,
       this.dotMaterial,
       totalPixels
-    );
+    ));
 
     this.dotMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     this.dotMesh.count = totalPixels;
@@ -911,6 +922,7 @@ export class Daydream {
    * @param {boolean} [resetColors=true] - Allocate colors for a new pixel grid.
    */
   precomputeMatrices(resetColors = true) {
+    const mesh = /** @type {RgbMesh} */ (this.dotMesh);
     const count = this.W * this.H;
     const key = `${this.W}x${this.H}x${this.DISPLAY_NORTH_PHI}x${this.DISPLAY_SOUTH_PHI}`;
     let matrices = this.matrixCache.get(key);
@@ -938,20 +950,20 @@ export class Daydream {
       this.matrixCache.set(key, composed);
       matrices = composed;
     }
-    this.dotMesh.instanceMatrix.array.set(matrices);
+    mesh.instanceMatrix.array.set(matrices);
 
     if (resetColors) {
-      const needed = this.dotMesh.count * 3;
-      this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(
+      const needed = mesh.count * 3;
+      mesh.instanceColor = /** @type {RgbAttribute} */ (new THREE.InstancedBufferAttribute(
         new Uint16Array(needed), 3, true
-      );
-      this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
-      this.pixels = this.dotMesh.instanceColor.array;
+      ));
+      mesh.instanceColor.setUsage(THREE.StreamDrawUsage);
+      this.pixels = mesh.instanceColor.array;
       if (isViewLive(this.pixels)) this.pixels.fill(0);
-      this.dotMesh.instanceColor.needsUpdate = true;
+      mesh.instanceColor.needsUpdate = true;
     }
 
-    this.dotMesh.instanceMatrix.needsUpdate = true;
+    mesh.instanceMatrix.needsUpdate = true;
   }
 
   /**
@@ -971,7 +983,7 @@ export class Daydream {
   /**
    * Hand one frame's measurements to the stats overlay.
    * @param {number} duration - Frame draw time in milliseconds.
-   * @param {{getArenaMetrics?: () => ?Object}} adapter - Render adapter; its getArenaMetrics() supplies arena usage when present.
+   * @param {{getArenaMetrics?: () => ArenaMetrics|null}} adapter - Render adapter; its getArenaMetrics() supplies arena usage when present.
    */
   updateStats(duration, adapter) {
     this.statsView?.update(duration, adapter?.getArenaMetrics?.() ?? null);
@@ -1039,14 +1051,14 @@ export class Daydream {
       this.canvas.removeEventListener(
         "webglcontextlost", this.onContextLost, false);
       this.canvas.removeEventListener(
-        "webglcontextrestored", this.onContextRestored, false);
+        "webglcontextrestored", /** @type {EventListener} */ (this.onContextRestored), false);
     }
     this.contextLostOverlay?.remove();
 
     if (this.onCanvasKeyDown) {
       this.canvas.removeEventListener("keydown", this.onCanvasKeyDown);
-      this.canvas.removeEventListener("focus", this.onCanvasFocus);
-      this.canvas.removeEventListener("blur", this.onCanvasBlur);
+      this.canvas.removeEventListener("focus", /** @type {EventListener} */ (this.onCanvasFocus));
+      this.canvas.removeEventListener("blur", /** @type {EventListener} */ (this.onCanvasBlur));
       // The canvas outlives the driver.
       this.canvas.classList.remove("keyboard-focus");
     }

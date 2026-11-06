@@ -10,12 +10,13 @@ import { errorDetail } from '../shared/banner.js';
 import { displayAliasesDiverged, repointDisplayAliases } from '../engine/display_aliases.js';
 
 /** @typedef {import('../engine/display_aliases.js').DisplayDriver} DisplayDriver */
+/** @typedef {import('../../generated/holosphere_wasm.js').ArenaMetrics} ArenaMetrics */
 
 /**
  * Build the per-frame adapter the driver's render loop calls.
  *
  * @param {Object} deps - Injected app collaborators.
- * @param {{engine: {drawFrame: () => void, getArenaMetrics: () => Object},
+ * @param {{engine: {drawFrame: () => void, getArenaMetrics: () => ArenaMetrics},
  *   refresh: () => boolean, view: () => Uint16Array|null}} deps.host - The EngineHost
  *   owning the main engine and its view.
  * @param {DisplayDriver} deps.driver - The Daydream driver.
@@ -27,7 +28,7 @@ import { displayAliasesDiverged, repointDisplayAliases } from '../engine/display
  * @param {(message: string) => void} [deps.logError] - Console sink for the
  *   once-per-page alias divergence report.
  * @returns {{drawFrame: () => void, sync: (advanced: boolean) => void,
- *   getArenaMetrics: () => Object|null, captureReady: (advanced?: boolean) => boolean,
+ *   getArenaMetrics: () => ArenaMetrics|null, captureReady: (advanced?: boolean) => boolean,
  *   refreshPixelView: () => void, retainsDisplay: () => boolean}} The adapter.
  */
 export function createRenderAdapter({
@@ -85,7 +86,7 @@ export function createRenderAdapter({
     },
     /**
      * Report the engine's current arena allocation metrics for the driver's HUD.
-     * @returns {?Object} The main engine's arena metrics, or null once the
+     * @returns {ArenaMetrics|null} The main engine's arena metrics, or null once the
      *   worker pool owns the display and the main engine is idle, where the HUD
      *   reads per-segment worker stats instead.
      */
@@ -390,12 +391,13 @@ export const MODULE_LOAD_DEADLINE_MS = 90000;
  * Race a module load against a deadline. The timer is cleared once the race
  * settles; a losing load's later rejection is handled.
  *
- * @param {() => Promise<Object>} load - Starts the module load.
+ * @template T
+ * @param {() => Promise<T>} load - Starts the module load.
  * @param {Object} [deps] - Injected collaborators.
  * @param {number} [deps.ms] - The deadline, in milliseconds.
  * @param {{setTimeout: Function, clearTimeout: Function}} [deps.timers] - Timer
  *   source.
- * @returns {Promise<Object>} The loaded module, or a rejection carrying the
+ * @returns {Promise<T>} The loaded module, or a rejection carrying the
  *   deadline that expired or whatever load() raised, synchronous throws included.
  */
 export function loadWithDeadline(load, {
@@ -413,13 +415,14 @@ export function loadWithDeadline(load, {
  *
  * Startup is skipped once the app is disposed. A load failure disposes the app.
  *
+ * @template T
  * @param {Object} deps - Injected app collaborators.
  * @param {() => ?{dispose: Function, disposed: () => boolean}} deps.teardown -
  *   Reads the app teardown, or null if none is set.
- * @param {(module: Object) => void} deps.start - Brings the app up on the
+ * @param {(module: T) => void} deps.start - Brings the app up on the
  *   loaded module.
  * @param {(err: *) => void} deps.reportFailure - Renders the load-failure UI.
- * @returns {{onModuleReady: (module: Object) => void,
+ * @returns {{onModuleReady: (module: T) => void,
  *   onModuleFailed: (err: *) => void}} The fulfillment and rejection handlers.
  */
 export function createModuleLoadHandlers({

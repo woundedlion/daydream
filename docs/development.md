@@ -99,6 +99,13 @@ After `npm ci` and an engine install, run `npm run lint`, `npm run typecheck`, a
 `npm test`. Test suites live in `tests/`, reusable support code in
 `tests/helpers/`, and fixture inputs in `tests/fixtures/`.
 
+The application composition root, renderer, and GUI wrapper are part of the
+checked source roster. TypeScript resolves the installed lil-gui declarations
+and the exact Three.js type package pinned in `package-lock.json`. Engine calls
+use the declarations from the installed engine bundle. The module-ready and
+display-ready views in `daydream.js` describe callbacks that run after engine
+installation and mesh allocation; the host's early lifecycle state stays nullable.
+
 A local green run can include skipped checks. Engine source checks search
 `engine`, `../Holosphere`, and `../pov` relative to this checkout; set
 `HOLOSPHERE_ENGINE_DIR` (also checkout-relative) for another location. They skip
