@@ -313,10 +313,13 @@ export class VideoRecorder {
     const endSession = () => {
       if (ended) return;
       ended = true;
-      sink?.finish();
-      stream.getTracks().forEach(t => t.stop());
-      // Only clean up if a rapid stop→start hasn't already replaced this session.
-      if (this.mediaRecorder === recorder) this.cleanup();
+      try {
+        sink?.finish();
+      } finally {
+        stream.getTracks().forEach(t => t.stop());
+        // Only clean up if a rapid stop→start hasn't already replaced this session.
+        if (this.mediaRecorder === recorder) this.cleanup();
+      }
     };
 
     this.mediaRecorder = recorder;
@@ -573,11 +576,21 @@ export class VideoRecorder {
    * @returns {VideoSink} The session sink; callers may ignore finish()'s promise.
    */
   openSink(recorder, effectName, chunks, bitrateMbps = DEFAULT_BITRATE_MBPS) {
+    const saveBuffered = () => {
+      try {
+        this.download(recorder, chunks, effectName);
+      } catch (cause) {
+        const message = 'buffered video could not be saved.';
+        console.error(`VideoRecorder: ${message}`, cause);
+        this.onSaveError?.(new Error(message, { cause }),
+          this.timestampedName(effectName, this.extension(recorder)));
+      }
+    };
     if (typeof globalThis.showSaveFilePicker !== 'function') {
       return {
         write: this.memorySink(recorder, chunks, 'this browser has no streaming save'),
         finish: () => {
-          if (chunks.length) this.download(recorder, chunks, effectName);
+          if (chunks.length) saveBuffered();
           else {
             console.warn('VideoRecorder: session produced no data; nothing to download');
             this.onEmptySession?.();
@@ -693,7 +706,7 @@ export class VideoRecorder {
             // or the session streamed no data (the chosen file was never
             // truncated). Download the buffer if there is one.
             if (!writable) {
-              if (chunks.length) this.download(recorder, chunks, effectName);
+              if (chunks.length) saveBuffered();
               else {
                 console.warn('VideoRecorder: session produced no data; nothing to download');
                 this.onEmptySession?.();
@@ -723,7 +736,7 @@ export class VideoRecorder {
           })
           .catch((err) => {
             saveFailure('streaming save failed; any buffered video will be saved to Downloads.', err);
-            if (chunks.length) this.download(recorder, chunks, effectName);
+            if (chunks.length) saveBuffered();
           });
       },
     };

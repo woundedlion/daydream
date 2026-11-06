@@ -1638,6 +1638,63 @@ test('the buffered save path downloads one blob through an anchor click', (t) =>
   assert.deepEqual(save.revoked, [save.created[0].url], 'then it is revoked');
 });
 
+for (const mode of ['buffered', 'picker-fallback']) {
+  test(`a throwing ${mode} download reports once and releases its capture session`, async (t) => {
+    t.after(installRecorderEnv());
+    const save = installSavePath();
+    t.after(save.restore);
+    const captured = installConsoleCapture('error', 'warn');
+    t.after(captured.restore);
+    const failure = new Error('object URL unavailable');
+    let attempts = 0;
+    URL.createObjectURL = () => { attempts++; throw failure; };
+    if (mode === 'picker-fallback')
+      globalThis.showSaveFilePicker = async () => { throw new Error('picker unavailable'); };
+    const rec = new VideoRecorder(recordableCanvas());
+    rec.format = 'webm';
+    const finished = mode === 'picker-fallback' ? trackSinkFinish(rec) : async () => {};
+    const errors = [];
+    rec.onSaveError = (error, name) => errors.push({error, name});
+    rec.start('failed');
+    const encoder = rec.mediaRecorder;
+    const stream = rec.stream;
+    await drainSink();
+    encoder.ondataavailable({data: {size: 10}});
+    rec.stop();
+    assert.doesNotThrow(() => encoder.onstop());
+    await finished();
+    assert.equal(attempts, 1);
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].error.cause, failure);
+    assert.match(errors[0].error.message, /buffered video could not be saved/);
+    assert.match(errors[0].name, /^failed_.*\.webm$/);
+    assert.equal(stream.track.stopped, true);
+    assert.equal(rec.stream, null);
+    assert.equal(rec.mediaRecorder, null);
+    assert.equal(rec.isRecording, false);
+    rec.start('next');
+    await drainSink();
+    assert.equal(rec.isRecording, true);
+    assert.notEqual(rec.mediaRecorder, encoder);
+    rec.dispose();
+  });
+}
+
+test('a failing sink finalizer still releases the live capture', (t) => {
+  t.after(installRecorderEnv());
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.openSink = () => ({write() {}, finish() { throw new Error('finalizer failed'); }});
+  rec.start('failed');
+  const encoder = rec.mediaRecorder;
+  const stream = rec.stream;
+  rec.stop();
+  assert.throws(() => encoder.onstop(), /finalizer failed/);
+  assert.equal(stream.track.stopped, true);
+  assert.equal(rec.stream, null);
+  assert.equal(rec.mediaRecorder, null);
+  assert.equal(rec.isRecording, false);
+});
+
 /**
  * The blob type and the file extension are both derived from the container the
  * browser actually chose, so they can never disagree; an unknown or empty type
