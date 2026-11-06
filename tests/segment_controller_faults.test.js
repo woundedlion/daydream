@@ -16,7 +16,6 @@ import { PROTOCOL_VERSION, FAULT_POOL, FAULT_RENDER } from '../src/segments/work
 import {
   installSegmentControllerHarness,
   expectSegmentDiagnostics,
-  capturedConsole,
   makeController,
   deliverReady,
   deliverBooted,
@@ -480,7 +479,13 @@ test('a bare-Event boot fault auto-rebuilds the pool instead of latching', () =>
 });
 
 test('a bare-Event boot fault latches once the retry budget is exhausted', () => {
-  expectSegmentDiagnostics([["warn", "[Segmented] seg 0 module failed to load (attempt 1/3); rebuilding pool"], ["warn", "[Segmented] seg 0 module failed to load (attempt 2/3); rebuilding pool"], ["warn", "[Segmented] seg 0 module failed to load (attempt 3/3); rebuilding pool"], ["error", "[Segmented] Worker seg 0 error: module load failed after 4 attempts (commonly a missing or renamed generated/holosphere_wasm.js, or a bare import specifier \u2014 a worker resolves its graph without the page's import map)"]]);
+  expectSegmentDiagnostics([
+    ...Array.from({ length: MAX_BOOT_RETRIES }, (_, attempt) => [
+      'warn', `[Segmented] seg 0 module failed to load (attempt ${attempt + 1}/${MAX_BOOT_RETRIES}); rebuilding pool`,
+    ]),
+    ['error', `[Segmented] Worker seg 0 error: module load failed after ${MAX_BOOT_RETRIES + 1} attempts `
+      + '(commonly a missing or renamed generated/holosphere_wasm.js, or a bare import specifier — a worker resolves its graph without the page\'s import map)'],
+  ]);
   const clock = installFakeTimers();
   try {
     const c = makeController();
@@ -731,7 +736,6 @@ function faultSegZero(controller) {
 // effect switch.
 test('repeated effect switches on a refaulting pool spawn a bounded worker count', () => {
   expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x"], ["error", "[Segmented] Worker seg 0 error: x"], ["error", "[Segmented] Worker seg 0 error: x"], ["warn", "[Segmented] pool faulted on 2 consecutive effect-switch rebuilds; change resolution or toggle segmented mode to restart"]]);
-  const capturedFrom = capturedConsole.length;
   const c = makeController();
   c.active = true;
   c.create(2);
@@ -746,11 +750,6 @@ test('repeated effect switches on a refaulting pool spawn a bounded worker count
   assert.equal(FakeWorker.constructionCount - spawnedBefore, MAX_FAULTED_REBUILDS * 2,
     'rebuild spawns are bounded, not one pool per switch');
   assert.equal(c.faulted, true, 'the pool stays latched once the budget is spent');
-  assert.deepEqual(capturedConsole.slice(capturedFrom).filter(({method}) => method === 'warn')
-    .map(({args}) => args[0]), [
-    `[Segmented] pool faulted on ${MAX_FAULTED_REBUILDS} consecutive `
-      + 'effect-switch rebuilds; change resolution or toggle segmented mode to restart',
-  ]);
 });
 
 test('toggling mode restores the rebuild budget before a new pool reaches ready', () => {
