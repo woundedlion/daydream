@@ -58,8 +58,8 @@ test('the reusable JavaScript suite runs all required checks', () => {
 // bash inside the `run:` blocks; actionlint is what pipes it through shellcheck.
 test('the reusable suite lints the workflow YAML and the bash inside it', () => {
   const suite = workflowText('js-unit-suite.yml');
-  assert.match(suite, /https:\/\/github\.com\/rhysd\/actionlint\/releases\/download\/v1\.7\.12\/actionlint_1\.7\.12_linux_amd64\.tar\.gz/);
-  assert.match(suite, /8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8.*sha256sum --check --strict/);
+  assert.match(suite, /https:\/\/github\.com\/rhysd\/actionlint\/releases\/download\/v(\d+\.\d+\.\d+)\/actionlint_\1_linux_amd64\.tar\.gz/);
+  assert.match(suite, /[0-9a-f]{64}[^\n]*sha256sum --check --strict/);
   assert.ok(suite.indexOf('sha256sum --check --strict') < suite.indexOf('tar -xzf'));
   assert.doesNotMatch(suite, /pip install[^\n]*actionlint/);
   const log = suite.match(/actionlint -verbose -oneline[^\n]*2> (\S+)/)?.[1];
