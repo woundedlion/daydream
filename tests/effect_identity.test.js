@@ -25,4 +25,6 @@ test('identity resolution accepts metadata without a legacy_ids field', async (t
   const identity = await import('../src/effects/effect_identity.js?field-absent');
   assert.equal(identity.canonicalEffectId('Study'), 'study');
   assert.equal(identity.effectDisplayName('study'), 'Study');
+  assert.equal(identity.canonicalEffectId('IndependentStudy'), 'IndependentStudy');
+  assert.equal(identity.effectDisplayName('IndependentStudy'), 'IndependentStudy');
 });
