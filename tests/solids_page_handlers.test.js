@@ -197,6 +197,7 @@ test('registry copy hands pending validation to the clipboard during the click',
   const validation = new Promise(resolve => { finish = resolve; });
   let pending;
   const copied = [];
+  let notice = 'export failed: previous attempt';
   const copyCode = handler('copyCode', {
     savedSolids: [{ base: 'cube', ops: [] }],
     savedChainShapeError: () => null,
@@ -205,6 +206,7 @@ test('registry copy hands pending validation to the clipboard during the click',
     validateRegistryFaces: () => validation,
     copyWithFeedback: async text => { pending = text; copied.push(await text); return true; },
     showCopyFailure: () => assert.fail('unexpected failure'),
+    showGateMsg: message => { notice = message; },
   });
   const copying = copyCode(0, 'registry', {});
   assert.ok(pending && typeof pending.then === 'function');
@@ -212,6 +214,7 @@ test('registry copy hands pending validation to the clipboard during the click',
   finish();
   await copying;
   assert.deepEqual(copied, ['registry code']);
+  assert.equal(notice, '');
 });
 
 test('registry validation failures retain export diagnostics without copying', async () => {
@@ -311,9 +314,11 @@ for (const [count, index, expected] of [[3, 1, 1], [3, 2, 1], [1, 0, 'add']]) {
 
 test('deleting saved solids preserves focus in reverse display order or on save', () => {
   const savedSolids = [{}, {}, {}];
+  let notice = 'rejected: the saved list is full';
   let focused;
   const deleteSolid = handler('deleteSolid', {
     savedSolids, persistSavedSolids() {}, renderSavedList() {},
+    showGateMsg: message => { notice = message; },
     document: { getElementById: (id) => {
       if (id === 'saveBtn') return { focus: () => { focused = 'save'; } };
       assert.equal(id, 'savedList');
@@ -326,6 +331,7 @@ test('deleting saved solids preserves focus in reverse display order or on save'
     } },
   });
   deleteSolid(2);
+  assert.equal(notice, '');
   assert.equal(focused, 0);
   deleteSolid(0);
   assert.equal(focused, 0);
@@ -925,7 +931,7 @@ test('base-solid arrows focus and select the next radio', () => {
 });
 
 
-test('saving a camelCase registry recipe warns and flags its card', () => {
+test('saving clears stale refusals and flags registry name clashes', () => {
   const list = fakeElement('div');
   const messages = [];
   const context = {
@@ -943,7 +949,8 @@ test('saving a camelCase registry recipe warns and flags its card', () => {
   context.renderSavedList = handler('renderSavedList', context);
   handler('saveSolid', context)();
   assert.equal(context.savedSolids.length, 1);
-  assert.match(messages[0], /already in the engine registry/);
+  assert.equal(messages[0], '');
+  assert.match(messages.at(-1), /already in the engine registry/);
   assert.ok(list.children[0].classList.contains('name-clash'));
   assert.match(list.children[0].title, /engine registry already defines/);
   const marker = list.children[0].children[0];
@@ -951,4 +958,11 @@ test('saving a camelCase registry recipe warns and flags its card', () => {
   assert.equal(marker.type, 'button');
   marker.dispatch('click');
   assert.equal(messages.at(-1), list.children[0].title);
+  context.savedSolids.length = 0;
+  context.registrySolidNames.clear();
+  messages.length = 0;
+  context.showGateMsg('rejected: the saved list is full');
+  handler('saveSolid', context)();
+  assert.equal(context.savedSolids.length, 1);
+  assert.deepEqual(messages, ['rejected: the saved list is full', '']);
 });

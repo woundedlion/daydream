@@ -628,6 +628,7 @@ function saveSolid() {
   };
 
   // A name matching an engine registry entry would redefine it at paste time.
+  showGateMsg('');
   const funcName = savedFuncName(item);
   if (funcName && registrySolidNames.has(registryDisplayName(item, funcName))) {
     showGateMsg(`saved: "${funcName}" is already in the engine registry — `
@@ -755,6 +756,7 @@ function deleteSolid(index) {
   savedSolids.splice(index, 1);
   persistSavedSolids();
   renderSavedList();
+  showGateMsg('');
   const rows = document.getElementById('savedList').children;
   (rows[Math.min(position, rows.length - 1)]?.querySelector('.del-btn')
     ?? document.getElementById('saveBtn'))?.focus();
@@ -815,7 +817,8 @@ async function copyCode(index, lang, btn) {
     const copied = await copyWithFeedback(
       code, { element: btn, copiedClasses: ['text-green-400'],
         failedText: 'Failed', failedClasses: ['text-red-400'] });
-    if (!copied) showGateMsg('copy failed: the browser refused clipboard access');
+    if (copied) showGateMsg('');
+    else showGateMsg('copy failed: the browser refused clipboard access');
   } catch (e) {
     if (validationError) {
       if (engineTrapped(validationError)) return;
