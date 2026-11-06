@@ -649,7 +649,11 @@ test('palettes.html recipe sliders stay inside the limits the engine compiler ac
 test('solid exports name engine categories and generator identifiers', { skip: engineSkip }, () => {
   const solids = header(SOLIDS_H);
   const generators = header('core/mesh/procedural_solids.h');
-  const category = generateRegistryCpp({ base: 'cube', ops: ['kis'] }).match(/Category::(\w+)/)[1];
+  const generated = generateRegistryCpp({ base: 'cube', ops: ['kis'] });
+  const registryEntry = /\{"\w+",\s*generate_recipe<(\w+)>,\s*Category::COMPLEX,\s*&\1\}/;
+  assert.match(solids, registryEntry);
+  assert.match(generated, registryEntry);
+  const category = generated.match(/Category::(\w+)/)[1];
   assert.match(solids, new RegExp(`enum class Category {[^}]*\\b${category}\\b`));
   const entries = [...solids.matchAll(/\{"(\w+)",\s*(\w+)::(\w+),/g)];
   assert.ok(entries.length > SIMPLE_SEEDS.length);
