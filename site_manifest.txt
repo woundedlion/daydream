@@ -12,6 +12,7 @@ favicon.svg
 styles/index.css
 vendor-importmap.js
 src/app/main.js
+src/shared/module_load_guard.js
 src/app/bootstrap.js
 src/app/app_lifecycle.js
 src/ui/apply_notice.js

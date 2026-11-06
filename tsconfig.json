@@ -93,6 +93,7 @@
     "src/workbench/shader/shader_deeplink.js",
     "src/workbench/shader/shader_documents.js",
     "src/shared/slider.js",
+    "src/shared/module_load_guard.js",
     "src/workbench/solids/solid_build.js",
     "src/workbench/solids/solid_codegen.js",
     "src/workbench/solids/solid_saved_store.js",

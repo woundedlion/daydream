@@ -53,7 +53,7 @@ test('every solids visualization switch carries an accessible name', () => {
   }
 });
 
-// Relative module specifiers, covering `import`, `export … from` and `import()`.
+// Relative module specifiers, covering `import`, `export â€¦ from` and `import()`.
 const SPECIFIER = /(?:from|import)\s*\(?\s*['"](\.[^'"]+\.js)['"]/g;
 
 /**
@@ -204,7 +204,7 @@ const callArgs = (src, open) => {
 
 /**
  * Class tokens a script puts on the elements it builds, read from
- * `className =`, `classList.add`/`toggle`, `…Class`/`…Classes` options, and
+ * `className =`, `classList.add`/`toggle`, `â€¦Class`/`â€¦Classes` options, and
  * the class arguments of `el(tag, classes)` and `makeDiv(classes, id)`. A class assembled any
  * other way goes ungated.
  * @param {string} src - Script source.
@@ -784,31 +784,56 @@ test('Mobius preset descriptions retain AA contrast when active', () => {
 });
 
 
-for (const page of ['index.html', 'tools/shader.html']) {
- test(`${page} entry script and syntax failures share the guarded load failure overlay`, () => {
-  const source = read(...page.split('/'));
-  const inline = source.match(/<script>([\s\S]*?)<\/script>/)[1];
-  const overlay = fakeElement('div');
-  const listeners = [];
-  let current = overlay;
-  const context = {
-    SyntaxError, document: { getElementById: () => current },
-    window: { addEventListener: (type, fn) => listeners.push(fn), removeEventListener() {} },
-  };
-  runInNewContext(inline + '\nthis.showFailure = showLoadFailure;', context);
-  assert.match(source, /src="(?:\.\.\/)?src\/app\/main\.js" onerror="showLoadFailure\(\)"/);
-  listeners[0]({ error: new Error('ordinary') });
-  assert.equal(overlay.classList.contains('error'), false);
-  listeners[0]({ error: new SyntaxError('bad module') });
-  assert.equal(overlay.classList.contains('error'), true);
-  assert.equal(overlay.getAttribute('role'), 'alert');
-  assert.match(overlay.textContent, /Unable to load the application/);
-  overlay.textContent = 'existing failure';
-  context.showFailure();
-  assert.equal(overlay.textContent, 'existing failure');
-  current = null;
-  assert.doesNotThrow(() => context.showFailure());
-});
+for (const page of ['index.html', 'tools/shader.html', 'tools/lissajous.html',
+  'tools/mobius.html', 'tools/solids.html', 'tools/palettes.html']) {
+  test(`${page} reports module resource and syntax failures through the shared classic guard`, () => {
+    const source = read(...page.split('/'));
+    const guard = source.match(/<script src="((?:\.\.\/)?src\/shared\/module_load_guard\.js)"><\/script>/);
+    assert.ok(guard);
+    assert.ok(guard.index < source.indexOf('<script type="module"'));
+    assert.doesNotMatch(source, /showLoadFailure|handleModuleSyntaxError/);
+    class Script {
+      constructor(type) { this.type = type; }
+    }
+    let current = fakeElement('div');
+    const listeners = [];
+    const context = {
+      SyntaxError, HTMLScriptElement: Script,
+      document: {getElementById: () => current, createElement: fakeElement,
+        body: {appendChild: (element) => { current = element; }}},
+      window: {addEventListener: (type, listener, capture) => listeners.push({type, listener, capture})},
+    };
+    runInNewContext(read('src', 'shared', 'module_load_guard.js'), context,
+      {filename: join(REPO, 'src/shared/module_load_guard.js')});
+    assert.equal(listeners.length, 1);
+    assert.equal(listeners[0].type, 'error');
+    assert.equal(listeners[0].capture, true, 'resource error events do not bubble');
+    const fail = listeners[0].listener;
+    for (const event of [{error: new Error('ordinary')}, {target: new Script('')}, {target: {tagName: 'LINK'}}])
+      fail(event);
+    assert.equal(current.dataset.moduleLoadFailure, undefined);
+    fail({target: new Script('module')});
+    assert.equal(current.dataset.moduleLoadFailure, 'true');
+    assert.equal(current.getAttribute('role'), 'alert');
+    assert.match(current.textContent, /Unable to load the application.*Hard-reload/);
+    current.textContent = 'existing failure';
+    fail({error: new SyntaxError('bad module')});
+    assert.equal(current.textContent, 'existing failure');
+    current = fakeElement('div');
+    current.classList.add('error');
+    current.textContent = 'application boot failure';
+    fail({error: new SyntaxError('late failure')});
+    assert.equal(current.textContent, 'application boot failure');
+    current = fakeElement('div');
+    fail({error: new SyntaxError('bad module')});
+    assert.equal(current.getAttribute('role'), 'alert');
+    current = null;
+    assert.doesNotThrow(() => fail({target: new Script('module')}));
+    assert.equal(current.id, 'loading-overlay');
+    assert.equal(current.getAttribute('role'), 'alert');
+    assert.match(current.style.cssText, /position:fixed.*z-index:10000/);
+    assert.match(current.textContent, /Unable to load the application/);
+  });
 }
 
 

@@ -83,6 +83,9 @@ backup retains those cards in the primary data for recovery on reload. Malformed
 backup JSON is replaced by the current rejected entries.
 If access to browser storage itself throws, the solids page uses an isolated
 in-memory store and displays that changes last for the current session.
+Every served page loads the classic module-load guard before its entry module.
+Module resource failures and syntax errors show a reload notice even when the
+application's module graph cannot initialize its normal error reporting.
 
 After `npm ci` and an engine install, run `npm run lint`, `npm run typecheck`, and
 `npm test`. Test suites live in `tests/`, reusable support code in
