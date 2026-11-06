@@ -3,9 +3,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runInNewContext } from 'node:vm';
 import { servedPages } from './helpers/site_pages.js';
-import { fakeElement } from './helpers/fake_dom.js';
+import { fakeElement, stashGlobals } from './helpers/fake_dom.js';
 import { buildOpRow } from '../src/workbench/solids/solid_op_rows.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -786,7 +785,8 @@ test('Mobius preset descriptions retain AA contrast when active', () => {
 
 for (const page of ['index.html', 'tools/shader.html', 'tools/lissajous.html',
   'tools/mobius.html', 'tools/solids.html', 'tools/palettes.html']) {
-  test(`${page} reports module resource and syntax failures through the shared classic guard`, () => {
+  test(`${page} reports module resource and syntax failures through the shared classic guard`, async (t) => {
+    t.after(stashGlobals('window', 'document', 'HTMLScriptElement'));
     const source = read(...page.split('/'));
     const guard = source.match(/<script src="((?:\.\.\/)?src\/shared\/module_load_guard\.js)"><\/script>/);
     assert.ok(guard);
@@ -797,14 +797,13 @@ for (const page of ['index.html', 'tools/shader.html', 'tools/lissajous.html',
     }
     let current = fakeElement('div');
     const listeners = [];
-    const context = {
-      SyntaxError, HTMLScriptElement: Script,
-      document: {getElementById: () => current, createElement: fakeElement,
-        body: {appendChild: (element) => { current = element; }}},
-      window: {addEventListener: (type, listener, capture) => listeners.push({type, listener, capture})},
+    globalThis.HTMLScriptElement = Script;
+    globalThis.document = {
+      getElementById: () => current, createElement: fakeElement,
+      body: {appendChild: (element) => { current = element; }},
     };
-    runInNewContext(read('src', 'shared', 'module_load_guard.js'), context,
-      {filename: join(REPO, 'src/shared/module_load_guard.js')});
+    globalThis.window = {addEventListener: (type, listener, capture) => listeners.push({type, listener, capture})};
+    await import(`../src/shared/module_load_guard.js?${encodeURIComponent(page)}`);
     assert.equal(listeners.length, 1);
     assert.equal(listeners[0].type, 'error');
     assert.equal(listeners[0].capture, true, 'resource error events do not bubble');
