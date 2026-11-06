@@ -770,7 +770,7 @@ test('a refused startup releases the engine and recorder through teardown', asyn
   const module = fakeWasmModule({ refusedWidth: 288 });
   const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
   assert.equal(module.deletes(), 1);
-  assert.equal(app.driver.recorder, null);
+  assert.equal(app.docListeners.some(({type}) => type === 'visibilitychange'), false);
 });
 
 test('the segment-count control marks the count no hardware produces', () => {
