@@ -619,7 +619,7 @@ export class SegmentController {
            + ` import specifier — a worker resolves its graph without the`
            + ` page's import map)`);
       console.error(`[Segmented] Worker seg ${i} error: ${detail}`
-        + ` (${e?.filename}:${e?.lineno}:${e?.colno})`, e);
+        + (e?.filename ? ` (${e.filename}:${e.lineno}:${e.colno})` : ''), e);
       this.onWorkerFault(i, detail);
     };
     worker.onmessageerror = (e) => {

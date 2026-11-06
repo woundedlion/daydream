@@ -450,7 +450,7 @@ test('a surviving worker responding after a fault does not drive pending negativ
 });
 
 test('only the first fault of a session is recorded', () => {
-  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: first (:0:0)"], ["error", "[Segmented] Worker seg 1 error: second (:0:0)"], ["warn", "[Segmented] additional worker fault (seg 1): second \u2014 first fault already latched, UI shows that one"]]);
+  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: first"], ["error", "[Segmented] Worker seg 1 error: second"], ["warn", "[Segmented] additional worker fault (seg 1): second \u2014 first fault already latched, UI shows that one"]]);
   const c = makeController();
   c.create(2);
   // Held before the latch closes: the first fault detaches every handler.
@@ -501,7 +501,7 @@ test('a bare-Event boot fault auto-rebuilds the pool instead of latching', () =>
 });
 
 test('a bare-Event boot fault latches once the retry budget is exhausted', () => {
-  expectSegmentDiagnostics([["warn", "[Segmented] seg 0 module failed to load (attempt 1/3); rebuilding pool"], ["warn", "[Segmented] seg 0 module failed to load (attempt 2/3); rebuilding pool"], ["warn", "[Segmented] seg 0 module failed to load (attempt 3/3); rebuilding pool"], ["error", "[Segmented] Worker seg 0 error: module load failed after 4 attempts (commonly a missing or renamed generated/holosphere_wasm.js, or a bare import specifier \u2014 a worker resolves its graph without the page's import map) (undefined:undefined:undefined)"]]);
+  expectSegmentDiagnostics([["warn", "[Segmented] seg 0 module failed to load (attempt 1/3); rebuilding pool"], ["warn", "[Segmented] seg 0 module failed to load (attempt 2/3); rebuilding pool"], ["warn", "[Segmented] seg 0 module failed to load (attempt 3/3); rebuilding pool"], ["error", "[Segmented] Worker seg 0 error: module load failed after 4 attempts (commonly a missing or renamed generated/holosphere_wasm.js, or a bare import specifier \u2014 a worker resolves its graph without the page's import map)"]]);
   const clock = installFakeTimers();
   try {
     const c = makeController();
@@ -526,7 +526,7 @@ test('a bare-Event boot fault latches once the retry budget is exhausted', () =>
 });
 
 test('a message-less error after the pool is ready still latches fast', () => {
-  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: worker failed after the pool became ready without an error message (undefined:undefined:undefined)"]]);
+  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: worker failed after the pool became ready without an error message"]]);
   // Post-ready there is no module to load, so a bare Event is a real worker fault.
   const c = readyController(2);
   c.workers[0].onerror({ message: '' });
@@ -693,7 +693,7 @@ test('a booted ping is handled and does not by itself make the pool ready', () =
 });
 
 test('destroy() clears the fault latch so a fresh pool can recover', () => {
-  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x (:0:0)"]]);
+  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x"]]);
   const c = makeController();
   c.create(2);
   c.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
@@ -706,7 +706,7 @@ test('destroy() clears the fault latch so a fresh pool can recover', () => {
 // A pool spawned inside setResolution would build every worker on the outgoing
 // effect before applyResolution() corrects it.
 test('a faulted setResolution leaves the rebuild to the apply pipeline', () => {
-  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x (:0:0)"]]);
+  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x"]]);
   const c = makeController();
   c.active = true;
   c.create(2);
@@ -725,7 +725,7 @@ test('a faulted setResolution leaves the rebuild to the apply pipeline', () => {
 });
 
 test('setEffect on a faulted active pool rebuilds it and clears the fault', () => {
-  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x (:0:0)"]]);
+  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x"]]);
   const c = makeController();
   c.active = true;
   c.create(2);
@@ -751,7 +751,7 @@ function faultSegZero(controller) {
 // A fault that reproduces on every rebuild must not respawn the pool on every
 // effect switch.
 test('repeated effect switches on a refaulting pool spawn a bounded worker count', () => {
-  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x (:0:0)"], ["error", "[Segmented] Worker seg 0 error: x (:0:0)"], ["error", "[Segmented] Worker seg 0 error: x (:0:0)"], ["warn", "[Segmented] pool faulted on 2 consecutive effect-switch rebuilds; change resolution or toggle segmented mode to restart"]]);
+  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x"], ["error", "[Segmented] Worker seg 0 error: x"], ["error", "[Segmented] Worker seg 0 error: x"], ["warn", "[Segmented] pool faulted on 2 consecutive effect-switch rebuilds; change resolution or toggle segmented mode to restart"]]);
   const capturedFrom = capturedConsole.length;
   const c = makeController();
   c.active = true;
@@ -775,7 +775,7 @@ test('repeated effect switches on a refaulting pool spawn a bounded worker count
 });
 
 test('toggling mode restores the rebuild budget before a new pool reaches ready', () => {
-  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x (:0:0)"], ["error", "[Segmented] Worker seg 0 error: x (:0:0)"], ["error", "[Segmented] Worker seg 0 error: x (:0:0)"], ["warn", "[Segmented] pool faulted on 2 consecutive effect-switch rebuilds; change resolution or toggle segmented mode to restart"], ["error", "[Segmented] Worker seg 0 error: x (:0:0)"]]);
+  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x"], ["error", "[Segmented] Worker seg 0 error: x"], ["error", "[Segmented] Worker seg 0 error: x"], ["warn", "[Segmented] pool faulted on 2 consecutive effect-switch rebuilds; change resolution or toggle segmented mode to restart"], ["error", "[Segmented] Worker seg 0 error: x"]]);
   const c = makeController();
   c.active = true;
   c.create(2);
@@ -798,7 +798,7 @@ test('toggling mode restores the rebuild budget before a new pool reaches ready'
 });
 
 test('a pool that reaches ready restores the faulted effect-switch budget', () => {
-  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x (:0:0)"], ["error", "[Segmented] Worker seg 0 error: x (:0:0)"], ["error", "[Segmented] Worker seg 0 error: x (:0:0)"], ["warn", "[Segmented] pool faulted on 2 consecutive effect-switch rebuilds; change resolution or toggle segmented mode to restart"], ["error", "[Segmented] Worker seg 0 error: x (:0:0)"]]);
+  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x"], ["error", "[Segmented] Worker seg 0 error: x"], ["error", "[Segmented] Worker seg 0 error: x"], ["warn", "[Segmented] pool faulted on 2 consecutive effect-switch rebuilds; change resolution or toggle segmented mode to restart"], ["error", "[Segmented] Worker seg 0 error: x"]]);
   const c = makeController();
   c.active = true;
   c.create(2);
@@ -837,7 +837,7 @@ for (const [label, act] of [
   ['setDisplayCaps', (c) => c.setDisplayCaps(0.1, 0.2)],
 ]) {
   test(`${label} on a faulted active pool stays latched`, () => {
-    expectSegmentDiagnostics([['error', '[Segmented] Worker seg 0 error: x (:0:0)']]);
+    expectSegmentDiagnostics([['error', '[Segmented] Worker seg 0 error: x']]);
     const c = makeController();
     c.active = true;
     c.create(2);
@@ -860,7 +860,7 @@ for (const [label, act] of [
 }
 
 test('a pause toggled on a faulted pool is carried into the rebuilt one', () => {
-  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x (:0:0)"]]);
+  expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x"]]);
   const c = makeController();
   c.active = true;
   c.create(2);
