@@ -917,8 +917,10 @@ function reorderOp(from, to, revision) {
     update();
     showGateMsg(`moved ${opName} to position ${to + 1}`, { persist: false });
     const movedItem = document.getElementById('opsList').children[to];
-    const focusTarget = [...movedItem.querySelectorAll('.move-op-btn')]
-      .find(button => !button.disabled);
+    const direction = to > from ? '.move-op-down' : '.move-op-up';
+    const preferred = movedItem.querySelector(direction);
+    const focusTarget = preferred && !preferred.disabled ? preferred
+      : [...movedItem.querySelectorAll('.move-op-btn')].find(button => !button.disabled);
     focusTarget?.focus();
   });
 }

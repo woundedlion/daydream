@@ -339,6 +339,36 @@ test('deleting saved solids preserves focus in reverse display order or on save'
   assert.equal(focused, 'save');
 });
 
+for (const [from, to, direction] of [[0, 1, 'down'], [2, 1, 'up'], [1, 2, 'up'], [1, 0, 'down']]) {
+  test(`reordering an op from ${from} to ${to} retains the ${direction} button as the usable direction`, async () => {
+    const state = {base: 'cube', ops: ['dual', 'ambo', 'kis'].map(op => ({op, params: {}}))};
+    const moved = state.ops[from].op;
+    let queued;
+    let focused;
+    const rows = () => state.ops.map((op, index) => {
+      const row = fakeElement('div');
+      for (const name of ['up', 'down']) {
+        const button = fakeElement('button');
+        button.className = `move-op-btn move-op-${name}`;
+        button.disabled = name === 'up' ? index === 0 : index === state.ops.length - 1;
+        button.focus = () => { focused = name; };
+        row.appendChild(button);
+      }
+      return row;
+    });
+    const reorder = handler('reorderOp', {
+      state, opsRevision: 1, movedOps, queueCommit: fn => { queued = fn; },
+      chainIsValid: async () => ({ok: true}), setOps: ops => { state.ops = ops; },
+      renderOps() {}, update() {}, showGateMsg() {},
+      document: {getElementById: () => ({children: rows()})},
+    });
+    reorder(from, to, 1);
+    await queued();
+    assert.equal(state.ops[to].op, moved);
+    assert.equal(focused, direction);
+  });
+}
+
 for (const op of ['ambo', 'meta']) test(`${op} gate preserves authored descriptions`, async () => {
   const authored = op === 'meta' ? 'tip-meta' : '';
   const reason = 'Would exceed an engine mesh limit from the shared description';
