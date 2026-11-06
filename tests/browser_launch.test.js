@@ -8,6 +8,14 @@ import { execFileSync } from 'node:child_process';
 import { BROWSER_ARGS, BROWSER_CANDIDATES, resolveBrowser } from '../scripts/browser.mjs';
 import { collectProblems } from '../scripts/probe_harness.mjs';
 
+/** @param {string} origin @returns {{listeners: Map<string, Function>, problems: string[]}} Probe capture. */
+function probeTab(origin) {
+  const listeners = new Map();
+  const problems = [];
+  collectProblems({ on: (name, handler) => listeners.set(name, handler) }, origin, problems);
+  return { listeners, problems };
+}
+
 test('a declared CHROME_PATH is the browser, when it exists', () => {
   assert.equal(resolveBrowser({ CHROME_PATH: process.execPath }), process.execPath);
 });
@@ -83,10 +91,7 @@ for (const localAppData of [undefined, 'C:/Users/browser-fixture/AppData/Local']
 }
 
 test('font and script request failures are problems', () => {
-  const listeners = new Map();
-  const tab = { on: (name, handler) => listeners.set(name, handler) };
-  const problems = [];
-  collectProblems(tab, 'http://127.0.0.1:8000', problems);
+  const { listeners, problems } = probeTab('http://127.0.0.1:8000');
   const failed = listeners.get('requestfailed');
   failed({
     url: () => 'http://127.0.0.1:8000/styles/fonts/inter-latin.woff2',
@@ -103,11 +108,8 @@ test('font and script request failures are problems', () => {
 });
 
 test('console errors, uncaught exceptions and error responses are problems', () => {
-  const listeners = new Map();
-  const tab = { on: (name, handler) => listeners.set(name, handler) };
-  const problems = [];
   const origin = 'http://127.0.0.1:8000';
-  collectProblems(tab, origin, problems);
+  const { listeners, problems } = probeTab(origin);
   assert.deepEqual([...listeners.keys()].sort(),
     ['console', 'pageerror', 'request', 'requestfailed', 'requestfinished', 'response']);
 
@@ -147,12 +149,9 @@ test('console errors, uncaught exceptions and error responses are problems', () 
 
 for (const prefix of ['/daydream', '/nested/daydream/']) {
   test(`expected missing assets are scoped to the app base ${prefix}`, () => {
-    const listeners = new Map();
-    const tab = { on: (name, handler) => listeners.set(name, handler) };
-    const problems = [];
     const origin = 'http://127.0.0.1:8000';
     const base = new URL(`${origin}${prefix.replace(/\/$/, '')}/`);
-    collectProblems(tab, `${origin}${prefix}`, problems);
+    const { listeners, problems } = probeTab(`${origin}${prefix}`);
 
     const report = (url) => {
       listeners.get('requestfailed')({
@@ -167,10 +166,8 @@ for (const prefix of ['/daydream', '/nested/daydream/']) {
       listeners.get('response')({ status: () => 404, url: () => url });
     };
 
-    for (const path of ['favicon.ico']) {
-      report(new URL(path, base).href);
-      report(path);
-    }
+    report(new URL('favicon.ico', base).href);
+    report('favicon.ico');
     report(`${origin}/favicon.ico`);
     assert.deepEqual(problems, []);
 
