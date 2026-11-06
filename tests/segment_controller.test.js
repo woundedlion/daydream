@@ -13,7 +13,7 @@ import {
   INIT_WATCHDOG_MS,
   RENDER_WATCHDOG_MS,
 } from '../src/segments/segment_controller.js';
-import { ModuleWarmer, warmModules, EMPTY_WASM } from './fixtures/module_warmer_fixture.js';
+import { ModuleWarmer, warmModules, warmEmptyModules, EMPTY_WASM } from './fixtures/module_warmer_fixture.js';
 import { FAULT_POOL } from '../src/segments/worker_protocol.js';
 import {
   installSegmentControllerHarness,
@@ -43,14 +43,7 @@ test('a worker clone failure records no delivered message', () => {
 });
 
 test('a warmed binary is compiled once and handed to every worker', async () => {
-  await warmModules({
-    baseUrl: 'http://localhost:8000/segment_controller.js',
-    minIntervalMs: 0,
-    fetch: (url) => Promise.resolve({
-      arrayBuffer: () => Promise.resolve(
-        url.pathname.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
-    }),
-  });
+  await warmEmptyModules(warmModules, 'segment_controller.js');
 
   const c = makeController();
   c.create(2);
@@ -126,13 +119,7 @@ test('a failed binary re-fetch drops the module the previous warm left', async (
 test('dispose drops the held compilation that destroy keeps for the next pool',
   async () => {
     const warmer = new ModuleWarmer();
-    await warmer.warm({
-      baseUrl: 'http://localhost:8000/segment_controller.js',
-      minIntervalMs: 0,
-      fetch: () => Promise.resolve({
-        arrayBuffer: () => Promise.resolve(EMPTY_WASM.buffer),
-      }),
-    });
+    await warmEmptyModules(warmer.warm.bind(warmer), 'segment_controller.js');
     assert.ok(warmer.module instanceof WebAssembly.Module, 'the warm compiled');
 
     const c = makeController({ moduleWarmer: warmer });

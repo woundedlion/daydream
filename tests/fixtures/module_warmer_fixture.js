@@ -21,4 +21,13 @@ class ModuleWarmer extends RealModuleWarmer {
 const warmModules = (dependencies) => pageWarmer.warm(withGlue(dependencies));
 
 const EMPTY_WASM = Uint8Array.of(0, 0x61, 0x73, 0x6d, 1, 0, 0, 0);
+/** @param {Function} warm @param {string} path @returns {Promise<void>} Warm completion. */
+export function warmEmptyModules(warm, path) {
+  return warm({
+    baseUrl: `http://localhost:8000/${path}`,
+    minIntervalMs: 0,
+    fetch: () => Promise.resolve({ arrayBuffer: () => Promise.resolve(EMPTY_WASM.buffer) }),
+  });
+}
+
 export { ModuleWarmer, warmModules, pageWarmer, GRAPH, WARM_INTERVAL_MS, WARM_DEADLINE_MS, EMPTY_WASM };

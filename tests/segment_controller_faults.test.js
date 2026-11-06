@@ -11,7 +11,7 @@ import {
   INIT_WATCHDOG_MS,
   RENDER_WATCHDOG_MS,
 } from '../src/segments/segment_controller.js';
-import { ModuleWarmer, EMPTY_WASM } from './fixtures/module_warmer_fixture.js';
+import { ModuleWarmer, warmEmptyModules } from './fixtures/module_warmer_fixture.js';
 import { PROTOCOL_VERSION, FAULT_POOL, FAULT_RENDER } from '../src/segments/worker_protocol.js';
 import {
   installSegmentControllerHarness,
@@ -253,14 +253,7 @@ test('an engineRejected worker message faults the pool with the reason and segId
 test('a shared module a worker refuses is dropped before the next spawn', async () => {
   expectSegmentDiagnostics([["warn", "[Segmented] seg 1 shared module rejected: shared module instantiate failed: LinkError (attempt 1/3); rebuilding pool"]]);
   const warmer = new ModuleWarmer();
-  await warmer.warm({
-    baseUrl: 'http://localhost:8000/shared/segment_controller.js',
-    minIntervalMs: 0,
-    fetch: (url) => Promise.resolve({
-      arrayBuffer: () => Promise.resolve(
-        url.pathname.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
-    }),
-  });
+  await warmEmptyModules(warmer.warm.bind(warmer), 'shared/segment_controller.js');
   const c = makeController({ moduleWarmer: warmer });
   c.create(2);
   const initOf = (worker) => worker.posted.find((m) => m.type === 'init');
@@ -284,14 +277,7 @@ test('a shared module a worker refuses is dropped before the next spawn', async 
 test('a refused shared compilation automatically retries without the module', async () => {
   expectSegmentDiagnostics([["warn", "[Segmented] seg 0 shared module rejected: LinkError (attempt 1/3); rebuilding pool"]]);
   const warmer = new ModuleWarmer();
-  await warmer.warm({
-    baseUrl: 'http://localhost:8000/shared/segment_controller.js',
-    minIntervalMs: 0,
-    fetch: (url) => Promise.resolve({
-      arrayBuffer: () => Promise.resolve(
-        url.pathname.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
-    }),
-  });
+  await warmEmptyModules(warmer.warm.bind(warmer), 'shared/segment_controller.js');
   const clock = installFakeTimers();
   const c = makeController({ moduleWarmer: warmer });
   try {
@@ -336,14 +322,7 @@ test('shared module rejection faults after the boot retry budget is exhausted', 
 
 test('a rejection unrelated to the shared module keeps the compilation', async () => {
   const warmer = new ModuleWarmer();
-  await warmer.warm({
-    baseUrl: 'http://localhost:8000/kept/segment_controller.js',
-    minIntervalMs: 0,
-    fetch: (url) => Promise.resolve({
-      arrayBuffer: () => Promise.resolve(
-        url.pathname.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
-    }),
-  });
+  await warmEmptyModules(warmer.warm.bind(warmer), 'kept/segment_controller.js');
   const c = makeController({ moduleWarmer: warmer });
   c.create(2);
 
