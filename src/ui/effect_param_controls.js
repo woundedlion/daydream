@@ -11,6 +11,7 @@
 import { enumChoices, paramControlKind } from "../effects/param_sync.js";
 import { focusWidget } from './effect_panel_view.js';
 import { stageControlLabel } from "../effects/shader_stages.js";
+import { float32Decimal } from '../shared/cpp_format.js';
 export { stageGrouping } from "../effects/shader_stages.js";
 
 /** Engine toggles omit the range fields.
@@ -104,7 +105,7 @@ export function addParamControl(
     const range = controller.domElement.ownerDocument.createElement('span');
     range.id = `param-range-${encodeURIComponent(p.name)}`;
     range.hidden = true;
-    range.textContent = `Range ${p.min} to ${p.max}.`;
+    range.textContent = `Range ${float32Decimal(Number(p.min))} to ${float32Decimal(Number(p.max))}.`;
     controller.domElement.appendChild(range);
     widget.setAttribute('aria-describedby', range.id);
   }

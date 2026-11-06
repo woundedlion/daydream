@@ -152,3 +152,13 @@ test('numeric range descriptions preserve the native text value semantics', () =
   assert.equal(controller.$input.getAttribute('role'), null);
   assert.equal(controller.getValue(), 0.75);
 });
+
+test('numeric range descriptions use concise binary32 bounds', () => {
+  const gui = fakePanelGui();
+  const controller = addParamControl(gui, {amplitude: 0.5},
+    {name: 'amplitude', value: 0.5, min: Math.fround(0.1), max: Math.fround(0.8)});
+  const id = controller.$input.getAttribute('aria-describedby');
+  const range = controller.domElement.children.find(node => node.id === id);
+  assert.equal(range.textContent, 'Range 0.1 to 0.8.');
+  assert.equal(controller.getValue(), 0.5);
+});
