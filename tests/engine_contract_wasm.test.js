@@ -1466,19 +1466,19 @@ test('every OP_DEFS bound sits inside the engine domain the WASM bridge enforces
     'into an engine assert. Narrow the range in src/workbench/solids/solid_codegen.js');
 });
 
-test('the Platonic and Catalan seed lists name registered Simple solids', () => {
-  assert.ok(SIMPLE_SEEDS.slice(0, 5).length > 0 && CATALAN_BASES.size > 0, 'both seed lists are populated');
+test('the seed lists name registered Simple solids and do not overlap', () => {
+  assert.ok(SIMPLE_SEEDS.length > 0 && CATALAN_BASES.size > 0, 'both seed lists are populated');
   const registry = M.MeshOps.getRegistry();
   const simple = new Set();
   for (let i = 0; i < registry.length; i++) {
     if (registry[i].category === 'Simple') simple.add(registry[i].name);
   }
-  const unregistered = [...SIMPLE_SEEDS.slice(0, 5), ...CATALAN_BASES]
+  const unregistered = [...SIMPLE_SEEDS, ...CATALAN_BASES]
     .filter((name) => !simple.has(name));
   assert.deepEqual(unregistered.slice(0, 5), [],
     `solid_codegen.js lists ${unregistered.length} names the engine registers no ` +
     'Simple solid for; update src/workbench/solids/solid_codegen.js to match solids.h');
-  const inBoth = [...SIMPLE_SEEDS.slice(0, 5)].filter((name) => CATALAN_BASES.has(name));
+  const inBoth = SIMPLE_SEEDS.filter((name) => CATALAN_BASES.has(name));
   assert.deepEqual(inBoth.slice(0, 5), [],
     `${inBoth.length} names are in both seed lists; the namespace qualifier ` +
     'would be ambiguous');
