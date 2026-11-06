@@ -1710,6 +1710,26 @@ test('Color stages reveal their selected source and retain settings while disabl
   assert.equal(rowFor(h, 'modulation', 'modulation.modulation-amount').hidden, false);
 });
 
+test('disabled modulation stages expose bypass styling and accessible state across synchronization', async () => {
+  const h = await makeStrip({writeThrough: true});
+  const check = (disabled) => {
+    const chip = chipByLabel(h, 'modulation');
+    assert.equal(chip.classList.contains('chain-chip--bypassed'), disabled);
+    assert.equal(chip.getAttribute('aria-label').endsWith(', bypassed'), disabled);
+    assert.equal(chip.querySelector('.chain-modulation-enabled').getAttribute('aria-pressed'), String(disabled));
+  };
+  check(false);
+  chipByLabel(h, 'modulation').querySelector('.chain-modulation-enabled').dispatch('click');
+  check(true);
+  assert.deepEqual(h.store.bypassedLabels(), []);
+  h.strip.render();
+  check(true);
+  h.strip.syncParameterValues({'modulation.modulation-enabled': 'enabled'});
+  check(false);
+  h.strip.syncParameterValues({'modulation.modulation-enabled': 'disabled'});
+  check(true);
+});
+
 test('Noise scale follows the sampling limit without replacing its controls', async () => {
   const h = await makeStrip({ writeThrough: true });
   const row = rowFor(h, 'modulation', 'modulation.pattern-scale');

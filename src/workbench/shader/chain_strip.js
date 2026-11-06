@@ -168,6 +168,14 @@ export function createChainStrip({
   /** @param {number} index @returns {*|null} The chip at that chain index. */
   const chipAt = (index) => elementBy('.chain-chip', 'index', String(index));
 
+  /** @param {ChainEntry} entry @param {boolean} bypassed @returns {string} Accessible chip name. */
+  const chipLabel = (entry, bypassed) => {
+    const op = opOf(entry);
+    return `${op.name} · ${entry.label}`
+      + (op.input !== op.output ? `, ${op.input} to ${op.output}` : '')
+      + (bypassed ? ', bypassed' : '');
+  };
+
   /**
    * Surfaces a store refusal in the shared live region.
    * @param {EditResult} result - The refused edit.
@@ -546,6 +554,12 @@ export function createChainStrip({
       control.setAttribute('aria-pressed', String(disabled));
       control.setAttribute('title', parameterLive(id) ? 'Bypass' : BAKED_PARAMETER_REASON);
       control.disabled = !parameterLive(id);
+      const entry = chain.find(entry => entry.label === control.dataset.label);
+      if (entry) {
+        const chip = chipByLabel(entry.label);
+        chip?.classList.toggle('chain-chip--bypassed', disabled);
+        chip?.setAttribute('aria-label', chipLabel(entry, disabled));
+      }
     }
     for (const control of container.querySelectorAll('.chain-palette-type')) {
       const id = control.dataset.parameter;
@@ -958,9 +972,7 @@ export function createChainStrip({
     chip.setAttribute('aria-keyshortcuts',
       crossing ? 'ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space Delete Backspace Insert'
         : 'ArrowUp ArrowDown Alt+ArrowUp Alt+ArrowDown ArrowLeft ArrowRight Alt+ArrowLeft Alt+ArrowRight Enter Space b Delete Backspace Insert');
-    chip.setAttribute('aria-label', `${op.name} · ${entry.label}`
-      + (crossing ? `, ${op.input} to ${op.output}` : '')
-      + (isBypassed ? ', bypassed' : ''));
+    chip.setAttribute('aria-label', chipLabel(entry, isBypassed));
     const header = el('div', 'chain-chip-header');
 
     if (crossing) {
