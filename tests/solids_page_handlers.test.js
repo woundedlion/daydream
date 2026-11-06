@@ -539,6 +539,11 @@ test('typed operation parameters snap and clamp before scheduling the render', (
   update(0, 't', '1000', 1);
   assert.equal(state.ops[0].params.t, OP_DEFS.truncate.params.t.max);
   assert.equal(schedules, 1);
+  update(0, 't', '0.334', 1);
+  assert.equal(state.ops[0].params.t, 0.33);
+  assert.equal(schedules, 2);
+  update(0, 't', 'abc', 1);
+  assert.equal(state.ops[0].params.t, 0.33);
 });
 
 test('an accepted topology tick keeps the focused input and publishes after validation', async () => {
