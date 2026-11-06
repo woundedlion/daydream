@@ -9,6 +9,16 @@ import {
 /** Fixed local wall-clock time so the timestamped file name is exact. */
 const SAVE_CLOCK = new Date(2026, 0, 2, 3, 4, 5);
 
+/** @param {import('node:test').TestContext} t @param {number} [count] @returns {void} */
+function expectEmptySessionWarnings(t, count = 1) {
+  const warnings = installConsoleCapture('warn');
+  t.after(() => {
+    warnings.restore();
+    assert.equal(warnings.messages.length, count);
+    for (const message of warnings.messages) assert.match(message, /session produced no data/);
+  });
+}
+
 /**
  * Builds a fake isTypeSupported probe that accepts only the listed MIME types,
  * so each test can pin down exactly which codecs the "browser" advertises.
@@ -374,12 +384,7 @@ test('isSupported answers true where captureStream and MediaRecorder both exist'
 });
 
 test('toggle starts then stops, reporting the true state each time', (t) => {
-  const warnings = installConsoleCapture('warn');
-  t.after(() => {
-    warnings.restore();
-    assert.equal(warnings.messages.length, 1);
-    for (const message of warnings.messages) assert.match(message, /session produced no data/);
-  });
+  expectEmptySessionWarnings(t);
   t.after(installRecorderEnv());
   const rec = new VideoRecorder(recordableCanvas());
   rec.download = () => {};
@@ -400,12 +405,7 @@ test('toggle starts then stops, reporting the true state each time', (t) => {
 });
 
 test('elapsed time follows the recording wall-clock lifecycle', (t) => {
-  const warnings = installConsoleCapture('warn');
-  t.after(() => {
-    warnings.restore();
-    assert.equal(warnings.messages.length, 1);
-    for (const message of warnings.messages) assert.match(message, /session produced no data/);
-  });
+  expectEmptySessionWarnings(t);
   t.after(installRecorderEnv());
   let nowMs = 10_000;
   let clockReads = 0;
@@ -462,12 +462,7 @@ test('a pending save dialog shows zero elapsed after a prior session', (t) => {
 
 /** abort() still finalizes the output; an idle recorder reports nothing. */
 test('abort stops a live session and tells the host', (t) => {
-  const warnings = installConsoleCapture('warn');
-  t.after(() => {
-    warnings.restore();
-    assert.equal(warnings.messages.length, 1);
-    for (const message of warnings.messages) assert.match(message, /session produced no data/);
-  });
+  expectEmptySessionWarnings(t);
   t.after(installRecorderEnv());
   const captured = installConsoleCapture('error');
   t.after(captured.restore);
@@ -955,12 +950,7 @@ test('a late file close failure reports its session without stopping a new recor
 });
 
 test('the encoder is opened at the configured bitrate', (t) => {
-  const warnings = installConsoleCapture('warn');
-  t.after(() => {
-    warnings.restore();
-    assert.equal(warnings.messages.length, 1);
-    for (const message of warnings.messages) assert.match(message, /session produced no data/);
-  });
+  expectEmptySessionWarnings(t);
   t.after(installRecorderEnv());
   const auto = new VideoRecorder(recordableCanvas());
   auto.download = () => {};
@@ -979,12 +969,7 @@ test('the encoder is opened at the configured bitrate', (t) => {
 });
 
 test('the save picker is offered the timestamped name and the container filter', async (t) => {
-  const warnings = installConsoleCapture('warn');
-  t.after(() => {
-    warnings.restore();
-    assert.equal(warnings.messages.length, 2);
-    for (const message of warnings.messages) assert.match(message, /session produced no data/);
-  });
+  expectEmptySessionWarnings(t, 2);
   t.after(installRecorderEnv());
   const picked = [];
   const writable = { write: async () => {}, close: async () => {} };
