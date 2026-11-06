@@ -99,19 +99,30 @@ test('strip clicks copy at pointer coordinates and abandoned drags cannot zoom',
   f.drag.onMove({clientX:90, clientY:-1});
   f.drag.onEnd({clientX:90, clientY:-1});
   assert.deepEqual(f.viewport.value, {start:0,end:1});
-  f.drag.onEnd(null);
   f.canvas.clientWidth = 0;
   f.drag.onStart({clientX:10, clientY:10});
-  f.drag.onCancel();
+  f.drag.onEnd({clientX:10, clientY:10});
+  await Promise.resolve();
+  assert.equal(f.feedback.hex.textContent, linearRgbToHex(0, 0, 0));
+  assert.equal(f.feedback.status.textContent, 'Copied');
   f.controller.dispose();
 });
 
 test('strip keys copy and dispatch generated-window zoom/reset without swallowing other keys', async () => {
-  const f = setup();
+  const copies = [];
+  const f = setup({copy: async (hex) => { copies.push(hex); return true; }});
   f.setTab('generative');
   for (const key of ['Enter', ' ']) {
+    f.feedback.status.textContent = '';
+    f.feedback.hex.textContent = '';
+    const count = copies.length;
     assert.equal(f.canvas.dispatch('keydown', {key}).defaultPrevented, true);
     await Promise.resolve();
+    const hex = linearRgbToHex(0.5, 0, 0);
+    assert.equal(copies.length, count + 1);
+    assert.equal(copies.at(-1), hex);
+    assert.equal(f.feedback.hex.textContent, hex);
+    assert.equal(f.feedback.status.textContent, 'Copied');
   }
   for (const event of [{key:'Enter', shiftKey:true}, {key:'Escape'}, {key:'ArrowRight'}])
     assert.equal(f.canvas.dispatch('keydown', event).defaultPrevented, false);
@@ -121,6 +132,7 @@ test('strip keys copy and dispatch generated-window zoom/reset without swallowin
   f.resetZoomButton.dispatch('click');
   assert.deepEqual(f.model.window, {offset:0, span:1});
   f.controller.syncResetZoom();
+  assert.equal(f.resetZoomButton.classList.contains('hidden'), true);
   f.controller.dispose();
 });
 

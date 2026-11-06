@@ -90,11 +90,9 @@ export function createStripController({canvas: colorStripCanvas, viewport, model
 
   /**
    * Handles the end of a drag (zoom) or a simple click (copy color).
-   * @param {PointerEvent|null} event
+   * @param {PointerEvent} event
    */
   function handleDragEnd(event) {
-    if (!event) return;
-
     handleDragMove(event);
 
     const wasSelectionActive = isSelectionActive;
@@ -235,7 +233,10 @@ export function createStripController({canvas: colorStripCanvas, viewport, model
   }
 
   const drag = createDrag({element: colorStripCanvas, onStart: handleDragStart,
-    onMove: handleDragMove, onEnd: handleDragEnd, onCancel: handleDragCancel});
+    onMove: handleDragMove,
+    // onCancel owns cancellation; onEnd receives a release event.
+    onEnd: /** @type {(event: PointerEvent|null) => void} */ (handleDragEnd),
+    onCancel: handleDragCancel});
   colorStripCanvas.addEventListener('keydown', handleStripKeyDown);
   resetZoomButton.addEventListener('click', handleResetZoom);
   updateStripView();
