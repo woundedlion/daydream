@@ -54,31 +54,35 @@ const JS_REF = [
 ];
 // The Emscripten glue locates its binary by plain file name, not by specifier.
 const WASM_REF = /['"]([\w.-]+\.wasm)['"]/g;
-const HTML_REF = /\b(?:src|href)\s*=\s*"([^"]*)"/g;
-const CSS_REF = /\burl\(\s*['"]?([^'")]+?)['"]?\s*\)/g;
+const HTML_REF = /\b(?:src|href)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+const CSS_REF = [
+  /\burl\(\s*['"]?([^'")]+?)['"]?\s*\)/g,
+  /@import\s+['"]([^'"]+)['"]/g,
+];
 const SCRIPT_BODY = /<script\b[^>]*>([\s\S]*?)<\/script>/g;
 const STYLE_BODY = /<style\b[^>]*>([\s\S]*?)<\/style>/g;
 
 /**
  * Repo-relative targets a file references. HTML attributes are document-relative
  * URLs; script bodies and modules use ES specifiers; style bodies and
- * stylesheets use url().
+ * stylesheets use url() or quoted @import paths.
  * @param {string} path - Repo-relative path of the referencing file.
+ * @param {string} [src] - Source text; defaults to the file contents.
  * @returns {{targets: string[], escaping: string[]}} Referenced paths normalized
  *   against the file's directory, and those that normalize outside the repo.
  */
-const referencesOf = (path) => {
-  const src = read(path);
+const referencesOf = (path, src = read(path)) => {
   const raw = [];
   const scan = (text, patterns) => {
-    for (const re of patterns) for (const [, v] of text.matchAll(re)) raw.push(v);
+    for (const re of patterns) for (const match of text.matchAll(re))
+      raw.push(match.slice(1).find((value) => value !== undefined));
   };
   if (path.endsWith('.html')) {
     scan(src, [HTML_REF]);
     for (const [, body] of src.matchAll(SCRIPT_BODY)) scan(body, JS_REF);
-    for (const [, body] of src.matchAll(STYLE_BODY)) scan(body, [CSS_REF]);
+    for (const [, body] of src.matchAll(STYLE_BODY)) scan(body, CSS_REF);
   } else if (path.endsWith('.css')) {
-    scan(src, [CSS_REF]);
+    scan(src, CSS_REF);
   } else {
     scan(src, JS_REF);
   }
@@ -98,6 +102,18 @@ const referencesOf = (path) => {
   }
   return { targets, escaping };
 };
+
+test('asset references include both HTML quote styles and CSS import forms', () => {
+  assert.deepEqual(referencesOf('tools/example.html', `
+    <script src = '../src/example.js'></script><link href="theme.css">
+    <style>@import '../styles/fonts.css';</style>`), {
+    targets: ['src/example.js', 'tools/theme.css', 'styles/fonts.css'], escaping: [],
+  });
+  assert.deepEqual(referencesOf('tools/theme.css', `
+    @import "base.css" screen; @import 'fonts.css' layer(fonts);
+    @import url('layout.css'); .icon { background: url(../favicon.svg); }`).targets.sort(),
+  ['favicon.svg', 'tools/base.css', 'tools/fonts.css', 'tools/layout.css']);
+});
 
 test('every site manifest entry is tracked source or an installed engine asset', () => {
   const entries = manifestEntries();
