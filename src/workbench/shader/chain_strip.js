@@ -770,6 +770,7 @@ export function createChainStrip({
       if (pinnedLabels.delete(entry.label)) pinnedLabels.add(next);
       const sections = potentialSectionChoices.get(entry.label);
       if (sections) potentialSectionChoices.set(next, sections);
+      potentialSectionChoices.delete(entry.label);
       commit(next);
     });
     row.appendChild(field);
@@ -1198,6 +1199,9 @@ export function createChainStrip({
     const labels = chain.map((entry) => entry.label);
     for (const label of pinnedLabels) {
       if (!labels.includes(label)) pinnedLabels.delete(label);
+    }
+    for (const label of potentialSectionChoices.keys()) {
+      if (!labels.includes(label)) potentialSectionChoices.delete(label);
     }
     const tabLabel = focusLabel !== null && labels.includes(focusLabel) ? focusLabel
       : focusedLabel !== null && labels.includes(focusedLabel) ? focusedLabel

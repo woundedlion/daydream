@@ -2372,8 +2372,29 @@ test('Potential Lens keeps explicit section choices across rerenders and renamin
   assert.equal(potentialFields(h, 3, 'motion').hidden, true);
   assert.equal(h.store.undo(), true);
   h.strip.render();
-  assert.equal(potentialFields(h, 2).hidden, false);
+  assert.equal(potentialFields(h, 2).hidden, true, 'the retired label uses default section choices');
 });
+
+for (const retirement of ['rename', 'delete']) {
+  test(`a Potential stage added after ${retirement} starts with default section choices`, async () => {
+    const h = await makeStrip({source: potentialDocument({}, ['displace'])});
+    potentialToggle(h, 1, 'displace').dispatch('click');
+    potentialToggle(h, 2, 'displace').dispatch('click');
+    if (retirement === 'rename') {
+      const rename = paramsOf(h, 'displace').querySelector('.chain-chip-rename');
+      rename.value = 'motion';
+      rename.dispatch('change');
+      assert.equal(potentialFields(h, 2, 'motion').hidden, false);
+    } else {
+      assert.equal(h.store.replaceSpan(0, 1, []).ok, true);
+      h.strip.render();
+    }
+    assert.equal(h.store.replaceSpan(0, 0, [{operator: 'sphere.displace.potential.v1'}]).ok, true);
+    h.strip.render();
+    assert.equal(potentialFields(h, 1, 'displace').hidden, false);
+    assert.equal(potentialFields(h, 2, 'displace').hidden, true);
+  });
+}
 
 test('Potential Lens term edits retain typed input ranges topology gates and undo', async () => {
   let maximum = 1;
