@@ -1,4 +1,5 @@
 // SegmentController against a fake Worker and an injected fake driver.
+import { currentChainSnapshot } from './helpers/chain_snapshot.js';
 import { installFakeTimers } from './helpers/fake_timers.js';
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
@@ -543,14 +544,10 @@ test('snapshotParams() is empty when no engine is bound', () => {
 });
 
 test('snapshot-capable effects rebuild from their exhaustive state', () => {
-  const snapshot = {
-    schemaVersion: 3,
-    chain: [{instance: 'project', operator: 'project.stereographic.v2'},
-      {instance: 'sample', operator: 'sample.grid.v4'},
-      {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],
+  const snapshot = currentChainSnapshot({
     parameters: [{name: 'sample.pattern-freq', value: 1}],
     animationsPaused: true,
-  };
+  });
   const c = makeController({ effect: 'SnapshotEffect' });
   c.getWasmEngine = () => ({
     getShaderChainBindings: () => ({getSnapshot: () => snapshot, delete: () => {}}),

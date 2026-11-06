@@ -13,6 +13,7 @@ import {
   switchFailureReport,
 } from '../src/effects/effect_sequencing.js';
 import { EffectSetResult, ResolutionSetResult, ChainSnapshotRestoreResult } from './helpers/fake_engine.js';
+import { currentChainSnapshot } from './helpers/chain_snapshot.js';
 
 function makeEffectControls(values, paused = false, sinks = null) {
   const state = { ...values };
@@ -738,9 +739,8 @@ test('an effect the resized engine rejects rejects the resolution change', () =>
 });
 
 test('resolution rebuild restores the chain runtime before rebuilding controls or broadcasting', () => {
-  const snapshot = {schemaVersion: 3, chain: [{instance: 'camera', operator: 'sphere.rotate.v2'}],
-    parameters: [{name: 'camera.wander', value: 0.3}],
-    runtime: [{instance: 'camera', kind: 'spatial-walk-v2', state: {walkTime: 37}}], animationsPaused: false};
+  const snapshot = currentChainSnapshot({parameters: [{name: 'camera.wander', value: 0.3}]});
+  snapshot.runtime.find(({instance}) => instance === 'camera').state.walkTime = 37;
   const app = makeApp({chainSnapshot: snapshot, segmented: true});
   assert.equal(app.pipeline.applyResolution(), ApplyResult.APPLIED);
   assert.ok(app.log.includes('chain.capture'));
@@ -754,13 +754,13 @@ test('resolution rebuild restores the chain runtime before rebuilding controls o
 });
 
 test('a refused chain restore rejects a resolution transaction before rebuilding its controls', () => {
-  const app = makeApp({chainSnapshot: {schemaVersion: 3}, restoreSnapshotResult: ChainSnapshotRestoreResult.INVALID_CHAIN});
+  const app = makeApp({chainSnapshot: currentChainSnapshot(), restoreSnapshotResult: ChainSnapshotRestoreResult.INVALID_CHAIN});
   assert.equal(app.pipeline.applyResolution(), ApplyResult.REJECTED);
   assert.equal(app.log.includes('effectGui.build'), false);
 });
 
 test('resolution correction discards the outgoing chain snapshot and parameter URL', () => {
-  const app = makeApp({resolution: 'Lo', effect: 'Gamma', chainSnapshot: {schemaVersion: 3}});
+  const app = makeApp({resolution: 'Lo', effect: 'Gamma', chainSnapshot: currentChainSnapshot()});
   assert.equal(app.pipeline.applyResolution({ preserveParams: true }), ApplyResult.APPLIED);
   assert.equal(app.log.includes('chain.capture'), true);
   assert.equal(app.log.includes('chain.restore'), false);
@@ -769,7 +769,8 @@ test('resolution correction discards the outgoing chain snapshot and parameter U
 
 test('rollback captures and restores complete chain runtime without individual parameter replay', () => {
   const effect = makeEffectControls({Speed: 0.25}, true);
-  const chain = {schemaVersion: 3, runtime: [{instance: 'sample', kind: 'source-clock-v1', state: {primary: 1.25}}]};
+  const chain = currentChainSnapshot();
+  chain.runtime.find(({instance}) => instance === 'sample').state.primary = 1.25;
   const snapshot = snapshotEffectControlState(effect, () => true, () => structuredClone(chain));
   assert.deepEqual(snapshot.chainSnapshot, chain);
   assert.deepEqual(snapshot.paramValues, []);

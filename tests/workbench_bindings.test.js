@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot, shaderChainCatalog } from '../src/engine/workbench_bindings.js';
+import { currentChainSnapshot } from './helpers/chain_snapshot.js';
 
 test('snapshot helpers share typed restore refusal and release their handles', () => {
-  const snapshot = {schemaVersion: 3};
+  const snapshot = currentChainSnapshot();
   const unavailable = {};
   const applied = {};
   const module = {ChainSnapshotRestoreResult: {NOT_SHADER_CHAIN: unavailable}};

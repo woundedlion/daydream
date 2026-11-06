@@ -2,6 +2,7 @@
 // blocks start() lifts out, driven through their factories.
 //
 // Notice owner names are checked against the composition source.
+import { currentChainSnapshot } from './helpers/chain_snapshot.js';
 import { canonicalEffectId, effectDisplayName } from '../src/effects/effect_identity.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -1032,11 +1033,7 @@ test('a workbench missing document controls preserves its URL across rendered an
     module.ChainSnapshotRestoreResult = ChainSnapshotRestoreResult;
     module.HolosphereEngine.prototype.getShaderChainBindings = () => ({
       isValid: () => true,
-      getSnapshot: () => ({schemaVersion: 3, chain: [
-        {instance: 'project', operator: 'project.stereographic.v2'},
-        {instance: 'sample', operator: 'sample.grid.v4'},
-        {instance: 'colorize', operator: 'colorize.generated-palette.v3'},
-      ], parameters: [], modulation: [], animationsPaused: false}),
+      getSnapshot: () => currentChainSnapshot(),
       restoreSnapshot: () => ChainSnapshotRestoreResult.APPLIED,
       delete: () => { releases++; },
     });

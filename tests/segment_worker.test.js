@@ -1,3 +1,4 @@
+import { currentChainSnapshot } from './helpers/chain_snapshot.js';
 import { captureTimeouts } from './helpers/fake_timers.js';
 import { installConsoleCapture } from './helpers/fake_console.js';
 import { test, mock, beforeEach } from 'node:test';
@@ -829,14 +830,10 @@ test('init restores accepted params before replaying rejected requests', async (
 });
 
 test('init restores a ShaderChain snapshot', async () => {
-  const snapshot = {
-    schemaVersion: 3,
-    chain: [{instance: 'project', operator: 'project.stereographic.v2'},
-      {instance: 'sample', operator: 'sample.grid.v4'},
-      {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],
+  const snapshot = currentChainSnapshot({
     parameters: [{name: 'sample.pattern-freq', value: 1}],
     animationsPaused: true,
-  };
+  });
   await dispatch({
     type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
     effectName: 'ShaderChain', chainSnapshot: snapshot,
@@ -853,7 +850,7 @@ for (const fault of ['missing restore API', 'rejected restore']) {
     nextRestoreResult = fault === 'rejected restore'
       ? ChainSnapshotRestoreResult.INVALID_VALUE : ChainSnapshotRestoreResult.APPLIED;
     await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
-      effectName: 'ShaderChain', chainSnapshot: { schema_version: 1 }, paused: true,
+      effectName: 'ShaderChain', chainSnapshot: currentChainSnapshot(), paused: true,
       params: [{ name: 'Speed', value: 0.5 }] });
     assert.equal(posted.length, 1);
     assert.equal(posted[0].msg.type, 'engineRejected');
@@ -949,14 +946,10 @@ test('setEffect handler rebuilds, then re-applies the carried param snapshot', a
 test('setEffect restores ShaderChain snapshot after rebuilding', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
     effectName: 'Plasma' });
-  const snapshot = {
-    schemaVersion: 3,
-    chain: [{instance: 'project', operator: 'project.stereographic.v2'},
-      {instance: 'sample', operator: 'sample.grid.v4'},
-      {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],
+  const snapshot = currentChainSnapshot({
     parameters: [{name: 'sample.pattern-freq', value: 1}],
     animationsPaused: true,
-  };
+  });
   await dispatch({
     type: 'setEffect', name: 'ShaderChain', chainSnapshot: snapshot,
     paramRevision: 14,

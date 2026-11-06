@@ -7,12 +7,18 @@ import {bakedTopologyFields, compileShaderDocument, documentModulationBinding, f
 import {documentFromChainSnapshot, scratchChainDocument} from '../src/workbench/shader/chain_document_store.js';
 import {applyChainDocument} from '../src/workbench/shader/chain_apply.js';
 import {applyFixedShaderDocument} from '../src/workbench/shader/shader_documents.js';
+import {currentChainSnapshot} from './helpers/chain_snapshot.js';
 
 const module = await createModule({print: () => {}});
 const engine = new module.HolosphereEngine();
 const capture = () => callWorkbenchBinding(engine, 'getSnapshot', []);
 const restore = (snapshot) => callWorkbenchBinding(engine, 'restoreSnapshot', [snapshot]);
 after(() => engine.delete());
+
+test('the shared current snapshot fixture restores on the compiled engine', () => {
+  engine.setEffect('ShaderChain');
+  assert.equal(restore(currentChainSnapshot()), module.ChainSnapshotRestoreResult.APPLIED);
+});
 
 test('every catalog document preset applies to its compiled engine', () => {
   const catalog = JSON.parse(readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
