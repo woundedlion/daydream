@@ -1491,13 +1491,16 @@ test('a disabled modulation link restores a stage that its toggle can enable', a
     bypassed: [], paused: false});
   const harness = await editorWorkbench({source: null, hash});
   const chip = stripChips(harness).find((entry) => entry.dataset.label === 'modulation');
-  assert.equal(chip.classList.contains('chain-chip--bypassed'), false);
+  assert.equal(chip.classList.contains('chain-chip--bypassed'), true);
   assert.equal(chip.querySelector('.chain-modulation-enabled').getAttribute('aria-pressed'), 'true');
   chip.querySelector('.chain-modulation-enabled').dispatch('click');
   await harness.controller.flushDeepLink();
   const restored = await decodeShaderStateHash(harness.win.location.hash);
   assert.equal(restored.document.preset_bank.presets[0].values['modulation.modulation-enabled'], 'enabled');
   assert.deepEqual(restored.bypassed, []);
+  const enabled = stripChips(harness).find((entry) => entry.dataset.label === 'modulation');
+  assert.equal(enabled.classList.contains('chain-chip--bypassed'), false);
+  assert.equal(enabled.querySelector('.chain-modulation-enabled').getAttribute('aria-pressed'), 'false');
 });
 
 test('an oversized document clears the previous shader state hash', async () => {
