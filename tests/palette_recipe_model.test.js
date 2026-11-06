@@ -174,11 +174,12 @@ test('hue mode transitions hand off into CUSTOM unless a loop sweep would be los
   assert.throws(() => model.applyHueModeTransition('SPIRAL'), /Unknown hueMode member/);
 });
 
-for (const harmony of ['ANALOGOUS', 'ACCENTED_ANALOGOUS']) {
+for (const harmony of Object.keys(PaletteV4.harmony)) {
   for (const direction of ['SHORTEST', 'CLOCKWISE', 'COUNTERCLOCKWISE']) {
     test(`${harmony} keeps its base through repeated custom handoffs (${direction})`, () => {
       const model = new PaletteRecipeModel();
       model.setChoice('harmony', harmony);
+      model.setAmount('spreadTurns', 0.2);
       model.setChoice('direction', direction);
       model.setBaseHue(0.2);
       for (let pass = 0; pass < 3; pass += 1) {

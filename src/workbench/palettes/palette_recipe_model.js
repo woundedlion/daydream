@@ -260,7 +260,11 @@ export class PaletteRecipeModel {
     if (mode === this.#readings.hueMode) return true;
     if (mode === 'CUSTOM') return this.activateCustomHues();
     if (mode === 'HARMONY' && this.#readings.hueMode === 'CUSTOM')
-      this.#readings.baseTurns = harmonyBaseFromCustomKeys(this.#current);
+      this.#readings.baseTurns = harmonyBaseFromCustomKeys({...this.#current, hue: {
+        ...this.#current.hue,
+        harmony: paletteEnumOrdinal('harmony', this.#readings.harmony),
+        spreadTurns: this.#readings.spreadTurns,
+      }});
     this.#readings.hueMode = mode;
     this.#rebuild();
     return true;

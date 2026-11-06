@@ -86,6 +86,8 @@ in-memory store and displays that changes last for the current session.
 Every served page loads the classic module-load guard before its entry module.
 Module resource failures and syntax errors show a reload notice even when the
 application's module graph cannot initialize its normal error reporting.
+Returning custom palette hue keys to a harmony resolves the base against the
+selected harmony and spread, keeping its first anchor on the first custom key.
 
 After `npm ci` and an engine install, run `npm run lint`, `npm run typecheck`, and
 `npm test`. Test suites live in `tests/`, reusable support code in
