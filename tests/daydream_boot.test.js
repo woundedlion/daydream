@@ -433,6 +433,15 @@ test('a recorder fault reports its reason and stops offering to stop', () => {
   assert.equal(rig.button.label, '\u25cf Record');
 });
 
+test('an encoder fault after Stop is reported as a stopped recording', () => {
+  const rig = recordingRig();
+  const recorder = rig.attach(fakeRecorder());
+  rig.button.object.record();
+  rig.button.object.record();
+  recorder.onError(new Error('the final chunk exceeded the limit'));
+  assert.equal(rig.notices.at(-1), 'Recording stopped: the final chunk exceeded the limit');
+});
+
 test('empty recording notices explain the missing file and preserve prior errors', () => {
   const rig = recordingRig();
   const recorder = rig.attach(fakeRecorder());

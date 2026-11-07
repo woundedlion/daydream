@@ -75,6 +75,7 @@ export function createRecordingControls({
   // recorder has already cleaned up, so its own state cannot tell a failed start
   // from a stopped session; this can.
   let recordingShown = false;
+  let stopRequested = false;
 
   let startNotice = '';
   let saveFallbackNotice = '';
@@ -130,6 +131,7 @@ export function createRecordingControls({
       return;
     }
     const wasRecording = recordingShown;
+    stopRequested = wasRecording;
     if (!wasRecording) {
       sessionError = false;
       sessionEmpty = false;
@@ -186,7 +188,7 @@ export function createRecordingControls({
       recorder.onError = (err) => {
         sessionError = true;
         const detail = recorderReason(err);
-        showNotice(recordingShown
+        showNotice(recordingShown || stopRequested
           ? `Recording stopped: ${detail}`
           : `Recording failed to start: ${detail}`);
         showRecording(false);
