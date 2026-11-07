@@ -11,8 +11,8 @@ import {
   numericSliderPosition, numericSliderValue, fieldOf,
   COLOR_PARAMETER_GROUPS, MODULATION_PARAMETER_GROUPS, COLOR_PARAMETER_NAMES,
   POTENTIAL_OPERATOR, POTENTIAL_PARAMETER_GROUPS,
-  colorParameterHidden, modulationParameterHidden, PALETTE_OPERATOR, MODULATION_OPERATOR,
-  BAKED_MODULATION_SCALE_MAX, UNIT_MODULATION_AMOUNT_MIN, UNIT_MODULATION_AMOUNT_MAX,
+  colorParameterHidden, modulationParameterHidden, modulationValueLimits,
+  PALETTE_OPERATOR, MODULATION_OPERATOR,
 } from './chain_presentation.js';
 
 import { createFrameScheduler } from '../../shared/page_lifecycle.js';
@@ -594,13 +594,10 @@ export function createChainStrip({
           minimum = Math.max(minimum, range.min);
           maximum = Math.min(maximum, range.max);
         }
-        if (modulation && field === 'pattern-scale'
-            && values[`${label}.modulation-evaluation`] === 'baked-cube')
-          maximum = Math.min(maximum, BAKED_MODULATION_SCALE_MAX);
-        if (modulation && field === 'modulation-amount'
-            && values[`${label}.modulation-mechanic`] !== 'hue-rotation') {
-          minimum = Math.max(minimum, UNIT_MODULATION_AMOUNT_MIN);
-          maximum = Math.min(maximum, UNIT_MODULATION_AMOUNT_MAX);
+        const limits = modulation && modulationValueLimits(field, (field) => values[`${label}.${field}`]);
+        if (limits) {
+          minimum = Math.max(minimum, limits.min);
+          maximum = Math.min(maximum, limits.max);
         }
         for (const control of row.querySelectorAll('input')) {
           const slider = control.type === 'range';

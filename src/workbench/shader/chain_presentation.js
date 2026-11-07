@@ -107,6 +107,19 @@ export function modulationParameterHidden(field, value) {
     && value('pattern-noise-variant') !== 'octave-contour';
 }
 
+/**
+ * @param {string} field - Modulation field id.
+ * @param {(field: string) => *} value - Current modulation values.
+ * @returns {{min: number, max: number}|null} Limits imposed by the chosen configuration.
+ */
+export function modulationValueLimits(field, value) {
+  if (field === 'pattern-scale' && value('modulation-evaluation') === 'baked-cube')
+    return { min: -Infinity, max: BAKED_MODULATION_SCALE_MAX };
+  if (field === 'modulation-amount' && value('modulation-mechanic') !== 'hue-rotation')
+    return { min: UNIT_MODULATION_AMOUNT_MIN, max: UNIT_MODULATION_AMOUNT_MAX };
+  return null;
+}
+
 /** @param {string} field @param {(field: string) => *} value @returns {boolean} */
 export function colorParameterHidden(field, value) {
   const type = value('palette-type');
