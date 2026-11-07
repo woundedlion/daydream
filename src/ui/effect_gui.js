@@ -85,6 +85,7 @@ const HOST_DEFAULTS = {
   focusedElement: () => null,
   paramFilter: () => null,
   canPausePresets: () => true,
+  showActionNotice: () => {},
   /** @param {...any} args */
   logWarn: (...args) => console.warn(...args),
 };
@@ -162,7 +163,7 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  *   engine's ChainSnapshotRestoreResult enum, which that value is judged against by
  *   identity.
  * @param {(message: string|null) => void} [deps.config.showImportNotice] - Shows
- *   or clears the snapshot notice.
+ *   or clears snapshot and panel build notices.
  *
  * @param {Object} deps.host - The page the panel mounts into.
  * @param {() => Gui} deps.host.createGui - Makes an empty effect GUI root (a
@@ -184,6 +185,7 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  *   builds no parameter controls, though every parameter still claims its
  *   value-stream slot. A change rebuilds the panel.
  * @param {() => boolean} [deps.host.canPausePresets] - Whether the active effect offers preset pause.
+ * @param {(message: string|null) => void} [deps.host.showActionNotice] - Shows or clears the export notice.
  * @param {(message: string, error?: any) => void} [deps.host.logWarn] - Console sink.
  * @returns {{active: () => Object|null, liveParamValues: () => ArrayLike<number>|null,
  *   movePreset: (delta: number) => boolean,
@@ -211,7 +213,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   } = checkedGroup('config', config ?? {}, [], CONFIG_DEFAULTS);
   const {
     createGui, container: guiContainer, isMobile, dragTarget, copyText,
-    applyEffect, focusedElement, paramFilter, canPausePresets, logWarn,
+    applyEffect, focusedElement, paramFilter, canPausePresets, logWarn, showActionNotice,
   } = checkedGroup('host', host, HOST_MEMBERS, HOST_DEFAULTS);
   if (typeof dragTarget?.addEventListener !== 'function'
       || typeof dragTarget?.removeEventListener !== 'function') {
@@ -405,7 +407,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       copyText: (text) => /** @type {(text: string) => Promise<boolean>} */ (copyText)(text),
       isActive: (record) => activeEffect === record,
       logWarn,
-      showNotice: showConfigImportNotice,
+      showNotice: showActionNotice,
     });
   }
 

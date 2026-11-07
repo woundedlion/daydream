@@ -210,6 +210,7 @@ export function makeHarness({
   const restoredChainSnapshots = [];
   const controllersAtRestore = [];
   const configNotices = [];
+  const actionNotices = [];
   let paramDefinitionReads = 0;
   const guis = [];
   const dragTarget = fakeElement('window');
@@ -283,6 +284,7 @@ export function makeHarness({
       isMobile: () => isMobile,
       canPausePresets,
       copyText: state.copyText,
+      showActionNotice: (message) => actionNotices.push(message),
       applyEffect: () => {
         writes.push('applyEffect');
         if (!rebuildOnApply) return;
@@ -298,7 +300,7 @@ export function makeHarness({
   });
 
   return { panel, state, writes, warnings, guis, dragTarget, container, engine,
-           restoredChainSnapshots, controllersAtRestore, configNotices,
+           restoredChainSnapshots, controllersAtRestore, configNotices, actionNotices,
            paramDefinitionReads: () => paramDefinitionReads,
            gui: () => guis[guis.length - 1] };
 }
