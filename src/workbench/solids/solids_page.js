@@ -1006,7 +1006,8 @@ function updateOpParam(index, key, value, revision) {
   // Typed number inputs can bypass min/max/step; reject non-numbers and snap to the op grid.
   const def = OP_DEFS[state.ops[index].op]?.params?.[key];
   let val = parseFloat(value);
-  if (Number.isNaN(val)) {
+  const invalidValue = Number.isNaN(val);
+  if (invalidValue) {
     val = state.ops[index].params[key];
   } else if (def) {
     val = val === state.ops[index].params[key]
@@ -1030,6 +1031,7 @@ function updateOpParam(index, key, value, revision) {
     if (slider) slider.value = val;
     if (input) input.value = formatParamValue(val, def);
   }
+  if (invalidValue) return;
   if (item) syncSweepWarning(item, candidateOp);
   const focusType = row && row.contains(document.activeElement) ? document.activeElement.type : null;
 
