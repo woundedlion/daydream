@@ -131,6 +131,11 @@
   touch-action: none;
 }
 
+.complex-plane-control .visually-hidden {
+  top: 0;
+  left: 0;
+}
+
 /* Highlights the axis whose off-screen slider handle has keyboard focus. */
 .complex-plane-control:has([aria-orientation="horizontal"]:focus-visible) .axis-h,
 .complex-plane-control:has([aria-orientation="vertical"]:focus-visible) .axis-v {
