@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import createHolosphereModule from '../generated/holosphere_wasm.js';
 import * as C from '../src/shared/color.js';
+import { PaletteRecipeModel } from '../src/workbench/palettes/palette_recipe_model.js';
 import * as P from '../src/workbench/palettes/palette_math.js';
 import {
   defaultPaletteRecipe, hueKeyState, paletteEnumName,  PaletteV4, zoomRecipeWindow,
@@ -417,6 +418,21 @@ test('a zoom ending at the right edge needs no input span adjustment', () => {
     const { status } = ops.compileAndBakeV4(recipe);
     assert.equal(status.code, M.PaletteCompileCode.OK);
     assert.equal(status.clampedFields, 0);
+  } finally {
+    ops.delete();
+  }
+});
+
+test('dragging the first custom key across the seam needs no engine canonicalization', () => {
+  const ops = new M.PaletteOps();
+  try {
+    const model = new PaletteRecipeModel();
+    model.applyHueModeTransition('CUSTOM');
+    model.setBaseHue(0.98);
+    model.moveHueKey(0, 0.02);
+    const { status } = ops.compileAndBakeV4(model.recipe());
+    assert.equal(status.code, M.PaletteCompileCode.OK);
+    assert.equal(status.canonicalizedFields, 0);
   } finally {
     ops.delete();
   }

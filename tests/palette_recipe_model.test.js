@@ -247,7 +247,7 @@ test('hue keys move to the nearest representative and nudge by turns', () => {
   model.nudgeHueKey(0, 0.1);
   assert.equal(model.customHueOffsets()[0],
     movedHueKeyOffset(base, moved, wrapTurns(base + moved + 0.1)));
-  assert.equal(model.recipe().hue.customTurns[0], wrapTurns(base) + model.customHueOffsets()[0]);
+  assert.equal(model.recipe().hue.customTurns[0], wrapTurns(wrapTurns(base) + model.customHueOffsets()[0]));
   model.applyHueModeTransition('HARMONY');
   assert.deepEqual([...model.recipe().hue.customTurns], [0, 0, 0, 0],
     'leaving CUSTOM restores the template keys');

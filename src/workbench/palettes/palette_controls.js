@@ -878,6 +878,8 @@ export function applyPaletteControls(recipe, controls) {
   if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
     customHueTurns(recipe.hue.baseTurns, controls.customHueOffsets,
       recipe.hue.customTurns, recipe.hue.customTurns);
+    const offset = Math.floor(recipe.hue.customTurns[0]);
+    for (let key = 0; key < 3; key++) recipe.hue.customTurns[key] -= offset;
     // The keys carry the base hue; the engine canonicalizes the field away.
     recipe.hue.baseTurns = 0;
   }
