@@ -6,6 +6,10 @@ import { readFileSync } from 'node:fs';
 // Engine fakes consume the installed, generated binding contract.
 import { CLASS_METHODS } from '../../generated/engine_contract.mjs';
 
+const PALETTE_FADE_FRAMES = 600;
+const PALETTE_HUE_STEP = 159;
+const RIPPLE_WAVE_COUNT = 16;
+
 const SHADER_CHAIN_BINDING_METHODS = CLASS_METHODS.ShaderChainBindings;
 
 export const ParamSetResult = enumeration('ParamSetResult');
@@ -196,7 +200,7 @@ export class FakeChainEngine {
       } else if (operator === 'sphere.displace.ripple.v2') {
         kind = 'ripple-burst-v1';
         state = { phase: 0, seed: 1337, burstCount: 0, frames: 0,
-          waves: Array.from({length: 16}, () => ({age: 1000, burst: 0})) };
+          waves: Array.from({length: RIPPLE_WAVE_COUNT}, () => ({age: 1000, burst: 0})) };
       } else if (operator.startsWith('sample.') || operator === 'sphere.lens.twist.v2'
           || operator === 'sphere.displace.potential.v1'
           || operator === 'sphere.displace.rossby-haurwitz.v1'
@@ -209,7 +213,7 @@ export class FakeChainEngine {
       }
       return [{ instance, kind, state }];
     });
-    this.paletteBank = { chroma: 0.15, hues: [159, 159, 159], cycles: Array.from({ length: 3 },
+    this.paletteBank = { chroma: 0.15, hues: Array(3).fill(PALETTE_HUE_STEP), cycles: Array.from({ length: 3 },
       () => ({ frame: 0, nextSequence: 2, fadeActive: false, displayDirty: true })) };
     this.modulation = entries.filter(({operator}) => operator === 'color.modulate.v1')
       .map(({instance}) => ({instance, recipe: modulationRecipe()}));
@@ -270,7 +274,7 @@ export class FakeChainEngine {
           if (entry.kind === 'ripple-burst-v1')
             return !Number.isFinite(entry.state.phase) || !unsigned(entry.state.seed)
               || !unsigned(entry.state.burstCount) || !unsigned(entry.state.frames)
-              || !Array.isArray(entry.state.waves) || entry.state.waves.length !== 16
+              || !Array.isArray(entry.state.waves) || entry.state.waves.length !== RIPPLE_WAVE_COUNT
               || entry.state.waves.some((wave) => !Number.isFinite(wave?.age) || !unsigned(wave?.burst));
           const fields = runtimeFields[entry.kind];
           return !fields || fields.some((key) => !Number.isFinite(entry.state[key]))
@@ -293,8 +297,8 @@ export class FakeChainEngine {
             || palette.cycles.some((cycle, index) => !cycle || !unsigned(cycle.frame)
               || !unsigned(cycle.nextSequence) || cycle.nextSequence < 2
               || typeof cycle.fadeActive !== 'boolean' || typeof cycle.displayDirty !== 'boolean'
-              || cycle.frame >= (cycle.fadeActive ? 600 : 1)
-              || palette.hues[index] !== (((cycle.nextSequence - 1) * 159) >>> 0))))
+              || cycle.frame >= (cycle.fadeActive ? PALETTE_FADE_FRAMES : 1)
+              || palette.hues[index] !== (((cycle.nextSequence - 1) * PALETTE_HUE_STEP) >>> 0))))
           return ChainSnapshotRestoreResult.INVALID_VALUE;
         if (snapshot.chain.length === 0) return ChainSnapshotRestoreResult.INVALID_LENGTH;
         if (snapshot.chain.some((entry) => !entry || typeof entry.instance !== 'string'
@@ -340,8 +344,12 @@ export class FakeChainEngine {
           if (remaining.size) return ChainSnapshotRestoreResult.INVALID_VALUE;
         }
         const outcome = this.#setShaderChain(snapshot.chain);
+        this.chainCalls.pop();
         if (outcome.code !== 'APPLIED') return ChainSnapshotRestoreResult.INVALID_CHAIN;
-        this.#setShaderChainParameters(snapshot.parameters);
+        const writesBefore = this.writes.length;
+        const written = this.#setShaderChainParameters(snapshot.parameters);
+        this.writes.length = writesBefore;
+        if (written !== ParamSetResult.APPLIED) throw new Error('snapshot parameter restore was refused');
         this.modulation = structuredClone(snapshot.modulation);
         for (const {instance, recipe} of this.modulation) {
           for (const [field, path] of Object.entries(MODULATION_PATHS)) {

@@ -226,6 +226,14 @@ const PALETTE_V4_ENUM_CONTRACT = Object.freeze({
     ['CUP', 4, 'b3cf93fad7188763'],
     ['CUSTOM', 5, '5be955544e7c0607'],
   ] },
+  chromaCurve: { field: 21, members: [
+    ['CONSTANT', 0, 'd550412f08500229'],
+    ['ASCENDING', 1, '645e06f0bafb23d2'],
+    ['DESCENDING', 2, 'b27b4bd77c5de496'],
+    ['BELL', 3, '2b9bcda303cb2108'],
+    ['CUP', 4, '5d91f7f1d76267a7'],
+    ['CUSTOM', 5, '5843f69773c4f711'],
+  ] },
   chromaBasis: { field: 22, members: [
     ['LOCAL_GAMUT', 0, '5d91f7f1d76267a7'],
     ['PATH_MINIMUM', 1, 'error:3:22'],
@@ -290,6 +298,7 @@ function setPaletteEnum(recipe, group, ordinal) {
   else if (group === 'harmony') recipe.hue.harmony = ordinal;
   else if (group === 'direction') recipe.hue.direction = ordinal;
   else if (group === 'curve') recipe.lightness.curve = ordinal;
+  else if (group === 'chromaCurve') recipe.chroma.curve = ordinal;
   else if (group === 'chromaBasis') recipe.chroma.basis = ordinal;
   else recipe[group] = ordinal;
 }
@@ -309,9 +318,10 @@ test('Palette V4 enum spellings and ordinals match the shipped engine', () => {
   try {
     for (const [group, { field, members }] of
       Object.entries(PALETTE_V4_ENUM_CONTRACT)) {
+      const enumGroup = group === 'chromaCurve' ? 'curve' : group;
       const roster = members.map(([name, ordinal]) => [name, ordinal]);
-      assert.deepEqual(Object.entries(PaletteV4[group]), roster, `${group} public roster`);
-      assert.deepEqual(roster.map(([, ordinal]) => paletteEnumName(group, ordinal)),
+      assert.deepEqual(Object.entries(PaletteV4[enumGroup]), roster, `${group} public roster`);
+      assert.deepEqual(roster.map(([, ordinal]) => paletteEnumName(enumGroup, ordinal)),
         roster.map(([name]) => name),
         `${group} inverse roster`);
 

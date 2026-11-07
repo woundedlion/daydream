@@ -2,10 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 // src/shared/color.js mirrors the engine's sRGB transfer function (core/color/color_space.h).
-const {
+import {
   srgbToLinearFloat, linearToSrgbFloat,
   linearRgbToHex,
-} = await import('../src/shared/color.js');
+} from '../src/shared/color.js';
 
 /**
  * Asserts that two numbers are equal within an absolute tolerance, for

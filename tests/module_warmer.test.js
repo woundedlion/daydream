@@ -48,6 +48,22 @@ test('default warm uses its served module URL, global fetch, and clears its dead
 });
 
 
+test('warming settles when the deadline wrapper starts it asynchronously', async () => {
+  const deadlineUrl = 'data:text/javascript,export const raceDeadline = (start) => Promise.resolve().then(start)';
+  const source = readFileSync(new URL('../src/segments/module_warmer.js', import.meta.url), 'utf8')
+    .replace("'../shared/deadline.js'", JSON.stringify(deadlineUrl));
+  const { ModuleWarmer: DeferredWarmer } = await import('data:text/javascript,' + encodeURIComponent(source));
+  const warmer = new DeferredWarmer();
+  const glue = new TextEncoder().encode('new URL("holosphere_wasm.wasm?v=abc123", import.meta.url)');
+  await warmer.warm({
+    baseUrl: 'https://daydream.test/src/segments/module_warmer.js',
+    fetch: async (url) => ({
+      arrayBuffer: async () => url.pathname.endsWith('.wasm') ? EMPTY_WASM.buffer : glue.buffer,
+    }),
+  });
+  assert.ok(warmer.module instanceof WebAssembly.Module);
+});
+
 test('warmModules revalidates the whole worker module graph', async () => {
   const calls = [];
   const response = { arrayBuffer: () => Promise.resolve(EMPTY_WASM.buffer) };

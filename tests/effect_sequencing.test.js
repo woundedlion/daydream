@@ -481,7 +481,7 @@ function makeApp({
     clearEffectParamUrl: () => log.push('clearEffectParamUrl'),
     segments,
     driver: {
-      setStrobeColumns: (n) => log.push(`driver.setStrobeColumns ${n}`),
+      setStrobeColumns: (strobe) => log.push(`driver.setStrobeColumns ${strobe}`),
       updateResolution: (w, h, dot) =>
         log.push(`driver.updateResolution ${w}x${h}@${dot}`),
       invalidate: () => log.push('driver.invalidate'),

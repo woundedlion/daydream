@@ -613,7 +613,7 @@ test('Lens Glitch to None survives a rebuild before the renderer advances', () =
   assert.equal(h.gui().ctrl('Lens').getValue(), 0);
 });
 
-test('requested selectors and rendered numeric values stay authoritative', () => {
+function authoritativeHarness() {
   const functionDef = {
     name: 'Function', value: 4,
     options: ['Twin Wave', 'Rings', 'Spiral', 'Grid', 'Coupled / Direct',
@@ -649,6 +649,11 @@ test('requested selectors and rendered numeric values stay authoritative', () =>
   });
   h.panel.build();
 
+  return h;
+}
+
+test('requested selectors survive a missing segmented frame', () => {
+  const h = authoritativeHarness();
   h.gui().ctrl('Projection').setValue(0);
   h.state.segmentValues = null;
   h.panel.sync();
@@ -659,6 +664,17 @@ test('requested selectors and rendered numeric values stay authoritative', () =>
   assert.equal(h.gui().ctrl('Projection').getValue(), 0);
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.2);
 
+});
+
+test('rendered numeric values wait for an active drag to finish', () => {
+  const h = authoritativeHarness();
+  h.gui().ctrl('Projection').setValue(0);
+  h.state.segmentValues = null;
+  h.panel.sync();
+
+  h.state.segmentValues = [4, 0, 0.2];
+  h.panel.sync();
+
   h.gui().ctrl('Speed').dragging = true;
   h.state.segmentValues = [4, 0, 0.4];
   h.panel.sync();
@@ -667,11 +683,37 @@ test('requested selectors and rendered numeric values stay authoritative', () =>
   h.panel.sync();
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.4);
 
+});
+
+test('preset advances retain the displayed segmented values', () => {
+  const h = authoritativeHarness();
+  h.gui().ctrl('Projection').setValue(0);
+  h.state.segmentValues = null;
+  h.panel.sync();
+
+  h.state.segmentValues = [4, 0, 0.2];
+  h.panel.sync();
+
   h.state.presetIndex = 2;
   h.state.segmentValues = [4, 0, 0.55];
   h.panel.sync();
   assert.equal(h.gui().ctrl('Function').getValue(), 4);
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.55);
+
+});
+
+test('segmented catch-up replaces the previous displayed values', () => {
+  const h = authoritativeHarness();
+  h.gui().ctrl('Projection').setValue(0);
+  h.state.segmentValues = null;
+  h.panel.sync();
+
+  h.state.segmentValues = [4, 0, 0.2];
+  h.panel.sync();
+
+  h.state.presetIndex = 2;
+  h.state.segmentValues = [4, 0, 0.55];
+  h.panel.sync();
 
   h.state.segmentValues = [6, 0, 0.9];
   h.panel.sync();

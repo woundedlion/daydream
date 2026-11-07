@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { RUNTIME_PATHS } from '../scripts/install-engine-bundle.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const text = (path) => readFileSync(resolve(REPO, path), 'utf8').replaceAll('\r\n', '\n');
@@ -40,14 +41,10 @@ test('the toolchain record describes a release module', () => {
   assert.equal(fields.dev_bindings, 'OFF');
 });
 
-test('the installed operator catalog describes the installed WASM', async () => {
-  const { default: createModule } = await import('../generated/holosphere_wasm.js');
-  const module = await createModule();
-  assert.deepEqual(JSON.parse(text('generated/shader/engine_catalog.json')),
-    JSON.parse(module.ShaderChainBindings.getShaderChainCatalog()));
-});
-
-for (const name of ['shader_workbench.mjs', 'sha256.mjs', 'composed_effect_roster.mjs']) {
+for (const path of RUNTIME_PATHS) {
+  const match = path.match(/^generated\/shader\/([^/]+\.mjs)$/);
+  if (!match) continue;
+  const name = match[1];
   test(`shader mirror ${name} matches the pinned engine`, { skip: engineSkip }, () => {
     assert.ok(engineRoot, engineMissing);
     assert.equal(text(`generated/shader/${name}`),

@@ -75,7 +75,7 @@ test('functionBody isolates indented members from later methods', () => {
 });
 
 /**
- * Evaluates an `inline constexpr float` definition from an engine header.
+ * Evaluates an inline or static constexpr float definition from an engine header.
  * @param {string} source - Header text.
  * @param {string} name - Constant name.
  * @param {string} path - The header `source` was read from, named in the diagnostic.
@@ -83,9 +83,10 @@ test('functionBody isolates indented members from later methods', () => {
  * @returns {number} The value, computed in double precision.
  */
 function engineConstant(source, name, path, scope = {}) {
-  const m = source.match(new RegExp(`inline constexpr float ${name}\\s*=\\s*([^;]+);`));
+  const m = source.match(new RegExp(`(?:inline|static) constexpr float ${name}\\s*=\\s*([^;]+);`));
   assert.ok(m, `${name} not found in ${path} — the parity reader is out of date`);
   const expr = m[1].replace(/\s+/g, ' ')
+    .replaceAll('math::', '')
     .replace(/0x([0-9a-f]+)p([+-]?\d+)f?\b/gi,
       (_, significand, exponent) => String(parseInt(significand, 16) * 2 ** Number(exponent)))
     .replace(/(\d)f\b/g, '$1');
@@ -420,6 +421,10 @@ test('generativePaletteCpp assigns the fields core/color/palette_recipe.h declar
         assert.match(element, /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?f$/,
           `recipe.${path} element "${element}" is not a float literal`);
       }
+    } else if (type === 'float') {
+      assert.match(value, /^-?\d+\.\d+f$/, `recipe.${path} is not a float literal`);
+    } else {
+      assert.match(value, /^\d+$/, `recipe.${path} is not an integer literal`);
     }
   }
 });
@@ -652,13 +657,7 @@ test('palettes.html recipe sliders stay inside the limits the engine compiler ac
     return { min: Number(m[1]), max: Number(m[2]) };
   };
   /** @param {string} name @returns {number} A static constexpr float limit, in double precision. */
-  const limit = (name) => {
-    const m = new RegExp(`static constexpr float ${name}\\s*=\\s*([^;]+);`).exec(cpp);
-    assert.ok(m, `${name} not found in ${path} — the parity reader is out of date`);
-    const expr = m[1].replace(/math::PI_F/g, 'Math.PI').replace(/(\d)f\b/g, '$1');
-    assert.match(expr, /^[\d\s.*/+\-()]*(Math\.PI)?[\d\s.*/+\-()]*$/, `${name} = ${expr} is not plain arithmetic`);
-    return Function(`return ${expr};`)();
-  };
+  const limit = (name) => engineConstant(cpp, name, path, { PI_F: Math.PI });
   for (const [id, name] of [['gen_sweep', 'MAX_SWEEP_TURNS'], ['gen_torsion', 'MAX_ABS_TORSION']]) {
     const { min, max } = slider(id);
     const bound = limit(name);

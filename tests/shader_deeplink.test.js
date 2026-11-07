@@ -40,7 +40,7 @@ test('v2 shader links retain typed runtime and palette state', async () => {
     document: {descriptor: {chain: [{label: 'source'}]}},
     preset: 'night', bypassed: [], paused: true,
     chainSnapshot: {
-      schemaVersion: 5, chain: [{instance: 'source', operator: 'sample.grid.v4'}],
+      schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: [{instance: 'source', operator: 'sample.grid.v4'}],
       modulation: [], parameters: [{name: 'source.pattern-freq', value: 1}], animationsPaused: true,
       runtime: [{instance: 'source', kind: 'source-clock-v1',
         state: {primary: 1.25, secondary: 0.5, angle: 2}}],
@@ -156,7 +156,7 @@ test('shader links refuse null snapshot entries before initializing a candidate'
     [[], [], [null]], [[], [], [[]]], [[], [], [3]],
   ]) {
     const compact = {d: {descriptor: {chain: []}}, p: 'night', b: [], a: true,
-      s: {schemaVersion: 5, chain, parameters, modulation}};
+      s: {schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain, parameters, modulation}};
     const payload = gzipSync(JSON.stringify(compact)).toString('base64url');
     await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`), /invalid shader link snapshot/);
     await assert.rejects(encodeShaderStateHash({document: compact.d, preset: compact.p,

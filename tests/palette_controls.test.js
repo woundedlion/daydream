@@ -1,4 +1,4 @@
-import {oklchLinearRgb, maxSrgbGamutChroma} from '../src/workbench/palettes/palette_wheel.js';
+import {hitTestHueKeyMarker} from '../src/workbench/palettes/palette_wheel.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -16,7 +16,6 @@ import {
   paletteEnumName, paletteEnumOrdinal,
   PALETTE_RECIPE_PRESETS, loopSweepTurns,
   paletteRecipeAvailability, wrapTurns, signedTurnDelta, equivalentTurnNear,
-  hitTestHueKeyMarker,
   hueKeyState, customHueKeyState, customHueSweepRepresentable, customHueTurns,
   movedHueKeyOffset,
 } from '../src/workbench/palettes/palette_controls.js';
@@ -75,8 +74,6 @@ test('successive palette viewport zooms compose in either drag direction', () =>
 
 test('reset restores the full palette viewport', () => {
   const viewport = createPaletteViewport();
-  viewport.zoom(0.5, 0.5);
-  assert.deepEqual(viewport.value, { start: 0, end: 1 });
   viewport.zoom(0.2, 0.6);
   viewport.reset();
   assert.deepEqual(viewport.value, { start: 0, end: 1 });
@@ -174,34 +171,7 @@ test('hue key hit testing ignores blank wheel space', () => {
   assert.equal(hitTestHueKeyMarker(50, 50, points, 12), null);
 });
 
-test('oklchLinearRgb fills a caller-owned triple in place', () => {
-  const out = [9, 9, 9];
-  const returned = oklchLinearRgb(0.62, 0.1, 0.25, out);
 
-  assert.equal(returned, out, 'the caller-owned array is what comes back');
-  assert.deepEqual(out, oklchLinearRgb(0.62, 0.1, 0.25),
-    'filling in place must not change the conversion');
-});
-
-test('gamut chroma scale finds the widest OKLCH hue boundary', () => {
-  const maximum = maxSrgbGamutChroma(0.5);
-  const hueSamples = 360;
-  let widestSample = 0;
-  let beyondBoundarySample = 0;
-
-  for (let hue = 0; hue < hueSamples; hue++) {
-    const rgb = oklchLinearRgb(0.5, maximum, hue / hueSamples);
-    if (rgb.every((channel) => channel >= -0.0002 && channel <= 1.0002))
-      widestSample++;
-    const beyondRgb = oklchLinearRgb(0.5, maximum + 0.002, hue / hueSamples);
-    if (beyondRgb.every((channel) => channel >= 0 && channel <= 1))
-      beyondBoundarySample++;
-  }
-
-  assert.ok(maximum > 0.28 && maximum < 0.31);
-  assert.ok(widestSample > 0);
-  assert.equal(beyondBoundarySample, 0);
-});
 
 test('custom hue state derives three sensible keys from authored harmonies', () => {
   const recipe = defaultPaletteRecipe();
@@ -343,6 +313,7 @@ test('recipe availability exposes only controls that can affect the result', () 
   const recipe = defaultPaletteRecipe();
   assert.deepEqual(paletteRecipeAvailability(recipe), {
     baseHue: true,
+    hueKeys: true,
     hueMode: true,
     harmony: true,
     hueSpread: true,
@@ -358,64 +329,98 @@ test('recipe availability exposes only controls that can affect the result', () 
     lightnessMaximum: false,
   });
 
+});
+
+test('zero chroma disables hue controls', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.chroma.center = 0;
+  assert.equal(paletteRecipeAvailability(recipe).hueKeys, false);
+  assert.equal(paletteRecipeAvailability(recipe).baseHue, false);
+  assert.equal(paletteRecipeAvailability(recipe).hueMode, false);
+});
+
+test('sweep hue mode exposes sweep controls', () => {
+  const recipe = defaultPaletteRecipe();
   recipe.hue.mode = PaletteV4.hueMode.SWEEP;
   assert.equal(paletteRecipeAvailability(recipe).harmony, false);
   assert.equal(paletteRecipeAvailability(recipe).hueSpread, false);
   assert.equal(paletteRecipeAvailability(recipe).hueSweep, true);
+});
 
+test('monochromatic harmony hides hue path controls', () => {
+  const recipe = defaultPaletteRecipe();
   recipe.hue.mode = PaletteV4.hueMode.HARMONY;
   recipe.hue.harmony = PaletteV4.harmony.MONOCHROMATIC;
   assert.equal(paletteRecipeAvailability(recipe).colorPath, false);
   assert.equal(paletteRecipeAvailability(recipe).hueDirection, false);
-  assert.equal(paletteRecipeAvailability(recipe).hueSpread, false,
-    'a monochromatic harmony places its one anchor without a spread');
+  assert.equal(paletteRecipeAvailability(recipe).hueSpread, false);
   assert.equal(paletteRecipeAvailability(recipe).hueSweep, false);
+});
 
+test('split complementary harmony exposes hue spread', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.mode = PaletteV4.hueMode.HARMONY;
   recipe.hue.harmony = PaletteV4.harmony.SPLIT_COMPLEMENTARY;
   assert.equal(paletteRecipeAvailability(recipe).hueSpread, true);
+});
+
+test('square harmony has fixed hue spread', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.mode = PaletteV4.hueMode.HARMONY;
   recipe.hue.harmony = PaletteV4.harmony.SQUARE;
-  assert.equal(paletteRecipeAvailability(recipe).hueSpread, false,
-    'a square harmony is fixed quarter-turns, whatever the spread says');
-  recipe.hue.harmony = PaletteV4.harmony.MONOCHROMATIC;
+  assert.equal(paletteRecipeAvailability(recipe).hueSpread, false);
+});
 
-  recipe.domain = PaletteV4.domain.FALLOFF;
-  assert.equal(paletteRecipeAvailability(recipe).falloffStart, true);
-  recipe.domain = PaletteV4.domain.STRAIGHT;
-  assert.equal(paletteRecipeAvailability(recipe).falloffStart, false);
+for (const [domain, expected] of [[PaletteV4.domain.FALLOFF, true], [PaletteV4.domain.STRAIGHT, false]]) {
+  test(`falloff availability follows domain ${domain}`, () => {
+    const recipe = defaultPaletteRecipe();
+    recipe.domain = domain;
+    assert.equal(paletteRecipeAvailability(recipe).falloffStart, expected);
+  });
+}
 
+test('local gamut headroom stays available at full saturation', () => {
+  const recipe = defaultPaletteRecipe();
   recipe.chroma.center = 1;
-  assert.equal(paletteRecipeAvailability(recipe).chromaHeadroom, true,
-    'headroom still caps a fully saturated center');
-  recipe.chroma.center = 0.62;
+  assert.equal(paletteRecipeAvailability(recipe).chromaHeadroom, true);
+});
+
+test('absolute chroma has no gamut headroom control', () => {
+  const recipe = defaultPaletteRecipe();
   recipe.chroma.basis = PaletteV4.chromaBasis.ABSOLUTE;
   assert.equal(paletteRecipeAvailability(recipe).chromaHeadroom, false);
-  recipe.chroma.basis = PaletteV4.chromaBasis.LOCAL_GAMUT;
+});
 
+test('a varied nonzero chroma range enables hue controls at zero center', () => {
+  const recipe = defaultPaletteRecipe();
   recipe.chroma.center = 0;
-  let availability = paletteRecipeAvailability(recipe);
-  assert.equal(availability.baseHue, false);
-  assert.equal(availability.hueMode, false);
-
   recipe.chroma.curve = PaletteV4.curve.BELL;
   recipe.chroma.range = 0.2;
-  availability = paletteRecipeAvailability(recipe);
+  const availability = paletteRecipeAvailability(recipe);
   assert.equal(availability.baseHue, true);
   assert.equal(availability.chromaMaximum, true);
+});
 
+test('varied lightness exposes its maximum', () => {
+  const recipe = defaultPaletteRecipe();
   recipe.lightness.curve = PaletteV4.curve.ASCENDING;
   assert.equal(paletteRecipeAvailability(recipe).lightnessMaximum, true);
-
-  recipe.hue.mode = PaletteV4.hueMode.CUSTOM;
-  recipe.lightness.curve = PaletteV4.curve.CUSTOM;
-  recipe.chroma.curve = PaletteV4.curve.CUSTOM;
-  availability = paletteRecipeAvailability(recipe);
-  assert.equal(availability.baseHue, true);
-  assert.equal(availability.hueDirection, false);
-  assert.equal(availability.lightnessEndpoints, false);
-  assert.equal(availability.chromaEndpoints, false);
-  recipe.domain = PaletteV4.domain.LOOP;
-  assert.equal(paletteRecipeAvailability(recipe).hueDirection, true);
 });
+
+for (const [domain, direction] of [[PaletteV4.domain.STRAIGHT, false], [PaletteV4.domain.LOOP, true]]) {
+  test(`custom hue direction availability follows domain ${domain}`, () => {
+    const recipe = defaultPaletteRecipe();
+    recipe.domain = domain;
+    recipe.hue.mode = PaletteV4.hueMode.CUSTOM;
+    recipe.lightness.curve = PaletteV4.curve.CUSTOM;
+    recipe.chroma.curve = PaletteV4.curve.CUSTOM;
+    const availability = paletteRecipeAvailability(recipe);
+    assert.equal(availability.baseHue, true);
+    assert.equal(availability.hueDirection, direction);
+    assert.equal(availability.lightnessEndpoints, false);
+    assert.equal(availability.chromaEndpoints, false);
+  });
+}
 
 // A full set of control readings, as the generative tab reads them.
 const CONTROL_READINGS = {
@@ -762,6 +767,9 @@ test('the axis and key writers fill the object they are handed', () => {
   assert.equal(customHueTurns(1.25, [0, 0.1, -0.1], turns, turns), turns);
   assert.deepEqual(turns, [0.25, 0.35, 0.15, 0.4]);
   assert.ok(Math.abs(movedHueKeyOffset(0.98, 0, 0.02) - 0.04) < 1e-12, 'nearest across the seam');
+});
+
+test('a moved hue key takes the nearest turn and cannot wind past two turns', () => {
   assert.equal(movedHueKeyOffset(0, 2, 0.4), 2, 'clamped to two turns');
   assert.equal(movedHueKeyOffset(0, 5, 1 / 360), 5, 'large offsets cannot wind further out');
   assert.ok(Math.abs(movedHueKeyOffset(0, 5, -1 / 360) - (5 - 1 / 360)) < 1e-12);
@@ -982,4 +990,10 @@ test('repeated procedural zoom preserves the last window above the minimum span'
     if ((before.end - before.start) * 0.5 < 0.01) assert.deepEqual(after, before);
   }
   assert.equal(viewport.zoomed, true);
+});
+
+test('a zero-width palette zoom leaves the viewport unchanged', () => {
+  const viewport = createPaletteViewport();
+  viewport.zoom(0.5, 0.5);
+  assert.deepEqual(viewport.value, {start: 0, end: 1});
 });

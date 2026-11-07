@@ -186,3 +186,35 @@ test('geodesicTriangleVertices survives a triangle collapsed on the origin', () 
   assert.equal(flat.length, 9 * 2 * 2, 'every cell of the n=2 subdivision is still emitted');
   assert.ok(flat.every((v) => v === 0), 'the collapsed vertices keep the origin');
 });
+
+test('faceNormal includes every corner of a reflex-first pentagon', () => {
+  const vertices = [
+    {x: 1, y: 0.8, z: 0}, {x: 0, y: 0, z: 0}, {x: 2, y: 0, z: 0},
+    {x: 2, y: 2, z: 0}, {x: 0, y: 2, z: 0},
+  ];
+  assert.ok(Math.abs(faceNormal(vertices, [0, 1, 2, 3, 4]).z - 6) < 1e-12);
+});
+
+test('isConvexFace accepts clockwise faces', () => {
+  assert.equal(isConvexFace(SQUARE, [3, 2, 1, 0]), true);
+});
+
+test('isConvexFace ignores collinear corners in either winding', () => {
+  const vertices = [...SQUARE, {x: 1, y: 0, z: 0}];
+  assert.equal(isConvexFace(vertices, [0, 4, 1, 2, 3]), true);
+  assert.equal(isConvexFace(vertices, [3, 2, 1, 4, 0]), true);
+});
+
+test('reversed shared edges produce matching geodesic side points', () => {
+  const [a, b, c] = OCTANT;
+  const d = {x: 0, y: 0, z: -1};
+  for (const level of [2, 3, 7, 24]) {
+    const first = points(geodesicTriangleVertices(c, a, b, level)).filter(p => p.z === 0);
+    const second = points(geodesicTriangleVertices(d, b, a, level)).filter(p => p.z === 0);
+    assert.ok(first.length > level);
+    for (const point of first) {
+      assert.ok(second.some(other => Math.hypot(point.x - other.x,
+        point.y - other.y, point.z - other.z) < 1e-12));
+    }
+  }
+});

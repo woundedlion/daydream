@@ -22,7 +22,7 @@ function fixture(t) {
 test('source snapshot receives installed contracts while retaining its existing declarations', (t) => {
   const {source, destination} = fixture(t);
   for (const path of ENGINE_CONTRACT_PATHS) writeFileSync(join(source, path), path);
-  const retained = 'generated/holosphere_wasm.d.ts';
+  const retained = [...ENGINE_CONTRACT_PATHS][0];
   writeFileSync(join(destination, retained), 'snapshot declaration');
   copyEngineContracts(source, destination);
   for (const path of ENGINE_CONTRACT_PATHS)

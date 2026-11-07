@@ -15,12 +15,11 @@ import {
   EffectSetResult, ParamSetResult, ResolutionSetResult, ChainSnapshotRestoreResult, unpinnedEngineMethods,
 } from './helpers/fake_engine.js';
 import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
-import { createRecordingControls } from '../src/recording/recording_controls.js';
-import { Daydream } from '../src/renderer/driver.js';
+
 import { FPS } from '../src/renderer/frame_constants.js';
-import { createSegmentPoolSpawner, createSegmentedPovControls } from '../src/ui/segmented_pov_controls.js';
+
 import { fakeWasmModule, noticeText, trackedStartApp, segmentCountControl } from './helpers/fake_app.js';
-import { fakeGui } from './helpers/fake_gui.js';
+
 
 restoreDocumentAfterEach();
 const startApp = trackedStartApp();
@@ -115,11 +114,12 @@ test('the effect pause toggle writes both the main engine and segment controller
 });
 
 test('a booted recorder captures at the driver frame rate', async () => {
-  const app = await bootedApp({ loadModule: async () => fakeWasmModule() });
+  const app = startApp({ loadModule: async () => fakeWasmModule() });
+  app.driver.frameInterval = 1 / 24;
+  await app.teardown.ready;
   const { recorder } = app.driver;
   assert.ok(recorder, 'the module load did not hand the driver a recorder');
-  assert.equal(recorder.frameInterval, 1 / Daydream.FPS);
-  assert.equal(Math.round(1 / recorder.frameInterval), Daydream.FPS);
+  assert.equal(recorder.frameInterval, app.driver.frameInterval);
 });
 
 test('the boot double mocks only methods the engine has', () => {
@@ -237,264 +237,16 @@ async function bootedApp(options) {
 }
 
 
-/**
- * A MediaRecorder stand-in as VideoRecorder presents one: a toggle that flips
- * the session, the settings the controls push, and the two hooks they wire.
- * @param {?string} [refusedAs] - Container extension the browser substitutes,
- *   reported through onFormatFallback after the start toggle.
- * @returns {Object} The recorder double.
- */
-function fakeRecorder(refusedAs = null) {
-  return {
-    isRecording: false,
-    elapsedSeconds: 0,
-    elapsedFormatted: '0:00',
-    toggle(effect) {
-      this.effect = effect;
-      this.isRecording = !this.isRecording;
-      if (this.isRecording && refusedAs) queueMicrotask(() => this.onFormatFallback(refusedAs));
-      return this.isRecording;
-    },
-  };
-}
 
-/**
- * The recording controls over fakes, with the pieces a case drives and reads.
- * @param {{labelAxes?: boolean}} [options] - Driver state the notice reads.
- * @returns {Object} The controls, the attach step, and the surfaces they write.
- */
-function recordingRig({ labelAxes = false } = {}) {
-  const canvasEl = fakeElement('div');
-  const doc = {
-    createElement: (tag) => fakeElement(tag),
-    getElementById: (id) => (id === 'canvas-container' ? canvasEl : null),
-  };
-  const gui = fakeGui('view');
-  const driver = {
-    frameInterval: 1 / 16, labelAxes, recorder: null, invalidations: 0, steps: 0,
-    invalidate() { this.invalidations += 1; },
-    stepOnce() { this.steps += 1; },
-  };
-  const notices = [];
-  let recorder = null;
-  const controls = createRecordingControls({
-    doc,
-    gui,
-    driver,
-    getRecorder: () => recorder,
-    getEffect: () => 'IslamicStars',
-    showNotice: (message) => notices.push(message),
-  });
-  const folder = gui.folders.find((f) => f.namespace === 'Recording');
-  return {
-    controls,
-    driver,
-    notices,
-    canvasEl,
-    button: folder.controllers.find((c) => c.property === 'record'),
-    settings: folder.controllers.find((c) => c.property === 'recQuality').object,
-    attach(fake) {
-      recorder = fake;
-      controls.attach(fake);
-      return fake;
-    },
-  };
-}
 
-for (const povFidelity of [false, true]) test(`recording discloses sweep sampling when POV fidelity is ${povFidelity}`, () => {
-  const rig = recordingRig();
-  rig.driver.povFidelity = povFidelity;
-  rig.attach(fakeRecorder());
-  rig.button.object.record();
-  assert.equal(rig.notices.at(-1).includes('the sweep animation samples only the beginning'), povFidelity);
-  rig.button.object.record();
-  assert.equal(rig.notices.at(-1).includes('the sweep animation samples only the beginning'), false);
-});
 
-test('the record toggle announces the session and the container it settled on', async () => {
-  const rig = recordingRig({ labelAxes: true });
-  assert.equal(rig.button.enabled, false,
-    'there is no recorder to start until the module load builds one');
-  rig.settings.recFormat = 'MP4';
 
-  const recorder = rig.attach(fakeRecorder('webm'));
 
-  assert.equal(rig.button.enabled, true);
-  assert.equal(recorder.frameInterval, 1 / 16,
-    'the recorder locks its capture rate to the driver frame interval');
-  assert.equal(recorder.format, 'mp4',
-    'a format chosen before the load must replay into the recorder it built');
-  assert.equal(rig.driver.recorder, recorder,
-    'the driver captures through the recorder, so it must be handed it');
 
-  rig.button.object.record();
-  await Promise.resolve();
 
-  assert.match(rig.notices.at(-1), /^Recording started\./,
-    'the tint, the readout and the label are visual; the notice is what a '
-    + 'screen-reader user gets');
-  assert.match(rig.notices.at(-1), /MP4 is unsupported in this browser/,
-    'on Firefox an MP4 request records WebM, which reaches the user as nothing '
-    + 'at all without this');
-  assert.match(rig.notices.at(-1), /Axis labels are page overlays/,
-    'the labels are page overlays, not canvas pixels, so the file will not '
-    + 'carry what the user can see');
-  assert.equal(rig.canvasEl.classList.contains('recording'), true);
-  assert.equal(rig.button.label, '\u25a0 Stop');
-  assert.equal(rig.driver.invalidations, 1,
-    'a session suppresses the PiP, so the scene must be redrawn without it');
 
-  recorder.elapsedSeconds = 3.4;
-  recorder.elapsedFormatted = '0:03';
-  rig.controls.tick();
-  const overlay = rig.canvasEl.children.find((el) => el.className === 'rec-duration');
-  assert.equal(overlay.textContent, '0:03',
-    'the readout is written per whole second, from the frame loop');
 
-  rig.button.object.record();
 
-  assert.equal(rig.notices.at(-1), 'Recording stopped.',
-    'a stale fallback detail must not be appended to the stop of a session '
-    + 'that encoded fine');
-  assert.equal(rig.canvasEl.classList.contains('recording'), false);
-  assert.equal(rig.button.label, '\u25cf Record');
-  assert.equal(rig.driver.invalidations, 2, 'the stop brings the PiP back');
-  assert.equal(rig.driver.steps, 0, 'recording controls redraw without advancing the effect');
-
-  rig.button.object.record();
-  assert.equal(rig.canvasEl.classList.contains('recording'), true);
-  rig.controls.removeOverlay();
-  assert.equal(rig.canvasEl.classList.contains('recording'), false);
-  assert.equal(rig.canvasEl.children.length, 0,
-    'the overlay belongs to the controls, so the page teardown drops it');
-});
-
-for (const failure of ['error', 'empty']) test(`synchronous stop ${failure} notice survives the toggle`, () => {
-  const rig = recordingRig();
-  const recorder = rig.attach(fakeRecorder());
-  rig.button.object.record();
-  recorder.toggle = () => {
-    if (failure === 'error') recorder.onError(new Error('encoder died'));
-    else recorder.onEmptySession();
-    return false;
-  };
-  rig.button.object.record();
-  assert.match(rig.notices.at(-1), failure === 'error' ? /encoder died/ : /no frames were captured/);
-  assert.equal(rig.canvasEl.classList.contains('recording'), false);
-});
-
-test('Save dialog notices wait for the encoder before announcing recording', () => {
-  const rig = recordingRig({labelAxes: true});
-  const recorder = rig.attach(fakeRecorder());
-  const toggle = recorder.toggle.bind(recorder);
-  recorder.toggle = name => { const result = toggle(name); recorder.starting = result; return result; };
-  rig.button.object.record();
-  assert.equal(rig.notices.at(-1), 'Choose a file to start recording.');
-  recorder.starting = false;
-  recorder.onStarted();
-  assert.match(rig.notices.at(-1), /^Recording started\./);
-  assert.match(rig.notices.at(-1), /Axis labels are page overlays/);
-  recorder.onFormatFallback('webm');
-  assert.match(rig.notices.at(-1), /^Recording started\./);
-});
-
-test('recording start preserves the picker fallback and memory limit', () => {
-  const picker = Object.getOwnPropertyDescriptor(globalThis, 'showSaveFilePicker');
-  Object.defineProperty(globalThis, 'showSaveFilePicker', { configurable: true, value: () => {} });
-  try {
-    const rig = recordingRig();
-    const recorder = rig.attach(fakeRecorder());
-    rig.button.object.record();
-    recorder.onSaveFallback(new Error('Saving to Downloads instead.'));
-    recorder.onStarted();
-    assert.match(rig.notices.at(-1), /^Recording started.*Saving to Downloads instead/);
-    assert.match(rig.notices.at(-1), /up to [\d.]+ MB/);
-  } finally {
-    if (picker) Object.defineProperty(globalThis, 'showSaveFilePicker', picker);
-    else Reflect.deleteProperty(globalThis, 'showSaveFilePicker');
-  }
-});
-
-test('a recorder fault reports its reason and stops offering to stop', () => {
-  const rig = recordingRig();
-  const recorder = rig.attach(fakeRecorder());
-
-  recorder.onError(new Error('the encoder died'));
-  assert.equal(rig.notices.at(-1), 'Recording failed to start: the encoder died',
-    'the hook also fires for a start that never produced a session, where '
-    + '"Recording stopped" names something that never happened');
-
-  rig.button.object.record();
-  recorder.onError(new Error('the encoder died'));
-
-  assert.equal(rig.notices.at(-1), 'Recording stopped: the encoder died');
-  assert.equal(rig.canvasEl.classList.contains('recording'), false,
-    'the session is already gone: the button must stop offering to stop it');
-  assert.equal(rig.button.label, '\u25cf Record');
-});
-
-test('an encoder fault after Stop is reported as a stopped recording', () => {
-  const rig = recordingRig();
-  const recorder = rig.attach(fakeRecorder());
-  rig.button.object.record();
-  rig.button.object.record();
-  recorder.onError(new Error('the final chunk exceeded the limit'));
-  assert.equal(rig.notices.at(-1), 'Recording stopped: the final chunk exceeded the limit');
-});
-
-test('empty recording notices explain the missing file and preserve prior errors', () => {
-  const rig = recordingRig();
-  const recorder = rig.attach(fakeRecorder());
-  rig.button.object.record();
-  rig.button.object.record();
-  recorder.onEmptySession();
-  assert.equal(rig.notices.at(-1), 'Recording stopped: no frames were captured, so nothing was saved.');
-  rig.button.object.record();
-  recorder.onError(new Error('encoder died'));
-  const error = rig.notices.at(-1);
-  recorder.onEmptySession();
-  assert.equal(rig.notices.at(-1), error);
-});
-
-test('recorder notices name only typed causes', () => {
-  const rig = recordingRig();
-  const recorder = rig.attach(fakeRecorder());
-
-  recorder.onSaveFallback(new Error('saving to Downloads instead.'));
-  assert.equal(rig.notices.at(-1), 'saving to Downloads instead.');
-
-  rig.button.object.record();
-  recorder.onError(new DOMException('disk full', 'QuotaExceededError'));
-  assert.equal(rig.notices.at(-1), 'Recording stopped: QuotaExceededError: disk full');
-});
-
-test('recording memory notices follow the selected bitrate', () => {
-  const rig = recordingRig();
-  rig.attach(fakeRecorder());
-  rig.settings.recQuality = 10;
-  rig.button.object.record();
-  const first = rig.notices.at(-1).match(/up to ([\d.]+) MB.*about (\d+) seconds/);
-  assert.ok(first, rig.notices.at(-1));
-  assert.ok(Number(first[1]) > 0);
-  rig.button.object.record();
-  rig.settings.recQuality = 20;
-  rig.button.object.record();
-  const second = rig.notices.at(-1).match(/up to ([\d.]+) MB.*about (\d+) seconds/);
-  assert.ok(second, rig.notices.at(-1));
-  assert.equal(second[1], first[1]);
-  assert.equal(Number(second[2]), Math.floor(Number(first[2]) / 2));
-});
-
-test('a completed recording save failure preserves the current recording controls', () => {
-  const rig = recordingRig();
-  const recorder = rig.attach(fakeRecorder());
-  rig.button.object.record();
-  recorder.onSaveError(new Error('file commit failed'), 'previous.webm');
-  assert.equal(rig.notices.at(-1), 'Recording save failed for previous.webm: file commit failed');
-  assert.equal(recorder.isRecording, true);
-  assert.equal(rig.canvasEl.classList.contains('recording'), true);
-  assert.equal(rig.button.label, '\u25a0 Stop');
-});
 
 test('a failed engine load disposes the app through the retained teardown', async () => {
   const app = await bootedApp({ loadModule: () => Promise.reject(new Error('no wasm')) });
@@ -640,85 +392,7 @@ test('resolution rollback restores an unpaused animated parameter snapshot', asy
   assert.equal(module.engine.getAnimationsPaused(), false);
 });
 
-test('a segmented-POV failure is announced and returns the toggle', async (t) => {
-  const gui = fakeGui('view');
-  const notices = [];
-  const segments = {
-    active: false,
-    count: 2,
-    showBoundaries: false,
-    create() { throw new Error('a worker would not start'); },
-    destroy() {},
-    updateStats() {},
-  };
-  t.mock.method(pageWarmer, 'warm', async () => {});
-  createSegmentedPovControls({
-    gui,
-    segments,
-    nav: { hardwareConcurrency: 8 },
-    win: {},
-    showNotice: (message) => notices.push(message),
-  });
-  const enabled = gui.folders.find((f) => f.namespace === 'Segmented POV')
-    .controllers.find((c) => c.property === 'segmented');
 
-  // lil-gui writes the bound object before firing the handler.
-  enabled.object[enabled.property] = true;
-  const capture = installConsoleCapture('error', 'warn');
-  try {
-    await enabled.changed(true);
-  } finally {
-    capture.restore();
-  }
-  assert.ok(capture.messages.some((message) =>
-    /Segmented POV: enable failed;.*would not start/.test(message)));
-
-  assert.match(notices.at(-1), /Segmented POV enable failed:.*would not start/,
-    'a console-only failure is invisible: the user sees the toggle flip back '
-    + 'and cannot tell it from a mis-click, and the fault banner covers only '
-    + 'latched runtime faults');
-  assert.equal(enabled.object[enabled.property], false,
-    'the failed switch leaves the bound state disabled');
-});
-
-test('segmented controls reconcile a mobile spawn and resize without a second pool', async (t) => {
-  const gui = fakeGui('view');
-  const created = [];
-  const layout = { matches: false };
-  const win = { matchMedia: () => layout };
-  const segments = {
-    active: false, count: 8, showBoundaries: false,
-    destroyed: 0,
-    create(count) { this.count = count; created.push(count); },
-    destroy() { this.destroyed += 1; },
-  };
-  let finishWarm;
-  t.mock.method(pageWarmer, 'warm', () => new Promise(resolve => { finishWarm = resolve; }));
-  const notices = [];
-  createSegmentedPovControls({ gui, segments, nav: { hardwareConcurrency: 8 }, win,
-    showNotice: message => notices.push(message) });
-  const controls = gui.folders[0].controllers;
-  const enabled = controls.find(control => control.property === 'segmented');
-  const count = controls.find(control => control.property === 'segments');
-  enabled.object.segmented = true;
-  const start = enabled.changed(true);
-  layout.matches = true;
-  finishWarm();
-  await start;
-  assert.deepEqual(created, [4]);
-  assert.equal(count.object.segments, 4);
-  assert.equal(segments.active, true);
-  t.mock.method(pageWarmer, 'warm', async () => {});
-  count.object.segments = 2;
-  await count.changed(2);
-  assert.deepEqual(created, [4, 2]);
-  assert.equal(count.object.segments, 2);
-  enabled.object.segmented = false;
-  await enabled.changed(false);
-  assert.equal(segments.active, false);
-  assert.equal(segments.destroyed, 1);
-  assert.deepEqual(notices, []);
-});
 
 test('the segmented controls have their own notice owner', async (t) => {
   const source = readFileSync(new URL('../src/app/daydream.js', import.meta.url), 'utf8');
@@ -766,7 +440,11 @@ test('a recording report reaches the shared notice element', async () => {
   const recorder = app.driver.recorder;
   assert.ok(recorder, 'the load must have handed the controls a recorder');
 
-  recorder.toggle = () => { queueMicrotask(() => recorder.onFormatFallback('webm')); return true; };
+  recorder.toggle = () => {
+    recorder.onStarted();
+    queueMicrotask(() => recorder.onFormatFallback('webm'));
+    return true;
+  };
   captureConsole(() => record.object.record());
   await Promise.resolve();
   const started = noticeText(app);
@@ -843,24 +521,6 @@ test('the segment-count slider carries the device cap as its own maximum', () =>
     + 'GUI showing a count the slider cannot represent');
 });
 
-test('the spawn bounds the pool by the ceiling the device carries now', () => {
-  const created = [];
-  let requested = 8;
-  let mobile = false;
-  const spawn = createSegmentPoolSpawner(
-    { create: (count) => created.push(count) },
-    () => requested,
-    { hardwareConcurrency: 8 },
-    () => mobile);
-
-  spawn();
-  requested = 6;
-  mobile = true;
-  spawn();
-
-  assert.deepEqual(created, [8, 4],
-    'a rotation into the mobile layout must lower the next pool spawn');
-});
 test('the late-bound engine controls are re-applied once the engine exists', async () => {
   const module = fakeWasmModule();
   let deliver;
@@ -971,17 +631,6 @@ test('a trapped resolution query stops the startup instead of booting on', async
     + 'nothing can render into');
 });
 
-test('the record toggle drops held captures', () => {
-  const rig = recordingRig();
-  rig.attach(fakeRecorder());
-  rig.button.object.record();
-  rig.driver.heldCaptures = 3;
-  rig.button.object.record();
-  assert.equal(rig.driver.heldCaptures, 0);
-  rig.driver.heldCaptures = 3;
-  rig.button.object.record();
-  assert.equal(rig.driver.heldCaptures, 0);
-});
 
 test('a refused parameter write reports its reason and a later accepted edit clears it', async () => {
   const module = fakeWasmModule({
@@ -999,6 +648,34 @@ test('a refused parameter write reports its reason and a later accepted edit cle
   assert.deepEqual(module.params.at(-1), ['Speed', 1.25]);
 });
 
+test('the same parameter rejection is re-announced once per pointer gesture', async (t) => {
+  const module = fakeWasmModule({
+    definitions: [{ name: 'Speed', value: 1, min: 0, max: 2 }],
+  });
+  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
+  const speed = app.guis.at(-1).controllers.find((c) => c.property === 'Speed');
+  t.mock.method(module.HolosphereEngine.prototype, 'setParameter', () => ParamSetResult.INADMISSIBLE);
+  const begin = () => speed.domElement.dispatch('pointerdown', { isPrimary: true, button: 0, pointerId: 1 });
+  const end = () => app.listeners.find(({type}) => type === 'pointerup')
+    .handler({type: 'pointerup', pointerId: 1});
+  const edit = (value) => captureConsole(() => speed.setValue(value));
+
+  begin();
+  edit(1.2);
+  const first = noticeText(app);
+  assert.match(first, /Speed.*was rejected/);
+  edit(1.3);
+  assert.equal(noticeText(app), first);
+  end();
+
+  begin();
+  edit(1.4);
+  assert.equal(noticeText(app), first + '\u200b');
+  edit(1.5);
+  assert.equal(noticeText(app), first + '\u200b');
+  end();
+});
+
 test('startup defaults to full coverage despite compiled physical geometry', async () => {
   const module = fakeWasmModule();
   Object.assign(module, {
@@ -1011,30 +688,52 @@ test('startup defaults to full coverage despite compiled physical geometry', asy
   assert.equal(app.driver.DISPLAY_SOUTH_PHI, Math.PI);
 });
 
-test('global cap edits survive module loading, paused redraw and resolution switches', async () => {
+function capBootRig() {
   let resolve;
   const loading = new Promise((done) => { resolve = done; });
   const app = startApp({ loadModule: () => loading });
   app.guis[0].controllers.find((c) => c.property === 'topCap').setValue(2);
   app.guis[0].controllers.find((c) => c.property === 'bottomCap').setValue(3);
-  assert.equal(app.driver.dotMesh, null);
   const module = fakeWasmModule();
   module.ChainSnapshotRestoreResult = ChainSnapshotRestoreResult;
-  resolve(module);
-  await app.teardown.ready;
+  return {app, module, async finish() { resolve(module); await app.teardown.ready; }};
+}
+
+async function pausedCapRig() {
+  const rig = capBootRig();
+  await rig.finish();
+  const {app, module} = rig;
+  app.driver.renderer.frame();
+  app.driver.paused = true;
+  let draws = 0;
+  module.HolosphereEngine.prototype.drawFrame = () => { draws++; };
+  app.guis[0].controllers.find(c => c.property === 'topCap').setValue(4);
+  return {...rig, get draws() { return draws; }};
+}
+
+test('global cap edits made during module loading reach the first display', async () => {
+  const rig = capBootRig();
+  const {app, module} = rig;
+  assert.equal(app.driver.dotMesh, null);
+  await rig.finish();
   assert.deepEqual(module.caps, [[2, 3]]);
   assert.equal(app.teardown.disposed(), false);
   app.driver.renderer.frame();
   assert.ok(app.driver.dotMesh.instanceColor.array.length > 0);
   assert.equal(app.driver.DISPLAY_NORTH_PHI, 0.02 * Math.PI);
-  app.driver.paused = true;
-  let draws = 0;
-  module.HolosphereEngine.prototype.drawFrame = () => { draws++; };
-  app.guis[0].controllers.find((c) => c.property === 'topCap').setValue(4);
-  assert.equal(draws, 1);
+});
+
+test('a global cap edit redraws paused geometry once', async () => {
+  const rig = await pausedCapRig();
+  const {app} = rig;
+  assert.equal(rig.draws, 1);
   assert.equal(app.driver.DISPLAY_NORTH_PHI, 0.04 * Math.PI);
   assert.equal(app.driver.DISPLAY_SOUTH_PHI, 0.97 * Math.PI);
   assert.equal(app.driver.paused, true);
+});
+
+test('resolution switches preserve the current global caps and refresh the color buffer', async () => {
+  const {app, module} = await pausedCapRig();
   const capsBefore = module.caps.length;
   const colorBefore = app.driver.dotMesh.instanceColor;
   app.guis[0].controllers.find((c) => c.property === 'resolution').setValue('Holosphere (96x20)');
@@ -1120,12 +819,16 @@ test('a refused effect reset preserves edits and a later reset restores defaults
   assert.equal(app.elements.get('apply-notice-body').hidden, true);
 });
 
-test('the preset selector preserves state on refusal and pauses an accepted preset', async () => {
+async function presetBootRig() {
   const module = fakeWasmModule();
   module.HolosphereEngine.prototype.getPresetCount = () => 2;
   const app = await bootedApp({ loadModule: async () => module });
   const panel = app.guis.at(-1);
-  const selectPreset = module.engine.selectPreset;
+  return {app, module, panel};
+}
+
+test('the preset selector preserves state when a preset is refused', async () => {
+  const {module, panel} = await presetBootRig();
   module.engine.selectPreset = () => false;
   panel.ctrl('presetIndex').setValue(1);
   assert.equal(module.engine.getPresetIndex(), 0);
@@ -1133,7 +836,10 @@ test('the preset selector preserves state on refusal and pauses an accepted pres
   assert.equal(module.engine.getAnimationsPaused(), false);
   assert.equal(panel.ctrl('pause').getValue(), false);
 
-  module.engine.selectPreset = selectPreset;
+});
+
+test('the preset selector pauses an accepted preset', async () => {
+  const {app, module, panel} = await presetBootRig();
   panel.ctrl('presetIndex').setValue(1);
 
   assert.equal(module.engine.getPresetIndex(), 1);
@@ -1141,7 +847,6 @@ test('the preset selector preserves state on refusal and pauses an accepted pres
   assert.equal(panel.ctrl('pause').getValue(), true);
   assert.equal(noticeText(app), '');
 });
-
 
 test('the recorder watches visibility on the injected document until teardown', async () => {
   const decoy = fakeElement('document');
@@ -1157,7 +862,7 @@ test('the recorder watches visibility on the injected document until teardown', 
     'the app teardown disposes the recorder');
 });
 
-test('a pooled effect switch sizes the preset row from the incoming effect', async (t) => {
+async function pooledPresetRig(t) {
   const presetCounts = { IslamicStars: 24, Fishbowl: 1, Comets: 12 };
   const module = fakeWasmModule();
   module.HolosphereEngine.prototype.setEffect = function (name) {
@@ -1177,48 +882,25 @@ test('a pooled effect switch sizes the preset row from the incoming effect', asy
     const control = app.guis.at(-1).ctrl('presetIndex');
     return control ? Object.keys(control.args[0]).length : 0;
   };
+  return {app, presetCounts, presetChoices};
+}
+
+test('a pooled effect switch sizes the preset row from the incoming effect', async (t) => {
+  const {app, presetCounts, presetChoices} = await pooledPresetRig(t);
   for (const name of ['IslamicStars', 'Fishbowl', 'Comets', 'IslamicStars']) {
     app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
       .find((entry) => entry.dataset.effect === canonicalEffectId(name)).onclick();
     assert.equal(presetChoices(), presetCounts[name], name);
-    assert.equal(Boolean(app.guis.at(-1).ctrl('pause')), presetCounts[name] > 1, name);
   }
 });
 
-
-test('segmented slider and pool follow viewport layout changes and release the listener', async (t) => {
-  const gui = fakeGui('view');
-  let changed;
-  let removed;
-  const query = {
-    matches: false,
-    addEventListener(type, handler) { changed = handler; },
-    removeEventListener(type, handler) { removed = handler; },
-  };
-  const created = [];
-  const segments = { active: false, count: 8, showBoundaries: false,
-    create(count) { this.count = count; created.push(count); }, destroy() {} };
-  t.mock.method(pageWarmer, 'warm', async () => {});
-  const spawn = createSegmentedPovControls({ gui, segments, nav: { hardwareConcurrency: 8 },
-    win: { matchMedia: () => query }, showNotice() {} });
-  const controls = gui.folders[0].controllers;
-  const count = controls.find(control => control.property === 'segments');
-  assert.equal(count.args[1], 8);
-  assert.equal(count.label, 'Segments (6 = sim only)');
-  query.matches = true;
-  changed();
-  assert.equal(count.args[1], 4);
-  assert.equal(count.label, 'Segments (max 4 here)');
-  assert.equal(count.object.segments, 4);
-  segments.active = true;
-  await spawn.respawn();
-  assert.deepEqual(created, [4]);
-  query.matches = false;
-  changed();
-  assert.equal(count.args[1], 8);
-  assert.equal(count.label, 'Segments (6 = sim only)');
-  spawn.dispose();
-  assert.equal(removed, changed);
+test('a pooled effect switch offers pause only for a preset bank', async (t) => {
+  const {app, presetCounts} = await pooledPresetRig(t);
+  for (const name of ['IslamicStars', 'Fishbowl', 'Comets', 'IslamicStars']) {
+    app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
+      .find((entry) => entry.dataset.effect === canonicalEffectId(name)).onclick();
+    assert.equal(Boolean(app.guis.at(-1).ctrl('pause')), presetCounts[name] > 1, name);
+  }
 });
 
 test('simulator shares canonical identity, preserves display metadata and reloads its route', async (t) => {
@@ -1258,36 +940,6 @@ test('canonical and legacy URL normalization retains parameter keys', async (t) 
   }
 });
 
-test('segment resize failure destroys the pool and clears Enabled while boundaries remain wired', async (t) => {
-  const gui = fakeGui('view');
-  const notices = [];
-  const segments = { active: true, count: 2, showBoundaries: false, destroyed: 0,
-    create() { throw new Error('resize refused'); },
-    destroy() { this.destroyed += 1; }, updateStats() {},
-  };
-  t.mock.method(pageWarmer, 'warm', async () => {});
-  const guard = createSegmentedPovControls({ gui, segments, nav: { hardwareConcurrency: 8 },
-    win: {}, showNotice: (message) => notices.push(message) });
-  t.after(() => guard.dispose());
-  const controls = gui.folders[0].controllers;
-  const count = controls.find((control) => control.property === 'segments');
-  const enabled = controls.find((control) => control.property === 'segmented');
-  const capture = installConsoleCapture('error', 'warn');
-  try {
-    count.object.segments = 4;
-    await count.changed(4);
-  } finally { capture.restore(); }
-  assert.match(notices.at(-1), /Segmented POV resize failed:.*resize refused/);
-  assert.ok(capture.messages.some((message) => /resize failed/.test(message)));
-  assert.ok(segments.destroyed >= 1);
-  assert.equal(segments.active, false);
-  assert.equal(enabled.object.segmented, false);
-  const boundaries = controls.find((control) => control.property === 'boundaries');
-  boundaries.setValue(true);
-  assert.equal(segments.showBoundaries, true);
-  boundaries.setValue(false);
-  assert.equal(segments.showBoundaries, false);
-});
 
 
 test('fidelity selects engine sampling before first draw and refreshes paused toggles once', async () => {

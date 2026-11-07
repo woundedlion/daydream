@@ -408,11 +408,22 @@ test('a version-mismatched init latches no segment identity', async () => {
   assert.deepEqual([resized.x0, resized.x1, resized.y0, resized.y1], [8, 16, 4, 8]);
 });
 
+test('messages received during init execute in order after the worker is ready', async () => {
+  await Promise.all([
+    dispatch({type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma'}),
+    dispatch({type: 'setEffect', name: 'Waves'}),
+    dispatch({type: 'render'}),
+  ]);
+  assert.equal(posted.some(({msg}) => msg.type === 'engineRejected'), false);
+  assert.deepEqual(posted.map(({msg}) => msg.type), ['ready', 'frame']);
+  assert.equal(engineInstance.effect, 'Waves');
+});
+
 test('init applies the segment clip and posts ready', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
 
   assert.ok(engineInstance, 'engine constructed');
-  assert.deepEqual(engineInstance.calls[2], ['setResolution', 8, 4]);
+  assert.deepEqual(engineInstance.calls.find(([method]) => method === 'setResolution'), ['setResolution', 8, 4]);
   assert.equal(engineInstance.effect, 'Plasma');
   // segId 3 of 4 over 8x4 → arm B (x0=4), bottom band (y0=2): clip {2,4,4,8}.
   assert.deepEqual(engineInstance.clip, { y0: 2, y1: 4, x0: 4, x1: 8 });
@@ -425,7 +436,7 @@ test('init with a rejected resolution posts engineRejected, not ready', async ()
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
 
   assert.ok(engineInstance, 'engine constructed');
-  assert.deepEqual(engineInstance.calls[2], ['setResolution', 8, 4], 'setResolution attempted');
+  assert.deepEqual(engineInstance.calls.find(([method]) => method === 'setResolution'), ['setResolution', 8, 4], 'setResolution attempted');
   assert.ok(!posted.some((p) => p.msg.type === 'ready'), 'no ready for a rejected resolution');
   const failed = posted.find((p) => p.msg.type === 'engineRejected');
   assert.ok(failed, 'engineRejected posted');
@@ -873,7 +884,8 @@ test('init selects the carried preset before applying tuned params', async () =>
     presetIndex: 2, params: [{ name: 'Speed', value: 0.5 }],
   });
   assert.equal(engineInstance.presetIndex, 2);
-  assert.deepEqual(engineInstance.calls.slice(3, 5),
+  const firstEffect = engineInstance.calls.findIndex(([method]) => method === 'setEffect');
+  assert.deepEqual(engineInstance.calls.slice(firstEffect, firstEffect + 2),
     [['setEffect', 'Plasma'], ['synchronizePreset', 2]]);
   assert.deepEqual(engineInstance.params, [['Speed', 0.5]]);
 });
@@ -925,6 +937,10 @@ test('worker cap changes preserve tuning and restore the segment clip', async ()
   assert.deepEqual(engineInstance.caps, [4, 5]);
   assert.deepEqual(engineInstance.params, [['Speed', 0.5]]);
   assert.deepEqual(engineInstance.clip, { y0: 2, y1: 4, x0: 4, x1: 8 });
+});
+
+test('a rejected live setDisplayCaps posts engineRejected', async () => {
+  await dispatch({type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma'});
   engineInstance.capsRejected = true;
   await dispatch({ type: 'setDisplayCaps', topCap: 26, bottomCap: 0 });
   assert.match(posted.at(-1).msg.reason, /setDisplayCaps rejected/);

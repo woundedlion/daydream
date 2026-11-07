@@ -9,6 +9,8 @@ import {applyChainDocument} from '../src/workbench/shader/chain_apply.js';
 import {applyFixedShaderDocument} from '../src/workbench/shader/shader_documents.js';
 import {currentChainSnapshot} from './helpers/chain_snapshot.js';
 
+const catalog = JSON.parse(readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
+
 const module = await createModule({print: () => {}});
 const engine = new module.HolosphereEngine();
 const capture = () => callWorkbenchBinding(engine, 'getSnapshot', []);
@@ -21,7 +23,6 @@ test('the shared current snapshot fixture restores on the compiled engine', () =
 });
 
 test('every catalog document preset applies to its compiled engine', () => {
-  const catalog = JSON.parse(readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
   const patterns = new URL('../generated/shader/patterns/', import.meta.url);
   const patternsCatalog = JSON.parse(readFileSync(new URL('catalog.json', patterns), 'utf8'));
   const sources = patternsCatalog.source_documents;
@@ -44,7 +45,6 @@ test('every catalog document preset applies to its compiled engine', () => {
 });
 
 test('Ash Cloud applies its real compiled controls and validates unregistered readonly fields', () => {
-  const catalog = JSON.parse(readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
   const compiled = compileShaderDocument(readFileSync(new URL('../generated/shader/patterns/ash_cloud.shader.json', import.meta.url), 'utf8'), {catalog});
   engine.setEffect('ash-cloud');
   const preset = compiled.document.preset_bank.presets[0];
@@ -283,7 +283,6 @@ test('a snapshot accessor may rebuild geometry without trapping internal handles
 });
 
 test('real modulation snapshots import every authored preset field', () => {
-  const catalog = JSON.parse(readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
   const document = scratchChainDocument(catalog, [
     {label: 'project', operator: 'project.stereographic.v2'},
     {label: 'sample', operator: 'sample.grid.v4'},

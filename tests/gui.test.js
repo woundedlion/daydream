@@ -1,3 +1,4 @@
+import {installRecordingWindow} from './helpers/fake_dom.js';
 // gui.js's DeepLinkGUI and URL writers, against a stubbed lil-gui.
 import { fakeTimers } from './helpers/fake_timers.js';
 import { test, mock, afterEach } from 'node:test';
@@ -174,16 +175,7 @@ const RES = ['Holosphere (96x20)', 'Phantasm (288x144)'];
 const captureWarnings = (body) => captureConsole(body).messages;
 
 test('rollback restores an unflushed control value to runtime sinks and URL', () => {
-  let lastUrl = '/?Speed=0.1';
-  installWindow({
-    location: { search: '?Speed=0.1' },
-    history: {
-      replaceState(state, title, url) {
-        lastUrl = url;
-        globalThis.window.location.search = new URL(url, 'http://x').search;
-      },
-    },
-  });
+  const recorded = installRecordingWindow({search: '?Speed=0.1'});
   new URLSync(new AppState({ effect: 'Old' }), ['effect']);
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -212,7 +204,7 @@ test('rollback restores an unflushed control value to runtime sinks and URL', ()
     const snapshot = snapshotEffectControlState(previous.effect);
     getActiveURLSync().discardPending();
     mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
-    assert.equal(new URL(lastUrl, 'http://x').searchParams.get('Speed'), '0.1');
+    assert.equal(new URL(window.location.search, 'http://x').searchParams.get('Speed'), '0.1');
 
     const rebuilt = makeEffect();
     restoreEffectControlState(rebuilt.effect, snapshot);
@@ -220,7 +212,7 @@ test('rollback restores an unflushed control value to runtime sinks and URL', ()
 
     assert.equal(rebuilt.model.Speed, 0.75);
     assert.deepEqual(rebuilt.runtime, { engine: 0.75, workers: 0.75 });
-    assert.equal(new URL(lastUrl, 'http://x').searchParams.get('Speed'), '0.75');
+    assert.equal(new URL(recorded.written(), 'http://x').searchParams.get('Speed'), '0.75');
   } finally {
     mock.timers.reset();
   }
@@ -232,7 +224,7 @@ test('rollback restores an unflushed control value to runtime sinks and URL', ()
  * canonicalizes the rejected token to the default.
  */
 test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
-  const url = installRecordingWindow('?resolution=GARBAGE');
+  const url = installRecordingWindow({search: '?resolution=GARBAGE'});
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const obj = { resolution: 'Phantasm (288x144)' };
@@ -300,11 +292,7 @@ test('DeepLinkGUI.add with no matching URL param keeps the default', () => {
  * and is written back to the URL.
  */
 test('DeepLinkGUI.add clamps an out-of-range numeric URL value to the slider min/max', () => {
-  let lastUrl = '/';
-  installWindow({
-    location: { search: '?speed=99' },
-    history: { replaceState(s, t, url) { lastUrl = url; } },
-  });
+  let recorded = installRecordingWindow({search: '?speed=99'});
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const guiHi = new DeepLinkGUI({ autoPlace: false });
@@ -314,11 +302,10 @@ test('DeepLinkGUI.add clamps an out-of-range numeric URL value to the slider min
     assert.equal(objHi.speed, 10, 'value above max clamps to max');
     assert.deepEqual(hi, [10], 'the clamped value replays through onChange');
     mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
-    assert.equal(new URL(lastUrl, 'http://x').searchParams.get('speed'), '10',
+    assert.equal(new URL(recorded.written(), 'http://x').searchParams.get('speed'), '10',
       'the clamped value replaces the out-of-range one in the URL');
 
-    globalThis.window.location.search = '?speed=-5';
-    lastUrl = '/';
+    recorded = installRecordingWindow({search: '?speed=-5'});
     const guiLo = new DeepLinkGUI({ autoPlace: false });
     const objLo = { speed: 1.0 };
     const lo = [];
@@ -326,7 +313,7 @@ test('DeepLinkGUI.add clamps an out-of-range numeric URL value to the slider min
     assert.equal(objLo.speed, 0, 'value below min clamps to min');
     assert.deepEqual(lo, [0]);
     mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
-    assert.equal(new URL(lastUrl, 'http://x').searchParams.get('speed'), '0',
+    assert.equal(new URL(recorded.written(), 'http://x').searchParams.get('speed'), '0',
       'the clamped low value replaces the out-of-range one in the URL');
   } finally {
     mock.timers.reset();
@@ -341,7 +328,7 @@ test('DeepLinkGUI.add clamps an out-of-range numeric URL value to the slider min
  * must not read as a correction and re-persist the value.
  */
 test('DeepLinkGUI.add snaps a numeric URL value to the control step', () => {
-  const offGrid = installRecordingWindow('?speed=2.7');
+  const offGrid = installRecordingWindow({search: '?speed=2.7'});
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const obj = { speed: 1 };
@@ -355,7 +342,7 @@ test('DeepLinkGUI.add snaps a numeric URL value to the control step', () => {
     assert.equal(new URL(offGrid.written(), 'http://x').searchParams.get('speed'), '2.5',
       'the snapped value replaces the off-grid one in the URL');
 
-    const onGrid = installRecordingWindow('?speed=0.3');
+    const onGrid = installRecordingWindow({search: '?speed=0.3'});
     const gridObj = { speed: 1 };
     new DeepLinkGUI({ autoPlace: false }).add(gridObj, 'speed', 0, 1, 0.1);
     assert.ok(Math.abs(gridObj.speed - 0.3) < 1e-9, 'an on-grid value survives the snap');
@@ -372,7 +359,7 @@ test('DeepLinkGUI.add snaps a numeric URL value to the control step', () => {
  * the URL writer still runs behind both.
  */
 test('DeepLinkGUI.add fans a change out to every registered onChange handler', () => {
-  const url = installRecordingWindow('');
+  const url = installRecordingWindow({search: ''});
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const first = [];
@@ -393,7 +380,7 @@ test('DeepLinkGUI.add fans a change out to every registered onChange handler', (
 });
 
 test('DeepLinkGUI persists the accepted value after handler fanout', () => {
-  const url = installRecordingWindow('');
+  const url = installRecordingWindow({search: ''});
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const first = [];
@@ -422,7 +409,7 @@ test('DeepLinkGUI persists the accepted value after handler fanout', () => {
 });
 
 test('a refused hydrated value is corrected before the next reload', () => {
-  const url = installRecordingWindow('?fx.Mode=2');
+  const url = installRecordingWindow({search: '?fx.Mode=2'});
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const controller = new DeepLinkGUI({ autoPlace: false }, 'fx')
@@ -450,7 +437,7 @@ test('a refused hydrated value is corrected before the next reload', () => {
  * the URL nor written back.
  */
 test('DeepLinkGUI.addSession keeps a session control out of the URL', () => {
-  const url = installRecordingWindow('?Cycle=on');
+  const url = installRecordingWindow({search: '?Cycle=on'});
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const gui = new DeepLinkGUI({ autoPlace: false });
@@ -472,7 +459,7 @@ test('DeepLinkGUI.addSession keeps a session control out of the URL', () => {
  * NaN) is rejected: the bound default is kept and no applyOnLoad replay fires.
  */
 test('DeepLinkGUI.add rejects a non-numeric URL value for a slider', () => {
-  const url = installRecordingWindow('?speed=fast');
+  const url = installRecordingWindow({search: '?speed=fast'});
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const obj = { speed: 1.0 };
@@ -520,7 +507,7 @@ test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
         assert.equal(obj.glow, false, `"${falsy}" adopted as false`);
         assert.deepEqual(replayed, [false]);
       }
-      const url = installRecordingWindow('?glow=maybe');
+      const url = installRecordingWindow({search: '?glow=maybe'});
       const gui = new DeepLinkGUI({ autoPlace: false });
       const obj = { glow: false };
       const replayed = [];
@@ -561,7 +548,7 @@ test('a ?param=value deep link reaches the engine through the replayed handler',
 });
 
 test('the sweep boundary view setting roundtrips through its URL key', () => {
-  const url = installRecordingWindow('?view.showSweepBoundary=true');
+  const url = installRecordingWindow({search: '?view.showSweepBoundary=true'});
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const gui = new DeepLinkGUI({ autoPlace: false }, 'view');
@@ -580,7 +567,7 @@ test('the sweep boundary view setting roundtrips through its URL key', () => {
 });
 
 test('response scale roundtrips through its view URL key', () => {
-  const url = installRecordingWindow('?view.povResponseScale=1.5');
+  const url = installRecordingWindow({search: '?view.povResponseScale=1.5'});
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const gui = new DeepLinkGUI({ autoPlace: false }, 'view');
@@ -659,7 +646,7 @@ test('readStoredString returns an opaque namespaced companion value', () => {
 
 test('addUnhydrated keeps the current value but still deep-links later edits', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
-  const url = installRecordingWindow('?fx.Speed=9');
+  const url = installRecordingWindow({search: '?fx.Speed=9'});
   try {
     const state = { Speed: 2 };
     const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
@@ -712,7 +699,7 @@ test('a display folder does not push a later real folder off its own key', () =>
  * the shared timer fires both reach the URL.
  */
 test('makeUrlParamWriter merges multiple keys changed within the debounce window', () => {
-  const url = installRecordingWindow('?keep=1');
+  const url = installRecordingWindow({search: '?keep=1'});
   const setUrlParam = makeUrlParamWriter();
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -732,7 +719,7 @@ test('makeUrlParamWriter merges multiple keys changed within the debounce window
  * The standalone-page fallback commit preserves location.hash.
  */
 test('makeUrlParamWriter preserves location.hash in the fallback commit', () => {
-  const url = installRecordingWindow('?keep=1', '#section');
+  const url = installRecordingWindow({search: '?keep=1', hash: '#section'});
   const setUrlParam = makeUrlParamWriter();
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -750,7 +737,7 @@ test('makeUrlParamWriter preserves location.hash in the fallback commit', () => 
  * significant digits, and a value with no URL form dropping its param.
  */
 test('makeUrlParamWriter serializes numbers and deletions like URLSync', () => {
-  const url = installRecordingWindow('?keep=1&stale=9&gone=1');
+  const url = installRecordingWindow({search: '?keep=1&stale=9&gone=1'});
   const write = makeUrlParamWriter();
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -770,27 +757,14 @@ test('makeUrlParamWriter serializes numbers and deletions like URLSync', () => {
   assert.equal(q.get('keep'), '1', 'unrelated params survive');
 });
 
-/**
- * Installs a window whose replaceState records the written URL.
- * @param {string} search - The raw query string, including the leading '?'.
- * @param {string} [hash] - The location fragment, including the leading '#'.
- * @returns {{written: () => string}} Accessor for the last URL written.
- */
-function installRecordingWindow(search, hash = '') {
-  let lastUrl = '/';
-  installWindow({
-    location: { search, hash },
-    history: { replaceState(state, title, url) { lastUrl = url; } },
-  });
-  return { written: () => lastUrl };
-}
+
 
 /**
  * The URL writer is shared root→children, so a child folder's destroy() must not
  * cancel a write the surviving root still owes.
  */
 test('destroying a child folder leaves the shared root URL writer armed', () => {
-  const url = installRecordingWindow('');
+  const url = installRecordingWindow({search: ''});
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const root = new DeepLinkGUI({ autoPlace: false });
@@ -813,7 +787,7 @@ test('destroying a child folder leaves the shared root URL writer armed', () => 
  * A discarded root leaves no armed timer.
  */
 test('destroying the root cancels its pending URL write', () => {
-  const url = installRecordingWindow('');
+  const url = installRecordingWindow({search: ''});
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const root = new DeepLinkGUI({ autoPlace: false });
@@ -834,7 +808,7 @@ test('destroying the root cancels its pending URL write', () => {
  * preserves the fragment.
  */
 test('resetGUI clears deep-link params except the excluded ones on a tool page', () => {
-  const url = installRecordingWindow('?Speed=0.5&Sides=7&keep=1', '#tool');
+  const url = installRecordingWindow({search: '?Speed=0.5&Sides=7&keep=1', hash: '#tool'});
   resetGUI(['keep']);
 
   const q = new URL(url.written(), 'http://x').searchParams;
@@ -846,7 +820,7 @@ test('resetGUI clears deep-link params except the excluded ones on a tool page',
 
 /** Verifies the fallback drops the query string entirely when nothing is excluded. */
 test('resetGUI with no exclusions leaves a bare path on a tool page', () => {
-  const url = installRecordingWindow('?Speed=0.5', '#tool');
+  const url = installRecordingWindow({search: '?Speed=0.5', hash: '#tool'});
   resetGUI();
   assert.equal(url.written(), '/#tool');
 });
@@ -856,7 +830,7 @@ test('resetGUI with no exclusions leaves a bare path on a tool page', () => {
  * state is re-asserted rather than cleared with the deep-link params.
  */
 test('resetGUI routes through the active URLSync', () => {
-  const url = installRecordingWindow('?Speed=0.5&keep=1&effect=Old', '#tool');
+  const url = installRecordingWindow({search: '?Speed=0.5&keep=1&effect=Old', hash: '#tool'});
   new URLSync(new AppState({ effect: 'Old' }), ['effect']);
 
   resetGUI(['keep']);
@@ -875,7 +849,7 @@ test('resetGUI routes through the active URLSync', () => {
  * URL entry on its way out.
  */
 test('a control added inside a scheduled reset ignores the params it drops', () => {
-  installRecordingWindow('?fx.Alpha=0.75&view.poleLod=1.5&effect=Old');
+  installRecordingWindow({search: '?fx.Alpha=0.75&view.poleLod=1.5&effect=Old'});
   new URLSync(new AppState({ effect: 'Old' }), ['effect']);
 
   resetGUI(['effect', 'view.poleLod']);
@@ -890,7 +864,7 @@ test('a control added inside a scheduled reset ignores the params it drops', () 
 });
 
 test('cap controls hydrate bounded percentages and retain their URL keys through effect resets', () => {
-  installRecordingWindow('?view.topCap=2.04&view.bottomCap=99&fx.Alpha=0.75');
+  installRecordingWindow({search: '?view.topCap=2.04&view.bottomCap=99&fx.Alpha=0.75'});
   new URLSync(new AppState({}), []);
   const binding = createDisplayCapsBinding({ getEngine: () => null, onChange: () => {} });
   const gui = new DeepLinkGUI({ autoPlace: false }, 'view');
@@ -964,7 +938,7 @@ test('a hydrated display refresh failure warns and retains its controller', (t) 
 
 test('a fallback URL writer hands pending keys to a newly registered URLSync', () => {
   const timers = fakeTimers();
-  const url = installRecordingWindow('');
+  const url = installRecordingWindow({search: ''});
   window.setTimeout = timers.setTimeout.bind(timers);
   window.clearTimeout = timers.clearTimeout.bind(timers);
   const write = makeUrlParamWriter(window);

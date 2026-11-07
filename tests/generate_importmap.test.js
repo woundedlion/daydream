@@ -246,6 +246,23 @@ test('transitive Three imports cannot escape the package', () => {
   assert.match(runExpectingFailure(), /Three import escapes its package: \.\.\/\.\.\/outside\.js/);
 });
 
+test('transitive Three module and addon imports receive hashes for their own bytes', () => {
+  installModules();
+  const bodies = {
+    'build/three.module.js': "export * from './three.core.js';\n",
+    'build/three.core.js': "import './chunk.js';\n",
+    'build/chunk.js': '// shared chunk\n',
+    'examples/jsm/controls/OrbitControls.js': "import './sibling.js';\n",
+    'examples/jsm/controls/sibling.js': '// addon sibling\n',
+  };
+  for (const [path, body] of Object.entries(bodies))
+    writeFileSync(join(root, 'node_modules/three', path), body);
+  const output = run();
+  for (const path of ['build/three.core.js', 'build/chunk.js', 'examples/jsm/controls/sibling.js']) {
+    assert.ok(output.includes(sri(bodies[path])), path);
+  }
+});
+
 for (const dependency of ['three', 'lil-gui']) {
   test(`the ${dependency} dependency must use an exact version`, () => {
     installModules();

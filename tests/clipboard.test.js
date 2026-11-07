@@ -3,12 +3,12 @@ import { test, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
-const {
+import {
   copyToClipboard,
   copyWithFeedback,
   COPY_FEEDBACK,
   wireCopyBlock,
-} = await import('../src/shared/clipboard.js');
+} from '../src/shared/clipboard.js';
 
 restoreDocumentAfterEach();
 

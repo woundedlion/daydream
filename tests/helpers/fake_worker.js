@@ -14,7 +14,6 @@ export class FakeWorker {
   static instances = [];
   static constructionCount = 0;
   static failConstructionAt = -1;
-  static failInitialPostAt = -1;
   /** Worker index whose post fails when failPostType matches. */
   static failPostAt = -1;
   static failPostType = null;
@@ -41,8 +40,6 @@ export class FakeWorker {
       this.postsAfterTermination.push(msg);
       return;
     }
-    if (msg.type === 'init' && this.index === FakeWorker.failInitialPostAt)
-      throw new DOMException('message rejected', 'DataCloneError');
     if (msg.type === FakeWorker.failPostType && this.index === FakeWorker.failPostAt)
       throw new DOMException('message rejected', 'DataCloneError');
     const received = structuredClone(msg, { transfer });
@@ -57,7 +54,6 @@ export class FakeWorker {
     FakeWorker.instances = [];
     FakeWorker.constructionCount = 0;
     FakeWorker.failConstructionAt = -1;
-    FakeWorker.failInitialPostAt = -1;
     FakeWorker.failPostAt = -1;
     FakeWorker.failPostType = null;
   }

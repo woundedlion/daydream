@@ -865,8 +865,7 @@ test('Mobius preset descriptions retain AA contrast when active', () => {
 });
 
 
-for (const page of ['index.html', 'tools/shader.html', 'tools/lissajous.html',
-  'tools/mobius.html', 'tools/solids.html', 'tools/palettes.html']) {
+for (const { page } of SERVED_PAGES) {
   test(`${page} reports module resource and syntax failures through the shared classic guard`, async (t) => {
     t.after(stashGlobals('window', 'document', 'HTMLScriptElement'));
     const source = read(...page.split('/'));

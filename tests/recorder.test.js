@@ -392,11 +392,6 @@ test('toggle starts then stops, reporting the true state each time', (t) => {
   assert.equal(rec.isRecording, true);
   const stream = rec.stream;
   const recorder = rec.mediaRecorder;
-  assert.equal(stream.captureRate, 0,
-    'the session must capture in manual-frame mode, not off the wall clock');
-  assert.equal(typeof rec.track.requestFrame, 'function');
-  assert.equal(recorder.timesliceMs, 1000,
-    'chunks must be delivered on a timeslice, not buffered until stop');
   assert.equal(rec.toggle('e'), false);
   assert.equal(rec.isRecording, false);
   recorder.onstop();
@@ -2065,4 +2060,31 @@ test('started hook waits for the Save dialog and the running encoder', async (t)
   await drainSink();
   assert.equal(started, 1);
   rec.stop();
+});
+
+test('a recording session captures in manual-frame mode', (t) => {
+  expectEmptySessionWarnings(t);
+  t.after(installRecorderEnv());
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.download = () => {};
+  rec.toggle('e');
+  const stream = rec.stream;
+  assert.equal(stream.captureRate, 0,
+    'the session must capture in manual-frame mode, not off the wall clock');
+  assert.equal(typeof rec.track.requestFrame, 'function');
+  rec.stop();
+  rec.mediaRecorder.onstop();
+});
+
+test('recording chunks arrive on a one-second timeslice', (t) => {
+  expectEmptySessionWarnings(t);
+  t.after(installRecorderEnv());
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.download = () => {};
+  rec.toggle('e');
+  const recorder = rec.mediaRecorder;
+  assert.equal(recorder.timesliceMs, 1000,
+    'chunks must be delivered on a timeslice, not buffered until stop');
+  rec.stop();
+  rec.mediaRecorder.onstop();
 });

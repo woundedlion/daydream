@@ -23,7 +23,7 @@ function paletteFixture() {
     el: (tag, classes) => { const node = fakeElement(tag); node.className = classes; return node; },
     store: {
       chain: () => chain,
-      legalInsertions: () => legal ? [{operator, legal: true}] : [],
+      legalInsertions: () => [{operator, legal, ...(legal ? {} : {reason: 'blocked'})}],
       replaceSpan: (start, deleteCount, entries) => {
         if (!accepted) return {ok: false, diagnostics: [{message: 'blocked'}]};
         chain.push(...entries);

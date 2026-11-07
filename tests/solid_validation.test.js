@@ -22,7 +22,7 @@ test('validator reports a thrown string and frees its standing mesh', async () =
   assert.equal(state.cleared, 1);
 });
 
-test('gate blocks a classification refusal without reclaiming an unexhausted arena', async () => {
+test('gate blocks a classification refusal with no mid-sweep flush', async () => {
   const { Mod, state } = fakeModule({
     rejects: new Set(['classifyFaces']), reason: 'CONNECTIVITY_OVERFLOW',
   });
@@ -127,12 +127,16 @@ test('the solids page gates on each chainIsValid verdict field', () => {
     'every call must bind its verdict; an unbound one is truthy and gates nothing');
   assert.doesNotMatch(SOLIDS_PAGE, /!\s*\(?await chainIsValid\(/,
     'a negated call tests the verdict object, not its ok field');
-  const verdicts = new Set([...SOLIDS_PAGE.matchAll(/const (\w+) = await chainIsValid\(/g)]
-    .map((match) => match[1]));
-  for (const verdict of verdicts) {
-    assert.doesNotMatch(SOLIDS_PAGE, new RegExp(`if\\s*\\(\\s*!?\\s*${verdict}\\s*\\)`),
-      `${verdict} must be tested through its ok field`);
+  const bindings = [...SOLIDS_PAGE.matchAll(/const (\w+) = await chainIsValid\(/g)];
+  for (const [index, binding] of bindings.entries()) {
+    const verdict = binding[1];
+    const scope = SOLIDS_PAGE.slice(binding.index, bindings[index + 1]?.index);
+    assert.ok(new RegExp(`\\b${verdict}\\.ok\\b`).test(scope)
+      || scope.includes(`dropSlotChecks.set(target, ${verdict})`),
+    `${verdict} must read ok or hand its verdict to the drop-slot map`);
+    assert.doesNotMatch(scope, new RegExp(`if\\s*\\(\\s*!?\\s*${verdict}\\s*(?:\\)|\\|\\||&&)`));
   }
+  assert.match(SOLIDS_PAGE, /slotCheck && !slotCheck\.ok/);
 });
 
 

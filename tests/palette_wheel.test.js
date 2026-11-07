@@ -1,17 +1,11 @@
+import {oklchLinearRgb, HUE_KEY_GRAB_RADIUS, HUE_KEY_NAMES, canvasPoint, createHueKeyWheelPainter, hueKeyDegrees, hueKeyHandoff, hueKeyLabelBoxes, hueKeyMarkerPoints, hueKeyNudgeTurns, paintHueWheelRaster, wheelTurnAt, maxSrgbGamutChroma} from '../src/workbench/palettes/palette_wheel.js';
 // The palette tool's hue-key wheel, run end to end against a recording context
 // double: the gamut raster, the marker and label geometry laid over it, and the
 // pointer and keyboard arithmetic a key is moved by.
-import {oklchLinearRgb} from '../src/workbench/palettes/palette_wheel.js';
 import { fakeContext, withPixelRatio } from './helpers/fake_canvas.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  HUE_KEY_GRAB_RADIUS, HUE_KEY_NAMES,
-  canvasPoint, createHueKeyWheelPainter, hueKeyDegrees, hueKeyHandoff,
-  hueKeyLabelBoxes, hueKeyMarkerPoints, hueKeyNudgeTurns, paintHueWheelRaster,
-  wheelTurnAt,
-} from '../src/workbench/palettes/palette_wheel.js';
-import { hitTestHueKeyMarker } from '../src/workbench/palettes/palette_controls.js';
+import { hitTestHueKeyMarker } from '../src/workbench/palettes/palette_wheel.js';
 import { linearToSrgbFloat } from '../src/shared/color.js';
 
 // Slate-900: what the raster paints outside the gamut.
@@ -330,4 +324,33 @@ test('the wheel caps display density at two and caches the resized raster', (t) 
   painter.draw(view);
   assert.equal(canvas.width, 320);
   assert.equal(ctx.rasters, 2);
+});
+
+test('oklchLinearRgb fills a caller-owned triple in place', () => {
+  const out = [9, 9, 9];
+  const returned = oklchLinearRgb(0.62, 0.1, 0.25, out);
+
+  assert.equal(returned, out, 'the caller-owned array is what comes back');
+  assert.deepEqual(out, oklchLinearRgb(0.62, 0.1, 0.25),
+    'filling in place must not change the conversion');
+});
+
+test('gamut chroma scale finds the widest OKLCH hue boundary', () => {
+  const maximum = maxSrgbGamutChroma(0.5);
+  const hueSamples = 360;
+  let widestSample = 0;
+  let beyondBoundarySample = 0;
+
+  for (let hue = 0; hue < hueSamples; hue++) {
+    const rgb = oklchLinearRgb(0.5, maximum, hue / hueSamples);
+    if (rgb.every((channel) => channel >= -0.0002 && channel <= 1.0002))
+      widestSample++;
+    const beyondRgb = oklchLinearRgb(0.5, maximum + 0.002, hue / hueSamples);
+    if (beyondRgb.every((channel) => channel >= 0 && channel <= 1))
+      beyondBoundarySample++;
+  }
+
+  assert.ok(maximum > 0.28 && maximum < 0.31);
+  assert.ok(widestSample > 0);
+  assert.equal(beyondBoundarySample, 0);
 });

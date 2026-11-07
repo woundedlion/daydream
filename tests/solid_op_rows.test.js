@@ -63,7 +63,7 @@ test('an op name carrying markup lands as text, never as parsed markup', () => {
     `Move ${hostile} at position 1 up`);
 });
 
-test('parameter controls preserve a hostile value as text', () => {
+test('parameter controls handle a hostile value through value properties', () => {
   const hostile = '0.3" autofocus onfocus="alert(1)';
   const { el } = build({ op: 'truncate', params: { t: hostile } });
   const [row] = el.querySelectorAll('.op-param');

@@ -29,6 +29,39 @@ const bandChipNames = (tab, carrier) => tab.$$eval(
   `.chain-band[data-carrier="${carrier}"] .chain-chip-name`,
   (nodes) => nodes.map((node) => node.textContent ?? ''));
 
+/**
+ * @param {import('puppeteer-core').Page} tab
+ * @param {{width: number, height: number}} viewport
+ */
+export async function resizeViewport(tab, viewport) {
+  const state = await tab.evaluateHandle(({ width, height }) => {
+    const state = {
+      resized: window.innerWidth === width && window.innerHeight === height,
+      settling: false,
+      settled: false,
+      cleanup: () => window.removeEventListener('resize', resized),
+    };
+    const resized = () => { state.resized = true; };
+    window.addEventListener('resize', resized);
+    return state;
+  }, viewport);
+  try {
+    await tab.setViewport(viewport);
+    await tab.waitForFunction((state, { width, height }) => {
+      if (!state.resized || window.innerWidth !== width || window.innerHeight !== height)
+        return false;
+      if (!state.settling) {
+        state.settling = true;
+        requestAnimationFrame(() => requestAnimationFrame(() => { state.settled = true; }));
+      }
+      return state.settled;
+    }, { timeout: TIMEOUT_MS }, state, viewport);
+  } finally {
+    try { await tab.evaluate((state) => state.cleanup(), state); }
+    finally { await state.dispose(); }
+  }
+}
+
 /** @param {import('puppeteer-core').Page} tab */
 async function savedDocument(tab) {
   await tab.evaluate(() => {
@@ -612,8 +645,7 @@ export async function probeStrip(tab) {
   const toolbar = await boxOf(tab, '#shader-toolbar');
   check(!overlaps(panels, toolbar), 'global controls clear #shader-toolbar');
 
-  await tab.setViewport({ width: 700, height: VIEWPORT.height });
-  await tab.waitForFunction(() => window.innerWidth === 700);
+  await resizeViewport(tab, { width: 700, height: VIEWPORT.height });
   await tab.mouse.move(0, 0);
   await tab.focus(add);
   await (await tab.waitForSelector(add)).click();
@@ -633,7 +665,7 @@ export async function probeStrip(tab) {
     + `${narrowLeft},${narrowTop} from anchor ${JSON.stringify(narrowAnchor)}`);
   await tab.keyboard.press('Escape');
 
-  await tab.setViewport({ width: VIEWPORT.width, height: 300 });
+  await resizeViewport(tab, { width: VIEWPORT.width, height: 300 });
   await tab.mouse.move(0, 0);
   await tab.focus(add);
   await (await tab.waitForSelector(add)).click();
@@ -645,8 +677,7 @@ export async function probeStrip(tab) {
   'the palette lifts above its anchor inside a short usable sidebar');
   await tab.keyboard.press('Escape');
 
-  await tab.setViewport({ width: VIEWPORT.width, height: SHORT_HEIGHT });
-  await tab.waitForFunction((height) => window.innerHeight === height, {}, SHORT_HEIGHT);
+  await resizeViewport(tab, { width: VIEWPORT.width, height: SHORT_HEIGHT });
   await tab.$eval(add, (node) => node.focus());
   await tab.keyboard.press('Enter');
   await tab.waitForSelector('.chain-palette-entry');
@@ -665,7 +696,7 @@ export async function probeStrip(tab) {
   check(capped.overflow === 'auto' && capped.scrollable,
     'the capped palette scrolls to its remaining entries');
   await tab.keyboard.press('Escape');
-  await tab.setViewport(VIEWPORT);
+  await resizeViewport(tab, VIEWPORT);
   return failures;
 }
 

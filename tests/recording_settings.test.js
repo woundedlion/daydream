@@ -30,7 +30,6 @@ function makeRecordingSettings() {
 test('a setting written before the recorder exists is held, not lost', () => {
   const h = makeRecordingSettings();
 
-  assert.throws(() => h.block.replay(), TypeError);
   h.block.settings.recQuality = 8;
   assert.equal(h.block.settings.recQuality, 8, 'the setting is its own durable home');
   assert.deepEqual(h.warnings, [], 'there is no session to warn about yet');
@@ -71,4 +70,9 @@ test('settings enumerate in definition order', () => {
 
   assert.deepEqual(Object.keys(h.block.settings), ['recQuality', 'recFormat'],
     'the settings enumerate in definition order');
+});
+
+test('replaying settings without a recorder throws', () => {
+  const h = makeRecordingSettings();
+  assert.throws(() => h.block.replay(), TypeError);
 });

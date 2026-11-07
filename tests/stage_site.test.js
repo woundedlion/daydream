@@ -1,5 +1,5 @@
 import { installConsoleCapture } from './helpers/fake_console.js';
-import { after, beforeEach, test } from 'node:test';
+import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, symlinkSync } from 'node:fs';
@@ -9,12 +9,7 @@ import { installEngineBundle, RUNTIME_PATHS } from '../scripts/install-engine-bu
 import { sitePaths, stageSite, verifiedEnginePaths } from '../scripts/stage-site.mjs';
 import { isolatedGitEnv, scratchDir, writeEngineBundle, writeFileAt } from './helpers/fixture_repo.js';
 
-const AMBIENT_BUNDLE_PIN = process.env.HOLOSPHERE_BUNDLE_PIN;
 beforeEach(() => { delete process.env.HOLOSPHERE_BUNDLE_PIN; });
-after(() => {
-  if (AMBIENT_BUNDLE_PIN === undefined) delete process.env.HOLOSPHERE_BUNDLE_PIN;
-  else process.env.HOLOSPHERE_BUNDLE_PIN = AMBIENT_BUNDLE_PIN;
-});
 
 function fixture(t, readme = 'new README.md') {
   const scratch = scratchDir(t, 'stage-site-');
@@ -42,7 +37,7 @@ function fixture(t, readme = 'new README.md') {
   try { installEngineBundle(bundle, root); } finally { capture.restore(); }
   assert.equal(capture.messages.length, 1);
   assert.match(capture.messages[0], /^Installed \d+ engine assets/);
-  return { root, bundle, site, pair, write: writeFileAt, git, scratch };
+  return { root, bundle, site, pair, git, scratch };
 }
 
 /** @param {string} base @returns {string[]} Every file under `base`, as sorted forward-slash paths. */
@@ -79,8 +74,8 @@ test('site staging publishes a bundled screenshot only when the README reference
 
 test('source-only site paths discover installed patterns without manifest entries', (t) => {
   const f = fixture(t);
-  f.write(f.root, 'site_manifest.txt', 'src/app/daydream.js\n');
-  f.write(f.root, 'generated/shader/patterns/added.shader.json', '{}');
+  writeFileAt(f.root, 'site_manifest.txt', 'src/app/daydream.js\n');
+  writeFileAt(f.root, 'generated/shader/patterns/added.shader.json', '{}');
   const paths = sitePaths(f.root);
   assert.ok(paths.includes('generated/shader/patterns/new.shader.json'));
   assert.ok(paths.includes('generated/shader/patterns/added.shader.json'));
@@ -88,24 +83,24 @@ test('source-only site paths discover installed patterns without manifest entrie
 
 test('staging refuses modified frontend, manifest, or engine bytes', (t) => {
   const f = fixture(t);
-  f.write(f.root, 'src/app/daydream.js', 'tampered');
+  writeFileAt(f.root, 'src/app/daydream.js', 'tampered');
   assert.throws(() => stageSite(f.root, f.bundle, f.site, f.pair), /Site source differs/);
-  f.write(f.root, 'site_manifest.txt', 'src/app/daydream.js');
+  writeFileAt(f.root, 'site_manifest.txt', 'src/app/daydream.js');
   assert.throws(() => stageSite(f.root, f.bundle, f.site, f.pair), /Site manifest differs/);
-  f.write(f.root, 'generated/holosphere_wasm.js', 'tampered');
+  writeFileAt(f.root, 'generated/holosphere_wasm.js', 'tampered');
   assert.throws(() => verifiedEnginePaths(f.root, f.bundle), /Installed engine asset differs/);
 });
 
 test('staging rejects unsafe committed paths and untracked source entries', (t) => {
   const f = fixture(t);
   for (const path of ['../escape.js', '/absolute.js', 'foo//bar.js', 'foo\\bar.js', './daydream.js']) {
-    f.write(f.root, 'site_manifest.txt', path + '\n');
+    writeFileAt(f.root, 'site_manifest.txt', path + '\n');
     f.git('add', '--', 'site_manifest.txt');
     f.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'unsafe path');
     assert.throws(() => stageSite(f.root, f.bundle, f.site, { ...f.pair, daydream: f.git('rev-parse', 'HEAD') }), /Invalid site path/);
   }
-  f.write(f.root, 'site_manifest.txt', 'private.js\n');
-  f.write(f.root, 'private.js', 'private');
+  writeFileAt(f.root, 'site_manifest.txt', 'private.js\n');
+  writeFileAt(f.root, 'private.js', 'private');
   f.git('add', '--', 'site_manifest.txt');
   f.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'untracked entry');
   assert.throws(() => stageSite(f.root, f.bundle, f.site, { ...f.pair, daydream: f.git('rev-parse', 'HEAD') }), /Site entry is not committed: private\.js/);
@@ -114,9 +109,9 @@ test('staging rejects unsafe committed paths and untracked source entries', (t) 
 test('staging rejects symlink directories escaping the selected checkout', (t) => {
   const f = fixture(t);
   const outside = join(f.scratch, 'outside');
-  f.write(outside, 'foreign.js', 'foreign');
+  writeFileAt(outside, 'foreign.js', 'foreign');
   symlinkSync(outside, join(f.root, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
-  f.write(f.root, 'site_manifest.txt', 'linked/foreign.js\n');
+  writeFileAt(f.root, 'site_manifest.txt', 'linked/foreign.js\n');
   f.git('add', '--', 'site_manifest.txt');
   f.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'linked entry');
   assert.throws(() => stageSite(f.root, f.bundle, f.site, { ...f.pair, daydream: f.git('rev-parse', 'HEAD') }), /regular repository file/);
@@ -125,7 +120,7 @@ test('staging rejects symlink directories escaping the selected checkout', (t) =
 test('stage CLI uses the verified bundle and pair file', (t) => {
   const f = fixture(t);
   const cli = fileURLToPath(new URL('../scripts/stage-site.mjs', import.meta.url));
-  f.write(f.root, 'pair.json', JSON.stringify(f.pair));
+  writeFileAt(f.root, 'pair.json', JSON.stringify(f.pair));
   const env = isolatedGitEnv();
   delete env.HOLOSPHERE_BUNDLE_PIN;
   const result = spawnSync(process.execPath, [cli, f.bundle, f.site, 'pair.json'], { cwd: f.root, env, encoding: 'utf8' });

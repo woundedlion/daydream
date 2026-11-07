@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import {fixture} from './helpers/fixture.js';
 import { D2R_F32, MAX_RECIPE_STEPS, KNOWN_OPS, PARAMETERIZED_OPS, SIMPLE_SEEDS, DEFINED_SEED_CONSTANTS, seedOpParams } from '../src/workbench/solids/solid_codegen.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -81,7 +81,7 @@ function chainStep(op, param = 0, twist = 0) {
 test('generateRegistryCpp emits an authored Recipe for a hankin-free chain too', () => {
   const item = { base: 'cube', ops: [{ op: 'truncate', params: { t: 0.33 } }] };
   assert.equal(generateRegistryCpp(item),
-    readFileSync(new URL('./fixtures/registry-0.cpp', import.meta.url), 'utf8').trimEnd());
+    fixture('registry-0.cpp'));
 });
 
 // A short seed and step-table name leave all three Recipe elements inside the
@@ -182,7 +182,7 @@ test('generateRegistryCpp emits a step table and authored Recipe for a hankin ch
     ops: [{ op: 'hankin', params: { angle: 62 } }, 'ambo'],
   };
   assert.equal(generateRegistryCpp(item),
-    readFileSync(new URL('./fixtures/registry-1.cpp', import.meta.url), 'utf8').trimEnd());
+    fixture('registry-1.cpp'));
 });
 
 test('a registry Entry instantiates its authored recipe generator', () => {
@@ -204,7 +204,7 @@ test('generateRegistryCpp wraps a long paste in the tool format', () => {
     ],
   };
   assert.equal(generateRegistryCpp(item),
-    readFileSync(new URL('./fixtures/registry-2.cpp', import.meta.url), 'utf8').trimEnd());
+    fixture('registry-2.cpp'));
 });
 
 test('no paste line exceeds the column limit solids.h is formatted at', () => {
@@ -220,11 +220,7 @@ test('no paste line exceeds the column limit solids.h is formatted at', () => {
   for (const base of SIMPLE_SEEDS) {
     for (const ops of chains) {
       for (const line of generateRegistryCpp({ base, ops }).split('\n')) {
-        // clang-format cannot break a line that offers no break: an identifier
-        // long enough to overflow on its own overflows there too.
-        const atom = line.replace(/^\s*(\* )?/, '');
-        assert.ok(line.length <= 80
-          || (!atom.includes(' ') && (line.trimStart().startsWith('*') || !atom.includes('::'))),
+        assert.ok(line.length <= 80,
           `"${line}" is ${line.length} columns for base "${base}"`);
       }
     }
@@ -280,7 +276,7 @@ test('generateRegistryCpp flattens a star-pattern base onto its own seed', () =>
   const item = { base: 'icosahedron_kis_gyro', ops: [{ op: 'hankin', params: { angle: 54 } }] };
   const baseRecipe = { seed: 'icosahedron', ops: [chainStep('kis'), chainStep('gyro')] };
   assert.equal(generateRegistryCpp(item, baseRecipe),
-    readFileSync(new URL('./fixtures/registry-3.cpp', import.meta.url), 'utf8').trimEnd());
+    fixture('registry-3.cpp'));
 });
 
 test('generateRegistryCpp never names a star pattern as the Recipe seed', () => {
@@ -442,13 +438,13 @@ test('registry exports refuse meshes beyond the effect face budget', () => {
 
 test('registry arguments wrap after the function when that saves a line', () => {
   assert.equal(generateRegistryCpp({ base: 'truncatedTetrahedron', ops: ['kis', 'gyro'] }),
-    readFileSync(new URL('./fixtures/registry-4.cpp', import.meta.url), 'utf8').trimEnd());
+    fixture('registry-4.cpp'));
 });
 
 test('long registry arguments move below a wrapped function call', () => {
   const ops = Array.from({ length: 3 }, () => ({ op: 'truncate', params: { t: 0.33 } }));
   assert.equal(generateRegistryCpp({ base: 'truncatedCuboctahedron', ops }),
-    readFileSync(new URL('./fixtures/registry-5.cpp', import.meta.url), 'utf8').trimEnd());
+    fixture('registry-5.cpp'));
 });
 
 

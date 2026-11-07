@@ -34,7 +34,7 @@ const LOCAL_GIT_ENV = [
  * @returns {string|null} Interpreter to spawn, or null when unavailable.
  */
 const findShell = (name) => {
-  if (spawnSync(name, ['-c', 'exit 0']).status === 0) return name;
+  if (process.platform !== 'win32' && spawnSync(name, ['-c', 'exit 0']).status === 0) return name;
   try {
     const execPath = execFileSync('git', ['--exec-path'], {
       encoding: 'utf8',
@@ -44,6 +44,7 @@ const findShell = (name) => {
   } catch {
     /* fall through to the skip */
   }
+  if (process.platform === 'win32' && spawnSync(name, ['-c', 'exit 0']).status === 0) return name;
   return null;
 };
 
@@ -157,6 +158,7 @@ export const expectFailure = (file, args, { captureStdout = false, ...options } 
       stdio: ['ignore', captureStdout ? 'pipe' : 'ignore', 'pipe'],
     });
   } catch (e) {
+    if (typeof e.status !== 'number') throw e;
     return captureStdout ? `${e.stdout}${e.stderr}` : String(e.stderr);
   }
   assert.fail('the command was expected to exit non-zero');

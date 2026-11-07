@@ -25,6 +25,7 @@ test('index provides every apply-notice element the sink resolves', () => {
   notice.show('Effect change was rejected.', 'switch'); // the write drives the lookup
 
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="apply-notice"[^>]*role="alert"/);
   assert.ok(queried.length > 0, 'the sink resolved nothing, so nothing is pinned');
   for (const id of queried)
     assert.match(html, new RegExp(`id=["']${id}["']`), id);
@@ -186,6 +187,17 @@ test('a clear with no recorded owner hides a visible notice', () => {
   assert.equal(h.notice.owner(), null);
 });
 
+test('showing the same notice restarts its dwell', () => {
+  const h = makeApplyNotice();
+  h.notice.show('Effect change was rejected.', 'switch');
+  h.notice.show('Effect change was rejected.', 'switch');
+  assert.deepEqual(h.timer.cancelled, [1]);
+  assert.equal(h.timer.handle, 2);
+  assert.equal(h.body.hidden, false);
+  h.expire();
+  assert.equal(h.body.hidden, true);
+});
+
 test('the notice self-clears so a stale rejection cannot outlive its action', () => {
   const h = makeApplyNotice();
 
@@ -229,13 +241,12 @@ test('clear() drops a notice whichever owner raised it and cancels its self-clea
   assert.deepEqual(h.timer.cancelled, [1], 'the pending self-clear is cancelled');
 });
 
-test('the notice tolerates a page missing the element', () => {
+test('clear() on a page missing the elements does not throw', () => {
   const notice = createApplyNotice({
     doc: { getElementById: () => null },
     logWarning: () => {},
   });
 
-  notice.show('Effect change was rejected.', 'switch');
   notice.clear();
 
   assert.equal(notice.owner(), null);

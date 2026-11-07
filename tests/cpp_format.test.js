@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { formatFloatCpp, fillColumns } = await import('../src/shared/cpp_format.js');
+import { formatFloatCpp, fillColumns } from '../src/shared/cpp_format.js';
 
 /** A whole number keeps one fractional digit and the f suffix (never "2f"). */
 test('formatFloatCpp: whole value renders as "2.0f"', () => {
@@ -103,9 +103,18 @@ test('formatFloatCpp: magnitude below the max-precision floor throws', () => {
   assert.equal(formatFloatCpp(1e-100), `0.${'0'.repeat(99)}1f`);
 });
 
-test('fillColumns handles limits, long words, default indentation and empty input', () => {
+test('fillColumns wraps at the supplied column limit', () => {
   assert.deepEqual(fillColumns(['abc', 'def', 'g'], '  ', '> ', 9), ['  abc def', '> g']);
+});
+
+test('fillColumns preserves unbreakable long words', () => {
   assert.deepEqual(fillColumns(['overlong', 'x'], '>', '-', 4), ['>overlong', '-x']);
+});
+
+test('fillColumns defaults the continuation indentation', () => {
   assert.deepEqual(fillColumns(['a', 'b'], ' '.repeat(78)), [' '.repeat(78) + 'a', ' '.repeat(78) + 'b']);
+});
+
+test('fillColumns emits no lines for empty input', () => {
   assert.deepEqual(fillColumns([], '// '), []);
 });

@@ -60,11 +60,25 @@ test('successful deployment records both exact commits only after status success
 });
 
 test('attempted pairs suppress scheduled retries independently of success', async () => {
-  assert.equal(await pairWasAttempted(async () => [{ payload: pair }], repo, pair), true);
+  assert.equal(await pairWasAttempted(async (path) => path.includes('/statuses')
+    ? [{state: 'failure'}] : [{id: 42, payload: pair}], repo, pair), true);
   assert.equal(await pairWasAttempted(async () => [{ payload: { ...pair, holosphere: 'c'.repeat(40) } }], repo, pair), false);
   const calls = [];
   await recordPair(async (...args) => { calls.push(args); return { id: 9 }; }, repo, pair, 'run', 'pending');
   assert.equal(calls[1][1].state, 'pending');
+});
+
+test('attempted pair discovery pages past a full nonmatching deployment page', async () => {
+  const paths = [];
+  const other = {...pair, holosphere: 'c'.repeat(40)};
+  assert.equal(await pairWasAttempted(async (path) => {
+    paths.push(path);
+    if (path.includes('/statuses')) return [{state: 'failure'}];
+    return path.endsWith('page=1')
+      ? Array.from({length: 100}, (_, id) => ({id, payload: other}))
+      : [{id: 101, payload: pair}];
+  }, repo, pair), true);
+  assert.ok(paths.some((path) => path.endsWith('page=2')));
 });
 
 for (const event of ['push', 'workflow_dispatch', 'repository_dispatch', 'schedule']) {
@@ -127,6 +141,13 @@ test('resolve skips deployed pairs, honors force and rejects stale source heads'
   assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /deploy=true/);
   writeFileSync(env.GITHUB_OUTPUT, '');
   await run('resolve', {...env, GITHUB_SHA: 'd'.repeat(40)}, async (path) => path.includes('deployments') ? [] : heads(path));
+  assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /deploy=false/);
+  writeFileSync(env.GITHUB_OUTPUT, '');
+  await run('resolve', {...env, GITHUB_SHA: 'd'.repeat(40),
+    GITHUB_EVENT_NAME: 'workflow_dispatch', FORCE_DEPLOY: 'true'}, api);
+  assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /deploy=false/);
+  writeFileSync(env.GITHUB_OUTPUT, '');
+  await run('resolve', {...env, GITHUB_EVENT_NAME: 'push', FORCE_DEPLOY: 'true'}, api);
   assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /deploy=false/);
 });
 

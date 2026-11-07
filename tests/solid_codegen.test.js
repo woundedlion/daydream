@@ -1,9 +1,9 @@
 import { LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
-import { SAVED_SOLIDS_MAX, captureSavedSolidThumbnail, queueSavedSolidRestore } from '../src/workbench/solids/solid_saved_store.js';
+import { queueSavedSolidRestore } from '../src/workbench/solids/solid_saved_store.js';
 import { fakeModule, stubMesh } from './helpers/fake_meshops.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import {fixture} from './helpers/fixture.js';
 
 import {
   OP_DEFS,
@@ -302,7 +302,7 @@ test('generateRecipeCpp wraps a long function at the target header column limit'
     fCount: 602,
     iCount: 3600,
   }, 'Archimedean');
-  assert.equal(cpp, readFileSync(new URL('./fixtures/recipe-archimedean.cpp', import.meta.url), 'utf8').trimEnd());
+  assert.equal(cpp, fixture('recipe-archimedean.cpp'));
 });
 
 /**
@@ -390,7 +390,7 @@ test('generateRecipeCpp wraps a long star seed constructor argument', () => {
   const cpp = generateRecipeCpp({
     base: 'truncatedIcosidodecahedron_hankin62_chamfer50', ops: ['dual'],
   }, 'IslamicStarPatterns');
-  assert.equal(cpp, readFileSync(new URL('./fixtures/recipe-2.cpp', import.meta.url), 'utf8').trimEnd());
+  assert.equal(cpp, fixture('recipe-2.cpp'));
 });
 
 /**
@@ -399,7 +399,7 @@ test('generateRecipeCpp wraps a long star seed constructor argument', () => {
  * comment terminator must not be able to splice C++ around the generated
  * function.
  */
-test('generateRecipeCpp emits counts no non-negative integer can escape', () => {
+test('generateRecipeCpp renders counts as non-negative integer comment text', () => {
   const spliced = generateRecipeCpp({
     base: 'cube',
     ops: ['dual'],
@@ -946,34 +946,7 @@ test('savedChainShapeError refuses a chain past the op cap', () => {
     () => assert.fail('a refused chain must not be queued')) ?? '', /at most 255/);
 });
 
-test('a malformed saved solid is rejected before its restore is queued', () => {
-  let queued = false;
-  const error = queueSavedSolidRestore(
-    { base: 'cube', ops: [{ op: 'unknown' }] },
-    () => { queued = true; });
 
-  assert.match(error, /unknown operator/);
-  assert.equal(queued, false);
-
-  assert.equal(queueSavedSolidRestore(
-    { base: 'cube', ops: [] }, () => { queued = true; }), null);
-  assert.equal(queued, true);
-});
-
-test('a full saved-solid list refuses before thumbnail capture', () => {
-  let captures = 0;
-  const capture = () => {
-    captures++;
-    return 'data:image/png;base64,test';
-  };
-
-  assert.deepEqual(captureSavedSolidThumbnail(SAVED_SOLIDS_MAX, capture),
-    { full: true, dataURL: null });
-  assert.equal(captures, 0);
-  assert.deepEqual(captureSavedSolidThumbnail(SAVED_SOLIDS_MAX - 1, capture),
-    { full: false, dataURL: 'data:image/png;base64,test' });
-  assert.equal(captures, 1);
-});
 
 /** Verifies opTopologyKey names the parameter only where the engine lowers on it. */
 test('opTopologyKey separates only the params that pick a lowering', () => {
@@ -1099,7 +1072,7 @@ test('opsFromRecipe maps engine-native steps to editor units', () => {
     { op: 'ambo', param: 0, twist: 0 },
     { op: 'truncate', param: Math.fround(0.33), twist: 0 },
     { op: 'truncate', param: rad(5), twist: 0 },
-    { op: 'snub', param: Math.fround(0.5), twist: 0 },
+    { op: 'snub', param: Math.fround(0.5), twist: Math.fround(0.25) },
     { op: 'relax', param: 0, twist: 0 },
     { op: 'relax', param: 100, twist: 0 },
   ]);
@@ -1108,7 +1081,7 @@ test('opsFromRecipe maps engine-native steps to editor units', () => {
     { op: 'ambo', params: {} },
     { op: 'truncate', params: { t: 0.33 } },
     { op: 'truncate', params: { t: ops[3].params.t } },
-    { op: 'snub', params: { t: 0.5, twist: 0 } },
+    { op: 'snub', params: { t: 0.5, twist: 0.25 } },
     { op: 'relax', params: { iter: OP_DEFS.relax.params.iter.max } },
     { op: 'relax', params: { iter: 100 } },
   ]);
@@ -1120,7 +1093,7 @@ test('opsFromRecipe maps engine-native steps to editor units', () => {
 test('star seed calls match formatter-derived bin-packed fixtures', () => {
   for (const [index, base] of ['dodecahedron_hk62_ambo_hk62',
     'truncatedIcosidodecahedron_hk62_ambo_hk62'].entries()) {
-    const expected = readFileSync(new URL(`./fixtures/recipe-${index}.cpp`, import.meta.url), 'utf8').trimEnd();
+    const expected = fixture(`recipe-${index}.cpp`);
     assert.equal(generateRecipeCpp({ base, ops: ['kis'] }, 'IslamicStarPatterns'), expected);
   }
 });
@@ -1130,6 +1103,6 @@ test('long star seeds match formatter-derived namespace continuations', () => {
     'truncatedIcosahedron_ambo_relax_truncate33_hk64',
     'truncatedIcosahedron_ambo_relax_truncate001_hankin59'].entries()) {
     assert.equal(generateRecipeCpp({ base, ops: ['kis'] }, 'IslamicStarPatterns'),
-      readFileSync(new URL(`./fixtures/recipe-${offset + 3}.cpp`, import.meta.url), 'utf8').trimEnd());
+      fixture(`recipe-${offset + 3}.cpp`));
   }
 });

@@ -272,8 +272,10 @@ test('authoring page accepts legacy and canonical document aliases', () => {
 });
 
 
-test('GSReactionDiffusion has no Pause Presets control', async () => {
-  const app = startApp({ search: '?effect=GSReactionDiffusion', loadModule: async () => fakeWasmModule() });
+test('Pause Presets is absent for one preset and no animated parameter', async () => {
+  const module = fakeWasmModule();
+  module.HolosphereEngine.prototype.getPresetCount = () => 1;
+  const app = startApp({ loadModule: async () => module });
   await app.teardown.ready;
   const panel = app.guis.find((gui) => gui.namespace === 'fx');
   assert.ok(panel);

@@ -49,8 +49,6 @@ test('positive strength ranges shade only values above the estimate', () => {
   syncParamAdvisories(controls, [{ name: STRENGTH.name, foldStrength: 0.5 }]);
   assert.equal(controller.domElement.style.getPropertyValue('--param-fold-low'), '0%');
   assert.equal(controller.domElement.style.getPropertyValue('--param-fold-high'), '25%');
-  syncParamAdvisories(controls, [{ name: STRENGTH.name, foldStrength: Infinity }]);
-  assert.equal(controller.domElement.querySelector('.param-fold-note'), null);
 });
 
 test('empty, zero and invalid estimates leave unrelated controls usable', () => {
@@ -66,9 +64,23 @@ test('empty, zero and invalid estimates leave unrelated controls usable', () => 
   assert.equal(mode.domElement.querySelector('.param-fold-note'), null);
   syncParamAdvisories(controls, [{ name: STRENGTH.name, foldStrength: -0.2 }]);
   assert.equal(strength.domElement.querySelector('.param-fold-note'), null);
+  for (const foldStrength of [Infinity, NaN]) {
+    syncParamAdvisories(controls, [{name: STRENGTH.name, foldStrength}]);
+    assert.equal(strength.domElement.querySelector('.param-fold-note'), null);
+  }
   syncParamAdvisories(controls, []);
   assert.equal(strength.$input.getAttribute('aria-describedby'), 'param-range-flow.strength');
   assert.equal(strength.getValue(), 0.7);
+});
+
+test('a spaced parameter name publishes resolvable fold and range description tokens', () => {
+  const name = 'Flow Strength';
+  const controller = addParamControl(fakePanelGui(), {[name]: 0.7}, {...STRENGTH, name});
+  syncParamAdvisories(new Map([[name, controller]]), [{name, foldStrength: 0.2}]);
+  const tokens = controller.$input.getAttribute('aria-describedby').split(' ');
+  assert.equal(tokens.length, 2);
+  for (const id of tokens)
+    assert.ok(controller.domElement.querySelectorAll('[id]').some((element) => element.id === id));
 });
 
 test('panel refreshes changed parameters while paused without writing strength', () => {
