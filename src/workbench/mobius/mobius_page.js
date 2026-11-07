@@ -394,8 +394,7 @@ const initThree = () => {
   const result = initScene('canvasContainer', 'threeCanvas', {
     cameraPosition: [2.5, 2.5, 4],
     maxDistance: 15,
-    sphereRadius: 1.48,
-    sphereOpacity: 0.05,
+    showSphere: false,
     onAnimate: () => {
       if (isAnimating && activePreset && activePreset.update) {
         const now = performance.now();
