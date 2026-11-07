@@ -272,6 +272,15 @@ export function createOpGate(validator, retries = 3) {
       };
 
       for (const op of candidates) {
+        await new Promise((resolve) => {
+          const { port1, port2 } = new MessageChannel();
+          port1.onmessage = () => {
+            port1.close();
+            port2.close();
+            resolve(undefined);
+          };
+          port2.postMessage(null);
+        });
         if (started !== generation) {
           try { mesh.delete(); Mod.MeshOps.clearToolingMemory(); }
           catch (e) { validator.noteDeath(e); }
