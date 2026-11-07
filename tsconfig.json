@@ -33,6 +33,7 @@
     "generated/shader/composed_effect_roster.d.mts",
     "src/types/file_system_access.d.ts",
     "src/app/daydream.js",
+    "src/app/view_display_controls.js",
     "src/renderer/driver.js",
     "src/renderer/geometry.js",
     "src/ui/gui.js",

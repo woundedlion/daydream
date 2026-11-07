@@ -6,11 +6,8 @@
 
 import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot } from '../engine/workbench_bindings.js';
 import { GlobalStatsView } from "../ui/global_stats_view.js";
-import { MAX_DISPLAY_CAP_PERCENT, createDisplayCapsBinding } from "../renderer/display_caps.js";
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
 import { Daydream } from "../renderer/driver.js";
-import { FPS } from '../renderer/frame_constants.js';
-import { PovSweep } from '../renderer/pov_sweep.js';
 import { MOBILE_MEDIA_QUERY } from "../shared/layout.js";
 import { GUI, resetGUI } from "../ui/gui.js";
 import { EffectSidebar } from "../ui/sidebar.js";
@@ -35,7 +32,7 @@ import {
 } from "./app_lifecycle.js";
 import { createApplyNotice } from "../ui/apply_notice.js";
 import { displayAliasesDiverged, repointDisplayAliases } from "../engine/display_aliases.js";
-import { createPoleLodBinding } from "../renderer/pole_lod.js";
+import { createViewDisplayControls } from './view_display_controls.js';
 import { createRecordingControls } from "../recording/recording_controls.js";
 import {
   createSegmentedPovControls,
@@ -362,8 +359,7 @@ export function start({
       loaded.engine.setTemporalSampling(daydream.povFidelity);
 
       // Push the Pole LOD value set while host.engine was null.
-      poleLod.replay();
-      if (!displayCaps.replay()) throw new Error('Engine rejected display cap settings.');
+      if (!viewDisplay.replay()) throw new Error('Engine rejected display cap settings.');
 
       if (!syncResolutionOptions(module)) return;
 
@@ -395,7 +391,7 @@ export function start({
           applyNotice.show(
             `The shader workbench could not be initialized: ${errorDetail(err)}`,
             WORKBENCH_NOTICE);
-        }).finally(finishColumnDefaults);
+        }).finally(viewDisplay.finishColumnDefaults);
       } catch (err) {
         console.error('Initial resolution/effect could not be applied:', err);
         if (abandonOnModuleDeath(err)) return;
@@ -509,7 +505,6 @@ export function start({
     },
   });
 
-  let columnDefaultsReady = false;
   const apply = createApplyPipeline({
     appState,
     getEngine: () => host.engine,
@@ -525,7 +520,7 @@ export function start({
     muteSubscription: (write) => switches.mute(write),
     moduleDead: (error) => host.moduleDead(error),
     onColumnDefault: () => {
-      if (columnDefaultsReady) urlSync.setParam('view.noBlackColumns', null);
+      if (viewDisplay.columnDefaultsReady()) urlSync.setParam('view.noBlackColumns', null);
     },
   });
 
@@ -584,89 +579,10 @@ export function start({
   guiInstance.add(daydream, 'labelAxes').name('Show Axes').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
   guiInstance.add(daydream, 'showPip').name('Show PiP').onChange(() => daydream.invalidate());
-  let temporalSampling = daydream.povFidelity;
-  const povFidelity = guiInstance.add(daydream, 'povFidelity').name(`POV fidelity (${FPS} Hz)`);
-  const povResponse = guiInstance.add(daydream, 'povResponseScale',
-    PovSweep.MIN_RESPONSE_SCALE, PovSweep.MAX_RESPONSE_SCALE, 0.05).name('Response timescale');
-  const armPositions = guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions');
-  const syncPovControls = () => {
-    for (const control of [povResponse, armPositions]) {
-      if (daydream.povFidelity) control.enable();
-      else control.disable();
-    }
-    daydream.invalidate();
-  };
-  povFidelity.onChange(() => {
-    const changed = temporalSampling !== daydream.povFidelity;
-    temporalSampling = daydream.povFidelity;
-    if (host.engine) host.engine.setTemporalSampling(daydream.povFidelity);
-    segments.setTemporalSampling(daydream.povFidelity);
-    if (changed && daydream.paused && host.adapter && !segments.ownsDisplay)
-      host.adapter.drawFrame();
-    syncPovControls();
+  const viewDisplay = createViewDisplayControls({
+    gui: guiInstance, driver: daydream, host, segments,
+    syncEffectGui: (advanced) => effectGui.sync(advanced),
   });
-  povResponse.onChange(() => daydream.invalidate());
-  armPositions.onChange(() => daydream.invalidate());
-  syncPovControls();
-  /** @type {boolean|null} */
-  let initialColumnOverride = null;
-  let columnOverrideChanged = false;
-  const finishColumnDefaults = () => {
-    if (initialColumnOverride !== null && host.engine && !columnOverrideChanged) {
-      daydream.noBlackColumns = initialColumnOverride;
-      daydream.invalidate();
-    }
-    columnDefaultsReady = true;
-  };
-  guiInstance.add(daydream, 'noBlackColumns').name('No black columns').listen().onChange((/** @type {boolean} */ value) => {
-    if (!host.engine) initialColumnOverride = value;
-    else columnOverrideChanged = true;
-    daydream.invalidate();
-  });
-
-  const poleLod = createPoleLodBinding({
-    getEngine: () => host.engine,
-    onChange: () => daydream.invalidate(),
-  });
-  guiInstance.add(poleLod.state, 'poleLod', 0, 2, 0.05).name('Pole LOD')
-    .onChange((/** @type {number} */ value) => {
-      poleLod.apply(value);
-      segments.setPoleLod(value);
-      if (daydream.paused && !segments.ownsDisplay) daydream.stepOnce();
-    });
-
-  const displayCaps = createDisplayCapsBinding({
-    getEngine: () => host.engine,
-    onChange: (geometry) => {
-      daydream.setDisplayGeometry(geometry);
-      host.invalidateView();
-      segments.setDisplayCaps(displayCaps.state.topCap, displayCaps.state.bottomCap);
-      if (host.adapter) {
-        host.refresh();
-        host.adapter.drawFrame();
-        if (segments.ownsDisplay) daydream.resetPovOnNextFrame();
-        else daydream.resetPovNow();
-        effectGui.sync(true);
-      }
-      daydream.invalidate();
-    },
-  });
-  let acceptedCaps = { ...displayCaps.state };
-  /** @type {import('lil-gui').Controller[]} */
-  const capControls = [];
-  const applyDisplayCaps = () => {
-    if (!displayCaps.apply()) {
-      Object.assign(displayCaps.state, acceptedCaps);
-      for (const control of capControls) control.updateDisplay();
-      throw new Error('Engine rejected display cap settings.');
-    }
-    acceptedCaps = { ...displayCaps.state };
-    if (!host.engine) segments.setDisplayCaps(displayCaps.state.topCap, displayCaps.state.bottomCap);
-  };
-  capControls.push(guiInstance.add(displayCaps.state, 'topCap', 0, MAX_DISPLAY_CAP_PERCENT, 0.1).name('Top cap (%)')
-    .onChange(applyDisplayCaps));
-  capControls.push(guiInstance.add(displayCaps.state, 'bottomCap', 0, MAX_DISPLAY_CAP_PERCENT, 0.1).name('Bottom cap (%)')
-    .onChange(applyDisplayCaps));
 
   const segSpawn = shaderWorkbench ? null : createSegmentedPovControls({
     gui: guiInstance,
@@ -732,7 +648,7 @@ export function start({
   const ready = loadWithDeadline(loadModule)
     .then(moduleLoad.onModuleReady)
     .then(() => {
-      if (!shaderDocuments) finishColumnDefaults();
+      if (!shaderDocuments) viewDisplay.finishColumnDefaults();
     }).catch(moduleLoad.onModuleFailed);
 
   return Object.assign(appTeardown, { ready });

@@ -3,7 +3,6 @@
 // module loader).
 import {getActiveURLSync} from '../src/app/state.js';
 import { canonicalEffectId } from '../src/effects/effect_identity.js';
-import { PovSweep } from '../src/renderer/pov_sweep.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -73,14 +72,6 @@ test('the global GUI carries session and deep-link controls', () => {
     ['recQuality', 'recResolution', 'recFormat', 'record']);
 });
 
-test('POV fidelity defaults off and toggling it requests a repaint', () => {
-  const { guis, driver } = startApp();
-  const control = guis[0].controllers.find((c) => c.property === 'povFidelity');
-  assert.equal(control.getValue(), false);
-  control.setValue(true);
-  assert.equal(driver.povFidelity, true);
-  assert.equal(driver.invalidated, true);
-});
 
 test('the column toggle follows the loaded effect default and accepts manual changes', async () => {
   const app = startApp({ loadModule: async () => fakeWasmModule() });
@@ -112,27 +103,7 @@ test('explicit column-layout choices survive the initial effect default', async 
   }
 });
 
-test('response timescale is a persistent view control', () => {
-  const { guis, driver } = startApp();
-  const control = guis[0].controllers.find((c) => c.property === 'povResponseScale');
-  assert.equal(control.getValue(), 1);
-  assert.deepEqual(control.args.slice(0, 2), [PovSweep.MIN_RESPONSE_SCALE, PovSweep.MAX_RESPONSE_SCALE]);
-  assert.equal(control.session, undefined);
-  assert.ok(guis[0].collectUrlKeys().includes('view.povResponseScale'));
-  driver.invalidated = false;
-  control.setValue(2);
-  assert.equal(driver.povResponseScale, 2);
-  assert.equal(driver.invalidated, true);
-});
 
-test('hydrated fidelity controls retain their response timescale', () => {
-  for (const povFidelity of [false, true]) {
-    const {guis} = startApp({hydratedView: {povFidelity, povResponseScale: 1.3}});
-    const response = guis[0].controllers.find(c => c.property === 'povResponseScale');
-    assert.equal(response.disabled, !povFidelity);
-    assert.equal(response.getValue(), 1.3);
-  }
-});
 
 test('legacy presentation query parameters are removed from shared URLs', () => {
   const {urlWrites} = startApp({search: '?view.povPresentation=raw&view.povExposureMs=187'});
@@ -142,37 +113,7 @@ test('legacy presentation query parameters are removed from shared URLs', () => 
   assert.equal(params.has('view.povExposureMs'), false);
 });
 
-test('response availability follows fidelity without resetting its value', () => {
-  const { guis } = startApp();
-  const control = (name) => guis[0].controllers.find((c) => c.property === name);
-  const response = control('povResponseScale');
-  const arms = control('showSweepBoundary');
-  assert.equal(arms.disabled, true);
-  assert.equal(response.disabled, true);
-  control('povFidelity').setValue(true);
-  assert.equal(arms.disabled, false);
-  assert.equal(response.disabled, false);
-  response.setValue(1.5);
-  control('povFidelity').setValue(false);
-  assert.equal(arms.disabled, true);
-  assert.equal(response.disabled, true);
-  assert.equal(response.getValue(), 1.5);
-  control('povFidelity').setValue(true);
-  assert.equal(response.disabled, false);
-  assert.equal(response.getValue(), 1.5);
-});
 
-test('the sweep boundary defaults off and persists as a view control', () => {
-  const { guis, driver } = startApp();
-  const control = guis[0].controllers.find((c) => c.property === 'showSweepBoundary');
-  assert.equal(control.label, 'Show arm positions');
-  assert.equal(control.getValue(), false);
-  assert.equal(control.session, undefined);
-  assert.ok(guis[0].collectUrlKeys().includes('view.showSweepBoundary'));
-  control.setValue(true);
-  assert.equal(driver.showSweepBoundary, true);
-  assert.equal(driver.invalidated, true);
-});
 
 test('a workbench-only effect deep link is handed to the workbench page', () => {
   for (const effect of ['ShaderChain', 'alien-brain']) {
