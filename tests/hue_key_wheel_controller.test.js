@@ -164,6 +164,34 @@ test('dragging a harmony key hands the recipe off to CUSTOM', () => {
   assert.equal(status.textContent, '');
 });
 
+test('disabling the hue wheel cancels edits and hides the key handles', () => {
+  const { wheel, model, canvas, handles, counts } = setup();
+  const recipe = model.snapshot();
+  const keys = hueKeyState(recipe);
+  const marker = pointAt(keys.baseTurns + keys.offsets[0]);
+  wheel.draw(recipe);
+  pointer(canvas, 'pointerdown', marker);
+  assert.equal(canvas.style.cursor, 'grabbing');
+
+  wheel.setEnabled(false);
+  assert.ok(handles.every((handle) => handle.hidden));
+  pointer(canvas, 'pointermove', pointAt(0.3));
+  pointer(canvas, 'pointerdown', marker);
+  pointer(canvas, 'pointermove', marker);
+  assert.equal(canvas.style.cursor, 'default');
+  assert.equal(press(handles[0], 'ArrowRight').prevented, false);
+  wheel.draw(recipe);
+  assert.ok(handles.every((handle) => handle.hidden));
+  assert.equal(counts.recipeChanges, 0);
+  assert.deepEqual(model.snapshot(), recipe);
+
+  wheel.setEnabled(true);
+  wheel.draw(recipe);
+  assert.equal(handles[0].hidden, false);
+  assert.equal(press(handles[0], 'ArrowRight').prevented, true);
+  assert.equal(model.reading('hueMode'), 'CUSTOM');
+});
+
 test('a drag that cannot keep a loop sweep stops and says why', () => {
   const recipe = PALETTE_RECIPE_PRESETS.isolightSpectralLoop();
   recipe.hue.sweepTurns = 3;

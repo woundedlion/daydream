@@ -34,6 +34,7 @@ const KEY_REFUSAL = 'This hue key is omitted when these keys are resampled to th
  * @typedef {object} HueKeyWheel
  * @property {(recipe: RecipeView) => void} draw - Paints the wheel for a
  *   recipe, as compiled; a CUSTOM recipe draws the model's own keys.
+ * @property {(enabled: boolean) => void} setEnabled - Allows the hue keys to be edited.
  * @property {(mode: string) => void} onHueModeChange - Applies a hue mode the
  *   distribution select chose; entering CUSTOM resamples the keys from the
  *   first one, and a refused handoff keeps the previous mode.
@@ -64,6 +65,7 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
   /** @type {number|null} */
   let activeKey = null;
   let selectedKey = 0;
+  let enabled = true;
   /** @type {{baseTurns: number, offsets: ReadonlyArray<number>}} */
   const customState = { baseTurns: 0, offsets: [] };
 
@@ -145,7 +147,7 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
     drawnPoints = drawn.points;
     drawnScale = drawn.scale;
     selectedKey = Math.min(selectedKey, drawn.points.length - 1);
-    syncHandles(drawn.degrees);
+    syncHandles(enabled ? drawn.degrees : []);
   };
 
   /**
@@ -155,6 +157,7 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
    * @returns {void}
    */
   const nudgeKey = (event, keyIndex) => {
+    if (!enabled) return;
     const delta = hueKeyNudgeTurns(event.key, event.shiftKey);
     if (delta === null) return;
     event.preventDefault();
@@ -205,6 +208,7 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
   const drag = createPointerDrag({
     element: canvas,
     onStart: (event) => {
+      if (!enabled) return false;
       activeKey = markerAt(event);
       if (activeKey === null) return false;
       selectedKey = activeKey;
@@ -224,7 +228,7 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
       scheduleUpdate();
     },
     onHover: (event) => {
-      canvas.style.cursor = markerAt(event) === null ? 'default' : 'grab';
+      canvas.style.cursor = enabled && markerAt(event) !== null ? 'grab' : 'default';
     },
     onEnd: () => {
       activeKey = null;
@@ -235,6 +239,15 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
 
   return {
     draw,
+    setEnabled(next) {
+      if (next === enabled) return;
+      enabled = next;
+      if (!enabled) {
+        drag.stop();
+        canvas.style.cursor = 'default';
+        syncHandles([]);
+      }
+    },
     onHueModeChange(mode) {
       if (mode === 'CUSTOM' && model.reading('hueMode') !== 'CUSTOM') {
         selectedKey = 0;
