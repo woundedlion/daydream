@@ -22,7 +22,7 @@ const APPLY_NOTICE_MS = 8000;
  * @param {(handle: any) => void} [deps.cancel] - Timer sink.
  * @param {(message: string) => void} [deps.logWarning] - Sink for the
  *   one-shot report that the notice elements are absent.
- * @returns {{show: (message: string|null, owner: string) => void,
+ * @returns {{show: (message: string|null, owner: string, gesture?: object) => void,
  *   clear: () => void, owner: () => string|null}} The sink. clear() drops the
  *   notice whoever raised it; owner() reports who holds the element.
  */
@@ -40,6 +40,8 @@ export function createApplyNotice({
   let handle = null;
   /** @type {string|null} */
   let held = null;
+  /** @type {object|undefined} */
+  let heldGesture;
 
   const resolve = () => {
     if (elements) return elements;
@@ -63,17 +65,26 @@ export function createApplyNotice({
   };
 
   const write = (
-    /** @type {string|null} */ notice, /** @type {string|null} */ owner) => {
+    /** @type {string|null} */ notice, /** @type {string|null} */ owner,
+    /** @type {object|undefined} */ gesture = undefined) => {
     const el = resolve();
     if (!el) return;
     const { body, text } = el;
     if (handle !== null) cancel(handle);
     handle = null;
-    held = notice === null ? null : owner;
     const hidden = notice === null;
-    const content = notice ?? '';
+    const current = text.textContent;
+    let content = notice ?? '';
+    if (notice !== null) {
+      const repeated = notice + '\u200b';
+      const sameGesture = gesture !== undefined && gesture === heldGesture && owner === held;
+      if (sameGesture && (current === notice || current === repeated)) content = current;
+      else if (current === notice) content = repeated;
+    }
+    held = hidden ? null : owner;
+    heldGesture = hidden ? undefined : gesture;
     if (body.hidden !== hidden) body.hidden = hidden;
-    if (text.textContent !== content) text.textContent = content;
+    if (current !== content) text.textContent = content;
     if (notice !== null) handle = schedule(() => expire(owner), timeoutMs);
   };
 
@@ -86,10 +97,10 @@ export function createApplyNotice({
   };
 
   return {
-    show(message, owner) {
+    show(message, owner, gesture) {
       const notice = message || null;
       if (notice === null && held !== null && held !== owner) return;
-      write(notice, owner);
+      write(notice, owner, gesture);
     },
     clear: () => write(null, null),
     owner: () => held,

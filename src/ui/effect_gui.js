@@ -129,8 +129,8 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  *   effect-load generation, stamped onto each definitions snapshot.
  * @param {() => ArrayLike<number>|null} deps.engine.paramValues - The engine's
  *   per-frame value stream.
- * @param {(name: string, value: number) => boolean} deps.engine.setParam - Writes
- *   one parameter and reports acceptance.
+ * @param {(name: string, value: number, gesture?: object) => boolean} deps.engine.setParam - Writes
+ *   one parameter and reports acceptance, grouping writes in a pointer gesture.
  * @param {(paused: boolean) => void} deps.engine.setAnimationsPaused -
  *   Freezes/resumes animation-driven params on every engine.
  * @param {() => boolean} deps.engine.animationsPaused - Reads the animation-pause state.
@@ -574,7 +574,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       const applyValue = (/** @type {number|boolean} */ v) => {
         const value = engineParamValue(v);
         const offered = !p.optionValues || p.optionValues.includes(value);
-        const accepted = offered && setEngineParam(p.name, value) !== false;
+        const accepted = offered && setEngineParam(p.name, value, fx.edits.dragGesture(controller)) !== false;
         if (!offered) {
           controller.object[controller.property] = acceptedControlValue;
           controller.updateDisplay();
