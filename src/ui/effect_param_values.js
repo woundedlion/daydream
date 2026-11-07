@@ -62,9 +62,10 @@ export function createParamValueSync({
       if (!controller?.isEnum || controller.isReadonly) continue;
       const isEditing = focused !== null
         && controller.domElement?.contains(focused) === true;
-      if (isEditing) selectorsPending = true;
-      const { update, value } = resolveParamSync(
-        controller.getValue(), selectorControlValue(parameter), { isEditing });
+      const current = controller.getValue();
+      const requested = selectorControlValue(parameter);
+      if (isEditing && current !== requested) selectorsPending = true;
+      const { update, value } = resolveParamSync(current, requested, { isEditing });
       if (!update) continue;
       controller.object[controller.property] = value;
       controller.updateDisplay();
