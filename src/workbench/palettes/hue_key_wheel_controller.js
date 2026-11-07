@@ -12,12 +12,12 @@
 import { createSliderProxy } from '../../shared/slider.js';
 import { createPointerDrag, innerRect } from '../../shared/pointer_drag.js';
 import {
-  PaletteV4, customHueKeyState, customHueSweepRepresentable, hitTestHueKeyMarker,
+  PaletteV4, customHueKeyState, customHueSweepRepresentable,
   hueKeyState,
 } from './palette_controls.js';
 import {
   HUE_KEY_GRAB_RADIUS, HUE_KEY_NAMES, canvasPoint, hueKeyHandoff, hueKeyNudgeTurns,
-  wheelTurnAt,
+  wheelTurnAt, hitTestHueKeyMarker,
 } from './palette_wheel.js';
 
 /** @typedef {import('./palette_controls.js').PaletteRecipe} PaletteRecipe */
