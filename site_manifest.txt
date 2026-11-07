@@ -38,6 +38,7 @@ src/recording/recording_settings.js
 src/segments/segment_policy.js
 src/ui/segmented_pov_controls.js
 src/app/daydream.js
+src/app/view_display_controls.js
 src/renderer/driver.js
 src/ui/effect_gui.js
 src/ui/effect_param_controls.js
