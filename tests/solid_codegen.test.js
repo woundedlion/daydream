@@ -380,10 +380,10 @@ test('generateRecipeCpp wraps at the column limit, not one column early or late'
   ]);
 });
 
-/** Verifies generateRecipeCpp falls back to zero vertex/face/internal counts when the item omits them. */
-test('generateRecipeCpp defaults missing V/F/I counts to 0', () => {
-  const cpp = generateRecipeCpp({ base: 'cube', ops: ['dual'] }, 'Archimedean');
-  assert.ok(cpp.includes('star pattern (V=0, F=0, I=0).'));
+test('generateRecipeCpp omits mesh counts if any count is missing', () => {
+  const cpp = generateRecipeCpp({ base: 'cube', ops: ['dual'], vCount: 8, fCount: 12 }, 'Archimedean');
+  assert.ok(cpp.includes('star pattern.'));
+  assert.doesNotMatch(cpp, /V=/);
 });
 
 test('generateRecipeCpp wraps a long star seed constructor argument', () => {
@@ -409,15 +409,16 @@ test('generateRecipeCpp renders counts as non-negative integer comment text', ()
   }, 'Archimedean');
   assert.equal(spliced.split('\n').length, 9);
   assert.ok(!spliced.includes('evil'));
-  assert.ok(spliced.includes('star pattern (V=0, F=12, I=4).'));
+  assert.ok(spliced.includes('star pattern.'));
 
-  for (const [count, shown] of [
-    [-3, 0], [1.9, 1], ['24', 24], [NaN, 0], [Infinity, 0], [null, 0], [{}, 0],
-    ['*/ evil() /*', 0],
-  ]) {
-    const cpp = generateRecipeCpp({ base: 'cube', ops: ['dual'], vCount: count }, 'Archimedean');
-    assert.ok(cpp.includes(`star pattern (V=${shown}, F=0, I=0).`),
+  for (const [count, shown] of [[-3, 0], [1.9, 1], ['24', 24]]) {
+    const cpp = generateRecipeCpp({ base: 'cube', ops: ['dual'], vCount: count, fCount: 12, iCount: 0 }, 'Archimedean');
+    assert.ok(cpp.includes(`star pattern (V=${shown}, F=12, I=0).`),
       `count ${String(count)} rendered wrong`);
+  }
+  for (const count of [NaN, Infinity, null, {}, '', false, '*/ evil() /*']) {
+    const cpp = generateRecipeCpp({ base: 'cube', ops: ['dual'], vCount: count, fCount: 12, iCount: 0 }, 'Archimedean');
+    assert.doesNotMatch(cpp, /V=|evil/);
   }
 });
 

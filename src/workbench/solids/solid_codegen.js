@@ -547,14 +547,15 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
 }
 
 /**
- * Converts a persisted mesh count to a truncated non-negative integer for the
- * generated doc comment. Nonfinite or negative results become 0.
+ * Converts a persisted mesh count to a non-negative integer.
  * @param {*} value - The persisted count.
- * @returns {number} The count as a non-negative integer, or 0.
+ * @returns {?number} The truncated count, or null if unavailable.
  */
 function commentCount(value) {
+  if (value == null || (typeof value !== 'number' && typeof value !== 'string')
+      || (typeof value === 'string' && value.trim() === '')) return null;
   const n = Math.trunc(Number(value));
-  return Number.isFinite(n) && n >= 0 ? n : 0;
+  return Number.isFinite(n) ? Math.max(0, n) : null;
 }
 
 /**
@@ -648,9 +649,14 @@ function returnRecipeCpp(recipe) {
 export function generateRecipeCpp(item, baseNamespace) {
   requireNamespace('generateRecipeCpp', baseNamespace);
   const { funcName, recipe } = generateFuncAndRecipe(item, baseNamespace);
+  const vCount = commentCount(item.vCount);
+  const fCount = commentCount(item.fCount);
+  const iCount = commentCount(item.iCount);
+  const counts = vCount !== null && fCount !== null && iCount !== null
+    ? ` (V=${vCount}, F=${fCount}, I=${iCount})`
+    : '';
   const doc = doxygenCpp([
-    `@brief Builds the ${funcName} star pattern (V=${commentCount(item.vCount)}, `
-      + `F=${commentCount(item.fCount)}, I=${commentCount(item.iCount)}).`,
+    `@brief Builds the ${funcName} star pattern${counts}.`,
     '@param a First arena in the alternating construction pair.',
     '@param b Second arena; the result may borrow storage from either arena.',
     '@return The resulting star-pattern mesh.',
