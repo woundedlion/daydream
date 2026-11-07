@@ -8,9 +8,9 @@ import { errorDetail, showFatalError } from '../shared/banner.js';
 
 // Remedy for an unreachable CDN. refreshModuleCache is same-origin only, so
 // Reload never repairs a cached vendor module.
-export const VENDOR_REMEDY = 'three and lil-gui load from cdn.jsdelivr.net. If '
-  + 'this machine is offline or the CDN is blocked, run `npm run importmap:local` '
-  + 'to serve the vendored copies instead (README §7.8).';
+export const VENDOR_REMEDY = 'three and lil-gui load from cdn.jsdelivr.net. Check '
+  + 'that this machine can reach it. In a local checkout, populate the vendored '
+  + 'copies and run `npm run importmap:local` (README §7.8).';
 
 // Remedy for a fetched module that failed to link: a cached copy against a
 // newer deploy.

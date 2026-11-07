@@ -105,7 +105,7 @@ test('a module the browser could not fetch gets the CDN remedy', () => {
     const remedy = childWithClass(overlay, 'load-error-remedy')?.textContent;
     assert.equal(remedy, VENDOR_REMEDY, message);
     assert.match(remedy, /cdn\.jsdelivr\.net/);
-    assert.match(remedy, /importmap:local/);
+    assert.match(remedy, /In a local checkout, populate the vendored copies.*importmap:local/);
   }
 });
 
