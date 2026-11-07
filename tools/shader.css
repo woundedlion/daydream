@@ -726,6 +726,15 @@ select.chain-param-control {
   outline: none;
 }
 
+@media (forced-colors: active) {
+  .chain-scroll-icon,
+  .chain-chip-pin-icon,
+  .chain-chip-reset-icon {
+    forced-color-adjust: none;
+    background: ButtonText;
+  }
+}
+
 @media (pointer: coarse), (width <= 900px) {
   .chain-chip-pin,
   .chain-chip-reset,
