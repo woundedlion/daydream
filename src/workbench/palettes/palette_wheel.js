@@ -400,7 +400,7 @@ export function createHueKeyWheelPainter({ canvas, ctx }) {
         rasterLightness = quantized;
       }
       ctx.putImageData(raster, 0, 0);
-      ctx.setTransform?.(scaleX, 0, 0, scaleY, 0, 0);
+      ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
 
       const points = hueKeyMarkerPoints(state, width, height);
       const selected = Math.min(selectedKey, points.length - 1);

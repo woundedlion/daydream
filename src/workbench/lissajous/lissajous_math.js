@@ -20,14 +20,6 @@ export const MAX_RATIONAL_TERM = 8;
 const MAX_SEARCH_TERM = 1024;
 
 /**
- * Greatest common divisor of two non-negative integers (Euclid).
- * @param {number} a - First integer (>= 0).
- * @param {number} b - Second integer (>= 0).
- * @returns {number} gcd(a, b); gcd(0, 0) is 0.
- */
-const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
-
-/**
  * The reduced ratio of a pair that already closes: the smallest denominator in
  * [1, maxTerm] whose multiple of the ratio is a whole number of active turns.
  * @param {number} ratio - Active over passive frequency.
@@ -40,8 +32,7 @@ const closingRatio = (ratio, maxTerm, tol = 1e-9) => {
   for (let N = 1; N <= maxTerm; N++) {
     const M = Math.round(ratio * N);
     if (Math.abs(ratio * N - M) > tol * Math.max(1, Math.abs(M))) continue;
-    const g = gcd(Math.abs(M), N);
-    return { M: M / g, N: N / g };
+    return { M, N };
   }
   return null;
 };

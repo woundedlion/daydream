@@ -80,7 +80,6 @@ export function selectMimeType(
  *   write: (data: Blob) => void,
  *   finish: () => (void|Promise<void>),
  *   ready?: Promise<void>,
- *   cancelled?: () => boolean,
  * }} VideoSink
  */
 
@@ -360,7 +359,7 @@ export class VideoRecorder {
     };
 
     const begin = () => {
-      if (this.mediaRecorder !== recorder || sink.cancelled?.()) return;
+      if (this.mediaRecorder !== recorder) return;
       try {
         recorder.start(RECORDER_TIMESLICE_MS);
         this.starting = false;
@@ -612,7 +611,6 @@ export class VideoRecorder {
     /** @type {FileSystemWritableFileStream|null} */
     let writable = null;
     let failed = false;
-    let aborted = false;
     let backlogBytes = 0;
     let overflowed = false;
     const maxBacklogBytes = (bitrateMbps * 1_000_000 / 8) * WRITE_BACKLOG_SECONDS;
@@ -625,7 +623,6 @@ export class VideoRecorder {
       .then((h) => { handle = h; })
       .catch((err) => {
         if (err?.name === 'AbortError') {
-          aborted = true;
           // Stop and notify the host only if this recorder still owns the cancelled session.
           if (this.mediaRecorder === recorder) {
             this.stop();
@@ -639,10 +636,9 @@ export class VideoRecorder {
     // Serialize chunks; create the writable on the first chunk, preserving files for empty sessions.
     let chain = Promise.resolve();
     return {
-      cancelled: () => aborted,
       ready: opened,
       write: (data) => {
-        if (overflowed || aborted || failed) return;
+        if (overflowed || failed) return;
         if (!handle && backlogBytes === 0) { hold(data); return; }
         if (backlogBytes + data.size > maxBacklogBytes) {
           overflowed = true;
@@ -658,9 +654,6 @@ export class VideoRecorder {
         }
         backlogBytes += data.size;
         chain = chain.then(async () => {
-          await opened;
-          // Save dialog cancelled: finish() discards the buffer, so drop chunks.
-          if (aborted) return;
           // No file handle (picker unavailable, or createWritable failed):
           // buffer every chunk for the blob-download fallback.
           if (!handle) { hold(data); return; }
@@ -698,9 +691,6 @@ export class VideoRecorder {
       finish: () => {
         return chain
           .then(async () => {
-            await opened;
-            // User cancelled the Save dialog: discard the buffered chunks.
-            if (aborted) return;
             // No writable opened — the picker was unavailable (chunks buffered)
             // or the session streamed no data (the chosen file was never
             // truncated). Download the buffer if there is one.

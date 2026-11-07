@@ -121,31 +121,6 @@ export class SegmentCompositor {
     for (let s = 0; s < n; s++) {
       const r = results[s];
       if (!r || !r.pixels) continue;
-      if (r.x0 < 0 || r.y0 < 0 || r.x1 > w || r.y1 > h) {
-        this.onFault(s,
-          `SegmentCompositor.composite: segment ${s} rect ` +
-          `[${r.x0},${r.y0})-[${r.x1},${r.y1}) is out of bounds for the ` +
-          `${w}x${h} display buffer — the generation fence let a stale-resolution ` +
-          `result through (layout/fence invariant violated)`);
-        return 0;
-      }
-      if (r.x1 <= r.x0 || r.y1 <= r.y0) {
-        this.onFault(s,
-          `SegmentCompositor.composite: segment ${s} rect ` +
-          `[${r.x0},${r.y0})-[${r.x1},${r.y1}) is empty/inverted — a zero or ` +
-          `negative expectedLen would mask layout corruption (segment-rect ` +
-          `invariant violated)`);
-        return 0;
-      }
-      const expectedLen = (r.x1 - r.x0) * (r.y1 - r.y0) * 3;
-      if (!(r.pixels instanceof Uint16Array) || r.pixels.length !== expectedLen) {
-        this.onFault(s,
-          `SegmentCompositor.composite: segment ${s} pixel buffer length ` +
-          `${r.pixels.length} != expected ${expectedLen} for rect ` +
-          `[${r.x0},${r.y0})-[${r.x1},${r.y1}) — a rect/buffer mismatch would ` +
-          `blit a truncated row (segment-result invariant violated)`);
-        return 0;
-      }
       // A worker that missed a setResolution answers under the current
       // generation with a self-consistent rect for the wrong band.
       const band = bands[s];
@@ -157,6 +132,15 @@ export class SegmentCompositor {
           `[${band.x0},${band.y0})-[${band.x1},${band.y1}) of the ${n}-segment ` +
           `${w}x${h} layout — a stale-geometry frame would composite into the ` +
           `wrong rows (segment-layout invariant violated)`);
+        return 0;
+      }
+      const expectedLen = (r.x1 - r.x0) * (r.y1 - r.y0) * 3;
+      if (!(r.pixels instanceof Uint16Array) || r.pixels.length !== expectedLen) {
+        this.onFault(s,
+          `SegmentCompositor.composite: segment ${s} pixel buffer length ` +
+          `${r.pixels.length} != expected ${expectedLen} for rect ` +
+          `[${r.x0},${r.y0})-[${r.x1},${r.y1}) — a rect/buffer mismatch would ` +
+          `blit a truncated row (segment-result invariant violated)`);
         return 0;
       }
     }

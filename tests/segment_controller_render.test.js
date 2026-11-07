@@ -96,7 +96,7 @@ test('composite() faults on a rectangle that overflows the current display buffe
   const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'a leading out-of-bounds rect blits nothing');
   assert.equal(c.faulted, true, 'an overflow latches a fault instead of throwing');
-  assert.match(c.faultInfo.message, /out of bounds/);
+  assert.match(c.faultInfo.message, /is not its band/);
   assert.ok(driver.pixels.every((v) => v === 0),
     'a leading out-of-bounds rect is never partially blitted');
 });
@@ -118,12 +118,12 @@ test('composite() faults atomically when a non-leading segment overflows', () =>
   const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'a later out-of-bounds rect blits nothing');
   assert.equal(c.faulted, true);
-  assert.match(c.faultInfo.message, /segment 1 .* out of bounds/);
+  assert.match(c.faultInfo.message, /segment 1 .* is not its band/);
   assert.ok(driver.pixels.every((v) => v === 0),
     'the good leading segment is not blitted when a later segment overflows');
 });
 
-test('composite() faults on an empty/inverted segment rect', () => {
+test('composite() rejects an empty segment rect as the wrong band', () => {
   setDisplayGrid(4, 2);
 
   const c = makeController();
@@ -134,7 +134,7 @@ test('composite() faults on an empty/inverted segment rect', () => {
   const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'an empty/inverted rect blits nothing');
   assert.equal(c.faulted, true, 'a zero-area rect latches a fault instead of masking corruption');
-  assert.match(c.faultInfo.message, /empty\/inverted/);
+  assert.match(c.faultInfo.message, /is not its band/);
   assert.ok(driver.pixels.every((v) => v === 0), 'nothing is blitted on an empty/inverted rect');
 });
 
@@ -143,9 +143,8 @@ test('composite() faults on a pixel buffer whose length disagrees with its rect'
 
   const c = makeController();
   c.showBoundaries = false;
-  // rect [0,0)-[2,2) expects 2 * 2 * 3 = 12 elements; supply 6.
-  const short = new Uint16Array(6).fill(123);
-  const staged = [{ pixels: short, x0: 0, x1: 2, y0: 0, y1: 2 }];
+  const short = new Uint16Array(3).fill(123);
+  const staged = [{ pixels: short, x0: 0, x1: 2, y0: 0, y1: 1 }];
 
   const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'a length-mismatched buffer blits nothing');

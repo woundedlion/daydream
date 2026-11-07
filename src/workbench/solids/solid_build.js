@@ -95,8 +95,7 @@ function readbackAndFree(wasmMesh, ctx) {
     if (ctx.onTrap(e)) return null;
     wasmMesh.delete();
     ctx.meshOps.clearToolingMemory();
-    ctx.onError(`Mesh readback failed: ${
-      errorText(e)}`);
+    ctx.onError(`Mesh readback failed: ${errorText(e)}`);
     return null;
   }
   wasmMesh.delete();
@@ -156,7 +155,7 @@ export function buildChainMesh(base, ops, ctx) {
     // Read before the flush overwrites the recorded reason. `mesh` is the last
     // valid op result: the failing op threw before the swap.
     const failure = meshOpFailure(ctx.Mod, `Op "${failing}"`);
-    if (mesh) mesh.delete();
+    mesh.delete();
     ctx.meshOps.clearToolingMemory();
     if (failure.reason === 'OK' || failure.reason === 'UNKNOWN') {
       ctx.onError(`Op error: ${errorText(e)}`);
@@ -179,8 +178,7 @@ export function buildChainMesh(base, ops, ctx) {
   } catch (e) {
     console.error('WASM classifyFaces error:', e);
     if (ctx.onTrap(e)) return null;
-    classifyFailure = `Face classification failed: ${
-      errorText(e)}`;
+    classifyFailure = `Face classification failed: ${errorText(e)}`;
   }
 
   const meshData = readbackAndFree(mesh, ctx);

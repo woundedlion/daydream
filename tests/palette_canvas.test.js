@@ -135,7 +135,6 @@ test('changing the visible phase window rebuilds the strip cache', () => {
 test('the strip fits its backing buffer to the displayed size and pixel density', (t) => {
   const canvas = { width: 1024, height: 100, clientWidth: 400, clientHeight: 96 };
   const ctx = fakeContext();
-  ctx.setTransform = (...args) => ctx.ops.push(['setTransform', ...args]);
   const { doc, created } = fakeDoc();
   const palette = fakePalette();
   const painter = createColorStripPainter({ canvas, ctx, doc });
@@ -153,7 +152,6 @@ test('the strip fits its backing buffer to the displayed size and pixel density'
 
 test('repeated strip draws leave an unlaid-out canvas its own size', (t) => {
   const { painter, canvas, ctx, palette } = stripSetup(2048, 512);
-  ctx.setTransform = (...args) => ctx.ops.push(['setTransform', ...args]);
   withPixelRatio(t, 2);
   for (let i = 0; i < 5; i++) painter.draw(palette);
 
@@ -192,7 +190,6 @@ test('the wave graph samples every column once for all three channels', () => {
 test('the wave graph fits its backing buffer to the displayed size and pixel density', (t) => {
   const canvas = { width: 1024, height: 300, clientWidth: 400, clientHeight: 120 };
   const ctx = fakeContext();
-  ctx.setTransform = (...args) => ctx.ops.push(['setTransform', ...args]);
   const palette = fakePalette();
   withPixelRatio(t, 2);
   drawWaveGraph({ canvas, ctx, palette });
@@ -206,7 +203,6 @@ test('the wave graph fits its backing buffer to the displayed size and pixel den
 test('repeated wave-graph draws leave an unlaid-out canvas its own size', (t) => {
   const canvas = { width: 2048, height: 512 };
   const ctx = fakeContext();
-  ctx.setTransform = (...args) => ctx.ops.push(['setTransform', ...args]);
   withPixelRatio(t, 2);
   for (let i = 0; i < 5; i++) drawWaveGraph({ canvas, ctx, palette: fakePalette() });
 

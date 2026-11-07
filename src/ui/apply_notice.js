@@ -78,7 +78,7 @@ export function createApplyNotice({
   };
 
   const expire = (/** @type {string|null} */ owner) => {
-    if (elements?.body.contains?.(doc.activeElement) || elements?.body.matches?.(':hover')) {
+    if (elements?.body.contains(doc.activeElement) || elements?.body.matches(':hover')) {
       handle = schedule(() => expire(owner), timeoutMs);
       return;
     }

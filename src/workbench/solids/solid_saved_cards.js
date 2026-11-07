@@ -32,15 +32,12 @@ export function buildSavedCard(item, index, {
   if (clashMessage) {
     el.classList.add('name-clash');
     el.title = clashMessage;
-  }
-
-  if (el.classList.contains('name-clash')) {
     const warning = doc.createElement('button');
     warning.type = 'button';
     warning.className = 'saved-clash-btn text-amber-400';
     warning.textContent = '!';
-    warning.setAttribute('aria-label', el.title);
-    warning.addEventListener('click', () => on.explain(el.title));
+    warning.setAttribute('aria-label', clashMessage);
+    warning.addEventListener('click', () => on.explain(clashMessage));
     el.appendChild(warning);
   }
   const deleteButton = doc.createElement('button');

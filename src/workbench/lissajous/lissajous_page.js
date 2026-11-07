@@ -173,7 +173,6 @@ const mountSlider = (id, params) => {
     if ((id === 'C1' || id === 'C2') && state.isRationalLocked) {
       snapFrequencies(id, rawValue);
     } else {
-      sliderHandles[id].setValue(state[id]);
       scheduleUpdate();
     }
   });

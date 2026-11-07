@@ -51,7 +51,7 @@ function fitCanvasToDisplay(canvas, ctx) {
 
   // Setting canvas.width resets the context state, so the transform is applied
   // after any resize.
-  ctx.setTransform?.(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   return { width, height };
 }
 

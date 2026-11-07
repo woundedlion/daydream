@@ -1513,7 +1513,6 @@ test('a cancelled save picker tells the host the session ended', async (t) => {
   const hostNotified = trackHostError(rec);
 
   rec.start('cancelled');
-  const recorder = rec.mediaRecorder;
   // The picker's rejection reaches the hook while the session is still installed.
   await hostNotified();
 
@@ -1523,8 +1522,7 @@ test('a cancelled save picker tells the host the session ended', async (t) => {
     'the host is given the cancellation in the words the UI shows');
   assert.equal(rec.isRecording, false, 'the cancelled session is stopped');
 
-  recorder.onstop();
-  assert.equal(rec.mediaRecorder, null, 'the stop path still finalizes the session');
+  assert.equal(rec.mediaRecorder, null, 'the cancelled session is cleaned up');
 });
 
 // ---------------------------------------------------------------------------
