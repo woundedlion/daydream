@@ -512,25 +512,27 @@ function wireCanvasTap(canvasEl) {
 const SAVED_THUMB_SIZE = 256;
 const savedStore = resolveSavedSolidsStorage();
 const savedStorage = loadSavedSolids(savedStore.storage);
-savedStorage.notice = [savedStore.notice, savedStorage.notice].filter(Boolean).join(' ');
 const savedSolids = savedStorage.entries;
 const savedStorageStatus = document.getElementById('savedStorageStatus');
-if (savedStorageStatus) savedStorageStatus.textContent = savedStorage.notice;
+if (savedStorageStatus) savedStorageStatus.textContent =
+  [savedStore.notice, savedStorage.notice, savedStorage.backupNotice].filter(Boolean).join(' ');
 
 function reloadSavedSolids(event) {
   if (event.key !== SAVED_SOLIDS_KEY && event.key !== null) return;
   const loaded = loadSavedSolids(savedStore.storage);
   savedSolids.splice(0, savedSolids.length, ...loaded.entries);
   savedStorage.rejected.splice(0, savedStorage.rejected.length, ...loaded.rejected);
-  savedStorage.notice = [savedStore.notice, loaded.notice].filter(Boolean).join(' ');
-  if (savedStorageStatus) savedStorageStatus.textContent = savedStorage.notice;
+  savedStorage.notice = loaded.notice;
+  savedStorage.backupNotice = loaded.backupNotice;
+  if (savedStorageStatus) savedStorageStatus.textContent =
+    [savedStore.notice, loaded.notice, loaded.backupNotice].filter(Boolean).join(' ');
   renderSavedList();
 }
 
 function persistSavedSolids() {
   const notice = persistSavedStore(savedStore.storage, savedSolids, savedStorage);
   const status = document.getElementById('savedStorageStatus');
-  if (status) status.textContent = notice;
+  if (status) status.textContent = [savedStore.notice, notice].filter(Boolean).join(' ');
 }
 
 function exportSavedSolids() {
