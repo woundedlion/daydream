@@ -26,7 +26,7 @@ import { enumChoices } from "../effects/param_sync.js";
  * @property {(fx: {gui: Gui}) => boolean} isActive - Whether a record is still the
  *   published one.
  * @property {(message: string, error?: unknown) => void} logWarn - Console sink.
- * @property {(message: string) => void} showNotice - Presents an export refusal.
+ * @property {(message: string|null) => void} showNotice - Shows or clears the export notice.
  */
 /**
  * @typedef {Object} EffectActions
@@ -120,6 +120,7 @@ export function createEffectActions(fx, deps) {
     return copyText(text).then((copied) => {
       if (!isActive(fx)) return;
       if (copied) {
+        showNotice(null);
         flashExport(EXPORT_COPIED);
       } else {
         logWarn('Export: clipboard copy failed');

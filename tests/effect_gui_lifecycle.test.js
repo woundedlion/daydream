@@ -111,7 +111,7 @@ test('Export does not fall back to controls from a stale schema', () => {
   assert.equal(h.gui().ctrl('export').label, '\u2717');
   assert.match(h.warnings[0], /no parameter values matching/);
   assert.equal(exportStatus(h).textContent, EXPORT_REFUSED);
-  assert.match(h.configNotices[0], /no parameter values matching/);
+  assert.match(h.actionNotices[0], /no parameter values matching/);
 });
 
 test('Export omits engine-written readonly params from the preset', async () => {
@@ -171,7 +171,7 @@ test('chain Export fails visibly when the typed snapshot is unavailable', () => 
   assert.deepEqual(h.warnings,
     ['Export: Shader Workbench chain snapshot is unavailable']);
   assert.equal(exportStatus(h).textContent, EXPORT_REFUSED);
-  assert.deepEqual(h.configNotices,
+  assert.deepEqual(h.actionNotices,
     ['Export: Shader Workbench chain snapshot is unavailable']);
 });
 

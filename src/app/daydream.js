@@ -223,6 +223,7 @@ export function start({
   const SEGMENT_NOTICE = 'segments';
   const RECORD_NOTICE = 'record';
   const CONFIG_NOTICE = 'config';
+  const EXPORT_NOTICE = 'export';
   const WORKBENCH_NOTICE = 'workbench';
 
   /**
@@ -492,6 +493,7 @@ export function start({
       canPausePresets: () => loaded.engine.getPresetCount() > 1
         || loaded.engine.getParameterDefinitions().some((parameter) => parameter.animated),
       copyText: copyToClipboard,
+      showActionNotice: (message) => applyNotice.show(message, EXPORT_NOTICE),
       applyEffect: () => {
         const rejected = apply.applyEffect() !== ApplyResult.APPLIED;
         const notice = rejected

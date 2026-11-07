@@ -107,6 +107,17 @@ test('a failed or rejected copy flashes failure', async () => {
   assert.deepEqual(rejected.notices, ['Export: clipboard copy failed']);
 });
 
+test('a successful Export retry clears its earlier copy failure', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  let allowed = false;
+  const a = actions({ copyText: async () => allowed });
+  await a.ctrl('export').object.export();
+  allowed = true;
+  await a.ctrl('export').object.export();
+  assert.deepEqual(a.notices, ['Export: clipboard copy failed', null]);
+  assert.equal(a.status().textContent, EXPORT_COPIED);
+});
+
 test('a copy that lands after the record was replaced flashes nothing', async () => {
   for (const outcome of [true, false, new Error('late')]) {
     const a = actions({ copyText: fakeCopyText(outcome) });
