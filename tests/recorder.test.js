@@ -2048,6 +2048,21 @@ test('stopping while the Save dialog is open prevents a later encoder start', as
 });
 
 
+test('a throwing started hook leaves the encoder recording', (t) => {
+  t.after(installRecorderEnv());
+  const captured = installConsoleCapture('error');
+  t.after(captured.restore);
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.onStarted = () => { throw new Error('host hook failed'); };
+  rec.start('recording');
+
+  assert.equal(rec.mediaRecorder.state, 'recording');
+  assert.equal(rec.isRecording, true);
+  assert.equal(rec.stream.track.stopped, false);
+  assert.match(captured.messages.join(), /host notification failed/);
+  rec.stop();
+});
+
 test('started hook waits for the Save dialog and the running encoder', async (t) => {
   t.after(installRecorderEnv());
   let accept;
