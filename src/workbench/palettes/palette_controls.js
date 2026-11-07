@@ -991,6 +991,7 @@ export function paletteRecipeAvailability(recipe) {
 
   return {
     baseHue: hasColor,
+    hueKeys: hasColor,
     hueMode: hasColor,
     harmony: hasColor && recipe.hue.mode === PaletteV4.hueMode.HARMONY,
     hueSpread: hasColor && recipe.hue.mode === PaletteV4.hueMode.HARMONY &&

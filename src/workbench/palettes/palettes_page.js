@@ -231,6 +231,7 @@ function renderBaseHue() {
 
 function renderRecipeAvailability() {
   const availability = paletteRecipeAvailability(recipeModel.recipe());
+  hueKeyWheel?.setEnabled(availability.hueKeys);
   /** @type {Array<[string,string,boolean]>} */
   const controls = [
     ['gen_base_hue_field', PALETTE_CONTROL_IDS.baseHueDegrees, availability.baseHue],
