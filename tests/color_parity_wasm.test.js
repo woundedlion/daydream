@@ -12,7 +12,7 @@ import createHolosphereModule from '../generated/holosphere_wasm.js';
 import * as C from '../src/shared/color.js';
 import * as P from '../src/workbench/palettes/palette_math.js';
 import {
-  defaultPaletteRecipe, hueKeyState, paletteEnumName,  PaletteV4,
+  defaultPaletteRecipe, hueKeyState, paletteEnumName,  PaletteV4, zoomRecipeWindow,
 } from '../src/workbench/palettes/palette_controls.js';
 import * as L from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
@@ -396,6 +396,19 @@ test('PaletteOps compiles deterministic V4 recipe LUTs', () => {
     assert.deepEqual(Uint8Array.from(fresh.compileAndBakeV4(recipe).lut), baked);
   } finally {
     fresh.delete();
+  }
+});
+
+test('a zoom ending at the right edge needs no input span adjustment', () => {
+  const ops = new M.PaletteOps();
+  try {
+    const recipe = defaultPaletteRecipe();
+    recipe.input = zoomRecipeWindow(recipe.input, 0.8, 1);
+    const { status } = ops.compileAndBakeV4(recipe);
+    assert.equal(status.code, M.PaletteCompileCode.OK);
+    assert.equal(status.clampedFields, 0);
+  } finally {
+    ops.delete();
   }
 });
 

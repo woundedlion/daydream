@@ -841,6 +841,9 @@ test('the recipe window is clamped to a span its controls can express', () => {
   assert.deepEqual(clampRecipeWindow(0.9, 0.5), { offset: 0.5, span: 0.5 },
     'the window cannot start past the end of the palette');
   assert.deepEqual(clampRecipeWindow(-1, 2), { offset: 0, span: 1 });
+  const rightEdge = zoomRecipeWindow({ offset: 0, span: 1 }, 0.8, 1);
+  assert.equal(rightEdge.offset, 0.8);
+  assert.ok(Math.fround(rightEdge.span) <= Math.fround(1 - Math.fround(rightEdge.offset)));
   assert.deepEqual(clampRecipeWindow(0.5, 0), { offset: 0.5, span: 0.01 },
     'an empty span is widened to the narrowest the slider offers');
 });

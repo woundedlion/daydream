@@ -231,9 +231,10 @@ export function createPaletteViewport() {
  */
 export function clampRecipeWindow(offset, span) {
   const clampedSpan = Math.max(0.01, Math.min(1, span));
+  const clampedOffset = Math.max(0, Math.min(1 - clampedSpan, offset));
   return {
-    offset: Math.max(0, Math.min(1 - clampedSpan, offset)),
-    span: clampedSpan,
+    offset: clampedOffset,
+    span: Math.min(clampedSpan, 1 - Math.fround(clampedOffset)),
   };
 }
 
