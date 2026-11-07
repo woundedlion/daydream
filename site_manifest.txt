@@ -99,6 +99,7 @@ src/workbench/shader/chain_apply.js
 src/workbench/shader/chain_document_store.js
 src/workbench/shader/chain_strip.js
 src/workbench/shader/chain_palette.js
+src/workbench/shader/chain_param_rows.js
 src/workbench/shader/chain_presentation.js
 src/shared/labels.js
 src/shared/clipboard.js
