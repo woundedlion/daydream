@@ -212,15 +212,22 @@ test('repeated wave-graph draws leave an unlaid-out canvas its own size', (t) =>
     'the drawn area is the backing store read back in CSS pixels');
 });
 
-test('the wave graph draws band edges, clamp boundaries, and three channels', () => {
+test('the wave graph paints its opaque background first', () => {
+  const canvas = { width: 16, height: 100 };
+  const ctx = fakeContext();
+  drawWaveGraph({ canvas, ctx, palette: fakePalette() });
+
+  assert.deepEqual(ctx.ops.filter(([name]) => name !== 'setTransform')[0], ['fillRect', 0, 0, 16, 100],
+    'the opaque background is the first paint; nothing clears ahead of it');
+
+});
+
+test('the wave graph marks band edges and clamp reference lines', () => {
   const canvas = { width: 16, height: 100 };
   const ctx = fakeContext();
   drawWaveGraph({ canvas, ctx, palette: fakePalette() });
 
   const { yTop, yBottom, toY } = waveGraphBand(100);
-  assert.deepEqual(ctx.ops.filter(([name]) => name !== 'setTransform')[0], ['fillRect', 0, 0, 16, 100],
-    'the opaque background is the first paint; nothing clears ahead of it');
-
   const moves = ctx.ops.filter(([n]) => n === 'moveTo').map(([, x, y]) => [x, y]);
   assert.ok(moves.some(([x, y]) => x === 0 && y === yTop), 'the value band top edge is missing');
   assert.ok(moves.some(([x, y]) => x === 0 && y === yBottom), 'the value band bottom edge is missing');
@@ -230,10 +237,24 @@ test('the wave graph draws band edges, clamp boundaries, and three channels', ()
     assert.ok(ctx.ops.some(([n, x, y]) => n === 'lineTo' && x === 16 && y === toY(value)));
   }
 
+});
+
+test('the wave graph strokes channels in RGB order', () => {
+  const canvas = { width: 16, height: 100 };
+  const ctx = fakeContext();
+  drawWaveGraph({ canvas, ctx, palette: fakePalette() });
+
   const strokes = ctx.ops.filter(([n]) => n === 'stroke').map(([, style, w]) => [style, w]);
   assert.deepEqual(strokes.slice(-3),
     [['#EF4444', 3], ['#22C55E', 3], ['#3B82F6', 3]],
     'the three channel curves must be stroked in R, G, B order');
+
+});
+
+test('the wave graph fills only its uniform background', () => {
+  const canvas = { width: 16, height: 100 };
+  const ctx = fakeContext();
+  drawWaveGraph({ canvas, ctx, palette: fakePalette() });
 
   const fills = ctx.ops.filter(([n]) => n === 'fillRect');
   assert.deepEqual(fills, [
@@ -308,4 +329,21 @@ test('wave graph reference lines follow a supplied generated-value range', () =>
   for (const value of [0, 1]) {
     assert.ok(ctx.ops.some(([name, x, y]) => name === 'moveTo' && x === 0 && y === toY(value)));
   }
+});
+
+test('a one-column color strip samples a finite starting phase', () => {
+  const {painter, palette} = stripSetup(1, 4);
+  const phases = [];
+  palette.get = phase => { phases.push(phase); return [0, 0, 0]; };
+  painter.draw(palette);
+  assert.deepEqual(phases, [0]);
+});
+
+test('selection overlays use CSS pixels at double pixel density', (t) => {
+  const {painter, canvas, ctx, palette} = stripSetup();
+  Object.assign(canvas, {clientWidth: 100, clientHeight: 20});
+  withPixelRatio(t, 2);
+  painter.draw(palette, {start: 0.2, end: 0.7});
+  assert.deepEqual(ctx.ops.filter(([name]) => name === 'fillRect' || name === 'strokeRect'),
+    [['fillRect', 20, 0, 50, 20], ['strokeRect', 20, 0, 50, 20]]);
 });

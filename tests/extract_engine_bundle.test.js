@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, readdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -41,6 +41,22 @@ test('bundle extraction retains valid nested files', (t) => {
   execFileSync(python, ['-c', 'import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],"w"); z.writestr("nested/file","ok"); z.close()', archive]);
   execFileSync(python, [script, archive, join(dir, 'out')]);
   assert.equal(readFileSync(join(dir, 'out/nested/file'), 'utf8'), 'ok');
+});
+
+test('bundle extraction cannot follow an existing destination link outside the output', (t) => {
+  const dir = scratchDir(t, 'bundle-existing-link-');
+  const archive = join(dir, 'bundle.zip');
+  const output = join(dir, 'out');
+  const outside = join(dir, 'outside');
+  mkdirSync(output);
+  mkdirSync(outside);
+  symlinkSync(outside, join(output, 'link'), process.platform === 'win32' ? 'junction' : 'dir');
+  execFileSync(python, ['-c',
+    'import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],"w"); z.writestr("link/file","escape"); z.close()', archive]);
+  const result = spawnSync(python, [script, archive, output], {encoding: 'utf8'});
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /bundle entry escapes destination/);
+  assert.deepEqual(readdirSync(outside), []);
 });
 
 test('bundle extraction rejects a NUL-truncated filename before writing', (t) => {

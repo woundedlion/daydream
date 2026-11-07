@@ -404,7 +404,7 @@ test('a move that breaks carrier agreement is refused', async () => {
   const [project, warp] = store.chain().slice(PROJECT, PROJECT + 2);
   const result = store.replaceSpan(PROJECT, 2, [warp, project]);
   assert.equal(result.ok, false);
-  assert.ok(result.diagnostics.length > 0);
+  assert.ok(result.diagnostics.some(({ code }) => code === 'CARRIER_MISMATCH' || code === 'FAMILY_ORDER'));
   assert.deepEqual(store.document(), before);
   assert.equal(store.canUndo(), false);
 });
@@ -715,14 +715,32 @@ test('the palette socket is replaceable only by operators that exit on the color
   assert.match(transfer.reason, /the chain needs color here/);
 });
 
+test('a refused multi-parameter edit preserves the document and undo history', async () => {
+  const store = await makeStore();
+  const before = store.document();
+  const preset = before.preset_bank.presets[0].preset_id;
+  const result = store.setPresetValues(preset, {'sample.pattern-freq': 3, 'camera.wander': 99});
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostics[0].code, 'VALUE_OUT_OF_RANGE');
+  assert.deepEqual(store.document(), before);
+  assert.equal(store.canUndo(), false);
+});
+
 test('legality agrees with replaceSpan', async () => {
   const store = await makeStore();
-  const entries = store.legalInsertions(WARP);
-  assert.ok(entries.length > 0);
-  for (const entry of entries) {
-    const probe = await makeStore();
-    const result = probe.replaceSpan(WARP, 0, [{ operator: entry.operator.id }]);
-    assert.equal(result.ok, entry.legal, entry.operator.id);
+  const before = store.document();
+  for (const remove of [0, 1]) {
+    const length = store.chain().length;
+    for (let index = 0; index <= length - remove; index += 1) {
+      const entries = remove === 0 ? store.legalInsertions(index) : store.legalReplacements(index, 1);
+      assert.ok(entries.length > 0);
+      for (const entry of entries) {
+        const result = store.replaceSpan(index, remove, [{ operator: entry.operator.id }]);
+        assert.equal(result.ok, entry.legal, `${index}/${remove}/${entry.operator.id}`);
+        if (result.ok) store.undo();
+        assert.deepEqual(store.document(), before);
+      }
+    }
   }
 });
 
@@ -1248,19 +1266,17 @@ test('a chain snapshot imports its chain and maps enum indices to option ids', (
 });
 
 test('a chain snapshot imports current Twist angles unchanged', () => {
-  const catalog = structuredClone(CATALOG);
-  const twist = catalog.operators.find((operator) => operator.id === 'sphere.lens.twist.v2');
-  Object.assign(twist.params[0], {id: 'twist-angle', name: 'Twist Angle (rad)', min: -96, max: 96, default: Math.PI * 2});
+  const twist = CATALOG.operators.find((operator) => operator.id === 'sphere.lens.twist.v2');
   const snapshot = {schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, modulation: [],
     chain: [{instance: 'lens', operator: twist.id}, ...SNAPSHOT_CHAIN],
     parameters: [{name: 'lens.twist-angle', value: -8}, {name: 'lens.twist-distribution', value: 0.5}],
   };
   const before = structuredClone(snapshot);
-  const document = documentFromChainSnapshot(snapshot, catalog);
+  const document = documentFromChainSnapshot(snapshot, CATALOG);
   const values = document.preset_bank.presets[0].values;
   assert.equal(values['lens.twist-angle'], -8);
   assert.equal(values['lens.twist-distribution'], 0.5);
-  assert.deepEqual(compiler.validateShaderDocument(document, {catalog}), []);
+  assert.deepEqual(compiler.validateShaderDocument(document, {catalog: CATALOG}), []);
   assert.deepEqual(snapshot, before);
 });
 
@@ -1278,7 +1294,7 @@ test('a chain snapshot import refuses unknown parameters and unsupported shapes'
     chain: SNAPSHOT_CHAIN, modulation: [], parameters: [{ name: 'missing.parameter', value: 0 }] }, CATALOG),
   /unknown chain snapshot parameter: missing\.parameter/);
   for (const snapshot of [null, { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION + 1, chain: SNAPSHOT_CHAIN, modulation: [], parameters: [] },
-    { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: null, parameters: [] },
+    { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: null, parameters: [], modulation: [] },
     { schemaVersion: 2, chain: SNAPSHOT_CHAIN, parameters: [], modulation: [] },
     { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: SNAPSHOT_CHAIN, parameters: [] },
     { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: SNAPSHOT_CHAIN, modulation: [], parameters: null }])

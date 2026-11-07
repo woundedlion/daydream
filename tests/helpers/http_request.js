@@ -5,6 +5,7 @@ export const request = (origin, path) => new Promise((done, fail) => {
   httpGet(`${origin}${path}`, { agent: false }, (res) => {
     let body = '';
     res.setEncoding('utf8');
+    res.on('error', fail);
     res.on('data', (chunk) => { body += chunk; });
     res.on('end', () => done({
       status: res.statusCode ?? 0,

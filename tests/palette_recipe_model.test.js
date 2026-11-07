@@ -192,7 +192,7 @@ test('hue mode transitions hand off into CUSTOM unless a loop sweep would be los
 });
 
 for (const harmony of Object.keys(PaletteV4.harmony)) {
-  for (const direction of ['SHORTEST', 'CLOCKWISE', 'COUNTERCLOCKWISE']) {
+  for (const direction of Object.keys(PaletteV4.direction)) {
     test(`${harmony} keeps its base through repeated custom handoffs (${direction})`, () => {
       const model = new PaletteRecipeModel();
       model.setChoice('harmony', harmony);
@@ -344,7 +344,7 @@ test('moving custom key A across the seam follows the nearby turn', () => {
   for (const index of [1, 2]) assert.ok(Math.abs(moved[index] - before[index]) < 1e-12);
 });
 
-test('moving custom key B retains its seam-safe independent behavior', () => {
+test('moving custom key B across the seam leaves the other offsets alone', () => {
   const offsets = [0, -0.96, -0.25];
   const recipe = defaultPaletteRecipe();
   recipe.hue.mode = PaletteV4.hueMode.CUSTOM;

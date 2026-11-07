@@ -1,6 +1,19 @@
+import {singlePatternCatalog, paramRow} from './helpers/shader_document_harness.js';
+import {
+  primaryName, ownedEditors, INDEX, WORKBENCH, ENGINE_CATALOG, SCRATCH, plainName, MODULE,
+  fixedEngine, promotedDocument, PROMOTED, PATTERN_CATALOG, shaderDocument, workbenchEngine,
+  patternFetch, workbench, onChange, SCRATCH_WRITES, chooseCatalogSource,
+  withoutEmbeddedModulation, KALEIDOSCOPE_HEX_BRIGHT, KALEIDOSCOPE_STAINED_GLASS,
+  HEX_PATTERN_CATALOG, compiledBuildEngine, editorWorkbench, clickPlaneBandEntry, stripChips,
+  displayedParameter, sampleFrequencySlider, expectStageAbsent, stageEditor, savedValues,
+  affineLatticeStudy,
+} from './helpers/shader_document_harness.js';
 import { canonicalEffectId } from '../src/effects/effect_identity.js';
-import { BAKED_CONSTANT_IDS, bakedTopologyFields, fixedDerivedBinding, engineControlNames, compileShaderDocument, DEFAULT_LIMITS, exportShaderDocumentJson, validateShaderDocument } from '../generated/shader/shader_workbench.mjs';
-import { afterEach, beforeEach, mock, test } from 'node:test';
+import {
+  BAKED_CONSTANT_IDS, engineControlNames, compileShaderDocument, DEFAULT_LIMITS,
+  exportShaderDocumentJson, validateShaderDocument,
+} from '../generated/shader/shader_workbench.mjs';
+import {mock, test} from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
@@ -13,41 +26,11 @@ import { scratchChainDocument } from '../src/workbench/shader/chain_document_sto
 import {
   CHAIN_SNAPSHOT_SCHEMA_VERSION, decodeShaderStateHash, encodeShaderStateHash,
 } from '../src/workbench/shader/shader_deeplink.js';
-import {
-  applyFixedShaderDocument,
-  createShaderDocumentController,
-  SHADER_LINK_DEBOUNCE_MS,
-  SHADER_LINK_MAX_WAIT_MS,
-} from '../src/workbench/shader/shader_documents.js';
+import {createShaderDocumentController, SHADER_LINK_DEBOUNCE_MS, SHADER_LINK_MAX_WAIT_MS} from '../src/workbench/shader/shader_documents.js';
 import {
   FakeChainEngine, ParamSetResult, ChainSnapshotRestoreResult, unpinnedEngineMethods,
 } from './helpers/fake_engine.js';
-import {
-  documentEvents, fakeElement, installAnimationFrames, installDocument,
-  restoreDocumentAfterEach,
-} from './helpers/fake_dom.js';
-
-const primaryName = (id, descriptor) => engineControlNames(id, descriptor)[0];
-
-const ownedEditors = new Set();
-afterEach(async () => {
-  for (const controller of ownedEditors) await controller.dispose();
-  ownedEditors.clear();
-});
-
-const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const WORKBENCH = readFileSync(new URL('../tools/shader.html', import.meta.url), 'utf8');
-const ENGINE_CATALOG = readFileSync(
-  new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8');
-// The document the workbench opens on, built from the same catalog the
-// page fetches, so the fakes register exactly what the scratch chain would.
-const SCRATCH = scratchChainDocument(JSON.parse(ENGINE_CATALOG));
-
-restoreDocumentAfterEach();
-
-let animationFrames;
-beforeEach(() => { animationFrames = installAnimationFrames(); });
-afterEach(() => { animationFrames.restore(); });
+import {fakeElement} from './helpers/fake_dom.js';
 
 test('simulator exposes Shader as a standalone tool', () => {
   assert.match(INDEX, /href="tools\/shader\.html"[^>]*>Shader/);
@@ -80,10 +63,6 @@ test('document parameter IDs map to their aliased promoted controls', () => {
   assert.equal(primaryName('colorize.value-opacity-high'), 'Opacity at Value 1');
 });
 
-/** @param {string} field The plain Title Case control name an alias-free label yields. */
-const plainName = (field) => field.split('-').map((part) => part.length === 0
-  ? part : part[0].toUpperCase() + part.slice(1)).join(' ');
-
 // A label outside the alias set maps to the plain Title Case of its field, so
 // a newly promoted document needs no table entry to land on its controls.
 test('labels outside the alias table need no entry', () => {
@@ -115,8 +94,6 @@ test('the alias table keys stay frozen', () => {
   assert.deepEqual([...aliased].sort(),
     ['camera', 'colorize', 'sample', 'surface', 'warp1', 'warp2']);
 });
-
-const MODULE = { ParamSetResult, ChainSnapshotRestoreResult, ShaderChainBindings: { getShaderChainCatalog: () => ENGINE_CATALOG } };
 
 for (const operation of ['selectEffect', 'setShaderChainParameters', 'stage edit']) {
   test(`a halted ${operation} reports failure and blocks later engine calls`, async (t) => {
@@ -153,32 +130,6 @@ for (const operation of ['selectEffect', 'setShaderChainParameters', 'stage edit
     assert.equal(harness.engine.chainCalls.length, chainCalls, 'the later load wrote no chain');
   });
 }
-const BAKED = bakedTopologyFields(JSON.parse(ENGINE_CATALOG));
-
-const fixedDocument = () => ({ document: {
-  preset_bank: { presets: [
-    { preset_id: 'noon', values: { 'sample.pattern-freq': 2, 'sample.weight-mode': 'projection' } },
-    { preset_id: 'dusk', values: { 'sample.pattern-freq': 5, 'sample.weight-mode': 'projection' } },
-  ] },
-} });
-
-/** @param {(id: string) => boolean} answer */
-function fixedEngine(answer) {
-  const selected = [];
-  const writes = [];
-  return {
-    selected,
-    writes,
-    selectPresetById: (id) => { selected.push(id); return answer(id); },
-    getParameterDefinitions: () => [{ name: 'Pattern Freq' }],
-    getDocumentParameterDefinitions: () => [],
-    setDocumentParameter: () => ParamSetResult.UNKNOWN_PARAM,
-    setParameter: (name, value) => {
-      writes.push([name, value]);
-      return ParamSetResult.APPLIED;
-    },
-  };
-}
 
 test('the shader-document engine fakes mock nothing outside the engine surface', () => {
   for (const [name, double] of [
@@ -195,236 +146,6 @@ test('the shader-document engine fakes mock nothing outside the engine surface',
   }
 });
 
-// The writes also pin the topology skip: sample.weight-mode selects a baked
-// structural variant, so the fixed path never offers it to the engine.
-test('a fixed-pipeline preset is staged on the engine preset it names', () => {
-  const engine = fixedEngine(() => true);
-
-  assert.equal(applyFixedShaderDocument(
-    engine, MODULE, fixedDocument(), 'dusk', ['noon', 'dusk'], BAKED, fixedDerivedBinding), null);
-  assert.deepEqual(engine.selected, ['dusk']);
-  assert.deepEqual(engine.writes, [['Pattern Freq', 5]]);
-});
-
-test('compiled modulation fields use exact resources and retain readonly values', () => {
-  const engine = fixedEngine(() => true);
-  const definitions = [
-    {resource: 'ink', id: 'grid-axis-b-x', readonly: true, value: Math.fround(0.3)},
-    {resource: 'ink', id: 'pattern-scale', readonly: false, value: 1},
-  ];
-  engine.getDocumentParameterDefinitions = () => definitions;
-  engine.setDocumentParameter = (resource, id, value) => {
-    engine.writes.push([resource, id, value]);
-    return ParamSetResult.APPLIED;
-  };
-  const compiled = {document: {
-    descriptor: {chain: [{label: 'ink', operator: 'color.modulate.v1'}]},
-    preset_bank: {presets: [{preset_id: 'one', values: {
-      'ink.grid-axis-b-x': 0.3, 'ink.pattern-scale': 2,
-    }}]},
-  }};
-  const apply = () => applyFixedShaderDocument(engine, MODULE, compiled, 'one', ['one'],
-    BAKED, () => null);
-  assert.equal(apply(), null);
-  assert.deepEqual(engine.writes, [['ink', 'pattern-scale', 2]]);
-  engine.writes.length = 0;
-  definitions[0].value = 0.4;
-  assert.match(apply(), /must match the fixed build/);
-  assert.deepEqual(engine.writes, []);
-  definitions[0].resource = 'other';
-  assert.match(apply(), /no engine parameter matches/);
-});
-
-// The document's presets and the effect's reference presets are separate banks:
-// an authored preset the effect never had still has to land on some reference
-// state, or the values are written over whatever the last preview left behind.
-test('a preset the effect does not carry falls back to its first reference', () => {
-  const engine = fixedEngine(() => true);
-
-  assert.equal(applyFixedShaderDocument(
-    engine, MODULE, fixedDocument(), 'dusk', ['noon'], BAKED, fixedDerivedBinding), null);
-  assert.deepEqual(engine.selected, ['noon']);
-  assert.deepEqual(engine.writes, [['Pattern Freq', 5]]);
-});
-
-// Every writable id is resolved before the first write: a refusal after one write would
-// leave the engine on a state that is neither the reference preset nor the
-// document's.
-test('an unmatched id refuses the fixed apply before any value is written', () => {
-  const engine = fixedEngine(() => true);
-  const values = { 'sample.pattern-freq': 3, 'sample.no-such-field': 1 };
-  const presets = [{ preset_id: 'noon', values }];
-
-  assert.equal(applyFixedShaderDocument(
-    engine, MODULE, { document: { preset_bank: { presets } } },
-    'noon', ['noon'], BAKED, fixedDerivedBinding),
-  'no engine parameter matches "sample.no-such-field"');
-  assert.deepEqual(engine.writes, []);
-});
-
-test('an effect with no reference preset is refused before any engine write', () => {
-  const engine = fixedEngine(() => true);
-
-  assert.equal(
-    applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', [], BAKED, fixedDerivedBinding),
-    'the effect has no reference preset');
-  assert.deepEqual(engine.selected, []);
-  assert.deepEqual(engine.writes, []);
-});
-
-test('a refused reference preset names the preset the engine rejected', () => {
-  const engine = fixedEngine(() => false);
-
-  assert.equal(
-    applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', ['noon'], BAKED, fixedDerivedBinding),
-    'the engine refused reference preset "noon"');
-  assert.deepEqual(engine.writes, []);
-});
-
-// selectPresetById is reached through an optional call, so an engine build
-// without it answers undefined rather than throwing.
-test('an engine without selectPresetById is refused, not written through', () => {
-  const engine = fixedEngine(() => true);
-  delete engine.selectPresetById;
-
-  assert.match(
-    String(applyFixedShaderDocument(
-      engine, MODULE, fixedDocument(), 'noon', ['noon'], BAKED, fixedDerivedBinding)),
-    /refused reference preset "noon"/);
-  assert.deepEqual(engine.writes, []);
-});
-
-// The skip set is the catalog's own topology flag. Palette mapping is the one
-// flagged field a fixed build keeps live, as an ordinary dropdown.
-test('the fixed path skips every topology field the catalog flags', () => {
-  const catalog = JSON.parse(ENGINE_CATALOG);
-  const flagged = catalog.operators.flatMap((/** @type {*} */ operator) =>
-    operator.params.filter((/** @type {*} */ parameter) => parameter.topology === true));
-  const values = Object.fromEntries(flagged
-    .filter((/** @type {*} */ parameter) => parameter.id !== 'palette-mapping')
-    .map((/** @type {*} */ parameter) => [`warp1.${parameter.id}`, parameter.default]));
-  const engine = fixedEngine(() => true);
-  const presets = [{ preset_id: 'noon', values }];
-
-  assert.ok(Object.keys(values).length > 0, 'the catalog flags topology fields');
-  assert.equal(applyFixedShaderDocument(
-    engine, MODULE, { document: { preset_bank: { presets } } },
-    'noon', ['noon'], BAKED, fixedDerivedBinding), null);
-  assert.deepEqual(engine.writes, []);
-  assert.ok(flagged.some((/** @type {*} */ parameter) =>
-    parameter.id === 'palette-mapping'));
-  assert.equal(BAKED.has('palette-mapping'), false);
-});
-
-const PATTERNS = new URL('../generated/shader/patterns/', import.meta.url);
-/** @param {string} filename */
-const promotedDocument = (filename) => {
-  const document = JSON.parse(readFileSync(new URL(filename, PATTERNS), 'utf8'));
-  return document.descriptor ? compileShaderDocument(document, {catalog: JSON.parse(ENGINE_CATALOG)}).document : document;
-};
-const PROMOTED = promotedDocument('catalog.json').source_documents;
-
-// The compiled build hard-codes these values, so it registers no control for
-// them.
-test('the fixed path skips the ids the compiled build bakes in as constants', () => {
-  const engine = fixedEngine(() => true);
-  const values = { 'camera.spin-speed': 0.01975, 'sample.pattern-freq': 3 };
-  const presets = [{ preset_id: 'noon', values }];
-
-  assert.ok(BAKED_CONSTANT_IDS.has('camera.spin-speed'));
-  assert.equal(applyFixedShaderDocument(
-    engine, MODULE, { document: { preset_bank: { presets } } },
-    'noon', ['noon'], BAKED, fixedDerivedBinding), null);
-  assert.deepEqual(engine.writes, [['Pattern Freq', 3]]);
-});
-
-// Ash Cloud's preset carries `camera.spin-speed`, a baked constant with no registered control.
-test('fixed apply orchestration writes matching controls in document order', () => {
-  const ashCloud = promotedDocument(PROMOTED['ash-cloud']);
-  assert.equal(ashCloud.preset_bank.presets[0].values['modulate.modulation-source'], 'displacement');
-  const dormant = new Set(['modulate.pattern-scale', 'modulate.pattern-speed', 'modulate.pattern-contrast']);
-  const ids = Object.keys(ashCloud.preset_bank.presets[0].values);
-  const definitions = ids
-    .filter((id) => !BAKED.has(id.slice(id.indexOf('.') + 1)))
-    .map((id) => {
-      const value = ashCloud.preset_bank.presets[0].values[id];
-      return {name: primaryName(id, ashCloud.descriptor), ...(typeof value === 'string'
-        ? {options: [value], optionValues: [0]} : {})};
-    })
-    .filter((definition) => definition.name !== 'Camera Spin Speed');
-  const engine = fixedEngine(() => true);
-  engine.getParameterDefinitions = () => definitions;
-
-  assert.ok(ids.includes('camera.spin-speed'));
-  assert.equal(applyFixedShaderDocument(
-    engine, MODULE, { document: ashCloud }, 'ash-cloud', ['ash-cloud'], BAKED, fixedDerivedBinding), null);
-  assert.equal(engine.writes.some(([name]) => name === 'Camera Spin Speed'), false);
-  const expectedWrites = Object.entries(ashCloud.preset_bank.presets[0].values)
-    .filter(([id]) => !dormant.has(id))
-    .map(([id, value]) => [primaryName(id, ashCloud.descriptor), typeof value === 'string' ? 0 : value])
-    .filter(([name]) => definitions.some((definition) => definition.name === name));
-  assert.deepEqual(engine.writes, expectedWrites);
-});
-
-test('the GridWorms compiled preset preserves dormant noise settings without noise controls', () => {
-  const document = promotedDocument(PROMOTED['grid-worms']);
-  const before = structuredClone(document);
-  const preset = document.preset_bank.presets[0];
-  assert.equal(preset.values['modulation.modulation-source'], 'directional-sine');
-  const dormant = new Set(['modulation.pattern-scale', 'modulation.pattern-speed']);
-  for (const id of dormant) assert.ok(Number.isFinite(preset.values[id]), id);
-  const definitions = Object.entries(preset.values)
-    .filter(([id]) => !dormant.has(id) && id !== 'sample.edge-width'
-      && !BAKED_CONSTANT_IDS.has(id) && !BAKED.has(id.slice(id.indexOf('.') + 1)))
-    .map(([id, value]) => ({name: primaryName(id, document.descriptor),
-      ...(typeof value === 'string' ? {options: [value], optionValues: [0]} : {})}));
-  assert.equal(definitions.some(({name}) => /^Pattern (Scale|Speed)$/.test(name)), false);
-  const engine = fixedEngine(() => true);
-  engine.getParameterDefinitions = () => definitions;
-  assert.equal(applyFixedShaderDocument(engine, MODULE, {document}, preset.preset_id,
-    [preset.preset_id], BAKED, fixedDerivedBinding), null);
-  assert.deepEqual(engine.writes.filter(([name]) => name.startsWith('Pattern ')), [['Pattern Frequency', 1]]);
-  assert.ok(engine.writes.some(([name, value]) => name === 'lens1.Twist Angle (rad)'
-    && value === preset.values['lens1.twist-angle']));
-  assert.deepEqual(document, before);
-});
-
-const affinePeriodDocument = (period, scale = 2) => ({ document: {
-  descriptor: { chain: [
-    { label: 'warp1', operator: 'warp.affine.v4' },
-    { label: 'cells', operator: 'sample.tessellation.v3' },
-  ] },
-  preset_bank: { presets: [{ preset_id: 'noon', values: {
-    'cells.cell-scale': scale,
-    'warp1.lattice-period': period,
-  } }] },
-} });
-
-test('a fixed affine fallback period applies through its own control', () => {
-  const engine = fixedEngine(() => true);
-  engine.getParameterDefinitions = () => [{ name: 'Cell Scale' },
-    { name: 'outer_warp.Lattice Period' }];
-  assert.equal(applyFixedShaderDocument(engine, MODULE, affinePeriodDocument(0.75),
-    'noon', ['noon'], BAKED, fixedDerivedBinding), null);
-  assert.deepEqual(engine.selected, ['noon']);
-  assert.deepEqual(engine.writes, [['Cell Scale', 2], ['outer_warp.Lattice Period', 0.75]]);
-});
-
-test('a fixed affine field without its control holds its compiled-out identity', () => {
-  const engine = fixedEngine(() => true);
-  engine.getParameterDefinitions = () => [{ name: 'Cell Scale' }];
-  assert.equal(applyFixedShaderDocument(engine, MODULE, affinePeriodDocument(0.75),
-    'noon', ['noon'], BAKED, fixedDerivedBinding), null);
-  assert.deepEqual(engine.writes, [['Cell Scale', 2]]);
-  const rotating = affinePeriodDocument(0.75);
-  rotating.document.preset_bank.presets[0].values['warp1.rotation-rate'] = 0.5;
-  engine.writes.length = 0;
-  assert.equal(applyFixedShaderDocument(engine, MODULE, rotating,
-    'noon', ['noon'], BAKED, fixedDerivedBinding),
-  `"warp1.rotation-rate" must match the fixed build's derived value 0`);
-  assert.deepEqual(engine.writes, []);
-});
-
 // A stale exemption would silently cover an id that has since become
 // registrable, so it only holds while a promoted document still carries it.
 test('every baked-constant exemption is still carried by a promoted document', () => {
@@ -438,191 +159,6 @@ test('every baked-constant exemption is still carried by a promoted document', (
   for (const id of BAKED_CONSTANT_IDS)
     assert.ok(carried.has(id), `no promoted document carries "${id}"`);
 });
-
-const PATTERN_CATALOG = JSON.stringify({
-  source_documents: { KaleidoscopeFlowers: 'kaleidoscope_flowers.shader.json' },
-  product_group: { children: [{ effect_id: 'KaleidoscopeFlowers', display_name: 'Kaleidoscope Flowers' }] },
-});
-
-/** @param {{digest?: string, status?: string, diagnostics?: *}} [shape] */
-const shaderDocument = ({ digest = 'digest-equator', status = 'VALID',
-                          diagnostics = undefined } = {}) => JSON.stringify({
-  status,
-  diagnostics,
-  descriptor_digest: digest,
-  document: {
-    effect_id: 'KaleidoscopeFlowers',
-    effect_metadata: { display_name: 'Kaleidoscope Flowers' },
-    descriptor: { chain: [{ label: 'sample', operator: 'sample.grid.v4' }] },
-    preset_bank: { presets: [
-      { preset_id: 'noon', display_name: 'Noon', values: { 'sample.pattern-freq': 2 } },
-      { preset_id: 'dusk', display_name: 'Dusk', values: { 'sample.pattern-freq': 5 } },
-    ] },
-  },
-});
-
-/** @returns {Object} An engine whose parameter definitions follow its writes. */
-function workbenchEngine() {
-  // 'Pattern Freq' serves the fixed path's alias lookup; the raw parameter ids
-  // are what a setShaderChain-programmed chain registers, and the scratch
-  // document is the chain the page opens on.
-  const definitions = [
-    { name: 'Pattern Freq', value: 1 },
-    { name: 'sample.pattern-freq', value: 1 },
-    ...SCRATCH.descriptor.parameters.map((parameter) => parameter.storage === 'enum8'
-      ? { name: parameter.id, value: parameter.domain.values.indexOf(parameter.default),
-          options: [...parameter.domain.values] }
-      : { name: parameter.id, value: parameter.default }),
-  ];
-  const writes = [];
-  const selected = [];
-  const chained = [];
-  const engine = {
-    definitions,
-    writes,
-    selected,
-    chained,
-    selectPresetById: (id) => { selected.push(id); return true; },
-    setShaderChain: (entries) => {
-      chained.push(entries);
-      return { code: 'APPLIED', entryIndex: -1 };
-    },
-    getParamGeneration: () => chained.length,
-    getParameterDefinitions: () => definitions,
-    setShaderChainParameters: (batch) => {
-      for (const { name, value } of batch) {
-        writes.push([name, value]);
-        const definition = definitions.find((candidate) => candidate.name === name);
-        if (definition) definition.value = value;
-      }
-      return ParamSetResult.APPLIED;
-    },
-    setParameter: (name, value) => {
-      writes.push([name, value]);
-      const definition = definitions.find((candidate) => candidate.name === name);
-      if (definition) definition.value = value;
-      return ParamSetResult.APPLIED;
-    },
-  };
-  const bindings = {
-    setShaderChain: engine.setShaderChain,
-    setShaderChainParameters: engine.setShaderChainParameters,
-    getSnapshot: () => null,
-    delete: () => {},
-  };
-  delete engine.setShaderChain;
-  delete engine.setShaderChainParameters;
-  engine.bindings = bindings;
-  engine.getShaderChainBindings = () => ({...bindings});
-  return engine;
-}
-
-/**
- * The shader.html toolbar mounts by id, with the blank scratch entry the
- * source select opens on: without it a select with nothing selected reports
- * the first document the page appends.
- * @returns {Map<string, Object>} Element id to fake element.
- */
-function workbenchMounts() {
-  const elements = new Map(['shader-document-select', 'shader-preset-select',
-    'shader-document-open', 'shader-document-save', 'shader-document-file',
-    'shader-document-status', 'shader-document-notice', 'shader-document-error',
-    'shader-document-digest', 'shader-parity-toggle',
-    'shader-animation-toggle', 'shader-document-save-as',
-  ].map((id) => [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
-  const scratch = fakeElement('option');
-  scratch.value = '';
-  scratch.textContent = 'Scratch Chain';
-  elements.get('shader-document-select').appendChild(scratch);
-  elements.get('shader-animation-toggle').textContent = 'Pause Presets';
-  return elements;
-}
-
-/**
- * A fetchText seam over the pattern directory: the pattern catalog, the
- * engine catalog, and the given documents by file name.
- * @param {Object<string, string>} files - Document source by file name.
- * @param {string} [patternCatalog] - The pattern catalog.
- * @param {string} [engineCatalog] - The engine catalog.
- * @returns {(url: string) => Promise<string>} The router.
- */
-function patternFetch(files, patternCatalog = PATTERN_CATALOG, engineCatalog = ENGINE_CATALOG) {
-  return async (url) => {
-    const name = String(url).split('/').pop();
-    if (name === 'catalog.json') return patternCatalog;
-    if (name === 'engine_catalog.json') return engineCatalog;
-    const source = files[name];
-    if (source === undefined) throw new Error(`404 ${name}`);
-    return source;
-  };
-}
-
-/**
- * Builds the workbench document controller over the shader.html control set.
- * @param {{files?: Object, engine?: *, patternCatalog?: string, selectEffect?: (effect: string) => boolean,
- *   initialEffect?: string|null, useDefaultFetch?: boolean,
- *   wrapImportCompiler?: (importer: Function) => Function}} [seams]
- * @returns {Object} The controller and everything it wrote to.
- */
-function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocument() },
-                     engine = workbenchEngine(),
-                     patternCatalog = PATTERN_CATALOG,
-                     selectEffect = () => true,
-                     initialEffect = null,
-                     useDefaultFetch = false,
-                     wrapImportCompiler = (f) => f } = {}) {
-  const elements = workbenchMounts();
-  elements.get('shader-document-save').disabled = true;
-
-  const downloads = [];
-  const selections = [];
-  const ran = { gui: 0, invalidated: 0 };
-  const controller = createShaderDocumentController({
-    doc: {
-      getElementById: (id) => elements.get(id) ?? null,
-      createElement: (tag) => fakeElement(tag),
-    },
-    getEngine: () => engine,
-    getModule: () => MODULE,
-    selectEffect: (effect) => { selections.push(effect); return selectEffect(effect); },
-    syncEffectGui: () => { ran.gui += 1; },
-    invalidate: () => { ran.invalidated += 1; },
-    fetchText: useDefaultFetch ? undefined : patternFetch(files, patternCatalog),
-    // The fixtures are compiler results already; a document object is the
-    // scratch build, which the fake passes through as its own compile.
-    importCompiler: wrapImportCompiler(async () => ({
-      DEFAULT_LIMITS,
-      fixedDerivedBinding: () => null,
-      compileShaderDocument: (s) => typeof s === 'string'
-        ? JSON.parse(s)
-        : { status: 'VALID', descriptor_digest: 'digest-scratch', document: s },
-      // The fixtures are not whole documents, so the canonicalizer would refuse
-      // them.
-      exportShaderDocumentJson: (document) =>
-        `${JSON.stringify(document, null, 2)}\n`,
-    })),
-    download: (filename, source) => downloads.push([filename, source]),
-    initialEffect,
-  });
-  ownedEditors.add(controller);
-  return { controller, elements, downloads, selections, engine, ran };
-}
-
-/** @param {Object} element @returns {Function} The element's change handler. */
-const onChange = (element) =>
-  element.listeners.find((listener) => listener.type === 'change').handler;
-
-// init() opens the scratch document, so every later assertion about the
-// engine reads past the writes that opening preview made.
-const SCRATCH_WRITES = SCRATCH.descriptor.parameters.length;
-
-/** @param {Object} harness @returns {Promise<void>} */
-async function chooseCatalogSource({ elements, controller }) {
-  await controller.init();
-  const select = elements.get('shader-document-select');
-  select.value = 'KaleidoscopeFlowers';
-  await onChange(select)();
-}
 
 test('a page missing the document controls builds no controller', () => {
   assert.equal(createShaderDocumentController({
@@ -796,6 +332,30 @@ test('a refused parity preset restores the interpreter and preserves the refusal
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'error');
   assert.match(harness.elements.get('shader-document-status').textContent,
     /refused reference preset "noon"/);
+});
+
+test('a parity trap updates the preview status and disables animation', async (t) => {
+  t.after(() => { delete MODULE.HS_MODULE_DEAD; });
+  const harness = workbench({
+    getAnimationsPaused: () => false,
+    selectEffect: (effect) => {
+      if (effect === 'KaleidoscopeFlowers') {
+        MODULE.HS_MODULE_DEAD = true;
+        throw new Error('engine halted during parity switch');
+      }
+      return true;
+    },
+  });
+  await chooseCatalogSource(harness);
+  const animation = harness.elements.get('shader-animation-toggle');
+  assert.equal(animation.disabled, false);
+
+  harness.elements.get('shader-parity-toggle').dispatch('click');
+
+  assert.equal(animation.disabled, true);
+  const status = harness.elements.get('shader-document-status');
+  assert.equal(status.dataset.status, 'error');
+  assert.match(status.textContent, /The preview edit failed: .*engine halted during parity switch/);
 });
 
 test('an imported study the catalog does not carry has no parity build', async () => {
@@ -984,214 +544,6 @@ test('returning to the scratch source reopens the default chain', async () => {
   assert.match(harness.elements.get('shader-document-status').textContent,
     /Scratch Chain · Catalog Defaults/);
 });
-
-// ── The pipeline strip over the real store, compiler and engine catalog ────
-
-const CANONICAL_KALEIDOSCOPE_HEX_BRIGHT = readFileSync(
-  new URL('../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8');
-function withoutEmbeddedModulation(source) {
-  const document = JSON.parse(source);
-  for (const parameter of document.descriptor.parameters) {
-    if (parameter.id.endsWith('.modulation-amount'))
-      parameter.default = 0;
-  }
-  for (const preset of document.preset_bank.presets) {
-    for (const id of Object.keys(preset.values)) {
-      if (id.endsWith('.modulation-amount')) preset.values[id] = 0;
-    }
-  }
-  return exportShaderDocumentJson(document);
-}
-const KALEIDOSCOPE_HEX_BRIGHT = withoutEmbeddedModulation(CANONICAL_KALEIDOSCOPE_HEX_BRIGHT);
-const KALEIDOSCOPE_STAINED_GLASS = readFileSync(
-  new URL('../generated/shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8');
-// No source documents: no load matches a promoted digest, so parity stays disarmed.
-const EMPTY_PATTERN_CATALOG = JSON.stringify({
-  source_documents: {}, product_group: { children: [] },
-});
-// kaleidoscope_hex_bright as a shipped pattern: loading it digests onto a promoted effect, so
-// the toolbar's parity toggle arms.
-const HEX_PATTERN_CATALOG = JSON.stringify({
-  source_documents: { KaleidoscopeHexBright: 'kaleidoscope_hex_bright.shader.json' },
-  product_group: { children: [{ effect_id: 'KaleidoscopeHexBright', display_name: 'Kaleidoscope Hex Bright' }] },
-});
-
-/**
- * The promoted build's engine surface: its own reference presets and the
- * alias-named controls derived from the supplied fixture. This orchestration
- * double does not model the compiled engine's control set.
- * @returns {Object} The engine.
- */
-function compiledBuildEngine(source = KALEIDOSCOPE_HEX_BRIGHT) {
-  const document = JSON.parse(source);
-  const fixed = (parameter) => {
-    const binding = fixedDerivedBinding(document.descriptor, parameter.id,
-      document.preset_bank.presets[0].values);
-    return binding !== null && binding.unregistered !== true;
-  };
-  const definitions = document.descriptor.parameters.filter((parameter) =>
-    !BAKED_CONSTANT_IDS.has(parameter.id) && !BAKED.has(parameter.id.slice(parameter.id.indexOf('.') + 1))
-    && !fixed(parameter))
-    .map((parameter) => ({
-    name: primaryName(parameter.id, document.descriptor),
-    ...(parameter.storage === 'enum8' ? { options: [...parameter.domain.values] } : {}),
-  }));
-  const selected = [];
-  const writes = [];
-  return {
-    selected,
-    writes,
-    selectPresetById: (id) => { selected.push(id); return true; },
-    getParameterDefinitions: () => definitions,
-    setParameter: (name, value) => {
-      writes.push([name, value]);
-      return ParamSetResult.APPLIED;
-    },
-  };
-}
-
-/**
- * The document controller over the real compiler, the real chain store, and a
- * FakeChainEngine, with the workbench mounts present and kaleidoscope_hex_bright loaded over
- * the scratch document the page opens on.
- * @param {{source?: string|null, patternCatalog?: string, hash?: string, search?: string, initialEffect?: string|null,
- *   paused?: boolean, pausedFromEngine?: boolean, selectEffect?: () => boolean,
- *   onOriginalLinkReleased?: () => void, prepare?: (engine: FakeChainEngine) => void,
- *   sourceFiles?: Record<string, string>, engineCatalog?: string,
- *   importCompiler?: () => Promise<typeof import("../generated/shader/shader_workbench.mjs")>}} [seams] - source null
- *   leaves the scratch document loaded; pausedFromEngine reads the pause seam off the chain engine; prepare
- *   alters the engine before the controller starts.
- * @returns {Promise<Object>} The controller and everything it wrote to.
- */
-async function editorWorkbench({
-  source = KALEIDOSCOPE_HEX_BRIGHT, sourceFiles = {}, patternCatalog = EMPTY_PATTERN_CATALOG, hash = '', search = '?effect=ShaderChain', initialEffect = null, paused = false,
-  engineCatalog = ENGINE_CATALOG,
-  selectEffect = () => true,
-  onOriginalLinkReleased = () => {},
-  pausedFromEngine = false,
-  prepare = () => {},
-  importCompiler = () => import('../generated/shader/shader_workbench.mjs'),
-} = {}) {
-  const engine = new FakeChainEngine();
-  engine.catalog = JSON.parse(engineCatalog);
-  const module = engineCatalog === ENGINE_CATALOG ? MODULE
-    : {...MODULE, ShaderChainBindings: {getShaderChainCatalog: () => engineCatalog}};
-  prepare(engine);
-  const compiledEngine = compiledBuildEngine(source ?? KALEIDOSCOPE_HEX_BRIGHT);
-  let animationsPaused = paused;
-  // writeDeepLink builds its link state synchronously, reading the pause seam
-  // once, so the count tells a write a timer started from one still pending.
-  let pausedReads = 0;
-  const animationWrites = [];
-  for (const [target, method] of [[engine, 'setParameter'],
-    [engine.bindings, 'setShaderChainParameters'], [compiledEngine, 'setParameter']]) {
-    const write = target[method].bind(target);
-    target[method] = (...args) => {
-      animationsPaused = true;
-      return write(...args);
-    };
-  }
-  let current = engine;
-  const elements = workbenchMounts();
-  elements.set('chain-strip', fakeElement('section'));
-  const doc = installDocument({
-    body: fakeElement('body'),
-    activeElement: null,
-    getElementById: (id) => elements.get(id) ?? null,
-    createElement: (tag) => fakeElement(tag),
-    ...documentEvents(),
-  });
-  const downloads = [];
-  const selections = [];
-  const filters = [];
-  const urls = [];
-  const location = {
-    pathname: '/tools/shader.html', search, hash,
-  };
-  const win = {
-    ...documentEvents(),
-    prompt: (message, filename) => filename,
-    location,
-    history: {
-      replaceState: (state, title, url) => {
-        urls.push(url);
-        const next = new URL(url, 'https://example.test');
-        location.pathname = next.pathname;
-        location.search = next.search;
-        location.hash = next.hash;
-      },
-    },
-  };
-  const ran = { gui: 0, invalidated: 0 };
-  const controller = createShaderDocumentController({
-    doc,
-    onOriginalLinkReleased,
-    getEngine: () => current,
-    getModule: () => module,
-    selectEffect: (effect) => {
-      selections.push(effect);
-      if (!selectEffect(effect)) return false;
-      current = effect === 'shader-chain' ? engine : compiledEngine;
-      if (effect === 'shader-chain') engine.setEffect(effect);
-      return true;
-    },
-    syncEffectGui: () => { ran.gui += 1; },
-    invalidate: () => { ran.invalidated += 1; },
-    getAnimationsPaused: () => {
-      pausedReads += 1;
-      return pausedFromEngine ? engine.getAnimationsPaused() : animationsPaused;
-    },
-    setAnimationsPaused: (paused) => {
-      animationsPaused = paused;
-      animationWrites.push(paused);
-    },
-    setParamFilter: (filter) => filters.push(filter),
-    fetchText: patternFetch(
-      { 'kaleidoscope_hex_bright.shader.json': KALEIDOSCOPE_HEX_BRIGHT,
-        'alien_core.shader.json': JSON.stringify(promotedDocument('alien_core.shader.json')),
-        'grid_space.shader.json': JSON.stringify(promotedDocument('grid_space.shader.json')), ...sourceFiles }, patternCatalog, engineCatalog),
-    importCompiler,
-    download: (filename, source) => downloads.push([filename, source]),
-    win,
-    initialEffect,
-  });
-  ownedEditors.add(controller);
-  assert.equal(await controller.init(), true);
-  if (source !== null)
-    assert.equal(await controller.loadSource(source, 'study.shader.json'), true);
-  await controller.flushDeepLink();
-  return {
-    controller, engine, compiledEngine, elements, downloads, selections, filters, ran,
-    animationFrames, animationWrites, animationsPaused: () => animationsPaused,
-    pausedReads: () => pausedReads, urls, win,
-  };
-}
-
-/**
- * Activates one operator's entry in the plane band's + palette: an entry the
- * gap accepts commits the insertion, one it refuses announces its reason.
- * @param {Object} harness - An editorWorkbench() result.
- * @param {string} operatorId - The catalog operator to activate.
- * @returns {void}
- */
-function clickPlaneBandEntry(harness, operatorId) {
-  const mount = harness.elements.get('chain-strip');
-  mount.querySelectorAll('.chain-band')
-    .find((band) => band.dataset.carrier === 'plane')
-    .querySelector('.chain-band-add').dispatch('click');
-  mount.querySelectorAll('.chain-palette-entry')
-    .find((entry) => entry.dataset.operator === operatorId)
-    .dispatch('click');
-}
-
-const stripChips = (harness) =>
-  harness.elements.get('chain-strip').querySelectorAll('.chain-chip');
-
-const displayedParameter = (harness, label, parameterId) => stripChips(harness)
-  .find((chip) => chip.dataset.label === label)
-  .querySelectorAll('.chain-param')
-  .find((row) => row.dataset.parameter === parameterId)
-  .querySelector('.chain-param-value').value;
 
 // The workbench opens on a valid, rendering document with the whole
 // authoring surface live — the scratch chain is edited exactly like a load.
@@ -1418,9 +770,7 @@ test('shader edits keep the full state hash current', async () => {
   clickPlaneBandEntry(harness, 'warp.affine.v4');
   stripChips(harness).find((chip) => chip.dataset.label === 'rotate')
     .querySelector('.chain-chip-bypass').dispatch('click');
-  const value = stripChips(harness).find((chip) => chip.dataset.label === 'sample')
-    .querySelectorAll('.chain-param')
-    .find((row) => row.dataset.parameter === 'sample.pattern-freq')
+  const value = paramRow(harness, 'sample', 'sample.pattern-freq')
     .querySelector('.chain-param-value');
   value.value = '3.5';
   value.dispatch('change');
@@ -1436,12 +786,6 @@ test('shader edits keep the full state hash current', async () => {
     .values['sample.pattern-freq'], 3.5);
 });
 
-const sampleFrequencySlider = (harness) => stripChips(harness)
-  .find((chip) => chip.dataset.label === 'sample')
-  .querySelectorAll('.chain-param')
-  .find((row) => row.dataset.parameter === 'sample.pattern-freq')
-  .querySelector('.chain-param-control');
-
 // The chips carry the inline stage controls, and they render one preset's
 // values.
 test('a deep-linked preset builds the strip from the preset it renders', async () => {
@@ -1456,9 +800,7 @@ test('a deep-linked preset builds the strip from the preset it renders', async (
   const harness = await editorWorkbench({ source: null, hash });
 
   assert.equal(sampleFrequencySlider(harness).value, '7.25');
-  assert.equal(stripChips(harness).find((chip) => chip.dataset.label === 'sample')
-    .querySelectorAll('.chain-param')
-    .find((row) => row.dataset.parameter === 'sample.pattern-freq')
+  assert.equal(paramRow(harness, 'sample', 'sample.pattern-freq')
     .querySelector('.chain-param-value').value, '7.25');
 });
 
@@ -1740,8 +1082,7 @@ test('compiled Twist stage edits resolve an arbitrary instance label', async () 
   ]);
   const source = JSON.stringify(document);
   const harness = await editorWorkbench({source, sourceFiles: {'twist_study.shader.json': source},
-    patternCatalog: JSON.stringify({source_documents: {'twist-study': 'twist_study.shader.json'},
-      product_group: {children: [{effect_id: 'twist-study', display_name: 'Twist Study'}]}})});
+    patternCatalog: singlePatternCatalog('twist-study', 'twist_study.shader.json', 'Twist Study')});
   const toggle = harness.elements.get('shader-parity-toggle');
   assert.equal(toggle.disabled, false);
   toggle.dispatch('click');
@@ -1777,6 +1118,48 @@ test('an accepted compiled edit clears the previous refusal', async () => {
   assert.equal(harness.elements.get('shader-document-error').textContent, '');
 });
 
+test('compiled stage rows share one document-definition read and refresh it after a write', async () => {
+  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
+  const engine = harness.compiledEngine;
+  const {descriptor, preset_bank} = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const parameterId = 'modulation.pattern-scale';
+  const names = engineControlNames(parameterId, descriptor);
+  const definitions = engine.getParameterDefinitions();
+  engine.getParameterDefinitions = () => definitions.filter(({name}) => !names.includes(name));
+  const {resource_key: resource = 'modulation'} = descriptor.chain.find(({label}) => label === 'modulation');
+  let reads = 0;
+  let readonly = false;
+  let scale = preset_bank.presets[0].values[parameterId];
+  engine.getParamGeneration = () => 1;
+  engine.getDocumentParameterDefinitions = () => {
+    reads += 1;
+    return [{resource, id: 'pattern-scale', value: scale, readonly}];
+  };
+  engine.setDocumentParameter = (_resource, _id, value) => {
+    scale = value;
+    return ParamSetResult.APPLIED;
+  };
+  harness.elements.get('shader-parity-toggle').dispatch('click');
+  assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
+  assert.ok(reads <= 3, `parity render and preset used ${reads} document-definition reads`);
+  const control = () => stripChips(harness).find((chip) => chip.dataset.label === 'modulation')
+    .querySelectorAll('.chain-param').find((row) => row.dataset.parameter === parameterId)
+    .querySelector('.chain-param-control');
+  assert.equal(control().disabled, false);
+
+  const write = engine.setParameter;
+  engine.setParameter = (...args) => {
+    readonly = true;
+    return write(...args);
+  };
+  const edit = stageEditor(harness, 'sample');
+  const before = reads;
+  edit('sample.pattern-freq', 2.5);
+
+  assert.equal(reads - before, 2, 'the write and its row refresh each read once');
+  assert.equal(control().disabled, true);
+});
+
 test('a descriptor edit under the compiled build returns the preview to the interpreter', async () => {
   const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
   const status = harness.elements.get('shader-document-status');
@@ -1785,7 +1168,7 @@ test('a descriptor edit under the compiled build returns the preview to the inte
   toggle.dispatch('click');
 
   assert.equal(harness.selections.at(-1), 'KaleidoscopeHexBright');
-  assert.deepEqual(harness.compiledEngine.selected, ['hex-twin-wave']);
+  assert.deepEqual(harness.compiledEngine.selected, [JSON.parse(KALEIDOSCOPE_HEX_BRIGHT).preset_bank.presets[0].preset_id]);
   assert.ok(harness.compiledEngine.writes.some(([name]) => name === 'Camera Wander'),
     'the compiled build takes the preset through its own control names');
   assert.match(status.textContent, /compiled build/);
@@ -1858,18 +1241,6 @@ test('a Save As copy carries the edits made since the load', async () => {
   assert.deepEqual(
     validateShaderDocument(copy, { catalog: JSON.parse(ENGINE_CATALOG) }), []);
 });
-
-/** @param {*} document @param {string} label */
-const expectStageAbsent = (document, label) => {
-  const owned = (/** @type {string} */ id) => id.startsWith(`${label}.`);
-  assert.equal(document.descriptor.chain.some((entry) => entry.label === label), false);
-  assert.equal(document.descriptor.parameters.some((parameter) => owned(parameter.id)), false);
-  assert.equal(document.descriptor.serialization.fields.some(owned), false);
-  for (const preset of document.preset_bank.presets)
-    assert.equal(Object.keys(preset.values).some(owned), false);
-  assert.deepEqual(
-    validateShaderDocument(document, { catalog: JSON.parse(ENGINE_CATALOG) }), []);
-};
 
 test('Save and Save As omit bypassed stages and keep them in the editor', async () => {
   const harness = await editorWorkbench();
@@ -2071,35 +1442,6 @@ test('a bypass reshapes the engine program and skips the bypassed parameters', a
   'a bypassed instance registers no parameters, so its values are skipped');
 });
 
-/**
- * Selects a chip and hands back a writer over its inline controls, driving the
- * control the way a pointer does.
- * @param {Object} harness - An editorWorkbench() result.
- * @param {string} label - The instance to select.
- * @returns {(parameterId: string, value: *) => void} The control writer.
- */
-function stageEditor(harness, label) {
-  stripChips(harness).find((chip) => chip.dataset.label === label).dispatch('click');
-  return (parameterId, value) => {
-    const row = stripChips(harness)
-      .find((chip) => chip.dataset.label === label)
-      .querySelectorAll('.chain-param')
-      .find((row) => row.dataset.parameter === parameterId);
-    const control = row.querySelector('.chain-param-control');
-    const readout = row.querySelector('.chain-param-value');
-    control.value = String(control.type === 'range' && control.min !== readout.min
-      ? Math.log2(Number(value)) : value);
-    const eventType = control.tagName === 'SELECT' ? 'change' : 'input';
-    control.dispatch(eventType);
-    if (eventType === 'input') harness.animationFrames.flush();
-  };
-}
-
-const savedValues = (harness) => {
-  assert.equal(harness.controller.save(), true);
-  return JSON.parse(harness.downloads.at(-1)[1]).preset_bank.presets[0].values;
-};
-
 test('a card reset applies defaults to the preview, Save and link with one undo', async () => {
   const harness = await editorWorkbench({ source: null });
   stageEditor(harness, 'sample')('sample.pattern-freq', 7);
@@ -2264,8 +1606,7 @@ test('chip ranges remain fixed during edits and refresh on commit and undo', asy
       {name: 'sample.pattern-freq', min: 1, max: maximum},
     ];
   }});
-  const currentSlider = () => stripChips(harness).find((chip) => chip.dataset.label === 'sample')
-    .querySelectorAll('.chain-param').find((row) => row.dataset.parameter === 'sample.pattern-freq')
+  const currentSlider = () => paramRow(harness, 'sample', 'sample.pattern-freq')
     .querySelector('.chain-param-control');
   assert.equal(Number(currentSlider().max), 6);
   const edit = stageEditor(harness, 'sample');
@@ -2280,8 +1621,7 @@ test('chip ranges remain fixed during edits and refresh on commit and undo', asy
   edit('sample.pattern-freq', 10);
   assert.equal(savedValues(harness)['sample.pattern-freq'], 10);
   harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
-  const restored = stripChips(harness).find((chip) => chip.dataset.label === 'sample')
-    .querySelectorAll('.chain-param').find((row) => row.dataset.parameter === 'sample.pattern-freq')
+  const restored = paramRow(harness, 'sample', 'sample.pattern-freq')
     .querySelector('.chain-param-control');
   assert.equal(Number(restored.max), 12);
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
@@ -2488,9 +1828,9 @@ test('refused replacement restores the previous compiled preset after switching 
   harness.compiledEngine.selected.length = 0;
   assert.equal(await harness.controller.loadSource(
     JSON.parse(KALEIDOSCOPE_HEX_BRIGHT), 'refused.shader.json', null,
-    { preset: 'hex-twin-wave', bypassed: ['missing-stage'], paused: false }), false);
+    { preset: JSON.parse(KALEIDOSCOPE_HEX_BRIGHT).preset_bank.presets[0].preset_id, bypassed: ['missing-stage'], paused: false }), false);
   assert.equal(harness.selections.at(-1), 'KaleidoscopeHexBright');
-  assert.deepEqual(harness.compiledEngine.selected, ['hex-twin-wave']);
+  assert.deepEqual(harness.compiledEngine.selected, [JSON.parse(KALEIDOSCOPE_HEX_BRIGHT).preset_bank.presets[0].preset_id]);
   assert.match(harness.elements.get('shader-document-status').textContent, /missing-stage/);
 });
 
@@ -2769,17 +2109,6 @@ test('abandoning a refused link reports its release once', async () => {
   assert.equal(releases, 1);
 });
 
-test('query snapshot import rejects retired archive versions without adopting them', async () => {
-  for (const schemaVersion of [1, 10, 11]) {
-    const search = `?effect=ShaderChain&fx.__chainSnapshot=${encodeURIComponent(JSON.stringify({schemaVersion, accepted: [], requested: []}))}`;
-    const harness = await editorWorkbench({source: null, search});
-    assert.equal(harness.controller.preservesOriginalLink(), true);
-    assert.equal(harness.win.location.search, search);
-    assert.match(harness.elements.get('shader-document-status').textContent,
-      /unsupported chain snapshot/);
-  }
-});
-
 test('the descriptor digest button copies the full digest and announces failures', async () => {
   const harness = await editorWorkbench();
   const button = harness.elements.get('shader-document-digest');
@@ -2805,30 +2134,9 @@ test('the descriptor digest button copies the full digest and announces failures
   }
 });
 
-test('fixed document presets preserve sparse option IDs and refuse numeric gaps', () => {
-  for (const value of ['Shells', 6, 2]) {
-    const engine = fixedEngine(() => true);
-    engine.getParameterDefinitions = () => [{ name: 'Pattern Freq',
-      options: ['Cubic', 'Octet Truss', 'Shells'], optionValues: [0, 1, 6] }];
-    const compiled = fixedDocument();
-    compiled.document.preset_bank.presets[0].values = { 'sample.pattern-freq': value };
-    const result = applyFixedShaderDocument(engine, MODULE, compiled, 'noon', ['noon'], BAKED, fixedDerivedBinding);
-    if (value === 2) {
-      assert.match(result, /has no option value 2/);
-      assert.deepEqual(engine.writes, []);
-    } else {
-      assert.equal(result, null);
-      assert.deepEqual(engine.writes, [['Pattern Freq', 6]]);
-    }
-  }
-});
-
 test('compiled lattice edits keep the authored fallback period and reapply', async () => {
   const source = withoutEmbeddedModulation(JSON.stringify(promotedDocument('grid_space.shader.json')));
-  const harness = await editorWorkbench({ source, sourceFiles: {'grid_space.shader.json': source}, patternCatalog: JSON.stringify({
-    source_documents: { 'grid-space': 'grid_space.shader.json' },
-    product_group: { children: [{ effect_id: 'grid-space', display_name: 'Grid Space' }] },
-  }) });
+  const harness = await editorWorkbench({ source, sourceFiles: {'grid_space.shader.json': source}, patternCatalog: singlePatternCatalog('grid-space', 'grid_space.shader.json', 'Grid Space') });
   const original = savedValues(harness);
   const toggle = harness.elements.get('shader-parity-toggle');
   assert.equal(toggle.disabled, false);
@@ -2853,28 +2161,6 @@ test('compiled lattice edits keep the authored fallback period and reapply', asy
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
 });
 
-test('fixed apply resolves a registered secondary compiled control name', () => {
-  const engine = fixedEngine(() => true);
-  engine.getParameterDefinitions = () => [{ name: 'Affine Scale X' }];
-  const compiled = fixedDocument();
-  compiled.document.preset_bank.presets[0].values = { 'warp1.scale-x': 2.5 };
-  assert.equal(applyFixedShaderDocument(engine, MODULE, compiled, 'noon', ['noon'],
-    BAKED, fixedDerivedBinding), null);
-  assert.deepEqual(engine.writes, [['Affine Scale X', 2.5]]);
-});
-
-const affineLatticeStudy = () => {
-  const catalog = JSON.parse(ENGINE_CATALOG);
-  const document = scratchChainDocument(catalog, [
-    { label: 'project', operator: 'project.stereographic.v2' },
-    { label: 'warp', operator: 'warp.affine.v4' },
-    { label: 'sample', operator: 'sample.tessellation.v3' },
-    { label: 'colorize', operator: 'colorize.generated-palette.v4' },
-  ]);
-  document.preset_bank.presets[0].values['sample.cell-scale'] = 4;
-  return { source: JSON.stringify(document), engineCatalog: JSON.stringify(catalog) };
-};
-
 test('an affine fallback period stays editable beside a lattice source', async () => {
   const harness = await editorWorkbench(affineLatticeStudy());
   assert.equal(savedValues(harness)['warp.lattice-period'], 1);
@@ -2889,138 +2175,15 @@ test('an affine fallback period stays editable beside a lattice source', async (
   assert.equal(savedValues(harness)['warp.lattice-period'], 1);
   stageEditor(harness, 'warp')('warp.lattice-period', 0.75);
   assert.equal(savedValues(harness)['warp.lattice-period'], 0.75);
-  const row = stripChips(harness).find((chip) => chip.dataset.label === 'warp')
-    .querySelectorAll('.chain-param').find((row) => row.dataset.parameter === 'warp.lattice-period');
+  const row = paramRow(harness, 'warp', 'warp.lattice-period');
   assert.equal(row.querySelector('.chain-param-control').disabled, false);
-});
-
-test('authored native controls preserve resource identities and live topology readbacks', () => {
-  const values = {'camera.wander': 0.3, 'camera.spin-speed': 0.02,
-    'world.wander': 0.7, 'world.spin-speed': 0.04, 'plane.lattice-period': 0.413,
-    'cells.cell-scale': 2, 'velocity.basis': 'ridged3',
-    'cells.coverage-mode': 'edge-fade-squared', 'velocity.edge-width': 0.4};
-  const descriptor = {chain: [
-    {label: 'camera', operator: 'sphere.rotate.v2'},
-    {label: 'world', operator: 'sphere.rotate.v2'},
-    {label: 'plane', operator: 'warp.affine.v4'},
-    {label: 'velocity', operator: 'warp.vector-noise.v2'},
-    {label: 'cells', operator: 'sample.tessellation.v3'},
-  ]};
-  const definitions = [
-    {name: 'Camera Wander', value: 0},
-    ...['camera.Wander', 'camera.Spin Speed', 'world.Wander', 'world.Spin Speed',
-      'plane.Lattice Period', 'Cell Scale', 'velocity.Warp Edge Width']
-      .map((name) => ({name, value: 0})),
-    {name: 'velocity.basis', options: ['Simplex', 'Fbm3', 'Ridged3'], optionValues: [2, 4, 9], value: 2},
-    {name: 'coverage-mode', options: ['None', 'Weight', 'Weight Squared', 'Edge Fade', 'Edge Fade Squared'], value: 0},
-  ];
-  const engine = fixedEngine(() => true);
-  engine.getParameterDefinitions = () => definitions;
-  engine.setParameter = (name, value) => {
-    const definition = definitions.find((entry) => entry.name === name);
-    assert.ok(definition);
-    definition.value = Math.fround(value);
-    engine.writes.push([name, value]);
-    return ParamSetResult.APPLIED;
-  };
-  assert.equal(applyFixedShaderDocument(engine, MODULE,
-    {document: {descriptor, preset_bank: {presets: [{preset_id: 'live', values}]}}},
-    'live', ['live'], BAKED, fixedDerivedBinding, JSON.parse(ENGINE_CATALOG)), null);
-  assert.deepEqual(engine.writes, [
-    ['camera.Wander', 0.3], ['camera.Spin Speed', 0.02], ['world.Wander', 0.7],
-    ['world.Spin Speed', 0.04], ['plane.Lattice Period', 0.413], ['Cell Scale', 2],
-    ['velocity.basis', 9], ['coverage-mode', 4], ['velocity.Warp Edge Width', 0.4],
-  ]);
-  for (const [name, value] of engine.writes)
-    assert.equal(engine.getParameterDefinitions().find((entry) => entry.name === name).value, Math.fround(value));
-  assert.equal(definitions[0].value, 0);
-});
-
-test('a live affine period remains independent when its sampler has no lattice cells', () => {
-  const engine = fixedEngine(() => true);
-  engine.getParameterDefinitions = () => [{name: 'plane.Lattice Period'}];
-  const descriptor = {chain: [
-    {label: 'plane', operator: 'warp.affine.v4'},
-    {label: 'sample', operator: 'sample.grid.v4'},
-  ]};
-  const values = {'plane.lattice-period': 2.5};
-  assert.equal(applyFixedShaderDocument(engine, MODULE,
-    {document: {descriptor, preset_bank: {presets: [{preset_id: 'live', values}]}}},
-    'live', ['live'], BAKED, fixedDerivedBinding), null);
-  assert.deepEqual(engine.writes, [['plane.Lattice Period', 2.5]]);
-});
-
-test('native warp speed names follow instance labels', () => {
-  for (const [label, name] of [
-    ['warp', 'Planar Warp 1 Speed'],
-    ['warp2', 'Planar Warp 2 Speed'],
-    ['drift', 'drift.Planar Warp Speed'],
-  ]) {
-    const descriptor = {chain: [{label, operator: 'warp.affine.v4'}]};
-    const engine = fixedEngine(() => true);
-    engine.getParameterDefinitions = () => [{name}, {name: 'Speed'}];
-    const values = {[`${label}.speed`]: 0.007};
-    assert.equal(applyFixedShaderDocument(engine, MODULE,
-      {document: {descriptor, preset_bank: {presets: [{preset_id: 'one', values}]}}},
-      'one', ['one'], BAKED, fixedDerivedBinding), null);
-    assert.deepEqual(engine.writes, [[name, 0.007]]);
-  }
-});
-
-test('potential nested native fields retain term identities across colliding resource names', () => {
-  const catalog = JSON.parse(ENGINE_CATALOG);
-  const fields = catalog.operators.find((entry) => entry.id === 'sphere.displace.potential.v1')
-    .params.filter((field) => field.id.startsWith('term-'));
-  assert.equal(fields.length, 24);
-  const descriptor = {chain: [
-    {label: 'surface', operator: 'sphere.displace.potential.v1'},
-    {label: 'vector', operator: 'sphere.displace.curl.v2'},
-    {label: 'warp', operator: 'warp.vector-noise.v2'},
-    {label: 'sample', operator: 'sample.grid.v4'},
-  ]};
-  const values = {};
-  const definitions = [];
-  const expected = [];
-  for (const field of fields) {
-    const value = field.values?.at(-1) ?? (field.id.endsWith('phase') ? 2.7 : -1.25);
-    const stored = field.values ? field.values.length - 1 : value;
-    values[`surface.${field.id}`] = value;
-    definitions.push({name: `surface.${field.id}`, value: 0,
-      ...(field.values ? {options: field.values} : {})});
-    expected.push([`surface.${field.id}`, stored]);
-  }
-  Object.assign(values, {'surface.drift': 0.01, 'sample.complexity': 0.75,
-    'vector.basis': 'fbm3', 'warp.basis': 'ridged3'});
-  definitions.push({name: 'surface.Drift', value: 0}, {name: 'source.Complexity', value: 0},
-    {name: 'vector.basis', options: ['simplex', 'fbm3', 'ridged3'], value: 0},
-    {name: 'outer_warp.basis', options: ['simplex', 'fbm3', 'ridged3'], value: 0});
-  expected.push(['surface.Drift', 0.01], ['source.Complexity', 0.75],
-    ['vector.basis', 1], ['outer_warp.basis', 2]);
-  const decoys = ['Amplitude', 'Phase', 'surface.Amplitude', 'surface.Phase', 'Drift', 'basis']
-    .map((name) => ({name, value: 123}));
-  definitions.push(...decoys);
-  const engine = fixedEngine(() => true);
-  engine.getParameterDefinitions = () => definitions;
-  engine.setParameter = (name, value) => {
-    definitions.find((definition) => definition.name === name).value = Math.fround(value);
-    engine.writes.push([name, value]);
-    return ParamSetResult.APPLIED;
-  };
-  assert.equal(applyFixedShaderDocument(engine, MODULE,
-    {document: {descriptor, preset_bank: {presets: [{preset_id: 'nested', values}]}}},
-    'nested', ['nested'], BAKED, fixedDerivedBinding, catalog), null);
-  assert.deepEqual(engine.writes, expected);
-  for (const [name, value] of expected)
-    assert.equal(definitions.find((definition) => definition.name === name).value, Math.fround(value));
-  assert.ok(decoys.every((definition) => definition.value === 123));
 });
 
 test('authored compiled stage edits keep camera spin, coverage and independent affine period live', async () => {
   const source = JSON.stringify(scratchChainDocument(JSON.parse(ENGINE_CATALOG),
     promotedDocument('grid_space.shader.json').descriptor.chain.filter((entry) => entry.operator !== 'color.modulate.v1')));
   const harness = await editorWorkbench({source, sourceFiles: {'grid_space.shader.json': source},
-    patternCatalog: JSON.stringify({source_documents: {'grid-space': 'grid_space.shader.json'},
-      product_group: {children: [{effect_id: 'grid-space', display_name: 'Grid Space'}]}})});
+    patternCatalog: singlePatternCatalog('grid-space', 'grid_space.shader.json', 'Grid Space')});
   const definitions = harness.compiledEngine.getParameterDefinitions();
   definitions.push({name: 'camera.Wander'}, {name: 'camera.Spin Speed'},
     {name: 'outer_warp.Lattice Period'},
@@ -3045,8 +2208,7 @@ test('authored compiled stage edits keep camera spin, coverage and independent a
 test('authored compiled modulation edits replay coupled source and amount writes after admission dependencies', async () => {
   const source = JSON.stringify(promotedDocument('grid_space.shader.json'));
   const harness = await editorWorkbench({source, sourceFiles: {'grid_space.shader.json': source},
-    patternCatalog: JSON.stringify({source_documents: {'grid-space': 'grid_space.shader.json'},
-      product_group: {children: [{effect_id: 'grid-space', display_name: 'Grid Space'}]}})});
+    patternCatalog: singlePatternCatalog('grid-space', 'grid_space.shader.json', 'Grid Space')});
   const definitions = harness.compiledEngine.getParameterDefinitions();
   const modulation = JSON.parse(ENGINE_CATALOG).operators.find((entry) => entry.id === 'color.modulate.v1');
   for (const field of modulation.params.filter((field) => field.topology))
@@ -3084,24 +2246,6 @@ test('authored compiled modulation edits replay coupled source and amount writes
   assert.equal(saved['modulation.modulation-amount'], 1);
   assert.equal(native['modulation-source'], 2);
   assert.equal(native['modulation-mechanic'], 1);
-});
-
-test('fixed Twist presets use label identities', () => {
-  for (const [label, prefix] of [
-    ['lens', ''], ['whorl', 'whorl.'],
-  ]) {
-    const fields = [['twist-angle', 'Twist Angle (rad)', 7.25],
-      ['twist-distribution', 'Twist Distribution', 0.625], ['speed', 'Speed', 0.035], ['drift', 'Drift', 0.006]];
-    const engine = fixedEngine(() => true);
-    engine.getParameterDefinitions = () => fields.map(([, name]) => ({name: prefix + name}));
-    const compiled = fixedDocument();
-    compiled.document.descriptor = {chain: [{label, operator: 'sphere.lens.twist.v2'}]};
-    compiled.document.preset_bank.presets[0].values = Object.fromEntries(
-      fields.map(([field, , value]) => [`${label}.${field}`, value]));
-    assert.equal(applyFixedShaderDocument(engine, MODULE, compiled, 'noon', ['noon'],
-      BAKED, fixedDerivedBinding), null);
-    assert.deepEqual(engine.writes, fields.map(([, name, value]) => [prefix + name, value]));
-  }
 });
 
 for (const failure of ['editor', 'runtime']) {
@@ -3156,15 +2300,28 @@ for (const operator of ['sphere.lens.mobius.v2', 'sphere.displace.symmetric.v1',
   });
 }
 
-for (const schemaVersion of [3, 4]) {
+for (const schemaVersion of [1, 3, 4, 10, 11]) {
   test(`stored snapshot version ${schemaVersion} is refused before engine restore`, async () => {
     const loaded = await editorWorkbench();
     const snapshot = callWorkbenchBinding(loaded.engine, 'getSnapshot', [], null);
     const current = structuredClone(snapshot);
     snapshot.schemaVersion = schemaVersion;
     const search = `?fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(snapshot))}`;
-    const refused = await editorWorkbench({source: null, search});
+    let restores = 0;
+    const refused = await editorWorkbench({source: null, search, prepare(target) {
+      const bindings = target.getShaderChainBindings.bind(target);
+      target.getShaderChainBindings = () => {
+        const live = bindings();
+        if (!live) return live;
+        const restore = live.restoreSnapshot;
+        live.restoreSnapshot = value => { restores++; return restore(value); };
+        return live;
+      };
+    }});
     assert.match(refused.elements.get('shader-document-status').textContent, /unsupported chain snapshot/);
+    assert.equal(restores, 0);
+    assert.equal(refused.controller.preservesOriginalLink(), true);
+    assert.equal(refused.win.location.search, search);
     const accepted = await editorWorkbench({source: null,
       search: `?fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(current))}`});
     assert.match(accepted.elements.get('shader-document-status').textContent, /Restored the chain snapshot/);

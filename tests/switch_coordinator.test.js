@@ -44,6 +44,7 @@ function makeApp({
   throwOnEffect = null,
   moduleDead = () => false,
   fullConfigEffects = new Set(),
+  refuseChainRestore = false,
 } = {}) {
   const appState = new AppState({ effect: 'Alpha', resolution: 'Lo' });
   const app = {
@@ -60,12 +61,14 @@ function makeApp({
     fatals: [],
     urlSyncs: [],
     restoredUrls: [],
+    rollbackApplyUrls: [],
   };
   app.activeEffect = makeEffectRecord('Alpha', 0.5, false, app.paramWrites);
 
   const applyEffect = ({preserveParams = false} = {}) => {
     const effect = appState.get('effect');
-    app.url = `/?effect=${effect}`;
+    if (app.switches.isRestoring()) app.rollbackApplyUrls.push(app.url);
+    else app.url = `/?effect=${effect}`;
     app.calls.push({
       fn: 'applyEffect', effect, preserveParams,
       restoring: app.switches.isRestoring(),
@@ -79,7 +82,8 @@ function makeApp({
 
   const applyResolution = ({ preserveParams = false } = {}) => {
     const resolution = appState.get('resolution');
-    app.url = `/?resolution=${resolution}`;
+    if (app.switches.isRestoring()) app.rollbackApplyUrls.push(app.url);
+    else app.url = `/?resolution=${resolution}`;
     app.calls.push({
       fn: 'applyResolution', resolution, preserveParams,
       restoring: app.switches.isRestoring(),
@@ -111,6 +115,7 @@ function makeApp({
     getChainSnapshot: () => ({ chain: app.activeEffect.state.Speed }),
     restoreChainSnapshot: (snapshot) => {
       app.chainRestores.push({ snapshot, effect: app.activeEffect.name });
+      if (refuseChainRestore) return false;
       app.activeEffect.state.Speed = snapshot.chain;
       return true;
     },
@@ -144,6 +149,7 @@ test('a rejected effect switch restores state, URL, and control values', () => {
   assert.equal(app.applied.effect, 'Alpha');
   assert.equal(app.url, urlBefore);
   assert.deepEqual(app.restoredUrls, [urlBefore]);
+  assert.deepEqual(app.rollbackApplyUrls, [urlBefore]);
   // The rollback rebuilt the GUI at engine defaults, then replayed the snapshot.
   assert.equal(app.activeEffect.state.Speed, 0.9);
   assert.deepEqual(app.notices,
@@ -227,6 +233,8 @@ test('a thrown effect apply is logged and rolled back', () => {
 
   assert.equal(app.appState.get('effect'), 'Alpha');
   assert.deepEqual(app.errors, [{ message: 'Effect switch failed:', error: failure }]);
+  assert.deepEqual(app.notices, ['Effect change was rejected. The previous value was restored.']);
+  assert.deepEqual(app.restoredUrls, ['/?effect=Alpha']);
   assert.deepEqual(app.fatals, []);
 });
 
@@ -254,6 +262,8 @@ test('a thrown resolution apply is logged and rolled back', async () => {
   assert.equal(app.appState.get('resolution'), 'Lo');
   assert.deepEqual(applyCalls(app, 'applyResolution').map((call) => call.resolution), ['Hi', 'Lo']);
   assert.deepEqual(app.errors, [{ message: 'Resolution switch failed:', error: failure }]);
+  assert.equal(app.applied.resolution, 'Lo');
+  assert.deepEqual(app.notices, ['Resolution change was rejected. The previous value was restored.']);
   assert.deepEqual(app.fatals, []);
   assert.deepEqual(app.urlSyncs, ['Lo']);
 });
@@ -293,6 +303,7 @@ test('an accepted resolution switch applies it without re-asserting the URL',
     await Promise.resolve();
 
     assert.equal(app.applied.resolution, 'Hi');
+    assert.deepEqual(app.notices, [null]);
     assert.deepEqual(app.urlSyncs, []);
     assert.deepEqual(app.errors, []);
   });
@@ -313,6 +324,7 @@ test('a rejected resolution switch restores resolution, effect, URL, and control
     assert.equal(app.applied.resolution, 'Lo');
     assert.equal(app.appState.get('effect'), 'Beta');
     assert.deepEqual(app.restoredUrls, ['/?effect=Beta']);
+    assert.equal(app.rollbackApplyUrls[0], '/?effect=Beta');
     // The dropdown must not keep advertising the resolution that was refused.
     assert.equal(app.control.resolution, 'Lo');
     assert.equal(app.activeEffect.state.Speed, 0.75);
@@ -472,4 +484,14 @@ test('dispose() is idempotent and does not drop a second coordinator', () => {
 
   assert.deepEqual(app.calls.map((c) => c.fn), ['other']);
   other.dispose();
+});
+
+test('a refused chain rollback reports a fatal recovery failure and closes its mute window', () => {
+  const app = makeApp({fullConfigEffects: new Set(['Alpha']),
+    rejectEffects: new Set(['Beta']), refuseChainRestore: true});
+  app.appState.set('effect', 'Beta');
+  assert.equal(app.errors[0].message, 'Effect rollback failed:');
+  assert.match(app.errors[0].error.message, /Chain snapshot rollback was rejected/);
+  assert.equal(app.fatals.length, 1);
+  assert.equal(app.switches.isRestoring(), false);
 });

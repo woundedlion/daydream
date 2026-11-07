@@ -589,10 +589,12 @@ test('canonical buttons retain display-keyed size and preset metadata', () => {
 test('the effect list leaves browser chords unhandled', () => {
   const { sidebar, selected } = makeSidebar();
   sidebar.setEffects(['A', 'B'], {});
+  document.activeElement = sidebar.buttons.get('A');
   for (const modifier of ['altKey', 'ctrlKey', 'metaKey']) {
-    let prevented = false;
-    sidebar.onKeyDown({ key: 'ArrowLeft', [modifier]: true, preventDefault() { prevented = true; } });
-    assert.equal(prevented, false);
+    for (const key of ['ArrowLeft', 'Enter', ' ']) {
+      const event = sidebar.listEl.dispatch('keydown', {key, [modifier]: true});
+      assert.equal(event.defaultPrevented, false);
+    }
   }
   assert.deepEqual(selected, []);
 });

@@ -695,7 +695,7 @@ function renderCtx(colors, log) {
   };
 }
 
-test('visual presentation repaints within columns and preserves paused samples and engine aliases', () => {
+function presentationRig() {
   const colors = new Uint16Array(8 * 2 * 3).fill(10000);
   const ctx = renderCtx(colors, []);
   Object.assign(ctx, {
@@ -712,35 +712,74 @@ test('visual presentation repaints within columns and preserves paused samples a
   const render = () => Daydream.prototype.render.call(ctx, {
     drawFrame: () => assert.fail('presentation advanced the engine'),
   });
-  render();
-  assert.ok(painted.every((value) => value === 0));
-  delta = ctx.frameInterval * 0.2;
-  render();
-  const earlier = painted[0];
+  return {ctx, colors, render, get painted() { return painted; },
+    get paints() { return paints; }, set delta(value) { delta = value; }};
+}
+
+function warmPresentationRig() {
+  const h = presentationRig();
+  h.render();
+  h.delta = h.ctx.frameInterval * 0.2;
+  h.render();
+  const earlier = h.painted[0];
+  h.delta = h.ctx.frameInterval * 0.02;
+  h.render();
+  return {h, earlier};
+}
+
+function pausedPresentationRig() {
+  const {h, earlier} = warmPresentationRig();
+  h.ctx.paused = true;
+  h.render();
+  const history = h.ctx.povSweep.emissions.map(({pixels}) => pixels.slice());
+  h.ctx.povResponseScale = 2;
+  h.ctx.needsRender = true;
+  h.render();
+  return {h, earlier, history};
+}
+
+test('visual presentation repaints between column advances and restores engine aliases', () => {
+  const h = presentationRig();
+  h.render();
+  assert.ok(h.painted.every((value) => value === 0));
+  h.delta = h.ctx.frameInterval * 0.2;
+  h.render();
+  const earlier = h.painted[0];
   assert.ok(earlier > 0);
-  delta = ctx.frameInterval * 0.02;
-  render();
-  assert.equal(ctx.povSweep.column, 1);
-  assert.ok(painted[0] > earlier);
-  assert.equal(paints, 3);
-  assert.equal(ctx.dotMesh.instanceColor.array, colors);
-  ctx.paused = true;
-  render();
-  assert.equal(paints, 3);
-  const history = ctx.povSweep.emissions.map(({ pixels }) => pixels.slice());
-  ctx.povResponseScale = 2;
-  ctx.needsRender = true;
-  render();
-  assert.ok(painted[0] < earlier);
-  const frozen = painted.slice();
-  colors.fill(20000);
-  ctx.needsRender = true;
-  render();
-  assert.deepEqual(painted, frozen);
-  assert.deepEqual(ctx.povSweep.emissions.map(({ pixels }) => pixels), history);
-  ctx.povFidelity = false;
-  render();
-  assert.deepEqual(painted, colors);
+  h.delta = h.ctx.frameInterval * 0.02;
+  h.render();
+  assert.equal(h.ctx.povSweep.column, 1);
+  assert.ok(h.painted[0] > earlier);
+  assert.equal(h.paints, 3);
+  assert.equal(h.ctx.dotMesh.instanceColor.array, h.colors);
+});
+
+test('visual presentation does not repaint a paused unchanged frame', () => {
+  const {h} = warmPresentationRig();
+  h.ctx.paused = true;
+  h.render();
+  assert.equal(h.paints, 3);
+});
+
+test('a paused response-scale edit reuses the frozen sweep samples', () => {
+  const {h, earlier, history} = pausedPresentationRig();
+  assert.ok(h.painted[0] < earlier);
+  const frozen = h.painted.slice();
+  h.colors.fill(20000);
+  h.ctx.needsRender = true;
+  h.render();
+  assert.deepEqual(h.painted, frozen);
+  assert.deepEqual(h.ctx.povSweep.emissions.map(({ pixels }) => pixels), history);
+});
+
+test('disabling POV presentation restores the live engine colors', () => {
+  const {h} = pausedPresentationRig();
+  h.colors.fill(20000);
+  h.ctx.needsRender = true;
+  h.render();
+  h.ctx.povFidelity = false;
+  h.render();
+  assert.deepEqual(h.painted, h.colors);
 });
 
 test('POV fidelity records a frame whose pixel view detaches during the tick', () => {
@@ -820,7 +859,7 @@ test('the sweep marker selects a separate display buffer only in fidelity mode',
   assert.equal(painted, colors);
 });
 
-test('POV fidelity sweeps between engine ticks and restores the engine aliases', () => {
+function fidelitySweepRig() {
   const colors = new Uint16Array(8 * 2 * 3);
   const ctx = renderCtx(colors, []);
   Object.assign(ctx, {
@@ -837,41 +876,78 @@ test('POV fidelity sweeps between engine ticks and restores the engine aliases',
   ctx.renderPip = () => assert.deepEqual(ctx.dotMesh.instanceColor.array, painted);
   const adapter = { drawFrame: () => colors.fill(++frames * 10) };
   const render = () => Daydream.prototype.render.call(ctx, adapter);
-  render();
-  assert.equal(frames, 1);
-  assert.equal(ctx.povSweep.column, 1);
-  assert.deepEqual(ctx.povSweep.emissions.at(-1).pixels, colors);
-  const history = ctx.povSweep.emissions.map(({ pixels }) => pixels.slice());
-  delta = ctx.frameInterval / 4;
-  render();
-  assert.equal(frames, 1);
-  assert.equal(ctx.povSweep.column, 2);
-  assert.deepEqual(ctx.povSweep.emissions.map(({ pixels }) => pixels), history);
-  assert.equal(ctx.pixels, colors);
-  assert.equal(ctx.dotMesh.instanceColor.array, colors);
+  return {ctx, colors, render, get painted() { return painted; },
+    get frames() { return frames; }, set delta(value) { delta = value; }};
+}
 
-  ctx.paused = true;
-  const frozen = painted;
-  ctx.needsRender = true;
-  render();
-  assert.deepEqual(painted, frozen);
-  colors.fill(15);
-  ctx.needsRender = true;
-  render();
-  assert.deepEqual(ctx.povSweep.emissions.map(({ pixels }) => pixels), history);
-  assert.deepEqual(painted, frozen);
-  assert.equal(frames, 1);
-  ctx.stepFrames = 1;
-  render();
-  assert.equal(frames, 2);
-  assert.deepEqual(ctx.povSweep.emissions.at(-1).pixels, colors);
-  assert.deepEqual(ctx.povSweep.emissions.at(-2).pixels, history.at(-1));
+function advancedSweepRig() {
+  const h = fidelitySweepRig();
+  h.render();
+  const history = h.ctx.povSweep.emissions.map(({pixels}) => pixels.slice());
+  h.delta = h.ctx.frameInterval / 4;
+  h.render();
+  return {h, history};
+}
 
-  ctx.povFidelity = false;
-  render();
-  assert.equal(ctx.povSweep, null);
-  assert.equal(ctx.dotMesh.instanceColor.array, colors);
-  assert.ok(painted.every((v) => v === 20));
+function frozenSweepRig() {
+  const {h, history} = advancedSweepRig();
+  h.ctx.paused = true;
+  const frozen = h.painted;
+  h.ctx.needsRender = true;
+  h.render();
+  return {h, history, frozen};
+}
+
+test('POV fidelity sweeps between engine ticks and restores engine aliases', () => {
+  const h = fidelitySweepRig();
+  h.render();
+  assert.equal(h.frames, 1);
+  assert.equal(h.ctx.povSweep.column, 1);
+  assert.deepEqual(h.ctx.povSweep.emissions.at(-1).pixels, h.colors);
+  const history = h.ctx.povSweep.emissions.map(({ pixels }) => pixels.slice());
+  h.delta = h.ctx.frameInterval / 4;
+  h.render();
+  assert.equal(h.frames, 1);
+  assert.equal(h.ctx.povSweep.column, 2);
+  assert.deepEqual(h.ctx.povSweep.emissions.map(({ pixels }) => pixels), history);
+  assert.equal(h.ctx.pixels, h.colors);
+  assert.equal(h.ctx.dotMesh.instanceColor.array, h.colors);
+
+});
+
+test('paused POV sweeps retain their published history and displayed colors', () => {
+  const {h, history, frozen} = frozenSweepRig();
+  assert.deepEqual(h.painted, frozen);
+  h.colors.fill(15);
+  h.ctx.needsRender = true;
+  h.render();
+  assert.deepEqual(h.ctx.povSweep.emissions.map(({ pixels }) => pixels), history);
+  assert.deepEqual(h.painted, frozen);
+  assert.equal(h.frames, 1);
+});
+
+test('a paused frame step appends one new POV emission', () => {
+  const {h, history} = frozenSweepRig();
+  h.colors.fill(15);
+  h.ctx.needsRender = true;
+  h.render();
+  h.ctx.stepFrames = 1;
+  h.render();
+  assert.equal(h.frames, 2);
+  assert.deepEqual(h.ctx.povSweep.emissions.at(-1).pixels, h.colors);
+  assert.deepEqual(h.ctx.povSweep.emissions.at(-2).pixels, history.at(-1));
+
+});
+
+test('disabling POV fidelity clears its sweep and restores the engine aliases', () => {
+  const {h} = frozenSweepRig();
+  h.ctx.stepFrames = 1;
+  h.render();
+  h.ctx.povFidelity = false;
+  h.render();
+  assert.equal(h.ctx.povSweep, null);
+  assert.equal(h.ctx.dotMesh.instanceColor.array, h.colors);
+  assert.ok(h.painted.every((v) => v === 20));
 });
 
 test('POV fidelity records only advanced frames through lag and paused frame steps', () => {
@@ -1551,7 +1627,7 @@ test('a pointer-focused canvas stays unringed when a later keypress promotes it'
   assert.equal(defaultPrevented, false, 'arrow key was stolen from the frame step');
 });
 
-test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
+function keyboardOrbitRig() {
   const state = { focusVisible: true };
   const ctx = orbitCtx(state);
   ctx.camera = new THREE.PerspectiveCamera();
@@ -1567,7 +1643,6 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
   Daydream.prototype.setupKeyboardOrbit.call(ctx);
 
   ctx.handlers.focus();
-  assert.equal(ctx.classes.has('keyboard-focus'), true);
 
   const keydown = (key, shiftKey = false) => {
     let prevented = false;
@@ -1581,18 +1656,44 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
   const spherical = () => new THREE.Spherical().setFromVector3(
     ctx.camera.position.clone().sub(ctx.controls.target));
 
+  return {ctx, keydown, spherical};
+}
+
+test('a keyboard-focused canvas rings until blur', () => {
+  const {ctx} = keyboardOrbitRig();
+  assert.equal(ctx.classes.has('keyboard-focus'), true);
+  ctx.handlers.blur();
+  assert.equal(ctx.classes.has('keyboard-focus'), false);
+});
+
+test('horizontal arrow keys orbit and request a repaint', () => {
+  const {ctx, keydown} = keyboardOrbitRig();
   assert.deepEqual(keydown('ArrowLeft'), { prevented: true, stopped: true });
   assert.ok(Math.abs(ctx.camera.position.x) > 1e-6, 'arrow key did not orbit');
   assert.equal(ctx.needsRender, true);
 
+});
+
+test('paused horizontal arrows remain available for frame stepping', () => {
+  const {ctx, keydown} = keyboardOrbitRig();
   ctx.paused = true;
   const beforeStep = ctx.camera.position.clone();
   assert.deepEqual(keydown('ArrowRight'), { prevented: false, stopped: false });
   assert.deepEqual(ctx.camera.position, beforeStep);
 
+});
+
+test('shifted horizontal arrows orbit while paused', () => {
+  const {ctx, keydown} = keyboardOrbitRig();
+  ctx.paused = true;
+  const beforeStep = ctx.camera.position.clone();
   assert.deepEqual(keydown('ArrowRight', true), { prevented: true, stopped: true });
   assert.ok(ctx.camera.position.x > beforeStep.x);
 
+});
+
+test('vertical arrow keys move the orbit polar angle', () => {
+  const {keydown, spherical} = keyboardOrbitRig();
   const beforeUp = spherical();
   assert.deepEqual(keydown('ArrowUp'), { prevented: true, stopped: true });
   assert.ok(spherical().phi < beforeUp.phi);
@@ -1601,6 +1702,10 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
   assert.deepEqual(keydown('ArrowDown'), { prevented: true, stopped: true });
   assert.ok(spherical().phi > beforeDown.phi);
 
+});
+
+test('plus and minus variants dolly the orbit', () => {
+  const {keydown, spherical} = keyboardOrbitRig();
   const beforeIn = spherical();
   assert.deepEqual(keydown('+'), { prevented: true, stopped: true });
   assert.ok(spherical().radius < beforeIn.radius);
@@ -1617,6 +1722,10 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
   assert.deepEqual(keydown('_'), { prevented: true, stopped: true });
   assert.ok(spherical().radius > beforeUnderscore);
 
+});
+
+test('keyboard orbit respects polar and distance clamps', () => {
+  const {ctx, keydown, spherical} = keyboardOrbitRig();
   ctx.controls.minPolarAngle = 0.2;
   ctx.controls.maxPolarAngle = 0.4;
   ctx.controls.minDistance = 2;
@@ -1633,6 +1742,10 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
     assert.ok(Math.abs(spherical().phi - expectedPhi) < 1e-12);
   }
 
+});
+
+test('keyboard orbit leaves browser chords and unowned keys untouched', () => {
+  const {ctx} = keyboardOrbitRig();
   const position = ctx.camera.position.clone();
   for (const event of [{ key: ' ' }, { key: 'ArrowLeft', ctrlKey: true },
     { key: 'ArrowLeft', altKey: true }, {key: 'ArrowLeft', metaKey: true}]) {
@@ -1642,8 +1755,6 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
     });
     assert.deepEqual(ctx.camera.position, position);
   }
-  ctx.handlers.blur();
-  assert.equal(ctx.classes.has('keyboard-focus'), false);
 });
 
 test('orbit bounds keep cap tops strictly inside both clipping planes at every dot size', () => {

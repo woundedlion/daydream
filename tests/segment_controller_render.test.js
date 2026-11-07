@@ -1,8 +1,9 @@
+import {SegmentStatsView} from '../src/ui/segment_stats_view.js';
 // SegmentController compositor and the tick() render-loop state machine.
 import { installFakeTimers } from './helpers/fake_timers.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeElement } from './helpers/fake_dom.js';
+import { fakeElement, fakeDocumentById } from './helpers/fake_dom.js';
 import { fakeColorAttribute } from './helpers/fake_three.js';
 import { repointDisplayAliases } from '../src/engine/display_aliases.js';
 import { SegmentController } from '../src/segments/segment_controller.js';
@@ -52,7 +53,6 @@ test('composite() blits each segment rectangle to its display-buffer offset', ()
   setDisplayGrid(4, 2);
 
   const c = readyController(2);
-  c.showBoundaries = false;
   const band = new Uint16Array(2 * 2 * 3).fill(111);
   const staged = [null, { pixels: band, x0: 2, x1: 4, y0: 0, y1: 2 }];
 
@@ -72,7 +72,6 @@ test('composite() faults when the display buffer is not the driver grid', () => 
   driver.pixels = new Uint16Array(2 * 2 * 3);
 
   const c = makeController();
-  c.showBoundaries = false;
   const band = new Uint16Array(4 * 2 * 3).fill(222);
   const staged = [{ pixels: band, x0: 0, x1: 4, y0: 0, y1: 2 }];
 
@@ -89,7 +88,6 @@ test('composite() faults on a rectangle that overflows the current display buffe
   setDisplayGrid(4, 2);
 
   const c = makeController();
-  c.showBoundaries = false;
   const band = new Uint16Array(2 * 2 * 3).fill(222);
   const staged = [{ pixels: band, x0: 0, x1: 99, y0: 0, y1: 2 }]; // x1=99 overshoots W=4
 
@@ -107,7 +105,6 @@ test('composite() faults atomically when a non-leading segment overflows', () =>
   setDisplayGrid(4, 2);
 
   const c = readyController(2);
-  c.showBoundaries = false;
   const good = new Uint16Array(2 * 2 * 3).fill(111);
   const bad = new Uint16Array(2 * 2 * 3).fill(222);
   const staged = [
@@ -127,7 +124,6 @@ test('composite() rejects an empty segment rect as the wrong band', () => {
   setDisplayGrid(4, 2);
 
   const c = makeController();
-  c.showBoundaries = false;
   const band = new Uint16Array(2 * 2 * 3).fill(123);
   const staged = [{ pixels: band, x0: 2, x1: 2, y0: 0, y1: 2 }]; // x1 == x0
 
@@ -142,7 +138,6 @@ test('composite() faults on a pixel buffer whose length disagrees with its rect'
   setDisplayGrid(4, 2);
 
   const c = makeController();
-  c.showBoundaries = false;
   const short = new Uint16Array(3).fill(123);
   const staged = [{ pixels: short, x0: 0, x1: 2, y0: 0, y1: 1 }];
 
@@ -160,7 +155,6 @@ test('composite() faults on a rect that is not that segment\'s band of the layou
   setDisplayGrid(4, 4);
 
   const c = readyController(4);
-  c.showBoundaries = false;
   // Segment 1's band is [0,2)-[2,4); this is segment 3's, and the same size.
   const band = new Uint16Array(2 * 2 * 3).fill(123);
   const staged = [null, { pixels: band, x0: 2, x1: 4, y0: 2, y1: 4 }];
@@ -178,7 +172,6 @@ test('composite() faults when the layout admits no band for a segment', () => {
   setDisplayGrid(2, 2);
 
   const c = readyController(8);
-  c.showBoundaries = false;
   const cell = new Uint16Array(1 * 1 * 3).fill(123);
   const staged = [{ pixels: cell, x0: 0, x1: 1, y0: 0, y1: 1 }];
 
@@ -186,6 +179,7 @@ test('composite() faults when the layout admits no band for a segment', () => {
   assert.equal(blitted, 0, 'an underivable layout blits nothing');
   assert.equal(c.faulted, true, 'a throwing layout derivation latches a fault instead of escaping');
   assert.match(c.faultInfo.message, /no segment-0 band exists/);
+  assert.ok(driver.pixels.every((v) => v === 0), 'nothing is blitted when no band can be derived');
 });
 
 // The pre-pass's band table is derived once per layout.
@@ -233,18 +227,14 @@ test('a generation published while paused composites without another tick', asyn
   const c = readyController(2);
   c.active = true;
   driver.paused = true;
-  try {
-    await publishGeneration(c, [
-      { pixels: new Uint16Array(12).fill(111), x0: 0, x1: 2, y0: 0, y1: 2 },
-      { pixels: new Uint16Array(12).fill(222), x0: 2, x1: 4, y0: 0, y1: 2 },
-    ]);
-    assert.equal(driver.pixels[idx(1, 0, 4)], 111);
-    assert.equal(driver.pixels[idx(3, 0, 4)], 222);
-    assert.equal(driver.invalidations, 1);
-    assert.equal(c.frameState.pendingFrame, false);
-  } finally {
-    driver.paused = false;
-  }
+  await publishGeneration(c, [
+    { pixels: new Uint16Array(12).fill(111), x0: 0, x1: 2, y0: 0, y1: 2 },
+    { pixels: new Uint16Array(12).fill(222), x0: 2, x1: 4, y0: 0, y1: 2 },
+  ]);
+  assert.equal(driver.pixels[idx(1, 0, 4)], 111);
+  assert.equal(driver.pixels[idx(3, 0, 4)], 222);
+  assert.equal(driver.invalidations, 1);
+  assert.equal(c.frameState.pendingFrame, false);
 });
 
 test('a paused active pool renders and publishes as soon as every worker is ready', async () => {
@@ -252,20 +242,16 @@ test('a paused active pool renders and publishes as soon as every worker is read
   const c = makeController();
   c.active = true;
   driver.paused = true;
-  try {
-    c.create(2);
-    deliverReady(c, 0);
-    assert.equal(c.workers[0].posted.some(message => message.type === 'render'), false);
-    deliverReady(c, 1);
-    assert.ok(c.workers.every(worker => worker.posted.some(message => message.type === 'render')));
-    await deliverGeneration(c, gridHalves(333));
-    assert.equal(driver.pixels[idx(1, 0, 4)], 333);
-    assert.equal(driver.pixels[idx(3, 0, 4)], 333);
-    assert.equal(c.hasPublishedFrame(), true);
-    assert.equal(driver.invalidations, 1);
-  } finally {
-    driver.paused = false;
-  }
+  c.create(2);
+  deliverReady(c, 0);
+  assert.equal(c.workers[0].posted.some(message => message.type === 'render'), false);
+  deliverReady(c, 1);
+  assert.ok(c.workers.every(worker => worker.posted.some(message => message.type === 'render')));
+  await deliverGeneration(c, gridHalves(333));
+  assert.equal(driver.pixels[idx(1, 0, 4)], 333);
+  assert.equal(driver.pixels[idx(3, 0, 4)], 333);
+  assert.equal(c.hasPublishedFrame(), true);
+  assert.equal(driver.invalidations, 1);
 });
 
 test('the boundary setter re-composites and invalidates a paused held generation', async () => {
@@ -274,40 +260,36 @@ test('the boundary setter re-composites and invalidates a paused held generation
   const c = readyController(2);
   c.active = true; // the setter checks it
   driver.paused = true;
-  try {
-    const bandL = new Uint16Array(2 * 2 * 3).fill(111);
-    const bandR = new Uint16Array(2 * 2 * 3).fill(222);
-    await publishGeneration(c, [
-      { pixels: bandL, x0: 0, x1: 2, y0: 0, y1: 2 },
-      { pixels: bandR, x0: 2, x1: 4, y0: 0, y1: 2 },
-    ]);
-    c.composite(c.frameState.results);
-    const posted = c.workers.map((worker) => worker.posted.length);
-    const uploads = driver.dotMesh.instanceColor.version;
-    const invalidations = driver.invalidations;
+  const bandL = new Uint16Array(2 * 2 * 3).fill(111);
+  const bandR = new Uint16Array(2 * 2 * 3).fill(222);
+  await publishGeneration(c, [
+    { pixels: bandL, x0: 0, x1: 2, y0: 0, y1: 2 },
+    { pixels: bandR, x0: 2, x1: 4, y0: 0, y1: 2 },
+  ]);
+  const posted = c.workers.map((worker) => worker.posted.length);
+  const uploads = driver.dotMesh.instanceColor.version;
+  const invalidations = driver.invalidations;
 
-    c.showBoundaries = true;
+  c.showBoundaries = true;
 
-    assert.ok(isCyan(0, 0) && isCyan(2, 0),
-      'the held generation gains its boundaries without a simulation tick');
-    assert.equal(driver.invalidations, invalidations + 1, 'the paused render loop was asked to repaint');
-    assert.equal(driver.dotMesh.instanceColor.version, uploads + 1,
-      'the seams are flagged for upload');
-    c.workers.forEach((worker, index) => {
-      assert.equal(worker.posted.length, posted[index],
-        'refreshing the overlay did not advance or dispatch the simulation');
-    });
+  assert.ok(isCyan(0, 0) && isCyan(2, 0),
+    'the held generation gains its boundaries without a simulation tick');
+  assert.equal(driver.invalidations, invalidations + 1, 'the paused render loop was asked to repaint');
+  assert.equal(driver.dotMesh.instanceColor.version, uploads + 1,
+    'the seams are flagged for upload');
+  c.workers.forEach((worker, index) => {
+    assert.equal(worker.posted.length, posted[index],
+      'refreshing the overlay did not advance or dispatch the simulation');
+  });
 
-    c.showBoundaries = false;
 
-    assert.equal(driver.pixels[idx(0, 0, 4)], 111, 'disabling restores the held left band');
-    assert.equal(driver.pixels[idx(2, 0, 4)], 222, 'disabling restores the held right band');
-    assert.equal(driver.invalidations, invalidations + 2, 'each visible change requests one repaint');
-    assert.equal(driver.dotMesh.instanceColor.version, uploads + 2,
-      'each visible change flags one upload');
-  } finally {
-    driver.paused = false;
-  }
+  c.showBoundaries = false;
+
+  assert.equal(driver.pixels[idx(0, 0, 4)], 111, 'disabling restores the held left band');
+  assert.equal(driver.pixels[idx(2, 0, 4)], 222, 'disabling restores the held right band');
+  assert.equal(driver.invalidations, invalidations + 2, 'each visible change requests one repaint');
+  assert.equal(driver.dotMesh.instanceColor.version, uploads + 2,
+    'each visible change flags one upload');
 });
 
 test('the boundary setter composites nothing when the pool owns no display', async () => {
@@ -472,17 +454,13 @@ test('composite() clears a buffer the refresh re-fetched', () => {
   const c = readyController(2);
   // The fresh view carries the engine's last frame, not the driver's clear.
   const fetched = new Uint16Array(4 * 2 * 3).fill(999);
-  let refreshed = false;
   c.compositor.refreshPixelView = () => {
-    if (!refreshed) return false;
     repointDisplayAliases(driver, fetched);
     return true;
   };
-  c.compositor.getMemoryView = () => driver.pixels;
   const band = new Uint16Array(2 * 2 * 3).fill(111);
   const staged = [{ pixels: band, x0: 0, x1: 2, y0: 0, y1: 2 }, null];
 
-  refreshed = true;
   c.composite(staged);
 
   assert.equal(driver.pixels, fetched, 'the refresh moved both aliases with it');
@@ -581,7 +559,6 @@ test('the next tick() composites the armed frame and dispatches the following on
   setDisplayGrid(4, 2);
 
   const c = readyController(2);
-  c.showBoundaries = false;
   await publishGeneration(c, gridHalves(111));
   assert.equal(c.frameState.pendingFrame, true);
 
@@ -598,7 +575,6 @@ test('each render dispatch hands the retired generation buffer back for reuse', 
   setDisplayGrid(4, 2);
 
   const c = readyController(2);
-  c.showBoundaries = false;
   const lastRender = (w) => w.posted.filter((m) => m.type === 'render').at(-1);
 
   c.tick(); // dispatch generation A
@@ -632,7 +608,6 @@ test('tick() re-blits the last composite when a render overruns the tick (previe
   setDisplayGrid(4, 2);
 
   const c = readyController(2);
-  c.showBoundaries = false;
   await publishGeneration(c, gridHalves(111));
   c.tick(); // composite the armed frame, dispatch the next (now in flight)
   assert.equal(c.frameState.pendingFrame, false);
@@ -658,7 +633,6 @@ test('an overrun re-blit shows one whole generation, never a half-updated mix', 
   const { restore } = installFakeTimers(); // the render watchdog never fires
   try {
     const c = readyController(2);
-    c.showBoundaries = false;
     await publishGeneration(c, gridHalves(111)); // generation A
     c.tick(); // composite generation A, dispatch generation B (now in flight)
     assert.equal(c.frameState.renderInFlight, true, 'generation B is in flight and will overrun');
@@ -687,7 +661,6 @@ test('a composite short one segment is not handed to the recorder as a frame', a
   setDisplayGrid(4, 2);
 
   const c = readyController(2);
-  c.showBoundaries = false;
   await publishGeneration(c, gridHalves(111));
 
   // The whole-array swap publishes only generations that filled every slot, so
@@ -705,7 +678,6 @@ test('destroy() clears frameComposited so a respawning pool cannot capture black
   setDisplayGrid(4, 2);
 
   const c = readyController(2);
-  c.showBoundaries = false;
   await publishGeneration(c, gridHalves(111));
   c.tick();
   assert.equal(c.frameComposited, true, 'a real composite latched the flag');
@@ -740,7 +712,6 @@ test('a fault latched by composite() mid-tick() does not re-dispatch a doomed re
   setDisplayGrid(4, 2);
 
   const c = readyController(2);
-  c.showBoundaries = false;
   c.tick();
 
   deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
@@ -763,7 +734,6 @@ test('tick() holds the assembled generation when the display buffer is missing',
   setDisplayGrid(4, 2);
 
   const c = readyController(2);
-  c.showBoundaries = false;
   await publishGeneration(c, [gridHalves(111)[0], gridHalves(222)[1]]);
   assert.equal(c.frameState.pendingFrame, true);
 
@@ -786,18 +756,13 @@ test('a fault latched by the overrun re-blit paints the overlay on the same tick
 
   const { restore } = installFakeTimers(); // the render watchdog never fires
   try {
-    const c = readyController(2);
-    c.showBoundaries = false;
+    const stats = fakeElement();
+    const c = readyController(2, {statsView: new SegmentStatsView(fakeDocumentById({'segment-stats': stats}))});
     await publishGeneration(c, gridHalves()); // generation A
     c.tick(); // composite A, dispatch B (in flight, so the next tick overruns)
 
     // Corrupt the published generation so the overrun re-blit's pre-pass faults.
     c.frameState.results[1] = { ...c.frameState.results[1], x1: 99 };
-    const stats = fakeElement();
-    c.statsView.doc = {
-      getElementById: (id) => id === 'segment-stats' ? stats : null,
-      createElement: (tag) => fakeElement(tag),
-    };
     c.active = true;
     const workers = [...c.workers];
     const posted = workers.map((w) => w.posted.length);
@@ -832,11 +797,7 @@ test('an init-phase fault still reaches the fault overlay (faulted checked befor
 
 test('the fault overlay is an alert that never takes focus', () => {
   const stats = fakeElement('div', { connected: true });
-  const c = makeController();
-  c.statsView.doc = {
-    getElementById: (id) => id === 'segment-stats' ? stats : null,
-    createElement: (tag) => fakeElement(tag),
-  };
+  const c = makeController({statsView: new SegmentStatsView(fakeDocumentById({'segment-stats': stats}))});
   c.active = true;
   c.faulted = true;
   c.faultInfo = { segId: 0, message: 'boom' };
@@ -857,11 +818,7 @@ test('a fault latched outside tick() paints the overlay without waiting for one'
   expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: hang (w.js:1:1)"]]);
   // A paused host need not tick, so the fault path paints the banner itself.
   const stats = fakeElement();
-  const c = makeController();
-  c.statsView.doc = {
-    getElementById: (id) => id === 'segment-stats' ? stats : null,
-    createElement: (tag) => fakeElement(tag),
-  };
+  const c = makeController({statsView: new SegmentStatsView(fakeDocumentById({'segment-stats': stats}))});
   c.active = true;
   c.create(2);
 
@@ -874,11 +831,8 @@ test('a fault latched outside tick() paints the overlay without waiting for one'
 
 test('a spawning pool reports the spawn and does not own the display', () => {
   const stats = fakeElement();
-  const c = makeController();
-  c.statsView.doc = {
-    getElementById: (id) => id === 'segment-stats' ? stats : null,
-    createElement: (tag) => fakeElement(tag),
-  };
+  const announcement = fakeElement();
+  const c = makeController({statsView: new SegmentStatsView(fakeDocumentById({'segment-stats': stats, 'segment-spawn-status': announcement}))});
   c.active = true;
   c.create(4);
 
@@ -886,15 +840,21 @@ test('a spawning pool reports the spawn and does not own the display', () => {
 
   c.updateStats();
   const status = stats.firstElementChild;
-  assert.equal(status.getAttribute('role'), 'status');
+  assert.equal(status.getAttribute('role'), null);
   assert.equal(status.childNodes.join(''), 'Spawning workers…');
+  assert.equal(announcement.textContent, 'Spawning workers…');
 
   c.updateStats();
   assert.equal(stats.firstElementChild, status, 'the status row is not rebuilt every frame');
 
   for (let s = 0; s < 4; s++) deliverReady(c, s);
   assert.equal(c.ownsDisplay, true, 'a ready pool owns the display');
+  c.updateStats();
+  assert.equal(announcement.textContent, '');
 
+});
+
+test('a faulted pool that never reached ready keeps the display', () => {
   const latched = makeController();
   latched.active = true;
   latched.create(4);
@@ -912,11 +872,7 @@ test('turning segmented mode off hands the global stat bars back', () => {
     'global-stats-desktop': fakeElement(),
     'stats-bar': fakeElement(),
   };
-  const c = makeController();
-  c.statsView.doc = {
-    getElementById: (id) => byId[id] ?? null,
-    createElement: (tag) => fakeElement(tag),
-  };
+  const c = makeController({statsView: new SegmentStatsView(fakeDocumentById(byId))});
 
   c.active = true;
   // A ready pool: the overlay leaves the bars up until it owns the display.

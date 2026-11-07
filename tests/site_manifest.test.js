@@ -1,10 +1,11 @@
+import {createHash} from 'node:crypto';
 // The published set combines site_manifest.txt with verified engine assets:
 // every source entry is tracked and present, and every asset the served pages
 // reach is covered by an entry.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { dirname, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { manifestEntries, servedPages } from './helpers/site_pages.js';
@@ -30,16 +31,6 @@ const trackedFiles = () =>
       .filter(Boolean),
     ...(process.env.ENGINE_BUNDLE_DIR ? verifiedEnginePaths(REPO, process.env.ENGINE_BUNDLE_DIR) : []),
   ]);
-
-/**
- * True when git ignores a path. The tool pages reference offline-only drops
- * under the gitignored /vendor/ tree behind a CDN fallback; those are not served
- * and must not be demanded of the manifest.
- * @param {string} path - Repo-relative path.
- * @returns {boolean} Whether the path is ignored.
- */
-const ignored = (path) =>
-  spawnSync('git', ['-C', REPO, 'check-ignore', '-q', '--', path]).status === 0;
 
 // Specifiers a module resolves through the import map (three, lil-gui and their
 // addons) are bare; only these forms name a file in this repo.
@@ -121,7 +112,7 @@ test('every site manifest entry is tracked source or an installed engine asset',
   const lines = read(MANIFEST).split(/\r?\n/).map((line) => line.trim())
     .filter((line) => line && !line.startsWith('#'));
   assert.deepEqual([...new Set(lines)], lines, `${MANIFEST} repeats an entry`);
-  const tracked = [...trackedFiles()];
+  const tracked = trackedFiles();
   const malformed = [];
   const absent = [];
   const untracked = [];
@@ -129,7 +120,7 @@ test('every site manifest entry is tracked source or an installed engine asset',
     if (/^[./]|\\|\/$/.test(entry)) malformed.push(entry);
     if (!generated(entry)
         && (!existsSync(resolve(REPO, entry)) || !lstatSync(resolve(REPO, entry)).isFile())) absent.push(entry);
-    if (!generated(entry) && !tracked.includes(entry))
+    if (!generated(entry) && !tracked.has(entry))
       untracked.push(entry);
   }
   assert.deepEqual(malformed.slice(0, 5), [],
@@ -151,7 +142,7 @@ test('the manifest publishes every tracked HTML page', () => {
       'CSP and stylesheet cases never see them');
 });
 
-test('engine-backed pages declare the browser-smoke readiness overlay', () => {
+test('the app and shader pages declare the browser-smoke readiness overlay', () => {
   for (const page of ['index.html', 'tools/shader.html'])
     assert.match(read(page), /\bid=["']loading-overlay["']/,
       `${page} must declare #loading-overlay for the readiness gate`);
@@ -187,9 +178,7 @@ const walkFromPages = () => {
         continue;
       }
       if (!tracked.has(target)) {
-        // Only a deliberately gitignored drop may be absent from the deploy
-        // checkout; anything else is a reference that 404s on Pages.
-        if (!ignored(target)) dangling.push(`${path} -> ${target}`);
+        dangling.push(`${path} -> ${target}`);
         continue;
       }
       if (!existsSync(resolve(REPO, target))) {
@@ -220,7 +209,7 @@ test('the site manifest covers every asset the served pages reference', () => {
   assert.deepEqual(absent.slice(0, 5), [],
     `${absent.length} references name a tracked path that does not exist`);
   assert.deepEqual(dangling.slice(0, 5), [],
-    `${dangling.length} references git neither tracks nor ignores — they would ` +
+    `${dangling.length} references git does not track — they would ` +
       '404 on Pages');
   assert.deepEqual(unpublished.slice(0, 5), [],
     `${unpublished.length} served paths ${MANIFEST} does not publish — they ` +
@@ -296,4 +285,27 @@ test('the license link publishes a text file containing the complete notices', (
   assert.match(read('index.html'), /href="LICENSE\.txt"/);
   assert.ok(manifestEntries().includes('LICENSE.txt'));
   assert.equal(read('LICENSE.txt'), read('LICENSE'));
+});
+
+test('font provenance matches the published files and documented byte totals', () => {
+  const rows = JSON.parse(read('styles/fonts/sources.json'));
+  const files = new Map();
+  for (const row of rows) {
+    const bytes = readFileSync(resolve(REPO, 'styles/fonts', row.file));
+    assert.equal(bytes.length, row.bytes, row.file);
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), row.sha256, row.file);
+    const recorded = {bytes: row.bytes, sha256: row.sha256};
+    if (files.has(row.file)) assert.deepEqual(files.get(row.file), recorded, row.file);
+    else files.set(row.file, recorded);
+  }
+  const expected = [...files.keys()].sort();
+  assert.deepEqual(readdirSync(resolve(REPO, 'styles/fonts')).filter(name => name.endsWith('.woff2')).sort(), expected);
+  assert.deepEqual(manifestEntries().filter(path => /^styles\/fonts\/[^/]+\.woff2$/.test(path))
+    .map(path => posix.basename(path)).sort(), expected);
+  const total = [...files.values()].reduce((sum, row) => sum + row.bytes, 0);
+  const latin = [...files.entries()].filter(([file]) => file.endsWith('-latin.woff2'))
+    .reduce((sum, [, row]) => sum + row.bytes, 0);
+  const notes = read('styles/fonts/README.md');
+  assert.match(notes, new RegExp(`fonts total ${total.toLocaleString('en-US')} bytes across ${files.size} files`));
+  assert.match(notes, new RegExp(`Latin pair is ${latin.toLocaleString('en-US')} bytes`));
 });

@@ -1,3 +1,4 @@
+import {wiring} from './helpers/effect_gui_harness.js';
 // Pins the behaviour of the lil-gui build package.json pins, driving the real
 // module over tests/helpers/fake_dom.js.
 //
@@ -76,19 +77,17 @@ for (const ownsDisplay of [false, true]) {
     const gui = await realGUI();
     let values = [12, 0.9];
     const win = { location: new URL('https://example.test/'), setTimeout, clearTimeout };
+    const deps = wiring();
     const panel = createEffectGui({
-      engine: {
+      engine: {...deps.engine,
         getParameterDefinitions: () => [
           { name: 'Unfinished Rays', value: 0, min: 0, max: 42050, step: 1, readonly: true },
           { name: 'Speed', value: 0.1, min: 0, max: 1 },
         ],
-        paramGeneration: () => 1, paramValues: () => values, setParam: () => true,
-        setAnimationsPaused: () => {}, animationsPaused: () => false,
-        getPresetCount: () => 0, getPresetIndex: () => 0,
-        synchronizePreset: () => true, selectPreset: () => true,
+        paramValues: () => values,
       },
-      segments: { ownsDisplay: () => ownsDisplay, paramValues: () => values, setParam: () => {} },
-      host: {
+      segments: {...deps.segments, ownsDisplay: () => ownsDisplay, paramValues: () => values, setParam: () => {} },
+      host: {...deps.host,
         createGui: () => new DeepLinkGUI(gui, 'fx', null, win), container: () => null,
         isMobile: () => false, applyEffect: () => {}, dragTarget: fakeElement('window'),
         focusedElement: () => document.activeElement,

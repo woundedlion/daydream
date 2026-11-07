@@ -356,8 +356,10 @@ test('the panel probe rejects a layout with no scrollable overflow', async () =>
 });
 
 test('the pad probe rejects wrong geometry and a pointer that never moves its value', async () => {
+  const focused = [];
   const tab = {
     select: async () => {}, waitForFunction: async () => {},
+    focus: async (selector) => focused.push(selector),
     waitForSelector: async () => ({
       boundingBox: async () => ({ x: 0, y: 0, width: 0, height: 0 }),
     }),
@@ -370,6 +372,8 @@ test('the pad probe rejects wrong geometry and a pointer that never moves its va
     evaluate: async () => ({ re: '0.00', im: '0.00', left: '0%', top: '0%', label: '' }),
   };
   const failures = await probePad(tab);
+  assert.deepEqual(focused, ['#B_re_axis']);
+  assert.ok(failures.some((message) => /focusing a pad axis/.test(message)));
   assert.ok(failures.some((message) => /pad lays out 0x0/.test(message)));
   assert.ok(failures.some((message) => /the press reads/.test(message)));
   assert.ok(failures.some((message) => /the drag tracks/.test(message)));

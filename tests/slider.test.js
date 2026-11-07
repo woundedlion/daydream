@@ -228,3 +228,12 @@ test('slider proxies expose label, bounds, orientation and shortcuts', () => {
   assert.equal(vertical.id, 'hue');
   assert.equal(vertical.getAttribute('aria-orientation'), 'vertical');
 });
+
+test('scaled fractional bounds use the rounded display grid', () => {
+  const { slider, setValue } = createSlider('c',
+    { ...base, min: 0.25, max: 0.75, step: 0.1, scale: 10 }, null);
+  assert.equal(slider.min, '3');
+  assert.equal(slider.max, '8');
+  assert.equal(setValue(0.25), 0.3);
+  assert.equal(setValue(0.75), 0.8);
+});

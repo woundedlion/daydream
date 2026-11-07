@@ -8,7 +8,7 @@ const noop = () => {};
 const actions = {restore: noop, remove: noop, copy: noop, explain: noop};
 const options = {count: 5, funcName: 'cube_kis', clashMessage: '', canRestore: true, on: actions, doc};
 
-test('saved cards render hostile metadata as text and wire each named action', () => {
+function savedCardRig() {
   const item = {title: '<img src=x onerror=alert(1)>', stats: 'V8', desc: '<script>x</script>',
     thumb: 'data:image/png;base64,thumbnail'};
   const calls = [];
@@ -16,11 +16,22 @@ test('saved cards render hostile metadata as text and wire each named action', (
     restore: value => calls.push(['restore', value]), remove: index => calls.push(['remove', index]),
     copy: (...args) => calls.push(['copy', ...args]), explain: assert.fail,
   }});
+  return {item, calls, card};
+}
+
+test('saved cards render hostile metadata as text', () => {
+  const {item, card} = savedCardRig();
   assert.equal(card.querySelector('.title').textContent, item.title);
   assert.equal(card.querySelector('.saved-stats').textContent, 'V8');
   assert.equal(card.querySelector('.details').textContent, item.desc);
   assert.equal(card.querySelector('img').src, item.thumb);
   assert.equal(card.querySelector('img').alt, '');
+  assert.equal(card.classList.contains('name-clash'), false);
+  assert.equal(card.querySelector('.saved-clash-btn'), null);
+});
+
+test('saved cards wire each named action', () => {
+  const {item, calls, card} = savedCardRig();
   const restore = card.querySelector('.saved-restore');
   assert.equal(restore.disabled, false);
   restore.dispatch('click');
@@ -37,8 +48,6 @@ test('saved cards render hostile metadata as text and wire each named action', (
     assert.deepEqual(calls[index].slice(0, 3), ['copy', 2, kind]);
     assert.ok(calls[index][3] === button);
   }
-  assert.equal(card.classList.contains('name-clash'), false);
-  assert.equal(card.querySelector('.saved-clash-btn'), null);
 });
 
 test('collision badges expose their explanation and cards fall back to their title', () => {
@@ -61,7 +70,7 @@ test('collision badges expose their explanation and cards fall back to their tit
 });
 
 test('only image data thumbnails are assigned and absent metadata stays empty', () => {
-  for (const thumb of [undefined, null, 7, 'https://example.test/image.png', 'javascript:x']) {
+  for (const thumb of [undefined, null, 7, 'https://example.test/image.png', 'javascript:x', 'data:text/plain,x']) {
     const card = buildSavedCard({thumb}, 0, options);
     assert.equal(card.querySelector('img').src, undefined);
     for (const selector of ['.title', '.saved-stats', '.details'])

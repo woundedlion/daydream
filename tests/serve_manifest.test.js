@@ -107,4 +107,6 @@ test('a path that escapes the site root is refused', () => withSite(async (get) 
   assert.equal((await get('/styles/%2e%2e%2f%2e%2e%2foutside.txt')).status, 404,
     'a listed path containing .. escaped the site root');
   assert.equal((await get('/%2e%2e%2foutside.txt')).status, 404);
+  assert.equal((await get('/%E0%A4%A')).status, 404);
+  assert.equal((await get('/index.html')).status, 200);
 }));

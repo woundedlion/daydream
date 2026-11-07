@@ -1,4 +1,4 @@
-import { after, beforeEach, test } from 'node:test';
+import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs, { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import {syncBuiltinESMExports} from 'node:module';
@@ -6,17 +6,12 @@ import { join } from 'node:path';
 import { installEngineBundle, runtimePath, RUNTIME_PATHS } from '../scripts/install-engine-bundle.mjs';
 import { scratchDir, writeEngineBundle, writeFileAt } from './helpers/fixture_repo.js';
 
-const AMBIENT_BUNDLE_PIN = process.env.HOLOSPHERE_BUNDLE_PIN;
 beforeEach(() => { delete process.env.HOLOSPHERE_BUNDLE_PIN; });
-after(() => {
-  if (AMBIENT_BUNDLE_PIN === undefined) delete process.env.HOLOSPHERE_BUNDLE_PIN;
-  else process.env.HOLOSPHERE_BUNDLE_PIN = AMBIENT_BUNDLE_PIN;
-});
 
 /**
  * @param {import('node:test').TestContext} t - The case, for cleanup.
  * @param {(files: Object<string, string>) => void} [shape] - Alters the bundle's files before its manifest is written.
- * @returns {{bundle: string, destination: string, write: (base: string, path: string, text: string) => void}} The fixture paths and a writer.
+ * @returns {{bundle: string, destination: string}} The fixture paths.
  */
 function fixture(t, shape = () => {}) {
   const root = scratchDir(t, 'daydream-bundle-');
@@ -33,7 +28,7 @@ function fixture(t, shape = () => {}) {
   files['generated/holosphere_wasm.sha'] = 'b'.repeat(40);
   shape(files);
   writeEngineBundle(bundle, files);
-  return { bundle, destination, write: writeFileAt };
+  return { bundle, destination };
 }
 
 test('install replaces stale assets and preserves consumer-owned files', (t) => {
@@ -54,8 +49,8 @@ test('install replaces stale assets and preserves consumer-owned files', (t) => 
 });
 
 test('corrupted generated documentation is rejected before any destination changes', (t) => {
-  const { bundle, destination, write } = fixture(t);
-  write(bundle, 'README.md', 'corrupted');
+  const { bundle, destination } = fixture(t);
+  writeFileAt(bundle, 'README.md', 'corrupted');
   assert.throws(() => installEngineBundle(bundle, destination), /checksum mismatch/);
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
   assert.equal(existsSync(join(destination, 'generated/shader/patterns/obsolete.shader.json')), true);
@@ -70,9 +65,11 @@ test('bundle paths cannot overwrite assets outside the engine install set', (t) 
 });
 
 test('bundle paths cannot escape the destination', (t) => {
-  const { bundle, destination, write } = fixture(t);
-  write(bundle, 'holosphere_engine.sha256', `${'a'.repeat(64)}  ../escape\n`);
+  const { bundle, destination } = fixture(t);
+  writeFileAt(bundle, 'holosphere_engine.sha256', `${'a'.repeat(64)}  ../escape\n`);
   assert.throws(() => installEngineBundle(bundle, destination), /Invalid engine bundle path/);
+  assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
+  assert.equal(existsSync(join(destination, '../escape')), false);
 });
 
 test('a bundle from another engine commit than the declared pin is refused', (t) => {
@@ -109,10 +106,10 @@ test('a destination without daydream.js is not a checkout', (t) => {
 });
 
 test('a publication failure restores the complete previous installation', (t) => {
-  const { bundle, destination, write } = fixture(t, (files) => {
+  const { bundle, destination } = fixture(t, (files) => {
     files['docs/screenshots/blocked/new.png'] = 'new';
   });
-  write(destination, 'docs/screenshots/blocked', 'consumer-owned');
+  writeFileAt(destination, 'docs/screenshots/blocked', 'consumer-owned');
   assert.throws(() => installEngineBundle(bundle, destination),
     { code: 'EEXIST', syscall: 'mkdir', path: join(destination, 'docs/screenshots/blocked') });
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
@@ -123,10 +120,10 @@ test('a publication failure restores the complete previous installation', (t) =>
 });
 
 test('a failed rollback preserves backup files for recovery', (t) => {
-  const {bundle, destination, write} = fixture(t, files => {
+  const {bundle, destination} = fixture(t, files => {
     files['docs/screenshots/blocked/new.png'] = 'new';
   });
-  write(destination, 'docs/screenshots/blocked', 'consumer-owned');
+  writeFileAt(destination, 'docs/screenshots/blocked', 'consumer-owned');
   const rename = fs.renameSync;
   t.mock.method(fs, 'renameSync', (from, to) => {
     if (String(from).replaceAll('\\', '/').includes('/backup/'))

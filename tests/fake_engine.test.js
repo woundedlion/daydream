@@ -64,6 +64,18 @@ test('fake parameter batches distinguish malformed and oversized payloads', () =
   assert.deepEqual(engine.getParameterDefinitions(), before);
 });
 
+test('a fake snapshot restore records no fallback chain or parameter writes', () => {
+  const engine = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
+  const bindings = engine.getShaderChainBindings();
+  const saved = bindings.getSnapshot();
+  engine.chainCalls.length = 0;
+  engine.writes.length = 0;
+  assert.equal(bindings.restoreSnapshot(saved), ChainSnapshotRestoreResult.APPLIED);
+  assert.deepEqual(engine.chainCalls, []);
+  assert.deepEqual(engine.writes, []);
+});
+
 test('FakeChainEngine refuses invalid snapshot writes and runtime atomically', () => {
   const engine = new FakeChainEngine();
   engine.setEffect('ShaderChain');

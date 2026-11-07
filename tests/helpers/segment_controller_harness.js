@@ -15,6 +15,7 @@ import { PROTOCOL_VERSION } from '../../src/segments/worker_protocol.js';
 // compositor reads, plus the dot mesh the second display alias lives on.
 export const driver = {
   W: 0, H: 0, pixels: null,
+  paused: false,
   dotMesh: { instanceColor: fakeColorAttribute(null) },
   invalidations: 0,
   invalidate() { this.invalidations++; },
@@ -80,6 +81,7 @@ export function installSegmentControllerHarness() {
     driver.W = 0;
     driver.H = 0;
     driver.pixels = null;
+    driver.paused = false;
     driver.invalidations = 0;
     // A fresh attribute per test: the length invariant binds at first upload and
     // the suites composite at different grid sizes.

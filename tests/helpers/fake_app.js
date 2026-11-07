@@ -242,20 +242,26 @@ export function startApp({
   globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
   const driver = fakeDriver();
   const guis = [];
-  const teardown = start({
-    doc,
-    win,
-    nav,
-    createDriver: () => driver,
-    createGui: (options, namespace) => {
-      const gui = fakeGui(namespace, {
-        optionsReplaces, hydrated: namespace === 'view' ? hydratedView : {},
-      });
-      guis.push(gui);
-      return gui;
-    },
-    loadModule,
-  });
+  let teardown;
+  try {
+    teardown = start({
+      doc,
+      win,
+      nav,
+      createDriver: () => driver,
+      createGui: (options, namespace) => {
+        const gui = fakeGui(namespace, {
+          optionsReplaces, hydrated: namespace === 'view' ? hydratedView : {},
+        });
+        guis.push(gui);
+        return gui;
+      },
+      loadModule,
+    });
+  } catch (error) {
+    restore();
+    throw error;
+  }
   return {
     teardown, driver, guis, listeners, docListeners, elements, queried, win,
     replaced, urlWrites, restore,
@@ -272,8 +278,8 @@ export function trackedStartApp() {
   afterEach(() => {
     while (started.length > 0) {
       const app = started.pop();
-      app.teardown.dispose();
-      app.restore();
+      try { app.teardown.dispose(); }
+      finally { app.restore(); }
     }
   });
   return (options) => {

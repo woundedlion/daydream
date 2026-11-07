@@ -8,6 +8,26 @@ import {
 
 restoreDocumentAfterEach();
 
+for (const [kind, create] of [['element', () => fakeElement()], ['document', documentEvents]]) {
+  test(`the ${kind} ignores duplicate listeners with the same capture flag`, () => {
+    const target = create();
+    let calls = 0;
+    const listener = () => { calls += 1; };
+    target.addEventListener('change', listener);
+    target.addEventListener('change', listener, false);
+    target.addEventListener('change', listener, {capture: false});
+    target.dispatch('change');
+    assert.equal(calls, 1);
+    target.removeEventListener('change', listener);
+    target.dispatch('change');
+    assert.equal(calls, 1);
+    target.addEventListener('change', listener, true);
+    target.addEventListener('change', listener, false);
+    target.dispatch('change');
+    assert.equal(calls, 3);
+  });
+}
+
 test('platform non-bubbling events still reach capturing ancestors', () => {
   const parent = fakeElement('div');
   const child = fakeElement('button');
@@ -297,7 +317,7 @@ test('a disabled leaf permits non-activation events through live ancestors', () 
   assert.deepEqual(log, ['root-capture', 'leaf', 'mid', 'root-bubble']);
 });
 
-test('a disabled control still runs its listeners for events disabling never gates', () => {
+test('a disabled control gates activation and input while allowing pointer and focus events', () => {
   const leaf = fakeElement('button');
   const seen = [];
   for (const type of ['click', 'keydown', 'pointerdown', 'input', 'change',
@@ -309,7 +329,7 @@ test('a disabled control still runs its listeners for events disabling never gat
   for (const type of ['click', 'keydown', 'pointerdown', 'input', 'change',
     'focusin', 'focusout', 'chain-applied']) leaf.dispatch(type);
 
-  assert.deepEqual(seen, ['focusin', 'focusout', 'chain-applied']);
+  assert.deepEqual(seen, ['pointerdown', 'focusin', 'focusout', 'chain-applied']);
 });
 
 test('a disabled flag on a tag that carries no such attribute gates nothing', () => {

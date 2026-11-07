@@ -871,19 +871,15 @@ for (const [name, fence] of [
     c.active = true;
     c.tick();
     driver.paused = true;
-    try {
       fence(c);
-      assert.notEqual(c.frameState.inflightGen, c.frameState.renderGen);
-      await deliverGeneration(c);
-      assert.equal(c.frameState.renderInFlight, true);
-      assert.equal(c.frameState.inflightGen, c.frameState.renderGen);
-      assert.ok(c.frameState.results.every((frame) => frame === null));
-      await deliverGeneration(c, gridHalves());
-      assert.equal(c.frameState.renderInFlight, false);
-      assert.ok(driver.invalidations > 0);
-    } finally {
-      driver.paused = false;
-    }
+    assert.notEqual(c.frameState.inflightGen, c.frameState.renderGen);
+    await deliverGeneration(c);
+    assert.equal(c.frameState.renderInFlight, true);
+    assert.equal(c.frameState.inflightGen, c.frameState.renderGen);
+    assert.ok(c.frameState.results.every((frame) => frame === null));
+    await deliverGeneration(c, gridHalves());
+    assert.equal(c.frameState.renderInFlight, false);
+    assert.ok(driver.invalidations > 0);
   });
 }
 

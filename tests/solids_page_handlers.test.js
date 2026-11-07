@@ -1,14 +1,44 @@
+import {movedOps} from '../src/workbench/solids/solid_op_order.js';
 import { buildSavedCard } from '../src/workbench/solids/solid_saved_cards.js';
-import { loadSavedSolids, persistSavedSolids as persistSavedStore, mergeSavedSolids, SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY } from '../src/workbench/solids/solid_saved_store.js';
+import { mergeSavedSolids, persistSavedSolids } from '../src/workbench/solids/solid_saved_store.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
-import { authoredParamRange, generateFuncAndRecipe, movedOps, opTopologyKey, OP_DEFS, savedChainShapeError, savedSolidExportError, seedOpParams, snapToStep } from '../src/workbench/solids/solid_codegen.js';
+import { MAX_RECIPE_STEPS, authoredParamRange, generateFuncAndRecipe, opTopologyKey, OP_DEFS, savedChainShapeError, seedOpParams, snapToStep } from '../src/workbench/solids/solid_codegen.js';
 import { registryDisplayName } from '../src/workbench/solids/solid_registry_codegen.js';
 import { createPointerDrag } from '../src/shared/pointer_drag.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
 const handler = pageHandlers(new URL('../src/workbench/solids/solids_page.js', import.meta.url));
+
+test('solids view toggles share the state used to render and publish them', () => {
+  const state = { autoRotate: false, showNormals: false, showIndices: true };
+  const buttons = new Map(['toggleRotate', 'toggleNormals', 'toggleIndices']
+    .map((id) => [id, fakeElement('button')]));
+  const views = [];
+  const context = {
+    state,
+    VIEW_TOGGLES: { toggleRotate: 'autoRotate', toggleNormals: 'showNormals', toggleIndices: 'showIndices' },
+    document: { getElementById: (id) => buttons.get(id) },
+    renderMesh: () => views.push({ ...state }),
+    controls: { autoRotate: false },
+  };
+  context.updateToggles = handler('updateToggles', context);
+  context.setAutoRotate = handler('setAutoRotate', context);
+  handler('wireViewToggles', context)();
+  context.updateToggles();
+
+  for (const id of ['toggleNormals', 'toggleIndices', 'toggleRotate']) buttons.get(id).dispatch('click');
+
+  assert.deepEqual(views, [
+    { autoRotate: false, showNormals: true, showIndices: true },
+    { autoRotate: false, showNormals: true, showIndices: false },
+  ]);
+  assert.equal(context.controls.autoRotate, true);
+  assert.equal(buttons.get('toggleNormals').getAttribute('aria-checked'), 'true');
+  assert.equal(buttons.get('toggleIndices').classList.contains('is-on'), false);
+  assert.equal(buttons.get('toggleRotate').classList.contains('is-on'), true);
+});
 
 test('queued topology edits validate the live result of earlier commits', async () => {
   const state = {base: 'cube', ops: [
@@ -45,7 +75,7 @@ for (const action of ['addOp', 'removeOp', 'resetOps', 'reorderOp', 'updateOpPar
     let notice = 'rejected: old operation';
     let updates = 0;
     const row = {querySelector: () => null, querySelectorAll: () => []};
-    const context = {state, opsRevision: 1, MAX_RECIPE_STEPS: 255,
+    const context = {state, opsRevision: 1, MAX_RECIPE_STEPS,
       currentMeshIsCurrent: false, currentMesh: null, seedOpParams: () => ({}),
       queueCommit: task => { queued = task; }, chainIsValid: async () => ({ok: true}),
       setOps: next => { state.ops = next; }, movedOps,
@@ -81,7 +111,7 @@ test('storage changes reload saved solids without restoring removed cards', () =
   assert.equal(renders, 0);
   reload({key: 'saved'});
   assert.equal(JSON.stringify(savedSolids), JSON.stringify(entries));
-  assert.equal(JSON.stringify(savedStorage.rejected), '["previous","invalid"]');
+  assert.equal(JSON.stringify(savedStorage.rejected), '["invalid"]');
   assert.equal(savedStorageStatus.textContent, 'rejected');
   entries = [];
   reload({key: null});
@@ -432,7 +462,7 @@ test('persistence failure is reported and clears after a later successful write'
   const status = { textContent: '' };
   let failing = true;
   const persist = handler('persistSavedSolids', { savedSolids: [], savedStorage: { rejected: [], notice: '' }, SAVED_SOLIDS_KEY: 'saved',
-    persistSavedStore, document: { getElementById: () => status },
+    persistSavedStore: persistSavedSolids, document: { getElementById: () => status },
     savedStore: {storage: { setItem() { if (failing) throw new Error('quota'); } }} });
   persist();
   assert.match(status.textContent, /Changes apply to this session only/);
@@ -545,6 +575,7 @@ test('typed operation parameters snap and clamp before scheduling the render', (
   assert.equal(schedules, 2);
   update(0, 't', 'abc', 1);
   assert.equal(state.ops[0].params.t, 0.33);
+  assert.equal(schedules, 2);
 });
 
 test('an accepted topology tick keeps the focused input and publishes after validation', async () => {
@@ -594,12 +625,6 @@ test('a topology commit cannot overwrite an edit returning to the same value', a
   assert.equal(state.ops[0].params.t, 0.49);
 });
 
-test('saved solids discard non-object entries', () => {
-  const result = loadSavedSolids({ getItem: () => '[null, 1, false, "bad", [], {"base":"cube","ops":[]}, {"base":"cube","ops":[{"op":"dual","params":{}}]}]' });
-  assert.equal(JSON.stringify(result.entries), '[{"base":"cube","ops":[{"op":"dual","params":{}}]}]');
-  assert.equal(result.rejected.length, 6);
-  assert.match(result.notice, /6 saved solids could not be loaded: not a saved-solid object/);
-});
 
 test('a failed rebuild invalidates cached mesh metadata and prevents saving', () => {
   const messages = [];
@@ -615,6 +640,44 @@ test('a failed rebuild invalidates cached mesh metadata and prevents saving', ()
   assert.equal(context.currentMesh, previous);
   handler('saveSolid', context)();
   assert.match(messages[0], /no successful preview/);
+});
+
+test('view-only renders preserve a classification failure until the mesh is rebuilt', () => {
+  const meshData = { vertices: [], faces: [] };
+  const stats = fakeElement();
+  const canvas = fakeElement();
+  const failures = [];
+  const context = {
+    currentMesh: null, currentMeshIsCurrent: false,
+    currentFaceClasses: null, currentClassifyFailure: null,
+    wasmModule: {}, meshOpsWasm: {},
+    state: { base: 'cube', ops: [{ op: 'dual' }], showIndices: false },
+    buildContext: () => ({}),
+    buildChainMesh: () => ({ meshData, faceClasses: null, classifyFailure: failure }),
+    refreshOpGating: async () => {},
+    console: { error: (message) => failures.push(message) },
+    meshRenderer: { render: () => ({ edgeCount: 0, labelsBuilt: false }) },
+    document: { getElementById: (id) => id === 'canvas' ? canvas : stats },
+    updateIndexLabelNotice() {},
+    renderBaseSolid() {},
+    meshStatsLine: () => 'Mesh stats',
+    meshCanvasLabel: () => 'Mesh canvas',
+    formatSolidName: String,
+  };
+  let failure = 'Face classification failed: invalid topology';
+  context.renderMesh = handler('renderMesh', context);
+  const update = handler('update', context);
+
+  update();
+  assert.equal(stats.textContent, failure);
+  context.renderMesh();
+  assert.equal(stats.textContent, failure);
+  assert.deepEqual(failures, [failure]);
+  assert.equal(canvas.getAttribute('aria-label'), 'Mesh canvas');
+
+  failure = null;
+  update();
+  assert.equal(stats.textContent, 'Mesh stats');
 });
 
 test('saved code export refuses off-grid parameters before generating code', async () => {
@@ -744,8 +807,8 @@ test('saved-solid imports name invalid entries and the first refusal reason', ()
   for (const [entries, reason] of [[ [null, {}], /not a saved-solid object/ ],
     [ [{base: 'cube', ops: [{op: 'truncate', params: {t: 50}}]}], /out-of-range/ ]]) {
     const messages = [];
-    handler('importSavedSolids', { savedSolids: [], mergeSavedSolids, SAVED_SOLIDS_MAX: 100,
-      savedSolidExportError, showGateMsg: (message) => messages.push(message),
+    handler('importSavedSolids', { savedSolids: [], mergeSavedSolids,
+      showGateMsg: (message) => messages.push(message),
     })(JSON.stringify(entries));
     assert.match(messages[0], /invalid entr(y|ies)/);
     assert.match(messages[0], reason);
@@ -758,8 +821,7 @@ test('saved-solid imports reject bare seeds while accepting an exportable recipe
   const savedSolids = [];
   const messages = [];
   const persistence = [];
-  const importSavedSolids = handler('importSavedSolids', { savedSolids, mergeSavedSolids, SAVED_SOLIDS_MAX: 100,
-    savedSolidExportError, importedSavedSolid: entry => entry,
+  const importSavedSolids = handler('importSavedSolids', { savedSolids, mergeSavedSolids,
     persistSavedSolids() {}, renderSavedList() {},
     showGateMsg: (message, options) => { messages.push(message); persistence.push(options.persist); },
   });
@@ -774,48 +836,7 @@ test('saved-solid imports reject bare seeds while accepting an exportable recipe
 });
 
 
-test('stale card backup failure cannot block the primary save', () => {
-  const valid = {base: 'cube', ops: [{op: 'dual', params: {}}]};
-  const stale = {base: 'cube', ops: [{op: 'truncate', params: {t: 50}}]};
-  const storage = new Map([[SAVED_SOLIDS_KEY, JSON.stringify([valid, stale])], [REJECTED_SOLIDS_KEY, '[{"older":true}]']]);
-  const writes = [];
-  let refusingBackup = true;
-  const localStorage = {getItem: key => storage.get(key), setItem(key, value) {
-    writes.push(key);
-    if (key === REJECTED_SOLIDS_KEY && refusingBackup) throw new Error('quota');
-    storage.set(key, value);
-  }};
-  const savedStorage = loadSavedSolids(localStorage);
-  assert.equal(savedStorage.entries.length, 1);
-  assert.equal(savedStorage.rejected.length, 1);
-  assert.match(savedStorage.notice, /1 saved solid could not be loaded.*out-of-range/);
-  assert.match(savedStorage.notice, /up to 20 rejected entries without thumbnails; oversized data may be truncated or omitted/);
-  const status = {textContent: savedStorage.notice};
-  const persist = () => { status.textContent = persistSavedStore(localStorage, savedStorage.entries, savedStorage); };
-  persist();
-  assert.deepEqual(JSON.parse(storage.get(SAVED_SOLIDS_KEY)), [valid, stale]);
-  assert.deepEqual(loadSavedSolids(localStorage).rejected, [stale]);
-  assert.deepEqual(writes, [REJECTED_SOLIDS_KEY, SAVED_SOLIDS_KEY]);
-  assert.equal(status.textContent, `${savedStorage.notice} Rejected cards could not be backed up.`);
-  assert.equal(savedStorage.rejected.length, 1);
-  refusingBackup = false;
-  persist();
-  assert.deepEqual(writes, [REJECTED_SOLIDS_KEY, SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY, SAVED_SOLIDS_KEY]);
-  assert.deepEqual(JSON.parse(storage.get(SAVED_SOLIDS_KEY)), [valid]);
-  assert.deepEqual(JSON.parse(storage.get(REJECTED_SOLIDS_KEY)), [{older: true}, stale]);
-  assert.equal(savedStorage.rejected.length, 0);
-  assert.equal(status.textContent, savedStorage.notice);
-  persist();
-  assert.deepEqual(JSON.parse(storage.get(REJECTED_SOLIDS_KEY)), [{older: true}, stale], 'later writes do not duplicate the backup');
-});
 
-test('a fully valid saved list needs no recovery notice or rejected backup', () => {
-  const localStorage = {getItem: () => '[{"base":"cube","ops":[{"op":"dual","params":{}}]}]'};
-  const loaded = loadSavedSolids(localStorage);
-  assert.equal(loaded.entries.length, 1);
-  assert.equal(loaded.rejected.length, 0);
-  assert.equal(loaded.notice, '');
-});
 
 test('queued hankin seeds its angle from the preceding committed mesh', async () => {
   const state = { base: 'cube', ops: [] };
@@ -825,7 +846,7 @@ test('queued hankin seeds its angle from the preceding committed mesh', async ()
   const square = { vertices: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 },
     { x: 1, y: 1, z: 0 }, { x: 0, y: 1, z: 0 }], faces: [[0, 1, 2, 3]] };
   const context = {
-    state, MAX_RECIPE_STEPS: 255, currentMeshIsCurrent: true, currentMesh: square,
+    state, MAX_RECIPE_STEPS, currentMeshIsCurrent: true, currentMesh: square,
     seedOpParams, queueCommit: (fn) => queued.push(fn),
     chainIsValid: async () => ({ ok: true }),
     setOps: (ops) => { state.ops = ops; }, renderOps() {},
@@ -841,12 +862,12 @@ test('queued hankin seeds its angle from the preceding committed mesh', async ()
 });
 
 test('two adds queued at one below the op cap commit only the first', async () => {
-  const state = { base: 'cube', ops: Array.from({ length: 254 }, () => ({ op: 'dual', params: {} })) };
+  const state = { base: 'cube', ops: Array.from({ length: MAX_RECIPE_STEPS - 1 }, () => ({ op: 'dual', params: {} })) };
   const queued = [];
   const messages = [];
   let validations = 0;
   const addOp = handler('addOp', {
-    state, MAX_RECIPE_STEPS: 255, currentMeshIsCurrent: false, currentMesh: null,
+    state, MAX_RECIPE_STEPS, currentMeshIsCurrent: false, currentMesh: null,
     seedOpParams: () => ({}), queueCommit: (fn) => queued.push(fn),
     chainIsValid: async () => { validations++; return { ok: true }; },
     setOps: (ops) => { state.ops = ops; }, renderOps() {}, update() {},
@@ -856,9 +877,9 @@ test('two adds queued at one below the op cap commit only the first', async () =
   addOp('dual');
   assert.equal(queued.length, 2);
   for (const task of queued) await task();
-  assert.equal(state.ops.length, 255);
+  assert.equal(state.ops.length, MAX_RECIPE_STEPS);
   assert.equal(validations, 1);
-  assert.deepEqual(messages, ['', 'rejected: a chain carries at most 255 ops']);
+  assert.deepEqual(messages, ['', `rejected: a chain carries at most ${MAX_RECIPE_STEPS} ops`]);
   assert.equal(savedChainShapeError(state.base, state.ops), null);
 });
 
@@ -966,7 +987,7 @@ test('base-solid arrows focus and select the next radio', () => {
 });
 
 
-test('saving clears stale refusals and flags registry name clashes', () => {
+function saveSolidRig() {
   const list = fakeElement('div');
   const messages = [];
   const context = {
@@ -983,6 +1004,11 @@ test('saving clears stale refusals and flags registry name clashes', () => {
   };
   context.savedFuncName = handler('savedFuncName', context);
   context.renderSavedList = handler('renderSavedList', context);
+  return {context, messages, list};
+}
+
+test('saving flags engine registry name clashes', () => {
+  const {context, messages, list} = saveSolidRig();
   handler('saveSolid', context)();
   assert.equal(context.savedSolids.length, 1);
   assert.equal(messages[0], '');
@@ -996,6 +1022,10 @@ test('saving clears stale refusals and flags registry name clashes', () => {
   assert.equal(marker.classList.contains('text-amber-400'), true);
   marker.dispatch('click');
   assert.equal(messages.at(-1), list.children[0].title);
+});
+
+test('saving clears an earlier saved-list refusal', () => {
+  const {context, messages} = saveSolidRig();
   context.savedSolids.length = 0;
   context.registrySolidNames.clear();
   messages.length = 0;

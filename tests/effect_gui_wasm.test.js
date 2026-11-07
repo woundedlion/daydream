@@ -6,6 +6,17 @@ import { AppState, URLSync, roundUrlNumber } from '../src/app/state.js';
 import { fakeGui } from './helpers/fake_gui.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
+async function loadEngineModule() {
+  const {default: createModule} = await import('../generated/holosphere_wasm.js');
+  return createModule({print: () => {}});
+}
+
+function fakeWindow(url) {
+  const win = {location: new URL(url), setTimeout, clearTimeout,
+    history: {replaceState(state, title, next) {win.location = new URL(next, win.location);}}};
+  return win;
+}
+
 function realEngineDeps(module, engine, win, { onWrite = () => {}, warnings }) {
   return {
     engine: {
@@ -44,8 +55,7 @@ const GENERATOR_SCENARIOS = [
 
 for (const scenario of GENERATOR_SCENARIOS) {
   test(`Mobius generator URL hydration settles before canonicalization (${scenario.name})`, async () => {
-    const {default: createModule} = await import('../generated/holosphere_wasm.js');
-    const module = await createModule({print: () => {}});
+    const module = await loadEngineModule();
     const engine = new module.HolosphereEngine();
     assert.notEqual(engine.setResolution(96, 20), module.ResolutionSetResult.UNSUPPORTED, '96x20');
     assert.equal(engine.setEffect('MobiusGrid'), module.EffectSetResult.INSTALLED, 'MobiusGrid');
@@ -57,8 +67,7 @@ for (const scenario of GENERATOR_SCENARIOS) {
       if (scenario.raw) url.searchParams.set(`fx.${name}`, value);
       if (scenario.accepted) url.searchParams.set(`fx.__accepted.${name}`, value);
     }
-    const win = {location: url, setTimeout, clearTimeout,
-      history: {replaceState(state, title, next) {win.location = new URL(next, win.location);}}};
+    const win = fakeWindow(url);
     const sync = new URLSync(new AppState({effect: 'MobiusGrid'}), ['effect'], {}, win);
     const writes = [];
     const warnings = [];
@@ -90,18 +99,10 @@ for (const scenario of GENERATOR_SCENARIOS) {
 }
 
 test('preset values survive URL reload after flushed or pending parameter edits', async () => {
-  const { default: createModule } = await import('../generated/holosphere_wasm.js');
-  const module = await createModule({ print: () => {} });
+  const module = await loadEngineModule();
   const warnings = [];
   for (const flushEdit of [false, true]) {
-    const win = {
-      location: new URL('https://example.test/?effect=AlienBrain'),
-      setTimeout,
-      clearTimeout,
-      history: {
-        replaceState(state, title, url) { win.location = new URL(url, win.location); },
-      },
-    };
+    const win = fakeWindow('https://example.test/?effect=AlienBrain');
     const sync = new URLSync(new AppState({ effect: 'AlienBrain' }), ['effect'], {}, win);
     const engine = new module.HolosphereEngine();
     assert.notEqual(engine.setResolution(96, 20), module.ResolutionSetResult.UNSUPPORTED, '96x20');
@@ -144,9 +145,8 @@ test('preset values survive URL reload after flushed or pending parameter edits'
 });
 
 test('composed engine definitions publish complete pipeline groups', async () => {
-  const {default: createModule} = await import('../generated/holosphere_wasm.js');
   const {stageGrouping} = await import('../src/effects/shader_stages.js');
-  const module = await createModule({print: () => {}});
+  const module = await loadEngineModule();
   const engine = new module.HolosphereEngine();
   try {
     for (const resolution of [[96, 20], [288, 144]]) {
@@ -165,21 +165,22 @@ test('composed engine definitions publish complete pipeline groups', async () =>
 });
 
 test('URL numbers resolve every implicit slider step in live effect ranges', async () => {
-  const { default: createModule } = await import('../generated/holosphere_wasm.js');
-  const module = await createModule({ print: () => {} });
+  const module = await loadEngineModule();
   const engine = new module.HolosphereEngine();
   let checked = 0;
   try {
-    assert.notEqual(engine.setResolution(96, 20), module.ResolutionSetResult.UNSUPPORTED, '96x20');
-    for (const effect of Object.keys(engine.getEffectSizes())) {
-      assert.equal(engine.setEffect(effect), module.EffectSetResult.INSTALLED, effect);
-      for (const param of engine.getParameterDefinitions()) {
-        if (param.readonly || typeof param.value !== 'number' || param.step === 1 || param.options || !(param.max > param.min)) continue;
-        const step = (param.max - param.min) / 1000;
-        const seen = new Set(Array.from({ length: 1001 }, (_, k) =>
-          String(roundUrlNumber(param.min + k * step))));
-        assert.equal(seen.size, 1001, `${effect}.${param.name} loses URL slider steps`);
-        checked++;
+    for (const resolution of [[96, 20], [288, 144]]) {
+      assert.notEqual(engine.setResolution(...resolution), module.ResolutionSetResult.UNSUPPORTED, resolution.join('x'));
+      for (const effect of Object.keys(engine.getEffectSizes())) {
+        assert.equal(engine.setEffect(effect), module.EffectSetResult.INSTALLED, effect);
+        for (const param of engine.getParameterDefinitions()) {
+          if (param.readonly || typeof param.value !== 'number' || param.step === 1 || param.options || !(param.max > param.min)) continue;
+          const step = (param.max - param.min) / 1000;
+          const seen = new Set(Array.from({ length: 1001 }, (_, k) =>
+            String(roundUrlNumber(param.min + k * step))));
+          assert.equal(seen.size, 1001, `${resolution.join("x")}/${effect}.${param.name} loses URL slider steps`);
+          checked++;
+        }
       }
     }
     assert.ok(checked > 0, 'no float slider ranges checked');

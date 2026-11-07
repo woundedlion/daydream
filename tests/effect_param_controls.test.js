@@ -115,6 +115,10 @@ test('warning ids separate names that differ only in punctuation or case', () =>
     const note = controller.domElement.querySelector('.param-warning-note');
     assert.ok(controller.$input.getAttribute('aria-describedby').split(' ').includes(note.id),
       'the description points at the note this control published');
+    for (const id of controller.$input.getAttribute('aria-describedby').split(' ')) {
+      assert.ok(controller.domElement.querySelectorAll('[id]').some((element) => element.id === id),
+        `the description token ${id} resolves within its control`);
+    }
     return note;
   });
 

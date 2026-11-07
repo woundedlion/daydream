@@ -9,10 +9,16 @@ const source = `document.head.appendChild({textContent: JSON.stringify({
   integrity: {'https://cdn.jsdelivr.net/npm/test@1.0.0/index.js': '${hash}'}
 })});`;
 
-test('CDN bytes must match the committed integrity value', async () => {
+test('CDN bytes matching the committed integrity value are accepted', async () => {
   assert.equal(await checkCdnIntegrity(source, async () => new Response(bytes)), 1);
+});
+
+test('bytes differing from the committed hash are rejected', async () => {
   await assert.rejects(checkCdnIntegrity(source, async () => new Response(`${bytes}\n`)),
     /integrity mismatch/);
+});
+
+test('persistent HTTP failures give up after four attempts on the backoff schedule', async () => {
   let attempts = 0;
   const waits = [];
   await assert.rejects(checkCdnIntegrity(source, async () => {
@@ -21,11 +27,14 @@ test('CDN bytes must match the committed integrity value', async () => {
   }, async (ms) => { waits.push(ms); }), /HTTP 404/);
   assert.equal(attempts, 4);
   assert.deepEqual(waits, [5_000, 15_000, 45_000]);
+});
+
+test('an empty integrity map is refused', async () => {
   await assert.rejects(checkCdnIntegrity('document.head.appendChild({textContent: "{}"})'),
     /empty/);
 });
 
-test('transient requests retry with bounded backoff and mismatches do not retry', async () => {
+test('transient requests retry with bounded backoff', async () => {
   let attempts = 0;
   const waits = [];
   assert.equal(await checkCdnIntegrity(source, async () => {
@@ -35,7 +44,10 @@ test('transient requests retry with bounded backoff and mismatches do not retry'
   }, async (ms) => { waits.push(ms); }), 1);
   assert.equal(attempts, 3);
   assert.deepEqual(waits, [5_000, 15_000]);
-  attempts = 0;
+});
+
+test('an integrity mismatch is not retried', async () => {
+  let attempts = 0;
   await assert.rejects(checkCdnIntegrity(source, async () => {
     attempts++;
     return new Response('wrong');

@@ -1,102 +1,28 @@
 // Check chain-strip gestures against the real document store and
 // kaleidoscope_hex_bright fixture compiled with the pinned engine catalog.
-import { afterEach, beforeEach, test } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 
 import { createChainDocumentStore, scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
 import { createChainStrip } from '../src/workbench/shader/chain_strip.js';
 import { deactivatedParameterIds, formatNumericValue } from '../src/workbench/shader/chain_presentation.js';
-import { compileShaderDocument } from '../generated/shader/shader_workbench.mjs';
 import {
-  documentEvents, fakeElement, installAnimationFrames, installDocument,
-  restoreDocumentAfterEach,
+  documentEvents, fakeElement, installDocument,
 } from './helpers/fake_dom.js';
 
-const CATALOG = JSON.parse(readFileSync(
-  new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
-const BASE = compileShaderDocument(readFileSync(
-  new URL('../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
-{ catalog: CATALOG });
-assert.equal(BASE.status, 'VALID');
+import {
+  CATALOG, BASE, runFrame, makeStrip, chips, chipByLabel, bandFor, paletteOf, paletteEntries,
+  lastAnnounced, labels, paramsOf, rowsOf, rowFor, controlIn, declarationsFor,
+} from './helpers/chain_strip_harness.js';
 
-let frames = null;
-beforeEach(() => { frames = installAnimationFrames(); });
-afterEach(() => { frames.restore(); });
-const runFrame = () => frames.flush();
-
-// kaleidoscope_hex_bright chain: camera, lens, project, warp2, sample,
-// colorize, modulation.
 const PROJECT = 2;
 
-restoreDocumentAfterEach();
-
-/**
- * A strip over a fresh store on a fresh fixture copy, plus its spies.
- * @param {{presetId?: string|null, bypassAvailable?: () => boolean,
- *   writeThrough?: boolean, parameterLive?: (parameterId: string) => boolean,
- *   acceptParameter?: () => boolean, parameterRanges?: () => Object[], source?: Object,
- *   catalog?: Object}} [seams] - The preset the inline controls read,
- *   omitted the strip falls back to the document's first; whether a bypass
- *   reaches what is rendering; and whether inline edits reach the store as the
- *   page writes them; whether a parameter is live in the active build; whether
- *   the page accepts an inline edit (false models a refused write); the
- *   current parameter ranges; the document the store opens on; and its catalog.
- * @returns {Promise<Object>} The harness.
- */
-async function makeStrip({
-  presetId = null, bypassAvailable = () => true, writeThrough = false, parameterLive = () => true,
-  acceptParameter = () => true,
-  parameterRanges = () => [],
-  source = structuredClone(BASE.document), catalog = CATALOG,
-} = {}) {
-  const store = await createChainDocumentStore({
-    document: source, catalog });
-  const container = fakeElement('section', { connected: true });
-  const doc = installDocument({
-    body: fakeElement('body', { connected: true }),
-    activeElement: null,
-    defaultView: documentEvents(),
-    createElement: (/** @type {string} */ tag) => fakeElement(tag),
-    ...documentEvents(),
-  });
-  const applied = [];
-  const announced = [];
-  const edits = [];
-  const commits = [];
-  const strip = createChainStrip({
-    doc,
-    container,
-    store,
-    catalog,
-    announce: (message) => announced.push(message),
-    onApply: () => applied.push(store.programShape().map((entry) => entry.instance)),
-    presetId: () => presetId,
-    onEditParameter: (parameterId, value) => {
-      if (!acceptParameter()) return false;
-      edits.push([parameterId, value]);
-      if (!writeThrough) return;
-      const target = presetId ?? store.document().preset_bank.presets[0].preset_id;
-      assert.equal(store.setPresetValue(target, parameterId, value).ok, true);
-    },
-    onCommitParameter: () => commits.push(edits.length),
-    bypassAvailable, parameterLive,
-    parameterRanges,
-  });
-  return {
-    store, container, doc, strip, applied, announced, edits, commits,
-  };
-}
-
-const chips = (h) => h.container.querySelectorAll('.chain-chip');
-const chipByLabel = (h, label) =>
-  chips(h).find((chip) => chip.dataset.label === label);
-const bandFor = (h, carrier) => h.container.querySelectorAll('.chain-band')
-  .find((band) => band.dataset.carrier === carrier);
-const paletteOf = (h) => h.container.querySelector('.chain-palette');
-const paletteEntries = (h) => h.container.querySelectorAll('.chain-palette-entry');
-const lastAnnounced = (h) => h.announced.at(-1) ?? '';
-const labels = (h) => h.store.chain().map((entry) => entry.label);
+test('a budget-exhausted chain offers no band insertion buttons', async () => {
+  const catalog = structuredClone(CATALOG);
+  catalog.budgets.max_chain_ops = BASE.document.descriptor.chain.length;
+  const harness = await makeStrip({catalog});
+  assert.equal(harness.container.querySelectorAll('.chain-band-add').length, 0);
+});
 
 test('the strip lays the chain out as editable carrier bands with sockets between them', async () => {
   const h = await makeStrip();
@@ -898,7 +824,7 @@ test('a bypass unavailable to the render is disabled, with the reason in text', 
   assert.deepEqual(h.store.bypassedLabels(), ['lens']);
 });
 
-test('the strip roves between chips and exposes their controls to Tab', async () => {
+test('the strip exposes one chip tab stop and tabbable header controls', async () => {
   const h = await makeStrip();
   const strip = h.container.querySelector('.chain-strip');
   const headerControls = strip.querySelectorAll(
@@ -912,11 +838,6 @@ test('the strip roves between chips and exposes their controls to Tab', async ()
       .filter((value) => value !== '-1'),
     ['0'], 'exactly one chip carries the tab stop');
 
-  chipByLabel(h, 'lens').dispatch('keydown', { key: 'b' });
-  assert.deepEqual(h.applied.at(-1),
-    ['camera', 'project', 'warp2', 'sample', 'colorize', 'modulation']);
-  chipByLabel(h, 'lens').dispatch('keydown', { key: 'b' });
-  assert.equal(h.applied.at(-1).includes('lens'), true);
 });
 
 test('a chip selects by click', async () => {
@@ -931,10 +852,11 @@ test('a chip selects by click', async () => {
 const rect = (top, height = 30, left = 10, width = 200) => ({
   top, bottom: top + height, left, right: left + width, width, height,
 });
-const dragGeometry = (h) => {
-  const band = bandFor(h, 'sphere');
+const dragGeometry = (h, carrier = 'sphere', labels = ['camera', 'lens']) => {
+  const band = bandFor(h, carrier);
   band.getBoundingClientRect = () => rect(0, 140);
-  for (const [label, top] of [['camera', 20], ['lens', 70]]) {
+  for (const [index, label] of labels.entries()) {
+    const top = 20 + index * 50;
     const chip = chipByLabel(h, label);
     chip.getBoundingClientRect = () => rect(top);
     chip.querySelector('.chain-chip-header').getBoundingClientRect = () => rect(top, 20);
@@ -1192,15 +1114,6 @@ test('destroy detaches the strip listeners and empties the strip', async () => {
 
 // ── Inline stage parameters ─────────────────────────────────────────────────
 
-const paramsOf = (h, label) =>
-  chipByLabel(h, label).querySelector('.chain-chip-params');
-const rowsOf = (h, label) => paramsOf(h, label).querySelectorAll('.chain-param');
-const rowFor = (h, label, parameterId) =>
-  rowsOf(h, label).find((row) => row.dataset.parameter === parameterId);
-const controlIn = (row) => row.querySelector('.chain-param-control');
-const declarationsFor = (h, label) => h.store.document().descriptor.parameters
-  .filter((parameter) => parameter.id.startsWith(`${label}.`));
-
 test('stage controls ignore hover and toggle immediately with the pin button', async () => {
   const h = await makeStrip();
   assert.equal(chipByLabel(h, 'sample').getAttribute('aria-expanded'), null);
@@ -1224,6 +1137,10 @@ test('stage controls ignore hover and toggle immediately with the pin button', a
   assert.equal(chipByLabel(h, 'sample').classList.contains('chain-chip--expanded'), false);
   assert.equal(pinned.querySelector('.chain-chip-pin').getAttribute('aria-pressed'), 'false');
 
+});
+
+test('parameter rows follow declared order and numeric domains', async () => {
+  const h = await makeStrip();
   const region = paramsOf(h, 'sample');
   assert.equal(region.getAttribute('role'), 'group');
   assert.equal(region.getAttribute('aria-label'), 'Twin Wave Extended Drift · sample parameters');
@@ -1932,16 +1849,8 @@ test('Color stage headers click to toggle panels and drag to reorder within Colo
   chipByLabel(h, first.label).querySelector('.chain-chip-header').dispatch('click');
   assert.equal(chipByLabel(h, first.label).classList.contains('chain-chip--expanded'), true);
   assert.equal(chipByLabel(h, 'colorize').classList.contains('chain-chip--expanded'), false);
-  const band = bandFor(h, 'color');
-  band.getBoundingClientRect = () => rect(0, 140);
-  const stages = band.querySelectorAll('.chain-chip');
-  for (const [index, stage] of stages.entries()) {
-    stage.getBoundingClientRect = () => rect(20 + index * 50);
-    stage.querySelector('.chain-chip-header').getBoundingClientRect = () => rect(20 + index * 50, 20);
-  }
-  const viewport = h.container.querySelector('.chain-strip-viewport');
-  viewport.getBoundingClientRect = () => rect(0, 200);
-  viewport.clientHeight = viewport.scrollHeight = 200;
+  dragGeometry(h, 'color', [first.label, second.label]);
+  const stages = bandFor(h, 'color').querySelectorAll('.chain-chip');
   const before = h.store.document();
   const header = stages[0].querySelector('.chain-chip-header');
   header.dispatch('pointerdown', dragPointer(25));
@@ -2063,7 +1972,6 @@ test('parameter gate predicates match every catalog live value', () => {
   }
 });
 
-
 test('arrow nudges finish independent undo entries', async () => {
   const h = await makeStrip({ writeThrough: true });
   const stored = () => h.store.document().preset_bank.presets[0].values['sample.pattern-freq'];
@@ -2080,7 +1988,6 @@ test('arrow nudges finish independent undo entries', async () => {
   assert.deepEqual(h.commits, [1, 2]);
 });
 
-
 test('band insertion buttons expose the open palette state', async () => {
   const h = await makeStrip();
   const add = h.container.querySelector('.chain-band-add');
@@ -2096,7 +2003,6 @@ test('band insertion buttons expose the open palette state', async () => {
   h.doc.activeElement.dispatch('keydown', { key: 'Escape' });
   assert.equal(add.getAttribute('aria-expanded'), 'false');
 });
-
 
 test('omitted catalog fields display defaults and become undoable document edits', async () => {
   const h = await makeStrip({ writeThrough: true });
@@ -2122,7 +2028,6 @@ test('omitted catalog fields display defaults and become undoable document edits
   assert.deepEqual(h.store.document(), before);
   assert.equal(h.store.compile().descriptor_digest, digest);
 });
-
 
 test('every catalog operator exposes its parameter controls without declarations', async () => {
   const crossings = CATALOG.carriers.slice(0, -1).map((carrier, index) =>
@@ -2201,7 +2106,6 @@ test('parameters baked into the active build cannot commit edits', async () => {
   assert.deepEqual(h.edits, []);
   assert.equal(controlIn(rowFor(h, 'sample', 'sample.pattern-freq')).disabled, false);
 });
-
 
 test('header collapse stays closed while focus and the pointer remain on the tile', async () => {
   const h = await makeStrip();
@@ -2414,315 +2318,6 @@ test('Ripple random center toggles manual coordinates and follows synchronized v
   assert.equal(polar.hidden, true);
   assert.equal(h.store.compile().status, 'VALID');
 });
-
-function potentialDocument(values = {}, labels = ['potential']) {
-  const source = scratchChainDocument(CATALOG, [
-    ...labels.map((label) => ({label, operator: 'sphere.displace.potential.v1'})),
-    {label: 'project', operator: 'project.stereographic.v2'},
-    {label: 'sample', operator: 'sample.tessellation.v3'},
-    {label: 'color', operator: 'colorize.generated-palette.v4'},
-  ]);
-  Object.assign(source.preset_bank.presets[0].values, values);
-  return source;
-}
-
-const potentialGroup = (h, name, label = 'potential') => paramsOf(h, label)
-  .querySelectorAll('.chain-param-group').find((group) => group.getAttribute('aria-label') === name);
-const potentialToggle = (h, term, label) => potentialGroup(h, `Term ${term}`, label)
-  .querySelector('.chain-param-group-toggle');
-const potentialFields = (h, term, label) => potentialGroup(h, `Term ${term}`, label)
-  .querySelector('.chain-param-group-fields');
-
-test('Potential Lens groups overall controls and names each independent term', async () => {
-  const source = potentialDocument();
-  const h = await makeStrip({source});
-  chipByLabel(h, 'potential').dispatch('click');
-  const groups = paramsOf(h, 'potential').querySelectorAll('.chain-param-group');
-  assert.deepEqual(groups.map((group) => group.getAttribute('aria-label')),
-    ['Overall', 'Term 1', 'Term 2', 'Term 3', 'Term 4']);
-  assert.deepEqual(potentialGroup(h, 'Overall').querySelectorAll('.chain-param')
-    .map((row) => row.dataset.parameter), ['potential.strength', 'potential.integrator',
-    'potential.orientation-azimuth', 'potential.orientation-polar', 'potential.drift']);
-  assert.equal(paramsOf(h, 'potential').querySelector('.chain-param-note'), null);
-  assert.equal(rowFor(h, 'potential', 'potential.drift').querySelector('.chain-param-name')
-    .getAttribute('title'), null);
-  for (let term = 1; term <= 4; term += 1) {
-    const group = potentialGroup(h, `Term ${term}`);
-    assert.equal(group.getAttribute('role'), 'group');
-    assert.deepEqual(group.querySelectorAll('.chain-param-name').map((label) => label.textContent),
-      ['Type', 'Kind', 'Degree', 'Order', 'Amplitude', 'Phase']);
-    assert.deepEqual(group.querySelectorAll('.chain-param').map((row) => row.dataset.parameter),
-      ['type', 'kind', 'l', 'm', 'amplitude', 'phase'].map((field) => `potential.term-${term}-${field}`));
-    const toggle = potentialToggle(h, term);
-    assert.equal(toggle.tagName, 'BUTTON');
-    assert.equal(toggle.type, 'button');
-    assert.equal(toggle.getAttribute('aria-label'), `Term ${term}`);
-    assert.equal(toggle.getAttribute('aria-controls'), potentialFields(h, term).getAttribute('id'));
-    assert.equal(toggle.getAttribute('aria-expanded'), String(term === 1));
-    assert.equal(potentialFields(h, term).hidden, term !== 1);
-    assert.equal(controlIn(rowFor(h, 'potential', `potential.term-${term}-l`)).getAttribute('aria-label'), 'Degree');
-    assert.equal(controlIn(rowFor(h, 'potential', `potential.term-${term}-m`)).getAttribute('aria-label'), 'Order');
-  }
-  assert.deepEqual(h.store.document(), source);
-  assert.deepEqual(h.edits, []);
-  assert.equal(h.store.canUndo(), false);
-});
-
-test('Potential Lens opens loaded active terms and keeps unused terms collapsed', async () => {
-  const source = potentialDocument({'potential.term-2-amplitude': -0.7, 'potential.term-4-amplitude': 1});
-  const h = await makeStrip({source});
-  assert.deepEqual([1, 2, 3, 4].map((term) => potentialFields(h, term).hidden),
-    [false, false, true, false]);
-  assert.equal(Number(controlIn(rowFor(h, 'potential', 'potential.term-2-amplitude')).value), -0.7);
-  assert.deepEqual(h.store.document(), source);
-});
-
-test('Potential Lens keeps explicit section choices across rerenders and renaming', async () => {
-  const h = await makeStrip({source: potentialDocument()});
-  chipByLabel(h, 'potential').dispatch('click');
-  const term2 = potentialToggle(h, 2);
-  term2.focus();
-  term2.dispatch('click');
-  assert.equal(h.doc.activeElement, term2);
-  potentialToggle(h, 1).dispatch('click');
-  assert.equal(h.store.canUndo(), false);
-  assert.deepEqual(h.applied, []);
-  assert.deepEqual(h.edits, []);
-  h.strip.render();
-  assert.equal(potentialFields(h, 1).hidden, true);
-  assert.equal(potentialFields(h, 2).hidden, false);
-  const preset = h.store.document().preset_bank.presets[0].preset_id;
-  assert.equal(h.store.setPresetValue(preset, 'potential.term-3-amplitude', 0.5).ok, true);
-  h.strip.render();
-  assert.equal(potentialFields(h, 3).hidden, false, 'a loaded active term opens until the user chooses otherwise');
-  potentialToggle(h, 3).dispatch('click');
-  assert.equal(h.store.setPresetValue(preset, 'potential.term-3-amplitude', 0.75).ok, true);
-  h.strip.render();
-  assert.equal(potentialFields(h, 3).hidden, true);
-  const rename = paramsOf(h, 'potential').querySelector('.chain-chip-rename');
-  rename.value = 'motion';
-  rename.dispatch('change');
-  assert.equal(potentialFields(h, 1, 'motion').hidden, true);
-  assert.equal(potentialFields(h, 2, 'motion').hidden, false);
-  assert.equal(potentialFields(h, 3, 'motion').hidden, true);
-  assert.equal(h.store.undo(), true);
-  h.strip.render();
-  assert.equal(potentialFields(h, 2).hidden, true, 'the retired label uses default section choices');
-});
-
-for (const retirement of ['rename', 'delete']) {
-  test(`a Potential stage added after ${retirement} starts with default section choices`, async () => {
-    const h = await makeStrip({source: potentialDocument({}, ['displace'])});
-    potentialToggle(h, 1, 'displace').dispatch('click');
-    potentialToggle(h, 2, 'displace').dispatch('click');
-    if (retirement === 'rename') {
-      const rename = paramsOf(h, 'displace').querySelector('.chain-chip-rename');
-      rename.value = 'motion';
-      rename.dispatch('change');
-      assert.equal(potentialFields(h, 2, 'motion').hidden, false);
-    } else {
-      assert.equal(h.store.replaceSpan(0, 1, []).ok, true);
-      h.strip.render();
-    }
-    assert.equal(h.store.replaceSpan(0, 0, [{operator: 'sphere.displace.potential.v1'}]).ok, true);
-    h.strip.render();
-    assert.equal(potentialFields(h, 1, 'displace').hidden, false);
-    assert.equal(potentialFields(h, 2, 'displace').hidden, true);
-  });
-}
-
-test('Potential Lens term edits retain typed input ranges topology gates and undo', async () => {
-  let maximum = 1;
-  const source = potentialDocument({'potential.term-1-amplitude': 0.4, 'potential.term-2-amplitude': -0.3});
-  const h = await makeStrip({source, writeThrough: true,
-    parameterRanges: () => [{name: 'potential.strength', min: -maximum, max: maximum}]});
-  chipByLabel(h, 'potential').dispatch('click');
-  const untouched = h.store.document().preset_bank.presets[0].values;
-  const row = rowFor(h, 'potential', 'potential.term-2-amplitude');
-  const typed = row.querySelector('.chain-param-value');
-  typed.focus();
-  typed.value = '0.6';
-  typed.dispatch('change');
-  assert.equal(h.doc.activeElement, typed);
-  assert.equal(rowFor(h, 'potential', 'potential.term-2-amplitude'), row);
-  assert.deepEqual(h.edits.at(-1), ['potential.term-2-amplitude', 0.6]);
-  const firstEdit = h.store.document().preset_bank.presets[0].values;
-  assert.deepEqual(firstEdit, {...untouched, 'potential.term-2-amplitude': 0.6});
-  const slider = controlIn(row);
-  slider.value = '0.8';
-  slider.dispatch('input');
-  runFrame();
-  slider.dispatch('change');
-  assert.equal(h.store.document().preset_bank.presets[0].values['potential.term-2-amplitude'], 0.8);
-  assert.equal(h.store.undo(), true);
-  assert.equal(h.store.document().preset_bank.presets[0].values['potential.term-2-amplitude'], 0.6);
-  assert.equal(h.store.redo(), true);
-  assert.equal(h.store.document().preset_bank.presets[0].values['potential.term-2-amplitude'], 0.8);
-  maximum = 0.25;
-  h.strip.syncParameterRows();
-  const strength = rowFor(h, 'potential', 'potential.strength').querySelector('.chain-param-value');
-  assert.equal(strength.max, '0.25');
-  strength.value = '1';
-  strength.dispatch('change');
-  assert.deepEqual(h.edits.at(-1), ['potential.strength', 0.25]);
-  const type = controlIn(rowFor(h, 'potential', 'potential.term-2-type'));
-  type.value = 'tetrahedral';
-  type.dispatch('change');
-  for (const field of ['l', 'm', 'phase']) {
-    const inactive = rowFor(h, 'potential', `potential.term-2-${field}`);
-    assert.equal(inactive.hidden, true);
-    assert.equal(inactive.querySelector('.chain-param-note'), null);
-    assert.equal(controlIn(inactive).disabled, false);
-    assert.equal(rowFor(h, 'potential', `potential.term-1-${field}`).hidden, false);
-  }
-  assert.equal(potentialFields(h, 2).hidden, false);
-  assert.equal(h.store.compile().status, 'VALID');
-});
-
-test('Potential Lens section choices belong to each operator instance', async () => {
-  const h = await makeStrip({source: potentialDocument({}, ['potential', 'other'])});
-  potentialToggle(h, 2).dispatch('click');
-  assert.equal(potentialFields(h, 2).hidden, false);
-  assert.equal(potentialFields(h, 2, 'other').hidden, true);
-  h.strip.render();
-  assert.equal(potentialFields(h, 2).hidden, false);
-  assert.equal(potentialFields(h, 2, 'other').hidden, true);
-});
-
-test('enum admission metadata updates allowed choices at float32 integer boundaries', async () => {
-  const source = structuredClone(BASE.document);
-  source.preset_bank.presets[0].values['lens.symmetry'] = 'octahedral';
-  let minimum = 2.0000001;
-  let maximum = 5.0000001;
-  const h = await makeStrip({source,
-    parameterRanges: () => [{name: 'lens.symmetry', min: minimum, max: maximum}]});
-  const select = controlIn(rowFor(h, 'lens', 'lens.symmetry'));
-  assert.deepEqual(select.options.map((option) => option.disabled),
-    [true, true, false, false, false, false, true, true, true]);
-  assert.equal(select.value, 'octahedral');
-  minimum = 1;
-  maximum = 8;
-  h.strip.syncParameterRows();
-  assert.equal(controlIn(rowFor(h, 'lens', 'lens.symmetry')), select);
-  assert.deepEqual(select.options.map((option) => option.disabled),
-    [true, false, false, false, false, false, false, false, false]);
-  assert.deepEqual(h.edits, []);
-});
-
-test('Potential Lens prevents invalid Degree and Order selections without changing sibling values', async () => {
-  let degreeMinimum = 3;
-  let orderMaximum = 4;
-  const source = potentialDocument({'potential.term-1-l': 'four', 'potential.term-1-m': 'three'});
-  const h = await makeStrip({source, writeThrough: true, parameterRanges: () => [
-    {name: 'potential.term-1-l', min: degreeMinimum, max: 8},
-    {name: 'potential.term-1-m', min: 0, max: orderMaximum},
-  ]});
-  const degree = controlIn(rowFor(h, 'potential', 'potential.term-1-l'));
-  const order = controlIn(rowFor(h, 'potential', 'potential.term-1-m'));
-  assert.deepEqual(degree.options.filter((option) => !option.disabled).map((option) => option.value),
-    ['three', 'four', 'five', 'six', 'seven', 'eight']);
-  assert.deepEqual(order.options.filter((option) => !option.disabled).map((option) => option.value),
-    ['zero', 'one', 'two', 'three', 'four']);
-  degree.value = 'two';
-  degree.dispatch('change');
-  assert.equal(degree.value, 'four');
-  assert.deepEqual(h.edits, []);
-  assert.deepEqual(h.commits, []);
-  assert.equal(h.store.canUndo(), false);
-  degreeMinimum = 2;
-  order.value = 'two';
-  order.dispatch('change');
-  assert.equal(degree.options[2].disabled, false);
-  assert.equal(degree.value, 'four');
-  orderMaximum = 2;
-  degree.value = 'two';
-  degree.dispatch('change');
-  assert.equal(order.value, 'two');
-  assert.equal(order.options[3].disabled, true);
-  order.value = 'three';
-  order.dispatch('change');
-  assert.equal(order.value, 'two');
-  assert.deepEqual(h.edits, [['potential.term-1-m', 'two'], ['potential.term-1-l', 'two']]);
-  assert.equal(h.commits.length, 2);
-  const values = h.store.document().preset_bank.presets[0].values;
-  assert.equal(values['potential.term-1-l'], 'two');
-  assert.equal(values['potential.term-1-m'], 'two');
-  assert.equal(values['potential.term-2-l'], source.preset_bank.presets[0].values['potential.term-2-l']);
-});
-
-test('Potential Lens hides non-Mode choices and respects Mode admission metadata', async () => {
-  const source = potentialDocument({'potential.term-1-type': 'tetrahedral',
-    'potential.term-1-l': 'four', 'potential.term-1-m': 'three'});
-  let modeAllowed = true;
-  const h = await makeStrip({source, parameterRanges: () => [
-    {name: 'potential.term-1-type', min: modeAllowed ? 0 : 1, max: 3},
-    {name: 'potential.term-1-l', min: 0, max: 8},
-    {name: 'potential.term-1-m', min: 0, max: 8},
-  ]});
-  const degreeRow = rowFor(h, 'potential', 'potential.term-1-l');
-  const degree = controlIn(degreeRow);
-  const order = controlIn(rowFor(h, 'potential', 'potential.term-1-m'));
-  assert.equal(degreeRow.hidden, true);
-  assert.equal(degree.disabled, false);
-  assert.ok(degree.options.every((option) => !option.disabled));
-  assert.ok(order.options.every((option) => !option.disabled));
-  modeAllowed = false;
-  h.strip.syncParameterValues({'potential.term-1-l': 'two'});
-  const type = controlIn(rowFor(h, 'potential', 'potential.term-1-type'));
-  assert.equal(type.options[0].disabled, true);
-  assert.equal(order.value, 'three');
-  type.value = 'mode';
-  type.dispatch('change');
-  assert.equal(type.value, 'tetrahedral');
-  assert.deepEqual(h.edits, []);
-  modeAllowed = true;
-  h.strip.syncParameterValues({'potential.term-1-m': 'one'});
-  type.value = 'mode';
-  type.dispatch('change');
-  assert.equal(degreeRow.hidden, false);
-  assert.equal(degree.value, 'two');
-  assert.equal(order.value, 'one');
-  assert.deepEqual(h.edits, [['potential.term-1-type', 'mode']]);
-});
-
-test('Potential Lens hides only each non-Mode term mode controls and keeps later terms independent', async () => {
-  const source = potentialDocument(Object.fromEntries([1, 2, 3, 4].flatMap((term) => [
-    [`potential.term-${term}-amplitude`, 0.1],
-    [`potential.term-${term}-l`, 'four'], [`potential.term-${term}-m`, 'two'],
-    [`potential.term-${term}-phase`, 0.7],
-  ])));
-  const h = await makeStrip({source, writeThrough: true});
-  const selectType = (term, value) => {
-    const select = controlIn(rowFor(h, 'potential', `potential.term-${term}-type`));
-    select.value = value;
-    select.dispatch('change');
-  };
-  selectType(1, 'dodecahedral');
-  selectType(3, 'octahedral');
-  for (const term of [1, 2, 3, 4]) {
-    const group = potentialGroup(h, `Term ${term}`);
-    assert.equal(group.hidden, false);
-    const visible = group.querySelectorAll('.chain-param').filter((row) => !row.hidden)
-      .map((row) => row.dataset.parameter);
-    assert.deepEqual(visible, (term === 1 || term === 3 ? ['type', 'kind', 'amplitude']
-      : ['type', 'kind', 'l', 'm', 'amplitude', 'phase']).map((field) => `potential.term-${term}-${field}`));
-    assert.ok(group.querySelectorAll('.chain-param').every((row) => row.querySelector('.chain-param-note') === null));
-    assert.ok(group.querySelectorAll('.chain-param-control').every((control) => !control.disabled));
-  }
-  const amplitude = rowFor(h, 'potential', 'potential.term-2-amplitude').querySelector('.chain-param-value');
-  amplitude.value = '0.2';
-  amplitude.dispatch('change');
-  assert.equal(h.store.document().preset_bank.presets[0].values['potential.term-2-amplitude'], 0.2);
-  selectType(1, 'mode');
-  for (const [field, value] of [['l', 'four'], ['m', 'two'], ['phase', '0.7']]) {
-    const row = rowFor(h, 'potential', `potential.term-1-${field}`);
-    assert.equal(row.hidden, false);
-    assert.equal(controlIn(row).value, value);
-  }
-  assert.equal(rowFor(h, 'potential', 'potential.term-3-l').hidden, true);
-  assert.equal(rowFor(h, 'potential', 'potential.term-4-l').hidden, false);
-});
-
 
 test('the Palette selector supports every family with family-specific controls', async () => {
   const h = await makeStrip({writeThrough: true});

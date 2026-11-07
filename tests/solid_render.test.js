@@ -222,6 +222,13 @@ test('flat shading is switched with the geodesic toggle, and only when it change
   materials.faceColorize.needsUpdate = false;
   renderer.render(tetrahedron(), view({ showGeodesics: true }), null);
   assert.equal(materials.face.needsUpdate, false, 'a repeat render must not recompile');
+  assert.equal(materials.faceColorize.needsUpdate, false);
+
+  renderer.render(tetrahedron(), view(), null);
+  for (const material of [materials.face, materials.faceColorize]) {
+    assert.equal(material.flatShading, true);
+    assert.equal(material.needsUpdate, true);
+  }
 });
 
 test('colorizing emits one class color per emitted vertex and swaps the material', () => {
@@ -324,21 +331,27 @@ test('teardown disposes whatever is currently built', () => {
 });
 
 
-test('a reflex-first face normal points outwards and degenerate faces remain finite', () => {
-  for (const degenerate of [false, true]) {
-    const { renderer, scene, materials } = setup();
-    const xy = degenerate ? [[0, 0], [0, 0], [0, 0]]
-      : [[0.2, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]];
-    const mesh = { vertices: xy.map(([x, y]) => new Vector3(x, y, 1)),
-      faces: [xy.map((_, i) => i)] };
-    renderer.render(mesh, view({ showFaces: false, showNormals: true }), null);
-    const [center, end] = scene.children.find((o) => o.material === materials.normal).geometry.points;
-    const outward = (end.x - center.x) * center.x + (end.y - center.y) * center.y
-      + (end.z - center.z) * center.z;
-    if (degenerate) assert.equal(outward, 0);
-    else assert.ok(outward > 0);
-    assert.ok([end.x, end.y, end.z].every(Number.isFinite));
-  }
+function renderedFaceNormal(xy) {
+  const { renderer, scene, materials } = setup();
+  const mesh = { vertices: xy.map(([x, y]) => new Vector3(x, y, 1)),
+    faces: [xy.map((_, i) => i)] };
+  renderer.render(mesh, view({ showFaces: false, showNormals: true }), null);
+  const [center, end] = scene.children.find((o) => o.material === materials.normal).geometry.points;
+  const outward = (end.x - center.x) * center.x + (end.y - center.y) * center.y
+    + (end.z - center.z) * center.z;
+  return {outward, end};
+}
+
+test('a reflex-first face normal points outwards', () => {
+  const {outward, end} = renderedFaceNormal([[0.2, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]]);
+  assert.ok(outward > 0);
+  assert.ok([end.x, end.y, end.z].every(Number.isFinite));
+});
+
+test('degenerate rendered face normals remain finite', () => {
+  const {outward, end} = renderedFaceNormal([[0, 0], [0, 0], [0, 0]]);
+  assert.equal(outward, 0);
+  assert.ok([end.x, end.y, end.z].every(Number.isFinite));
 });
 
 test('geodesic face colouring emits one colour per tessellated position', () => {

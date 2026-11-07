@@ -496,12 +496,15 @@ test('refreshModuleCache skips cross-origin and unrelated resources', async () =
   ]);
 });
 
-test('refreshModuleCache survives a rejected re-fetch and a missing timeline', async () => {
+test('refreshModuleCache tolerates a rejected re-fetch', async () => {
   await assert.doesNotReject(() => refreshModuleCache({
     origin: 'http://localhost:8000',
     performance: fakeTimeline('http://localhost:8000/daydream.js'),
     fetch: () => Promise.reject(new TypeError('network down')),
   }));
+});
+
+test('refreshModuleCache does not fetch without a timeline', async () => {
   let fetches = 0;
   await assert.doesNotReject(() => refreshModuleCache({
     origin: 'http://localhost:8000',
@@ -509,6 +512,9 @@ test('refreshModuleCache survives a rejected re-fetch and a missing timeline', a
     fetch: () => { fetches += 1; },
   }));
   assert.equal(fetches, 0);
+});
+
+test('refreshModuleCache tolerates a rejected response body', async () => {
   await assert.doesNotReject(() => refreshModuleCache({
     origin: 'http://localhost:8000',
     performance: fakeTimeline('http://localhost:8000/daydream.js'),

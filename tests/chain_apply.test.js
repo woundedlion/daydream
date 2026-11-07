@@ -10,13 +10,31 @@ import {
   FakeChainEngine, ParamSetResult,
 } from './helpers/fake_engine.js';
 
-test('parameter writes reject nonnumeric values and resolve sparse option labels', () => {
-  const definitions = [{name: 'speed'}, {name: 'mode', options: ['One', 'Six'], optionValues: [1, 6]}];
+const sparseDefinitions = [{name: 'speed'}, {name: 'mode', options: ['One', 'Six'], optionValues: [1, 6]}];
+
+test('parameter writes refuse nonnumeric values', () => {
+  const definitions = sparseDefinitions;
   for (const value of [null, undefined, true, {}, NaN, Infinity, -Infinity])
     assert.match(resolveParameterWrite(definitions, 'speed', value), /no numeric value/);
+});
+
+test('parameter writes refuse unknown option labels', () => {
+  const definitions = sparseDefinitions;
   assert.match(resolveParameterWrite(definitions, 'speed', '1'), /no option/);
+});
+
+test('parameter writes preserve numeric values', () => {
+  const definitions = sparseDefinitions;
   assert.deepEqual(resolveParameterWrite(definitions, 'speed', 1), {name: 'speed', stored: 1});
+});
+
+test('parameter writes resolve sparse option labels', () => {
+  const definitions = sparseDefinitions;
   assert.deepEqual(resolveParameterWrite(definitions, 'mode', 'Six'), {name: 'mode', stored: 6});
+});
+
+test('parameter writes refuse sparse numeric gaps', () => {
+  const definitions = sparseDefinitions;
   assert.match(resolveParameterWrite(definitions, 'mode', 2), /no option value/);
 });
 
@@ -208,8 +226,8 @@ test('an inadmissible preset is submitted together and reports native refusal', 
   assert.deepEqual(order, ['setShaderChain', 'batch-refused', 'syncEffectGui', 'invalidate']);
 });
 
-test('chain presets write sparse option IDs and refuse numeric gaps before writing', () => {
-  for (const value of ['Shells', 6, 2]) {
+test('chain presets write sparse option IDs', () => {
+  for (const value of ['Shells', 6]) {
     const { engine, run } = harness();
     engine.getParameterDefinitions = () => [{ name: 'sample.pattern',
       options: ['Cubic', 'Octet Truss', 'Shells'], optionValues: [0, 1, 6] }];
@@ -217,13 +235,15 @@ test('chain presets write sparse option IDs and refuse numeric gaps before writi
       engine.writes.push(...writes.map(({ name, value }) => [name, value]));
       return ParamSetResult.APPLIED;
     };
-    const result = run(compiledDocument({ 'sample.pattern': value }));
-    if (value === 2) {
-      assert.match(result, /has no option value 2/);
-      assert.deepEqual(engine.writes, []);
-    } else {
-      assert.equal(result, null);
-      assert.deepEqual(engine.writes, [['sample.pattern', 6]]);
-    }
+    assert.equal(run(compiledDocument({ 'sample.pattern': value })), null);
+    assert.deepEqual(engine.writes, [['sample.pattern', 6]]);
   }
+});
+
+test('chain presets refuse sparse numeric gaps before writing', () => {
+  const { engine, run } = harness();
+  engine.getParameterDefinitions = () => [{name: 'sample.pattern',
+    options: ['Cubic', 'Octet Truss', 'Shells'], optionValues: [0, 1, 6]}];
+  assert.match(run(compiledDocument({'sample.pattern': 2})), /has no option value 2/);
+  assert.deepEqual(engine.writes, []);
 });

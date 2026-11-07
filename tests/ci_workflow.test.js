@@ -595,6 +595,68 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
 });
 
 
+test('the engine bundle poll recovers after exhausting metadata or ZIP retries', (t) => {
+  const shell = findBash();
+  if (!shell) { t.skip('Bash is unavailable'); return; }
+  const gate = workflowText('engine-bundle.yml');
+  const block = gate.split('      - name: Download the verified engine bundle\n')[1].split('      - name:')[0];
+  const root = scratchDir(t, 'engine-poll-');
+  const body = block.split('        run: |\n')[1].replace(/^ {10}/gm, '')
+    .replaceAll('/tmp/engine-bundle.zip', '"$FIXTURE_ROOT/bundle.zip"');
+  const stubs = `
+    sleep() { :; }
+    python3() {
+      if [ "$FAIL_PHASE" = extract ]; then return 42; fi
+      test "$(cat "$FIXTURE_ROOT/bundle.zip")" = bundle
+    }
+    fail_batch() {
+      if [ "$1" != "$FAIL_PHASE" ]; then return 1; fi
+      counter="$FIXTURE_ROOT/$1"
+      n=0
+      if [ -f "$counter" ]; then read -r n < "$counter"; fi
+      n=$((n + 1))
+      printf '%s\\n' "$n" > "$counter"
+      [ "$n" -le 4 ]
+    }
+    gh() {
+      case "$2:$4" in
+        *workflows*) printf '12\\tcompleted\\tsuccess\\t%s\\n' "$PIN" ;;
+        *runs/*/artifacts\\?*:*length) printf '1\\n' ;;
+        *runs/*/artifacts\\?*)
+          if fail_batch metadata; then return 1; fi
+          printf '42\\tfalse\\t2030-01-01\\n' ;;
+        *artifacts/*/zip:*)
+          if fail_batch zip; then printf 'partial'; return 1; fi
+          printf 'bundle' ;;
+        *) return 9 ;;
+      esac
+    }
+  `;
+  for (const [phase, message] of [
+    ['metadata', 'artifact metadata query failed'],
+    ['zip', 'artifact ZIP download failed'],
+    ['extract', ''],
+  ]) {
+    for (const timeout of phase === 'extract' ? [false] : [false, true]) {
+      const fixture = join(root, `${phase}-${timeout}`);
+      mkdirSync(fixture);
+      const result = spawnSync(shell, ['-e', '-s'], {
+        input: stubs + (timeout ? body.replace('SECONDS + 3300', 'SECONDS + 0') : body),
+        encoding: 'utf8', timeout: 60_000,
+        env: { ...process.env, FIXTURE_ROOT: fixture.replaceAll('\\', '/'),
+          PIN: 'a'.repeat(40), FAIL_PHASE: phase },
+      });
+      assert.equal(result.status, phase === 'extract' ? 42 : Number(timeout),
+        result.error?.message || result.stderr + result.stdout);
+      if (phase === 'extract') continue;
+      assert.match(result.stdout, new RegExp(`::warning::Engine bundle ${message}`));
+      assert.equal(result.stdout.includes('::error::'), timeout);
+      if (timeout) assert.match(result.stdout, new RegExp(`::error::[^\\n]+${message}`));
+      assert.equal(readFileSync(join(fixture, phase), 'utf8').trim(), timeout ? '4' : '5');
+    }
+  }
+});
+
 test('deployment pair recovery uses retained resolve outputs and engine packages last through reruns', (t) => {
   const deploy = workflowText('deploy.yml');
   assert.doesNotMatch(deploy, /name: deployment-pair/);

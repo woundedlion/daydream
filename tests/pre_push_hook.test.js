@@ -24,6 +24,7 @@ function writeTool(root, name, body) {
 
 /** @param {string} root @param {NodeJS.ProcessEnv} env @param {string} input @returns {Object} Spawn result. */
 function runSnapshotHook(root, env, input) {
+  assert.ok(SH, MISSING_SH);
   const bin = posixPath(join(root, 'bin'));
   return spawnSync(SH, ['-c', `PATH="${bin}:$PATH"; export PATH; . "$0"`, HOOK], {
     cwd: root, env, encoding: 'utf8', input,

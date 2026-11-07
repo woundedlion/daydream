@@ -78,31 +78,48 @@ function press(handle, key, shiftKey = false) {
   return { prevented: handle.dispatch('keydown', { key, shiftKey }).defaultPrevented };
 }
 
-test('the wheel draws harmony anchors as compiled and CUSTOM keys from the model', () => {
-  const { wheel, model, draws, handles } = setup();
+test('the wheel draws compiled harmony anchors', () => {
+  const {wheel, model, draws, handles} = setup();
   wheel.draw(model.recipe());
   assert.deepEqual(draws[0].state, hueKeyState(defaultPaletteRecipe()));
   assert.equal(draws[0].lightness, 0.62);
   assert.equal(handles.length, 4);
   assert.deepEqual(handles.map((handle) => handle.hidden), [false, false, false, true]);
 
+});
+
+test('a two-key sweep hides unused handles and names its key values', () => {
+  const {wheel, model, draws, handles} = setup();
   model.applyHueModeTransition('SWEEP');
   wheel.draw(model.recipe());
   assert.deepEqual(handles.map((handle) => handle.hidden), [false, false, true, true],
     'a two-key sweep hides the third handle');
-  assert.equal(handles[1].getAttribute('aria-valuetext'), `${hueKeyDegrees(draws[1].state)[1]} degrees`);
+  assert.equal(handles[1].getAttribute('aria-valuetext'), `${hueKeyDegrees(draws[0].state)[1]} degrees`);
 
+});
+
+function customWheelRig() {
+  const {wheel, model, draws} = setup();
   model.applyHueModeTransition('HARMONY');
   model.applyHueModeTransition('CUSTOM');
   model.moveHueKey(1, 0.5);
-  const recipe = structuredClone(model.snapshot());
+  const recipe = model.snapshot();
   recipe.lightness.curve = PaletteV4.curve.CUSTOM;
   recipe.lightness.custom = [0.1, 0.4, 0.7, 0];
   recipe.hue.customTurns = [0.9, 0.9, 0.9, 0];
   wheel.draw(recipe);
-  assert.deepEqual(draws[2].state.offsets, [...model.customHueOffsets()]);
-  assert.equal(draws[2].state.baseTurns, model.baseHueTurns);
-  assert.ok(Math.abs(draws[2].lightness - 0.4) < 1e-12, 'CUSTOM lightness averages the authored keys');
+  return {model, draws};
+}
+
+test('CUSTOM hue keys follow the model offsets', () => {
+  const {model, draws} = customWheelRig();
+  assert.deepEqual(draws[0].state.offsets, [...model.customHueOffsets()]);
+  assert.equal(draws[0].state.baseTurns, model.baseHueTurns);
+});
+
+test('CUSTOM wheel lightness averages the authored keys', () => {
+  const {draws} = customWheelRig();
+  assert.ok(Math.abs(draws[0].lightness - 0.4) < 1e-12, 'CUSTOM lightness averages the authored keys');
 });
 
 test('a hue-key drag grabs a marker, follows the pointer, and lets go', () => {
@@ -292,4 +309,34 @@ test('dispose removes the pointer drag and the key handles', () => {
   wheel.dispose();
   assert.equal(canvas.listeners.length, 0);
   assert.equal(group.children.length, 0);
+});
+
+test('a sweep end-marker drag edits the resampled ending key', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.mode = PaletteV4.hueMode.SWEEP;
+  recipe.hue.sweepTurns = 0.5;
+  const expected = customHueKeyState(recipe);
+  const {wheel, model, canvas} = setup(recipe);
+  wheel.draw(recipe);
+  const anchors = hueKeyState(recipe);
+  const end = anchors.baseTurns + anchors.offsets.at(-1);
+  pointer(canvas, 'pointerdown', pointAt(end));
+  pointer(canvas, 'pointermove', pointAt(end + 0.1));
+  assert.notEqual(model.customHueOffsets()[2], expected.offsets[2]);
+  assert.equal(model.customHueOffsets()[1], expected.offsets[1]);
+  pointer(canvas, 'pointerup', pointAt(end + 0.1));
+});
+
+test('dragging a square key omitted by resampling refuses the handoff', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.harmony = PaletteV4.harmony.SQUARE;
+  const {wheel, model, canvas, status} = setup(recipe);
+  const before = model.snapshot();
+  wheel.draw(recipe);
+  const anchors = hueKeyState(recipe);
+  pointer(canvas, 'pointerdown', pointAt(anchors.baseTurns + anchors.offsets[1]));
+  pointer(canvas, 'pointermove', pointAt(0.3));
+  assert.match(status.textContent, /Choose another key/);
+  assert.deepEqual(model.snapshot(), before);
+  assert.equal(canvas.style.cursor, 'default');
 });

@@ -142,7 +142,8 @@ test('a synchronous worker-N construction failure terminates the partial pool', 
 });
 
 test('a synchronous worker-N init post failure terminates the partial pool', () => {
-  FakeWorker.failInitialPostAt = 1;
+  FakeWorker.failPostAt = 1;
+  FakeWorker.failPostType = 'init';
   const c = makeController();
 
   assert.doesNotThrow(() => c.create(4));

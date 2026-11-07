@@ -661,6 +661,14 @@ test('the pause toggle is offered without requiring animated params or a preset 
 
   const pause = staticPresets.gui().ctrl('pause');
   assert.equal(pause.label, 'Pause Presets');
+});
+
+test('selecting a preset pauses advancement and the toggle resumes it', () => {
+  const staticPresets = makeHarness({presetCount: 2});
+  staticPresets.panel.build();
+  staticPresets.panel.applyAnimationPause();
+  staticPresets.writes.length = 0;
+  const pause = staticPresets.gui().ctrl('pause');
   staticPresets.gui().ctrl('presetIndex').setValue(1);
   assert.equal(pause.getValue(), true);
   pause.setValue(false);

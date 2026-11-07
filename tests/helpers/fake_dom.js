@@ -206,14 +206,12 @@ const FOCUSABLE_TAGS = new Set(['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA']);
 // Tags carrying a `disabled` IDL attribute, which reads false until written.
 const DISABLEABLE_TAGS = new Set(
   ['BUTTON', 'FIELDSET', 'INPUT', 'OPTGROUP', 'OPTION', 'SELECT', 'TEXTAREA']);
-// The event families a disabled form control never receives: activation,
-// pointer and mouse, keyboard, and the value-change pair. Focus-related events
-// and custom events still reach it.
+// Disabled controls suppress activation, mouse buttons, keyboard, and value changes.
+// Pointer, mouse-move, focus, and custom events still reach their listeners.
 const DISABLED_DEAF_EVENTS = new Set([
   'auxclick', 'change', 'click', 'contextmenu', 'dblclick', 'input',
   'keydown', 'keypress', 'keyup',
-  'mousedown', 'mousemove', 'mouseup',
-  'pointercancel', 'pointerdown', 'pointermove', 'pointerup',
+  'mousedown', 'mouseup',
 ]);
 
 /**
@@ -478,6 +476,9 @@ export function fakeElement(tag = 'div', options = {}) {
         (child) => typeof child.contains === 'function' && child.contains(node));
     },
     addEventListener(type, handler, options) {
+      const capture = captureFlag(options);
+      if (this.listeners.some((listener) => listener.type === type
+          && listener.handler === handler && listener.capture === capture)) return;
       this.listeners.push({ type, handler, options, capture: captureFlag(options) });
     },
     removeEventListener(type, handler, options) {
@@ -761,6 +762,9 @@ export function documentEvents() {
     listeners,
     /** @param {string} type @param {Function} handler @param {any} [options] */
     addEventListener(type, handler, options) {
+      const capture = captureFlag(options);
+      if (listeners.some((listener) => listener.type === type
+          && listener.handler === handler && listener.capture === capture)) return;
       listeners.push({ type, handler, options, capture: captureFlag(options) });
     },
     /** @param {string} type @param {Function} handler @param {any} [options] */
@@ -894,4 +898,22 @@ export function installAnimationFrames() {
       else globalThis.cancelAnimationFrame = savedCancel;
     },
   };
+}
+
+export const fakeDocumentById = byId => ({
+  getElementById: id => byId[id] ?? null,
+  createElement: tag => fakeElement(tag),
+});
+
+export function installRecordingWindow({search = '', pathname = '/', hash = ''} = {}) {
+  const calls = [];
+  installWindow({location: {search, pathname, hash}, history: {
+    replaceState(state, title, url) {
+      calls.push(url);
+      const target = new URL(url, 'https://example.test');
+      Object.assign(globalThis.window.location,
+        {pathname: target.pathname, search: target.search, hash: target.hash});
+    },
+  }});
+  return {calls, written: () => calls.at(-1) ?? '/'};
 }

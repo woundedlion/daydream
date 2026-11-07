@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { formatExportParams } = await import('../src/shared/export_params.js');
+import { formatExportParams } from '../src/shared/export_params.js';
 
 /** Trailing zeros trimmed; whole values keep one fractional digit. */
 test('formatExportParams: emits a C++ float brace-init list', () => {
@@ -88,8 +88,7 @@ test('formatExportParams: preserves small-magnitude significand', () => {
   assert.equal(formatExportParams(params, [0.00001]), '{ 0.00001f }');
 });
 
-
-test('sparse enum exports resolve numeric IDs to symbols and refuse gaps', () => {
+test('formatExportParams: sparse enum exports resolve numeric IDs to symbols and refuse gaps', () => {
   const params = [{ name: 'Pattern', optionValues: [0, 1, 6],
     exportOptions: ['Pattern::CUBIC', 'Pattern::OCTET', 'Pattern::SHELLS'] }];
   for (const [value, symbol] of [[0, 'CUBIC'], [1, 'OCTET'], [6, 'SHELLS']])
@@ -97,8 +96,7 @@ test('sparse enum exports resolve numeric IDs to symbols and refuse gaps', () =>
   assert.throws(() => formatExportParams(params, [2]), /No enum option for Pattern value 2/);
 });
 
-
-test('numeric sparse enums without export symbols still reject gaps', () => {
+test('formatExportParams: numeric sparse enums without export symbols reject gaps', () => {
   const params = [{ name: 'Pattern', step: 1, optionValues: [0, 1, 6] }];
   assert.equal(formatExportParams(params, [6]), '{ 6 }');
   assert.throws(() => formatExportParams(params, [2]), /No enum option for Pattern value 2/);

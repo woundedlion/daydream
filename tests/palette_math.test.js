@@ -270,11 +270,6 @@ test('GenerativePalette.get clamps to the final LUT entry', () => {
     const justBelow = pal.get(0.99999);
 
     assert.deepEqual(atOne, [1, 0, 0.21586050011389926]);
-    assert.equal(atOne.length, 3);
-    for (const ch of atOne) {
-      assert.ok(Number.isFinite(ch), `channel finite at t=1.0`);
-      assert.ok(ch >= -1e-6 && ch <= 1 + 1e-6, `channel ${ch} in [0,1] at t=1.0`);
-    }
 
     assert.deepEqual(beyond, atOne);
 
@@ -284,11 +279,11 @@ test('GenerativePalette.get clamps to the final LUT entry', () => {
   });
 });
 
-test('generativePaletteCpp serializes the complete V4 recipe', () => {
+test('generativePaletteCpp names enum members and nests chroma fields under axis', () => {
   const recipe = defaultPaletteRecipe();
-  recipe.domain = 4;
-  recipe.hue.harmony = 5;
-  recipe.lightness.curve = 1;
+  recipe.domain = PaletteV4.domain.LOOP;
+  recipe.hue.harmony = PaletteV4.harmony.TRIADIC;
+  recipe.lightness.curve = PaletteV4.curve.ASCENDING;
   const source = generativePaletteCpp(recipe);
 
   for (const field of ['curve', 'center', 'range', 'custom']) {
@@ -407,7 +402,7 @@ test('GenerativePalette uses the canonical recipe', () => {
   });
 });
 
-test('GenerativePalette.get blends adjacent entries in linear light', () => {
+function withBlendingPalette(body) {
   const lut = new Uint8Array(256 * 3);
   lut.fill(128, 3);
   const ops = mockPaletteOps({
@@ -417,14 +412,22 @@ test('GenerativePalette.get blends adjacent entries in linear light', () => {
       lut,
     }),
   });
-  withPaletteOps(ops, () => {
-    const palette = new GenerativePalette(defaultPaletteRecipe());
+  withPaletteOps(ops, () => body(new GenerativePalette(defaultPaletteRecipe())));
+}
+
+test('GenerativePalette.get blends adjacent entries in linear light', () => {
+  withBlendingPalette(palette => {
     const grey = 0.21586050011389926;
     for (const [t, fraction] of [[0.5 / 255, 0.5], [0.25 / 255, 0.25]]) {
       for (const channel of palette.get(t)) {
         assert.ok(Math.abs(channel - grey * fraction) < NEAR);
       }
     }
+  });
+});
+
+test('GenerativePalette.get clamps bounds and treats NaN as the ending phase', () => {
+  withBlendingPalette(palette => {
     assert.deepEqual(palette.get(2), palette.get(1));
     assert.deepEqual(palette.get(-1), palette.get(0));
     assert.deepEqual(palette.get(Number.NaN), palette.get(1));

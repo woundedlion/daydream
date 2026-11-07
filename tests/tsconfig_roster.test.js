@@ -130,8 +130,8 @@ test('every not-checked module has a declaration file on the roster', () => {
       ? file.replace(/\.mjs$/, '.d.mts') : file.replace(/\.js$/, '.d.ts');
     assert.ok(roster.includes(declaration),
       `${file} is exempt from the typecheck but a rostered module imports it; `
-      + `without ${declaration} on tsconfig.json "files" the import is an `
-      + 'missing checked contract for generated code');
+      + `without ${declaration} on tsconfig.json "files" the import has no `
+      + 'checked contract for generated code');
     assert.ok(existsSync(fileURLToPath(new URL(declaration, ROOT))),
       `${fileSources.get(declaration)} "files" lists ${declaration}, which does not exist`);
   }
@@ -187,6 +187,7 @@ test('every source module is typechecked or has a written exemption', () => {
   collect('src/');
   collect('scripts/');
   const exemptions = { ...SOURCE_EXEMPTIONS, ...TOOL_PAGE_EXEMPTIONS };
+  for (const [file, reason] of Object.entries(exemptions)) assert.ok(reason.trim(), file);
   assert.deepEqual(modules.filter((file) => !roster.includes(file)).sort(),
     Object.keys(exemptions).sort(),
     'add each source module to tsconfig.json or explain its exemption; remove stale exemptions');
