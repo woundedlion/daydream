@@ -515,14 +515,16 @@ test('dispose removes each axis from the scene and frees its geometry', () => {
   }
 });
 
-test('dispose leaves no dangling mesh or pixel buffer', () => {
+test('dispose drops retained display buffers and meshes', () => {
   const log = [];
   const ctx = disposeCtx(fakeMesh(log), log);
+  ctx.povSweep = { emissions: [{ pixels: new Uint16Array(3) }] };
   Daydream.prototype.dispose.call(ctx);
 
   assert.equal(ctx.dotMesh, null);
   assert.equal(ctx.dotMaterial, null);
   assert.equal(ctx.pixels, null);
+  assert.equal(ctx.povSweep, null);
 });
 
 test('dispose during a real Three animation callback cancels the rearmed frame', async () => {
