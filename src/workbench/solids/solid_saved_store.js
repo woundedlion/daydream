@@ -32,7 +32,9 @@ export function queueSavedSolidRestore(item, queue) {
   return null;
 }
 
+/** Primary saved-card storage key. */
 export const SAVED_SOLIDS_KEY = 'daydream.savedSolids.v1';
+/** Backup key for rejected saved cards. */
 export const REJECTED_SOLIDS_KEY = 'daydream.savedSolids.rejected.v1';
 
 /**
@@ -51,7 +53,11 @@ export function resolveSavedSolidsStorage(readStorage = () => localStorage) {
   }
 }
 
-/** @param {Pick<Storage, "getItem">} storage */
+/**
+ * Separates stored cards from rejected data.
+ * @param {Pick<Storage, "getItem">} storage - Source of the saved list.
+ * @returns {{entries: any[], rejected: any[], notice: string}} Parsed cards and any rejection notice.
+ */
 export function loadSavedSolids(storage) {
   const entries = [], rejected = [];
   let reason = '';
@@ -76,7 +82,13 @@ export function loadSavedSolids(storage) {
     ? `${rejected.length} saved solid${rejected.length === 1 ? '' : 's'} could not be loaded: ${reason}. Saving attempts a backup of up to 20 rejected entries without thumbnails; oversized data may be truncated or omitted.` : '' };
 }
 
-/** @param {Pick<Storage, "getItem"|"setItem">} storage @param {any[]} savedSolids @param {{notice:string, rejected:any[]}} savedStorage */
+/**
+ * Saves cards, retaining rejected entries until they can be backed up.
+ * @param {Pick<Storage, "getItem"|"setItem">} storage - Destination and backup store.
+ * @param {any[]} savedSolids - Cards to persist.
+ * @param {{notice: string, rejected: any[]}} savedStorage - Rejected data and its notice.
+ * @returns {string} Notice to display after saving.
+ */
 export function persistSavedSolids(storage, savedSolids, savedStorage) {
   let notice = savedStorage.notice;
   try {
@@ -143,7 +155,13 @@ export function importedSavedSolid(entry) {
   return item;
 }
 
-/** @param {string} text @param {any[]} savedSolids */
+/**
+ * Appends admissible cards from an export to the saved list.
+ * @param {string} text - Exported JSON.
+ * @param {any[]} savedSolids - List to extend.
+ * @returns {{added: number, message: string, persist: boolean}} Import outcome. If
+ *   persist is true, the status line stays until replaced.
+ */
 export function mergeSavedSolids(text, savedSolids) {
   let parsed;
   try {

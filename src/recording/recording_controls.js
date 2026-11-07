@@ -180,11 +180,11 @@ export function createRecordingControls({
         showNotice(`${startNotice} ${recSettings.recFormat} is unsupported in this`
           + ` browser; recording as ${label}.${filenameNote}`);
       };
-      // A fault ends the session on its own; drop the recording UI and report why.
       recorder.onEmptySession = () => {
         sessionEmpty = true;
         if (!sessionError) showNotice('Recording stopped: no frames were captured, so nothing was saved.');
       };
+      // Recording faults can end a session without a stop request.
       recorder.onError = (err) => {
         sessionError = true;
         const detail = recorderReason(err);

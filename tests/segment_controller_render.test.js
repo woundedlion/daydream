@@ -273,7 +273,7 @@ test('the boundary setter re-composites and invalidates a paused held generation
   setDisplayGrid(4, 2);
 
   const c = readyController(2);
-  c.active = true; // the app sets this before create(); the setter checks it
+  c.active = true; // the setter checks it
   driver.paused = true;
   try {
     const bandL = new Uint16Array(2 * 2 * 3).fill(111);
@@ -328,7 +328,7 @@ test('the boundary setter composites nothing when the pool owns no display', asy
 
   assert.equal(driver.pixels[idx(0, 0, 4)], 77,
     'the single-engine frame is left untouched');
-  assert.equal(c.faulted, false, 'no fault latched on a controller holding nothing');
+  assert.equal(c.faulted, false, 'no fault latched on an inactive pool');
   assert.equal(driver.invalidations, 1, 'the repaint is still requested');
 });
 

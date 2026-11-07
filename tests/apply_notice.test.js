@@ -174,10 +174,8 @@ test('clearing an already-clear notice writes neither element', () => {
     + 'slider drag, and an unchanged hidden attribute still invalidates style');
 });
 
-test('a clear on an unowned element hides it rather than crashing', () => {
+test('a clear with no recorded owner hides a visible notice', () => {
   const h = makeApplyNotice();
-  // A notice on screen that no owner is recorded for, as a reload of a page
-  // whose markup already carried one leaves it.
   h.body.hidden = false;
   h.text.textContent = 'Effect change was rejected.';
 
@@ -220,7 +218,7 @@ test('the self-clear waits out keyboard focus inside the notice', () => {
   assert.equal(h.notice.owner(), null);
 });
 
-test('the dismiss button and the teardown clear whoever raised the notice', () => {
+test('clear() drops a notice whichever owner raised it and cancels its self-clear', () => {
   const h = makeApplyNotice();
 
   h.notice.show('Effect change was rejected.', 'switch');

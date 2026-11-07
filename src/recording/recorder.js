@@ -112,7 +112,6 @@ export class VideoRecorder {
     this.doc?.addEventListener?.('visibilitychange', this.visibilityChanged);
     /** @type {MediaRecorder|null} */
     this.mediaRecorder = null;
-    /** @type {Blob[]} */
     /** @type {MediaStream|null} */
     this.stream = null;
     /** @type {CaptureTrack|null} */
@@ -406,7 +405,7 @@ export class VideoRecorder {
     }
   }
 
-  /** @returns {void} */
+  /** Stops the elapsed clock at its current value. */
   freezeElapsed() {
     if (this.recordingStartedAtMs === null) return;
     this.elapsedBaseSeconds = this.elapsedSeconds;

@@ -69,7 +69,7 @@ test('simulator exposes Shader as a standalone tool', () => {
 // The alias table serves effects promoted before the chain schema: a document
 // parameter id is <label>.<field>, and the label picks the family whose
 // registered control names the field maps onto.
-test('v2 document parameter IDs map to pre-spec promoted controls', () => {
+test('document parameter IDs map to their aliased promoted controls', () => {
   assert.equal(primaryName('sample.pattern-freq'), 'Pattern Freq');
   assert.equal(primaryName('sample.angle-speed'), 'Source Angle Speed');
   assert.equal(primaryName('warp1.cell-x'), 'Planar Warp 1 Cell X');
@@ -97,7 +97,7 @@ test('labels outside the alias table need no entry', () => {
 
 // Across every shipped pattern document, the labels whose mapping differs from
 // the plain field spelling stay this frozen set.
-test('the alias table keys stay frozen to the pre-spec promoted labels', () => {
+test('the alias table keys stay frozen', () => {
   const patternCatalog = JSON.parse(readFileSync(
     new URL('../generated/shader/patterns/catalog.json', import.meta.url), 'utf8'));
   const aliased = new Set();
@@ -338,8 +338,7 @@ test('the fixed path skips the ids the compiled build bakes in as constants', ()
   assert.deepEqual(engine.writes, [['Pattern Freq', 3]]);
 });
 
-// Ash Cloud carries a baked constant: AshCloud registers no Camera Spin Speed
-// because CAMERA_SPIN_RATE is a constant.
+// Ash Cloud's preset carries `camera.spin-speed`, a baked constant with no registered control.
 test('fixed apply orchestration writes matching controls in document order', () => {
   const ashCloud = promotedDocument(PROMOTED['ash-cloud']);
   assert.equal(ashCloud.preset_bank.presets[0].values['modulate.modulation-source'], 'displacement');
@@ -544,6 +543,7 @@ function workbenchMounts() {
  * engine catalog, and the given documents by file name.
  * @param {Object<string, string>} files - Document source by file name.
  * @param {string} [patternCatalog] - The pattern catalog.
+ * @param {string} [engineCatalog] - The engine catalog.
  * @returns {(url: string) => Promise<string>} The router.
  */
 function patternFetch(files, patternCatalog = PATTERN_CATALOG, engineCatalog = ENGINE_CATALOG) {
@@ -734,7 +734,7 @@ test('a deep link naming no catalog document opens the scratch chain', async () 
   }
 });
 
-// No separate read-only mode. A shipped pattern previews through
+// A shipped pattern previews through
 // the interpreter exactly as a scratch chain does; the digest match only arms
 // the parity toggle to the promoted build.
 test('choosing a catalog source previews it through the interpreter', async () => {
@@ -1056,7 +1056,9 @@ function compiledBuildEngine(source = KALEIDOSCOPE_HEX_BRIGHT) {
  * the scratch document the page opens on.
  * @param {{source?: string|null, patternCatalog?: string, hash?: string, search?: string, initialEffect?: string|null,
  *   paused?: boolean, pausedFromEngine?: boolean, selectEffect?: () => boolean,
- *   onOriginalLinkReleased?: () => void, prepare?: (engine: FakeChainEngine) => void}} [seams] - source null
+ *   onOriginalLinkReleased?: () => void, prepare?: (engine: FakeChainEngine) => void,
+ *   sourceFiles?: Record<string, string>, engineCatalog?: string,
+ *   importCompiler?: () => Promise<typeof import("../generated/shader/shader_workbench.mjs")>}} [seams] - source null
  *   leaves the scratch document loaded; pausedFromEngine reads the pause seam off the chain engine; prepare
  *   alters the engine before the controller starts.
  * @returns {Promise<Object>} The controller and everything it wrote to.

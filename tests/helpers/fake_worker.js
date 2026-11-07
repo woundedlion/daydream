@@ -15,6 +15,7 @@ export class FakeWorker {
   static constructionCount = 0;
   static failConstructionAt = -1;
   static failInitialPostAt = -1;
+  /** Worker index whose post fails when failPostType matches. */
   static failPostAt = -1;
   static failPostType = null;
 

@@ -66,9 +66,7 @@ test('a write during a session is reported as deferred to the next one', () => {
   assert.match(h.warnings[0], /next recording/, 'and says when it takes effect');
 });
 
-// GUI-bound: lil-gui enumerates the object it is handed, so a non-enumerable
-// setting would never get a control.
-test('every setting is enumerable on the GUI-bound object', () => {
+test('settings enumerate in definition order', () => {
   const h = makeRecordingSettings();
 
   assert.deepEqual(Object.keys(h.block.settings), ['recQuality', 'recFormat'],

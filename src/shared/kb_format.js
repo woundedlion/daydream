@@ -3,15 +3,15 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// Dependency-free kilobyte formatter.
+// Formats bytes in KiB.
 
 
 /**
- * Format a byte count as kilobytes, rounded to a fixed number of fractional
+ * Format a byte count in KiB (1024 bytes), rounded to a fixed number of fractional
  * digits. The unit suffix is left to the caller, whose surrounding text varies.
  * @param {number} bytes - The byte count.
  * @param {number} [digits=1] - Fractional digits to round to.
- * @returns {string} The kilobyte figure (e.g. "12.3").
+ * @returns {string} The KiB figure (e.g. "12.3").
  */
 export function formatKB(bytes, digits = 1) {
   return (bytes / 1024).toFixed(digits);

@@ -24,8 +24,8 @@ Holosphere master once in their engine gate.
 Transient API failures are retried; only successful responses supply run and
 artifact metadata.
 
-Generated WASM glue, binary, provenance files and engine catalog are ignored
-local build outputs. A fresh checkout needs an engine install before running
+Generated WASM glue, binary, provenance files, WASM declarations, engine
+contract, segment geometry and engine catalog are ignored local build outputs. A fresh checkout needs an engine install before running
 the simulator, pushing (the push hook typechecks against installed contracts),
 or running the full test suite. Build Holosphere's `wasm-release-install`
 preset from its sibling checkout, or install a verified package with
@@ -54,7 +54,8 @@ working-tree edits do not substitute for the source being pushed.
 
 The engine bundle installs runtime binaries, provenance, the segment map, and
 shader modules and patterns under `generated/`. Its WASM checksum manifest uses
-filenames relative to that directory. Handwritten TypeScript declarations are
-tracked beside their generated modules for module resolution; runtime files are
-ignored.
+filenames relative to that directory. The bundle also installs the WASM
+declarations, engine contract and segment geometry as ignored outputs. The two
+shader declarations tracked here are `composed_effect_roster.d.mts` and
+`shader_workbench.d.mts`.
 The engine still mirrors `README.md` and `docs/screenshots/` at their public paths.

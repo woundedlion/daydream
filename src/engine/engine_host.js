@@ -36,7 +36,7 @@ export class EngineHost {
     this.dead = false;
   }
 
-  /** Current Uint16Array display view; null until the first refresh() or after a resize. */
+  /** @returns {Uint16Array|null} Current display view, if refreshed since the last resize. */
   view() {
     return this.pixelView;
   }
@@ -56,8 +56,8 @@ export class EngineHost {
 
   /**
    * Identity of the effect and parameter schema, bumped on every effect
-   * replacement or descriptor-schema change. A parameter-definition snapshot and a value-stream read reporting
-   * the same generation describe the same effect.
+   * replacement or descriptor-schema change. Definition and value reads
+   * with the same generation describe the same effect.
    * @returns {number|undefined} The engine's generation counter; undefined
    *   before the WASM load or after dispose().
    */

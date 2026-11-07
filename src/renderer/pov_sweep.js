@@ -21,7 +21,10 @@ export function sustainedSurvival(age) {
 
 /** Persistent two-arm display, sampled from one frozen image per half-turn. */
 export class PovSweep {
-  /** Sustained-channel gamma time constant in milliseconds. */
+  /**
+   * Sustained-channel gamma time constant in milliseconds from Stigliani,
+   * Jeska and Grill-Spector (2017). See docs/development.md#visual-response-model.
+   */
   static RESPONSE_TAU_MS = 4.94;
   /** Largest exploratory multiplier of the response time constant. */
   static MAX_RESPONSE_SCALE = 2;
@@ -29,9 +32,9 @@ export class PovSweep {
   static RESPONSE_TAIL_TAU = 40;
 
   /**
-   * @param {number} width
-   * @param {number} height
-   * @param {Uint16Array} initial
+   * @param {number} width - Display columns.
+   * @param {number} height - Display rows.
+   * @param {Uint16Array} initial - Initial frozen display pixels.
    * @param {number} [initialFraction=0] Start of recorded emissions in this half-turn.
    * @param {number} [frameMs=62.5] Half-turn duration in milliseconds.
    */

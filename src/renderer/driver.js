@@ -91,7 +91,11 @@ export class LabelPool {
   }
 }
 
-/** @param {number} accumulator @param {number} interval @returns {number} */
+/**
+ * @param {number} accumulator - Accumulated simulation time.
+ * @param {number} interval - Duration of one step, in the same units.
+ * @returns {number} Fractional progress through the current step.
+ */
 const sweepFraction = (accumulator, interval) => (accumulator % interval) / interval;
 
 /**
@@ -509,6 +513,7 @@ export class Daydream {
     this.needsRender = true;
   }
 
+  /** Queues one simulation step and requests a repaint. */
   stepOnce() {
     this.stepFrames = Math.max(1, this.stepFrames);
     this.invalidate();

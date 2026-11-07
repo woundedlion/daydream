@@ -173,6 +173,7 @@ export function bootRemedy(error) {
 }
 
 /**
+ * Shows a bootstrap failure in the loading overlay.
  * @param {unknown} error Bootstrap failure.
  * @param {{document?: Document, location?: Location, title?: string,
  *   refresh?: (dependencies?: {signal?: AbortSignal}) => Promise<void>,
@@ -256,6 +257,7 @@ export function reportBootFailure(error, {
 }
 
 /**
+ * Loads the application and reports startup failures.
  * @param {{loader?: () => Promise<unknown>|unknown, document?: Document,
  *   location?: Location, logger?: Pick<Console, 'error'>,
  *   fatal?: (message: string) => void, performance?: Performance}} [dependencies]

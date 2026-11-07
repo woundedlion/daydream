@@ -21,7 +21,7 @@
     "branches": 83.7
   },
   "src/ui/effect_panel_view.js": {
-    "reason": "Browser probes exercise focused controller DOM paths.",
+    "reason": "Unit gaps are the focusWidget null result, panelControllers with no panel, and absent stageFolders fallbacks. scripts/panel-probe.mjs checks panel scrolling and focus restoration in Chrome.",
     "branches": 81.82
   },
   "scripts/probe_harness.mjs": {

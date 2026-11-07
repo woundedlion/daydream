@@ -185,7 +185,7 @@ const callArgs = (src, open) => {
 
 /**
  * Class tokens a script puts on the elements it builds, read from
- * `className =`, `classList.add`/`toggle`, `â€¦Class`/`â€¦Classes` options, and
+ * `className =`, `classList.add`/`toggle`, `*Class`/`*Classes` options, and
  * the class arguments of `el`, `makeDiv`, and `buildButton`. A class assembled any
  * other way goes ungated.
  * @param {string} src - Script source.

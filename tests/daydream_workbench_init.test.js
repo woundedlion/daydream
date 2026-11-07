@@ -1,5 +1,4 @@
-// The composition root's handling of a rejected shader-workbench init, with the
-// document controller replaced by a module mock.
+// The composition root's shader-workbench startup, with the document controller replaced by a module mock.
 import { mock, test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { restoreDocumentAfterEach } from './helpers/fake_dom.js';

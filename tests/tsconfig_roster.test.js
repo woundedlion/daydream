@@ -15,7 +15,7 @@ const NOT_CHECKED = new Set([
   'generated/shader/composed_effect_roster.mjs',
 ]);
 
-// Never entered: dependency and git metadata, the linked worktrees, the vendored
+// Top-level directories never entered: dependency and git metadata, the linked worktrees, the vendored
 // third-party drops, the engine checkout, and tests/, which tsconfig.json puts
 // out of scope.
 const SKIP_DIRS = new Set([

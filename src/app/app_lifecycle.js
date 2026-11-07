@@ -40,9 +40,11 @@ export function createRenderAdapter({
 }) {
   let aliasDivergenceLogged = false;
   return {
+    /** Whether the worker pool owns the display while awaiting a published frame. */
     retainsDisplay() {
       return segments.ownsDisplay && !segments.faulted && !segments.hasPublishedFrame();
     },
+    /** Refreshes the engine view and repoints the display aliases when present. */
     refreshPixelView() {
       host.refresh();
       const view = host.view();

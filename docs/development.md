@@ -81,7 +81,7 @@ The engine validates a replacement before applying it, so refusal commits no
 snapshot state. Caller-accessor side effects during WASM payload cloning are
 not rolled back.
 
-## Validation
+## Page behaviour
 
 Saved solids back up rejected cards before replacing the primary list. A refused
 backup retains those cards in the primary data for recovery on reload. Malformed
@@ -101,6 +101,10 @@ instantiation. A saved star-pattern base can be flattened through Copy registry
 C++; the callable-seed recipe export refuses such bases.
 Saved-solid card DOM is built by `solid_saved_cards.js` with injected document
 and action handlers; the page owns registry collision detection and list order.
+
+## Validation
+
+## Validation
 
 After `npm ci` and an engine install, run `npm run lint`, `npm run typecheck`, and
 `npm test`. Test suites live in `tests/`, reusable support code in

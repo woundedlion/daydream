@@ -145,8 +145,7 @@ generated/shader/composed_effect_roster.mjs
 generated/shader/engine_catalog.json
 generated/shader/patterns/catalog.json
 
-# The project license and notices for the PROJ-derived projection code,
-# FastNoiseLite, Tailwind CSS, and modern-normalize.
+# The project license and third-party notices.
 LICENSE.txt
 
 # Documentation supplied by the verified engine bundle.

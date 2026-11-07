@@ -118,8 +118,8 @@ export function createPointerDrag({
   /**
    * @param {PointerEvent} event - The capture the element no longer holds.
    * @returns {void}
-   * @details An implicit release — the element detached, the gesture taken over
-   *   by the browser — raises no pointerup on the element.
+   * @details An implicit release can occur without pointerup. A detached
+   * element receives neither event, so its drag never finishes.
    */
   const handleLostCapture = (event) => finish(event, cancelHandler);
 

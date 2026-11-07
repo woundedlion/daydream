@@ -40,15 +40,20 @@ export function shaderChainCatalog(module) {
   return module.ShaderChainBindings.getShaderChainCatalog();
 }
 
-/** @param {*} engine @returns {*} Chain snapshot or null. */
+/**
+ * Reads the active shader chain snapshot.
+ * @param {*} engine - Engine hosting the chain.
+ * @returns {*} Chain snapshot or null.
+ */
 export function getChainSnapshot(engine) {
   return callWorkbenchBinding(engine, 'getSnapshot', []);
 }
 
 /**
- * @param {*} engine
- * @param {*} module
- * @param {*} snapshot
+ * Restores a shader chain snapshot.
+ * @param {*} engine - Engine hosting the chain.
+ * @param {*} module - Module defining the restore result codes.
+ * @param {*} snapshot - Authored chain state to restore.
  * @returns {*} Native snapshot restore result.
  */
 export function restoreChainSnapshot(engine, module, snapshot) {

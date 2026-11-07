@@ -1393,7 +1393,7 @@ test('the preset methods answer the way the segmented path assumes', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 });
 
-// MeshOps' 16 MB tooling block is allocated lazily on first use and cannot fit
+// MeshOps' tooling block is allocated lazily on first use and cannot fit
 // the heap the module starts with, so that first call grows it, which detaches
 // every live view.
 test('heap growth detaches a held pixel view and the re-fetch is live and identical', async () => {
@@ -1418,8 +1418,8 @@ test('heap growth detaches a held pixel view and the re-fetch is live and identi
 
     assert.ok(engine.getPixels().buffer.byteLength > baselineBytes);
     assert.equal(isViewLive(held), false,
-      'the 16 MB tooling allocation must grow the heap and detach the held view; ' +
-      'if it no longer does, nothing exercises the detachment contract daydream.js ' +
+      'the tooling allocation must grow the heap and detach the held view; ' +
+      'if it no longer does, nothing exercises the detachment contract src/renderer/driver.js ' +
       'guards against every frame');
 
     const { refreshed, view } = refreshPixelView(
