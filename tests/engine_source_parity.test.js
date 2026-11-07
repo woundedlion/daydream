@@ -20,6 +20,8 @@ import { generateFuncAndRecipe, DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS,
 import { generateRegistryCpp, MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount, LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
 import { MAX_DISPLAY_CAP_PERCENT } from '../src/renderer/display_caps.js';
 import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../src/workbench/shader/shader_deeplink.js';
+import { BAKED_MODULATION_SCALE_MAX, UNIT_MODULATION_AMOUNT_MIN,
+  UNIT_MODULATION_AMOUNT_MAX } from '../src/workbench/shader/chain_presentation.js';
 
 const enginePin = readFileSync(new URL('../generated/holosphere_wasm.sha', import.meta.url), 'utf8').trim();
 
@@ -648,6 +650,19 @@ test('CHAIN_SNAPSHOT_SCHEMA_VERSION is the engine chain snapshot schema', { skip
   const match = /static constexpr uint32_t SCHEMA_VERSION\s*=\s*(\d+);/.exec(header(path));
   assert.ok(match, `SCHEMA_VERSION not found in ${path} — the parity reader is out of date`);
   assert.equal(CHAIN_SNAPSHOT_SCHEMA_VERSION, Number(match[1]));
+});
+
+test('shader modulation bounds match the installed engine', { skip: engineSkip }, () => {
+  const typesPath = 'core/pattern/types.h';
+  assert.equal(BAKED_MODULATION_SCALE_MAX,
+    engineConstant(header(typesPath), 'MAX_BAKED_NOISE_SCALE', typesPath));
+
+  const controlPath = 'core/render/pullback/modulation.h';
+  const body = functionBody(header(controlPath), 'control_fields');
+  const amount = /"Modulation Amount",\s*&config\.mechanic\.amount,\s*UNIT \? (-?[\d.]+)f : -?[\d.]+f,\s*UNIT \? (-?[\d.]+)f : -?[\d.]+f/.exec(body);
+  assert.ok(amount, `Unit modulation amount bounds not found in ${controlPath} — the parity reader is out of date`);
+  assert.deepEqual([UNIT_MODULATION_AMOUNT_MIN, UNIT_MODULATION_AMOUNT_MAX],
+    [Number(amount[1]), Number(amount[2])]);
 });
 
 test('palettes.html recipe sliders stay inside the limits the engine compiler accepts', { skip: engineSkip }, () => {

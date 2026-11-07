@@ -8,8 +8,7 @@ import { engineHalted } from '../../shared/engine_halt.js';
 import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot, shaderChainCatalog } from '../../engine/workbench_bindings.js';
 import { enumConstantName, replayParameterWrites } from '../../effects/param_sync.js';
 import {
-  BAKED_MODULATION_SCALE_MAX, fieldOf as fieldSegment, MODULATION_OPERATOR,
-  UNIT_MODULATION_AMOUNT_MIN, UNIT_MODULATION_AMOUNT_MAX,
+  fieldOf as fieldSegment, MODULATION_OPERATOR, modulationValueLimits,
 } from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
 import { applyChainDocument, resolveParameterWrite } from './chain_apply.js';
@@ -566,16 +565,26 @@ export function createShaderDocumentController({
       const field = fieldSegment(parameterId);
       const modulated = descriptor.chain.some((/** @type {*} */ entry) =>
         entry.label === label && entry.operator === MODULATION_OPERATOR);
-      if (modulated && field === 'modulation-source' && value !== 'noise')
-        values[`${label}.modulation-evaluation`] = 'direct';
-      if (modulated && field === 'modulation-mechanic' && value !== 'hue-rotation') {
-        const amount = Number(presetValues[`${label}.modulation-amount`] ?? 0);
-        values[`${label}.modulation-amount`] = Math.max(UNIT_MODULATION_AMOUNT_MIN,
-          Math.min(UNIT_MODULATION_AMOUNT_MAX, amount));
+      if (modulated) {
+        const valueOf = (/** @type {string} */ field) => {
+          const id = `${label}.${field}`;
+          return values[id] ?? presetValues[id];
+        };
+        if (field === 'modulation-source' && value !== 'noise')
+          values[`${label}.modulation-evaluation`] = 'direct';
+        if (field === 'modulation-mechanic') {
+          const limits = modulationValueLimits('modulation-amount', valueOf);
+          if (limits) {
+            const amount = Number(valueOf('modulation-amount') ?? 0);
+            values[`${label}.modulation-amount`] = Math.max(limits.min, Math.min(limits.max, amount));
+          }
+        }
+        if (field === 'modulation-evaluation') {
+          const limits = modulationValueLimits('pattern-scale', valueOf);
+          if (limits && Number(valueOf('pattern-scale') ?? 1) > limits.max)
+            values[`${label}.pattern-scale`] = limits.max;
+        }
       }
-      if (modulated && values[`${label}.modulation-evaluation`] === 'baked-cube'
-          && Number(presetValues[`${label}.pattern-scale`] ?? 1) > BAKED_MODULATION_SCALE_MAX)
-        values[`${label}.pattern-scale`] = BAKED_MODULATION_SCALE_MAX;
       const addsDeclaration = Object.keys(values).some(id => !store.declares(id));
       const coupled = Object.keys(values).length > 1;
       const result = store.setPresetValues(presetId, values, () => {
