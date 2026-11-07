@@ -81,6 +81,10 @@ export async function probePad(tab) {
   { timeout: TIMEOUT_MS });
 
   await tab.$eval(PAD, (node) => node.scrollIntoView({ block: 'center' }));
+  await tab.focus(REAL_AXIS);
+  check(await tab.$eval(PAD, (node) =>
+    node.scrollHeight === node.clientHeight && node.scrollTop === 0),
+  'focusing a pad axis leaves its drawing surface in place');
   const box = await boxOf(tab, PAD);
   check(box.width > 0 && box.height > 0,
     `the ${PARAM} pad lays out ${Math.round(box.width)}x${Math.round(box.height)}`);
@@ -155,7 +159,7 @@ export async function probePad(tab) {
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'mobius-probe',
-  minimumChecks: 13,
+  minimumChecks: 14,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'the complex-plane pad tracks a real pointer on and off itself.',
