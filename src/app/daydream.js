@@ -620,7 +620,11 @@ export function start({
     onChange: () => daydream.invalidate(),
   });
   guiInstance.add(poleLod.state, 'poleLod', 0, 2, 0.05).name('Pole LOD')
-    .onChange((/** @type {number} */ v) => { poleLod.apply(v); segments.setPoleLod(v); });
+    .onChange((/** @type {number} */ value) => {
+      poleLod.apply(value);
+      segments.setPoleLod(value);
+      if (daydream.paused && !segments.ownsDisplay) daydream.stepOnce();
+    });
 
   const displayCaps = createDisplayCapsBinding({
     getEngine: () => host.engine,

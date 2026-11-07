@@ -951,7 +951,10 @@ export class SegmentController {
     // pool stays latched (this fires per drag event).
     this.poleLod = value;
     if (this.faulted) return;
+    const paused = this.driver.paused;
+    if (paused) this.#fencePublished();
     this.broadcast({ type: 'setPoleLod', value });
+    if (paused) this.tick();
   }
 
   /** @param {boolean} enabled Whether columns sample their individual sweep times. */

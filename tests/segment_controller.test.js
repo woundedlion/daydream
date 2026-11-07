@@ -863,6 +863,7 @@ test('cap changes reach current workers and survive pool recreation', () => {
 for (const [name, fence] of [
   ['cap', (c) => c.setDisplayCaps(2, 3)],
   ['sampling', (c) => c.setTemporalSampling(true)],
+  ['pole LOD', (c) => c.setPoleLod(1)],
 ]) {
   test(`paused ${name} changes fence old frames and dispatch a replacement after they settle`, async () => {
     setDisplayGrid(4, 2);
