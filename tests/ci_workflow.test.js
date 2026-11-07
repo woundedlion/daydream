@@ -56,6 +56,15 @@ test('npm test retains discovery and coverage guards', () => {
     '"tests/**/*.test.js" "tests/**/*.test.mjs" "tests/**/*.spec.js" "tests/**/*.spec.mjs"');
 });
 
+test('Dependabot groups the pinned three runtime and types before dependency-type groups', () => {
+  const pkg = packageJson();
+  assert.equal(pkg.dependencies.three, pkg.devDependencies['@types/three']);
+  const source = readFileSync(resolve(REPO, '.github/dependabot.yml'), 'utf8');
+  const npm = source.split('package-ecosystem: npm')[1].split('package-ecosystem:')[0];
+  assert.match(npm,
+    /groups:\s*(?:#[^\r\n]*\s*)?three-runtime-and-types:\s*patterns:\s*- "three"\s*- "@types\/three"\s+browser-runtime:/);
+});
+
 // The prepare script is the only thing that points git at .githooks, and a
 // hook the index holds without its executable bit is never run.
 test('npm install points git at the tracked hooks, every one executable', () => {

@@ -20,12 +20,15 @@ updates:
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
     groups:
-      node-development:
-        dependency-type: development
-      # A bump stays red until `npm run importmap` regenerates the SRI hashes in
-      # vendor-importmap.js.
+      # Browser runtime bumps require `npm run importmap` to refresh SRI hashes.
+      three-runtime-and-types:
+        patterns:
+          - "three"
+          - "@types/three"
       browser-runtime:
         dependency-type: production
+      node-development:
+        dependency-type: development
   - package-ecosystem: pip
     directory: /requirements
     schedule:
