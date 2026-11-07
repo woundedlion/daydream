@@ -56,7 +56,7 @@ export function resolveSavedSolidsStorage(readStorage = () => localStorage) {
 /**
  * Separates stored cards from rejected data.
  * @param {Pick<Storage, "getItem">} storage - Source of the saved list.
- * @returns {{entries: any[], rejected: any[], notice: string}} Parsed cards and any rejection notice.
+ * @returns {{entries: any[], rejected: any[], notice: string, backupNotice: string}} Parsed cards and recovery status.
  */
 export function loadSavedSolids(storage) {
   const entries = [], rejected = [];
@@ -78,19 +78,25 @@ export function loadSavedSolids(storage) {
     if (raw !== undefined) rejected.push(raw);
     reason = 'invalid saved-solid JSON';
   }
-  return { entries, rejected, notice: rejected.length
-    ? `${rejected.length} saved solid${rejected.length === 1 ? '' : 's'} could not be loaded: ${reason}. Saving attempts a backup of up to 20 rejected entries without thumbnails; oversized data may be truncated or omitted.` : '' };
+  return {
+    entries,
+    rejected,
+    notice: rejected.length
+      ? `${rejected.length} saved solid${rejected.length === 1 ? '' : 's'} could not be loaded: ${reason}.` : '',
+    backupNotice: rejected.length
+      ? 'Saving attempts a backup of up to 20 rejected entries without thumbnails; oversized data may be truncated or omitted.' : '',
+  };
 }
 
 /**
  * Saves cards, retaining rejected entries until they can be backed up.
  * @param {Pick<Storage, "getItem"|"setItem">} storage - Destination and backup store.
  * @param {any[]} savedSolids - Cards to persist.
- * @param {{notice: string, rejected: any[]}} savedStorage - Rejected data and its notice.
+ * @param {{notice: string, backupNotice?: string, rejected: any[]}} savedStorage - Rejected data and recovery status.
  * @returns {string} Notice to display after saving.
  */
 export function persistSavedSolids(storage, savedSolids, savedStorage) {
-  let notice = savedStorage.notice;
+  let backupNotice = savedStorage.backupNotice;
   try {
     if (savedStorage.rejected.length) {
       try {
@@ -110,16 +116,18 @@ export function persistSavedSolids(storage, savedSolids, savedStorage) {
           });
         storage.setItem(REJECTED_SOLIDS_KEY, JSON.stringify(backup));
         savedStorage.rejected.length = 0;
+        backupNotice = savedStorage.backupNotice = 'Rejected entries were backed up. '
+          + 'The backup keeps up to 20 entries without thumbnails; oversized data may have been truncated or omitted.';
       } catch (error) {
         console.warn('Could not back up rejected solids:', error);
-        notice = `${savedStorage.notice} Rejected cards could not be backed up.`;
+        backupNotice = [backupNotice, 'Rejected cards could not be backed up.'].filter(Boolean).join(' ');
       }
     }
     storage.setItem(SAVED_SOLIDS_KEY, JSON.stringify([...savedSolids, ...savedStorage.rejected]));
-    return notice;
+    return [savedStorage.notice, backupNotice].filter(Boolean).join(' ');
   } catch (error) {
     console.warn('Could not persist saved solids:', error);
-    return [savedStorage.notice,
+    return [savedStorage.notice, backupNotice,
       'Changes apply to this session only: browser storage refused the write.'].filter(Boolean).join(' ');
   }
 }
