@@ -26,6 +26,8 @@ export class PovSweep {
    * Jeska and Grill-Spector (2017). See docs/development.md#visual-response-model.
    */
   static RESPONSE_TAU_MS = 4.94;
+  /** Smallest exploratory multiplier of the response time constant. */
+  static MIN_RESPONSE_SCALE = 0.5;
   /** Largest exploratory multiplier of the response time constant. */
   static MAX_RESPONSE_SCALE = 2;
   /** Retained response duration in time constants. */
@@ -101,13 +103,13 @@ export class PovSweep {
 
   /**
    * @param {number} fraction Response time within the current half-turn, in [0, 1].
-   * @param {number} [responseScale=1] Sustained-channel timescale multiplier, in [0.5, 2].
+   * @param {number} [responseScale=1] Sustained-channel timescale multiplier.
    * @returns {Uint16Array} Approximate sustained visual response in linear RGB16.
    */
   visualPixels(fraction, responseScale = 1) {
     const end = Math.max(0, Math.min(1, fraction));
     const tau = PovSweep.RESPONSE_TAU_MS
-      * Math.max(0.5, Math.min(PovSweep.MAX_RESPONSE_SCALE, responseScale));
+      * Math.max(PovSweep.MIN_RESPONSE_SCALE, Math.min(PovSweep.MAX_RESPONSE_SCALE, responseScale));
     if (this.responsePixels && this.responseFraction === end && this.responseTau === tau)
       return this.responsePixels;
     const pixels = this.weightedPixels((pulseStart, pulseEnd) => Math.max(0,

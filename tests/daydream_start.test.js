@@ -3,6 +3,7 @@
 // module loader).
 import {getActiveURLSync} from '../src/app/state.js';
 import { canonicalEffectId } from '../src/effects/effect_identity.js';
+import { PovSweep } from '../src/renderer/pov_sweep.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -115,6 +116,7 @@ test('response timescale is a persistent view control', () => {
   const { guis, driver } = startApp();
   const control = guis[0].controllers.find((c) => c.property === 'povResponseScale');
   assert.equal(control.getValue(), 1);
+  assert.deepEqual(control.args.slice(0, 2), [PovSweep.MIN_RESPONSE_SCALE, PovSweep.MAX_RESPONSE_SCALE]);
   assert.equal(control.session, undefined);
   assert.ok(guis[0].collectUrlKeys().includes('view.povResponseScale'));
   driver.invalidated = false;
