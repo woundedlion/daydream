@@ -40,6 +40,14 @@ test('isConvexFace accepts a convex face', () => {
   assert.equal(isConvexFace(SQUARE, [0, 1, 2, 3]), true);
 });
 
+test('isConvexFace rejects an octagram with three windings', () => {
+  const vertices = Array.from({ length: 8 }, (_, i) => {
+    const angle = i * Math.PI / 4;
+    return { x: Math.cos(angle), y: Math.sin(angle), z: 0 };
+  });
+  assert.equal(isConvexFace(vertices, [0, 3, 6, 1, 4, 7, 2, 5]), false);
+});
+
 test('isConvexFace rejects a concave star face', () => {
   assert.equal(isConvexFace(STAR, STAR.map((_, i) => i)), false);
 });

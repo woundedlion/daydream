@@ -30,7 +30,7 @@ export function faceNormal(vertices, face) {
 }
 
 /**
- * Tests whether an ordered planar face has a consistent turn direction.
+ * Tests whether an ordered planar face has a consistent turn direction and a single winding.
  *
  * @param {Array<{x:number, y:number, z:number}>} vertices - Mesh vertices.
  * @param {Array<number>} face - Ordered vertex indices for one face.
@@ -44,6 +44,8 @@ export function isConvexFace(vertices, face) {
   const normalLengthSquared = nx * nx + ny * ny + nz * nz;
   if (normalLengthSquared === 0) return true;
   const tolerance = normalLengthSquared * 1e-12;
+  const normalLength = Math.sqrt(normalLengthSquared);
+  let totalTurn = 0;
   let turnSign = 0;
 
   for (let i = 0; i < face.length; i++) {
@@ -59,13 +61,15 @@ export function isConvexFace(vertices, face) {
     const turn = (aby * bcz - abz * bcy) * nx
       + (abz * bcx - abx * bcz) * ny
       + (abx * bcy - aby * bcx) * nz;
+    const dot = abx * bcx + aby * bcy + abz * bcz;
+    totalTurn += Math.atan2(turn, dot * normalLength);
     if (Math.abs(turn) <= tolerance) continue;
     const sign = Math.sign(turn);
     if (turnSign !== 0 && sign !== turnSign) return false;
     turnSign = sign;
   }
 
-  return true;
+  return Math.abs(totalTurn) <= 3 * Math.PI;
 }
 
 /**
