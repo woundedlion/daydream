@@ -43,6 +43,15 @@ const EXTENSION_MIME_TYPES = new Map([
   ['ogv', 'video/ogg'],
 ]);
 
+/** @param {() => void} callback - Host notification to deliver. */
+function notifyHost(callback) {
+  try {
+    callback();
+  } catch (err) {
+    console.error('VideoRecorder: host notification failed.', err);
+  }
+}
+
 /**
  * Pick the best-supported MIME type for the requested output format. Codec
  * priority: MP4/H.264 > WebM/VP9 > WebM/VP8. Returns '' if nothing in the
@@ -362,11 +371,6 @@ export class VideoRecorder {
       if (this.mediaRecorder !== recorder) return;
       try {
         recorder.start(RECORDER_TIMESLICE_MS);
-        this.starting = false;
-        this.elapsedSeconds = 0;
-        this.recordingStartedAtMs = this.now();
-        this.visibilityChanged();
-        this.onStarted?.();
       } catch (err) {
         recorder.ondataavailable = null;
         recorder.onstop = null;
@@ -374,7 +378,13 @@ export class VideoRecorder {
         sink.finish();
         this.cleanup();
         this.reportFailure('MediaRecorder start failed.', err);
+        return;
       }
+      this.starting = false;
+      this.elapsedSeconds = 0;
+      this.recordingStartedAtMs = this.now();
+      this.visibilityChanged();
+      notifyHost(() => this.onStarted?.());
     };
 
     if (sink.ready) {
