@@ -465,6 +465,7 @@ function engineTrapped(error) {
   if (engineHalted) return true;
   return standDownIfHalted(error, wasmModule, (message) => {
     engineHalted = true;
+    hueKeyWheel?.dispose();
     scheduleUpdate.cancel();
     scheduleViewportRedraw.cancel();
     for (const control of /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('input, select, button, textarea')))
