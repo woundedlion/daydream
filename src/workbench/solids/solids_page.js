@@ -96,6 +96,8 @@ let currentMeshIsCurrent = false;
 // Per-face topology class ids for the Colorize Faces toggle, cached from the
 // last recompute: classifyFaces() needs the live WASM mesh, which update() frees.
 let currentFaceClasses = null;
+/** @type {?string} */
+let currentClassifyFailure = null;
 
 // Lists (populated from WASM)
 let simpleSolids = [];
@@ -1280,9 +1282,10 @@ function update() {
   currentMesh = built.meshData;
   currentMeshIsCurrent = true;
   currentFaceClasses = built.faceClasses;
+  currentClassifyFailure = built.classifyFailure;
 
   renderMesh();
-  if (built.classifyFailure) showMeshError(built.classifyFailure);
+  if (currentClassifyFailure) console.error(currentClassifyFailure);
 
   // The mesh changed, so which ops would now overflow changed too.
   refreshOpGating().catch((e) => {
@@ -1310,7 +1313,7 @@ function renderMesh() {
   renderBaseSolid();
   if (!currentMeshIsCurrent) return;
   const stats = document.getElementById('meshStats');
-  const statsText = meshStatsLine(meshData, edgeCount);
+  const statsText = currentClassifyFailure ?? meshStatsLine(meshData, edgeCount);
   if (stats.textContent !== statsText) stats.textContent = statsText;
   document.getElementById('canvas').setAttribute('aria-label',
     meshCanvasLabel(formatSolidName(state.base), state.ops.map((o) => o.op),
