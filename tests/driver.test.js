@@ -1274,6 +1274,27 @@ test('running display frames between simulation ticks do not poll the panel', ()
   assert.equal(syncs, 0);
 });
 
+test('a POV sweep-only repaint leaves the panel alone until invalidation', () => {
+  const log = [];
+  const pixels = new Uint16Array(2 * 2 * 3);
+  const ctx = renderCtx(pixels, log);
+  Object.assign(ctx, {
+    W: 2, H: 2, pixels, povFidelity: true, povSweep: null, paused: false,
+    needsRender: false, timeAccumulator: 0, frameInterval: 1,
+    advanceFrameClock() { this.timeAccumulator += 0.1; return false; },
+  });
+  const syncs = [];
+  const adapter = { sync: (advanced) => syncs.push(advanced) };
+
+  Daydream.prototype.render.call(ctx, adapter);
+
+  assert.ok(log.includes('renderMainView'));
+  assert.deepEqual(syncs, []);
+  ctx.needsRender = true;
+  Daydream.prototype.render.call(ctx, adapter);
+  assert.deepEqual(syncs, [false]);
+});
+
 test('render shows axes and labels before the inset view', () => {
   const log = [];
   const ctx = renderCtx(new Uint16Array(4), log);
