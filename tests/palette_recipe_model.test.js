@@ -208,6 +208,14 @@ for (const harmony of Object.keys(PaletteV4.harmony)) {
   }
 }
 
+test('switching from CUSTOM to SWEEP starts at the edited first hue key', () => {
+  const model = new PaletteRecipeModel();
+  model.applyHueModeTransition('CUSTOM');
+  model.moveHueKey(0, 0.5);
+  model.applyHueModeTransition('SWEEP');
+  assert.equal(model.baseHueTurns, 0.5);
+});
+
 test('a LOOP sweep rounds to whole turns inside the domain, mode and sweep operations', () => {
   const model = new PaletteRecipeModel();
   model.setAmount('sweepTurns', 2.4);

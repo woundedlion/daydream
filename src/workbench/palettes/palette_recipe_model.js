@@ -265,6 +265,8 @@ export class PaletteRecipeModel {
         harmony: paletteEnumOrdinal('harmony', this.#readings.harmony),
         spreadTurns: this.#readings.spreadTurns,
       }});
+    if (mode === 'SWEEP' && this.#readings.hueMode === 'CUSTOM')
+      this.#readings.baseTurns = wrapTurns(this.#current.hue.customTurns[0]);
     this.#readings.hueMode = mode;
     this.#rebuild();
     return true;
