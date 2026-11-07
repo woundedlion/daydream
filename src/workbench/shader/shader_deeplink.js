@@ -13,8 +13,85 @@ const PREFIX = '#shader=v2.';
 const MAX_PAYLOAD_CHARS = 65536;
 const MAX_STATE_BYTES = 524288;
 
+export const SHADER_LINK_DEBOUNCE_MS = 200;
+export const SHADER_LINK_MAX_WAIT_MS = 1000;
+
 /** Chain snapshot schema the engine's ChainSnapshot encodes and accepts. */
 export const CHAIN_SNAPSHOT_SCHEMA_VERSION = 5;
+
+/**
+ * Coalesces URL writes, rejecting stale encodes after the state is superseded.
+ * @param {object} options
+ * @param {() => boolean} options.canWrite - Whether a preview is active.
+ * @param {() => *} options.readState - Current link state, or null when no preview is active.
+ * @param {(hash: string) => void} options.replace - Writes the hash.
+ * @param {(error: unknown) => void} options.onError - Reports a current encoding failure.
+ * @param {() => void} options.onOriginalLinkReleased - Reports when a refused link may be replaced.
+ */
+export function createShaderLinkWriter({ canWrite, readState, replace, onError, onOriginalLinkReleased }) {
+  let generation = 0;
+  /** @type {Promise<void>} */
+  let writing = Promise.resolve();
+  /** @type {ReturnType<typeof setTimeout>|null} */
+  let debounceTimer = null;
+  /** @type {ReturnType<typeof setTimeout>|null} */
+  let maxTimer = null;
+  let pending = false;
+  let disposed = false;
+  let preserveOriginal = false;
+
+  const clearTimers = () => {
+    if (debounceTimer !== null) clearTimeout(debounceTimer);
+    if (maxTimer !== null) clearTimeout(maxTimer);
+    debounceTimer = null;
+    maxTimer = null;
+  };
+
+  const flush = () => {
+    clearTimers();
+    if (!pending || !canWrite()) return writing;
+    pending = false;
+    const ticket = ++generation;
+    const state = readState();
+    writing = encodeShaderStateHash(state).then((hash) => {
+      if (ticket === generation) replace(hash);
+    }).catch((error) => {
+      if (ticket !== generation) return;
+      replace('');
+      onError(error);
+    });
+    return writing;
+  };
+
+  return {
+    flush,
+    schedule() {
+      if (disposed || preserveOriginal || !canWrite()) return;
+      pending = true;
+      if (debounceTimer !== null) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(flush, SHADER_LINK_DEBOUNCE_MS);
+      maxTimer ??= setTimeout(flush, SHADER_LINK_MAX_WAIT_MS);
+    },
+    invalidate() { generation += 1; },
+    refuseLink() {
+      preserveOriginal = true;
+      clearTimers();
+      pending = false;
+      generation += 1;
+    },
+    releaseOriginalLink() {
+      if (!preserveOriginal) return;
+      preserveOriginal = false;
+      onOriginalLinkReleased();
+    },
+    preservesOriginalLink: () => preserveOriginal,
+    dispose() {
+      const finalWrite = flush();
+      disposed = true;
+      return finalWrite;
+    },
+  };
+}
 
 /** @param {*} value @returns {*} */
 function normalizedState(value) {
