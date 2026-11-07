@@ -662,6 +662,13 @@ export async function createChainDocumentStore({
     /** @returns {ReadonlyArray<Readonly<ChainEntry>>} Current chain without cloning. */
     chainView: () => chain(),
 
+    /**
+     * @param {string} presetId - Preset to inspect.
+     * @returns {Readonly<Record<string, *>>|null} Current values without cloning.
+     */
+    presetValuesView: (presetId) => doc.preset_bank.presets.find(
+      (/** @type {{preset_id: string}} */ preset) => preset.preset_id === presetId)?.values ?? null,
+
     /** @returns {*} The compiler's full result for the current document, digests included. */
     compile: () => {
       if (compiled === null || compiled.doc !== doc) {

@@ -557,13 +557,14 @@ export function createShaderDocumentController({
       if (chainUi === null || active === null || active.presetId === null) return false;
       const presetId = active.presetId;
       const compiledSide = active.compiledSide;
-      const document = chainUi.store.document();
-      const presetValues = document.preset_bank.presets
-        .find((/** @type {*} */ preset) => preset.preset_id === presetId).values;
+      const store = chainUi.store;
+      const presetValues = store.presetValuesView(presetId);
+      if (presetValues === null) return false;
+      const descriptor = { chain: store.chainView() };
       const values = { [parameterId]: value };
       const label = parameterId.slice(0, parameterId.indexOf('.'));
       const field = fieldSegment(parameterId);
-      const modulated = document.descriptor.chain.some((/** @type {*} */ entry) =>
+      const modulated = descriptor.chain.some((/** @type {*} */ entry) =>
         entry.label === label && entry.operator === MODULATION_OPERATOR);
       if (modulated && field === 'modulation-source' && value !== 'noise')
         values[`${label}.modulation-evaluation`] = 'direct';
@@ -575,10 +576,9 @@ export function createShaderDocumentController({
       if (modulated && values[`${label}.modulation-evaluation`] === 'baked-cube'
           && Number(presetValues[`${label}.pattern-scale`] ?? 1) > BAKED_MODULATION_SCALE_MAX)
         values[`${label}.pattern-scale`] = BAKED_MODULATION_SCALE_MAX;
-      const store = chainUi.store;
       const addsDeclaration = Object.keys(values).some(id => !store.declares(id));
       const coupled = Object.keys(values).length > 1;
-      const result = chainUi.store.setPresetValues(presetId, values, () => {
+      const result = store.setPresetValues(presetId, values, () => {
         if (addsDeclaration && compiledSide) return { ok: true };
         const engine = getEngine();
         const module = getModule();
@@ -603,10 +603,10 @@ export function createShaderDocumentController({
             }
           } else if (compiledSide) {
             const resolved = resolveFixedWrites(values, definitions,
-              engine.getDocumentParameterDefinitions?.() ?? [], document.descriptor,
+              engine.getDocumentParameterDefinitions?.() ?? [], descriptor,
               (id) => engineControlName(id, definitions),
               (id, control) => {
-                const binding = compiler.fixedDerivedBinding?.(document.descriptor, id, {...presetValues, ...values});
+                const binding = compiler.fixedDerivedBinding?.(descriptor, id, {...presetValues, ...values});
                 return Boolean(binding && !liveDerivedControl(id, control, definitions, binding));
               });
             refusal = resolved.refusal ?? performEngineWrites(engine, module, resolved.writes)
