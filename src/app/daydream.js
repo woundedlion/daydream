@@ -583,9 +583,12 @@ export function start({
   let temporalSampling = daydream.povFidelity;
   const povFidelity = guiInstance.add(daydream, 'povFidelity').name(`POV fidelity (${FPS} Hz)`);
   const povResponse = guiInstance.add(daydream, 'povResponseScale', 0.5, 2, 0.05).name('Response timescale');
+  const armPositions = guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions');
   const syncPovControls = () => {
-    if (daydream.povFidelity) povResponse.enable();
-    else povResponse.disable();
+    for (const control of [povResponse, armPositions]) {
+      if (daydream.povFidelity) control.enable();
+      else control.disable();
+    }
     daydream.invalidate();
   };
   povFidelity.onChange(() => {
@@ -598,8 +601,8 @@ export function start({
     syncPovControls();
   });
   povResponse.onChange(() => daydream.invalidate());
+  armPositions.onChange(() => daydream.invalidate());
   syncPovControls();
-  guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions').onChange(() => daydream.invalidate());
   /** @type {boolean|null} */
   let initialColumnOverride = null;
   let columnOverrideChanged = false;
