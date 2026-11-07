@@ -70,9 +70,18 @@ jobs:
             done
             return 1
           }
+          download_bundle() {
+            local attempt
+            for attempt in 1 2 3 4; do
+              if gh api "$1" > /tmp/engine-bundle.zip; then return 0; fi
+              if [ "$attempt" -lt 4 ]; then sleep 5; fi
+            done
+            return 1
+          }
           deadline=$((SECONDS + 3300))
           queried=false
           while :; do
+            pending='no successful engine run was ready'
             runs="$(retry_api "repos/woundedlion/pov/actions/workflows/ci.yml/runs?head_sha=$PIN&branch=master&per_page=100" \
               --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")][] | [(.id // "-"), (.status // "-"), (.conclusion // "-"), (.head_sha // "-")] | @tsv')" || {
               if [ "$queried" = false ]; then
@@ -80,8 +89,8 @@ jobs:
                 exit 1
               fi
               runs=''
+              pending='engine CI query failed'
               echo "::warning::Engine CI query failed; retrying within the wait budget."
-
             }
             queried=true
             run="$(printf '%s\n' "$runs" | head -n 1)"
@@ -104,31 +113,33 @@ jobs:
                   echo "::error::POV CI for $PIN concluded $run_conclusion"
                   exit 1
                 fi
-                artifact="$(retry_api "repos/woundedlion/pov/actions/runs/$run_id/artifacts?name=holosphere-engine-$PIN&per_page=100" --jq ".artifacts | map(select(.name == \"holosphere-engine-$PIN\")) | .[0] // empty | [.id, .expired, .expires_at] | @tsv")"
-                if [ -z "$artifact" ]; then
-                  echo "::error::successful POV CI for $PIN published no verified engine bundle, or it expired. While $PIN is master head, dispatch a fresh run: gh workflow run ci.yml --repo woundedlion/pov --ref master. If master has advanced, select the current verified engine SHA. Unless DAYDREAM_DISPATCH_TOKEN is set, run daydream Deploy to GitHub Pages manually (workflow_dispatch) or use Re-run failed jobs; a full scheduled rerun skips an attempted pair."
-                  exit 1
+                if artifact="$(retry_api "repos/woundedlion/pov/actions/runs/$run_id/artifacts?name=holosphere-engine-$PIN&per_page=100" --jq ".artifacts | map(select(.name == \"holosphere-engine-$PIN\")) | .[0] // empty | [.id, .expired, .expires_at] | @tsv")"; then
+                  if [ -z "$artifact" ]; then
+                    echo "::error::successful POV CI for $PIN published no verified engine bundle, or it expired. While $PIN is master head, dispatch a fresh run: gh workflow run ci.yml --repo woundedlion/pov --ref master. If master has advanced, select the current verified engine SHA. Unless DAYDREAM_DISPATCH_TOKEN is set, run daydream Deploy to GitHub Pages manually (workflow_dispatch) or use Re-run failed jobs; a full scheduled rerun skips an attempted pair."
+                    exit 1
+                  fi
+                  read -r artifact_id expired expires_at <<< "$artifact"
+                  if [ "$expired" = true ]; then
+                    echo "::error::Engine bundle expired. While $PIN is master head, dispatch a fresh run: gh workflow run ci.yml --repo woundedlion/pov --ref master. If master has advanced, select the current verified engine SHA. Unless DAYDREAM_DISPATCH_TOKEN is set, run daydream Deploy to GitHub Pages manually (workflow_dispatch) or use Re-run failed jobs; a full scheduled rerun skips an attempted pair."
+                    exit 1
+                  fi
+                  remaining_days=$(( ($(date -d "$expires_at" +%s) - $(date +%s)) / 86400 ))
+                  if [ "$remaining_days" -le 14 ]; then
+                    echo "::warning::Engine bundle expires in $remaining_days days. While $PIN is master head, renew it with: gh workflow run ci.yml --repo woundedlion/pov --ref master. If master has advanced, select the current verified engine SHA."
+                  fi
+                  if download_bundle "repos/woundedlion/pov/actions/artifacts/$artifact_id/zip"; then
+                    python3 scripts/extract-engine-bundle.py /tmp/engine-bundle.zip engine-bundle
+                    break
+                  fi
+                  pending='artifact ZIP download failed'
+                else
+                  pending='artifact metadata query failed'
                 fi
-                read -r artifact_id expired expires_at <<< "$artifact"
-                if [ "$expired" = true ]; then
-                  echo "::error::Engine bundle expired. While $PIN is master head, dispatch a fresh run: gh workflow run ci.yml --repo woundedlion/pov --ref master. If master has advanced, select the current verified engine SHA. Unless DAYDREAM_DISPATCH_TOKEN is set, run daydream Deploy to GitHub Pages manually (workflow_dispatch) or use Re-run failed jobs; a full scheduled rerun skips an attempted pair."
-                  exit 1
-                fi
-                remaining_days=$(( ($(date -d "$expires_at" +%s) - $(date +%s)) / 86400 ))
-                if [ "$remaining_days" -le 14 ]; then
-                  echo "::warning::Engine bundle expires in $remaining_days days. While $PIN is master head, renew it with: gh workflow run ci.yml --repo woundedlion/pov --ref master. If master has advanced, select the current verified engine SHA."
-                fi
-                for attempt in 1 2 3 4; do
-                  if gh api "repos/woundedlion/pov/actions/artifacts/$artifact_id/zip" > /tmp/engine-bundle.zip; then break; fi
-                  if [ "$attempt" -eq 4 ]; then exit 1; fi
-                  sleep 5
-                done
-                python3 scripts/extract-engine-bundle.py /tmp/engine-bundle.zip engine-bundle
-                break
+                echo "::warning::Engine bundle $pending; retrying within the wait budget."
               fi
             fi
             if [ "$SECONDS" -ge "$deadline" ]; then
-              echo "::error::no verified engine bundle became available for $PIN. Run POV CI at this commit, then retry this workflow. Unless DAYDREAM_DISPATCH_TOKEN is set, run daydream Deploy to GitHub Pages manually (workflow_dispatch) or use Re-run failed jobs; a full scheduled rerun skips an attempted pair."
+              echo "::error::no verified engine bundle became available for $PIN ($pending). Run POV CI at this commit, then retry this workflow. Unless DAYDREAM_DISPATCH_TOKEN is set, run daydream Deploy to GitHub Pages manually (workflow_dispatch) or use Re-run failed jobs; a full scheduled rerun skips an attempted pair."
               exit 1
             fi
             echo "Waiting for the engine bundle at $PIN."
