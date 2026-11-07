@@ -9,7 +9,7 @@ on:
         default: ''
       engine-sha:
         type: string
-        default: ''
+        required: true
 
 permissions:
   contents: read

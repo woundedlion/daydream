@@ -8,7 +8,7 @@ on:
         default: ''
       engine-sha:
         type: string
-        default: ''
+        required: true
     secrets:
       POV_TOKEN:
         description: Optional read access for a future private engine repository; the public repository uses the run token.
