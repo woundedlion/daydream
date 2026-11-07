@@ -710,7 +710,7 @@ export class VideoRecorder {
                 message = 'the recording could not be saved; the chosen file was not updated.';
               }
               console.error(`VideoRecorder: ${message}`);
-              this.onSaveError?.(new Error(message), filename);
+              this.onSaveError?.(new Error(message), handle?.name ?? filename);
               return;
             }
             // A close() failure can still leave the file unflushed or truncated.
@@ -720,7 +720,7 @@ export class VideoRecorder {
               console.error('VideoRecorder: finalizing the streamed file failed; it may be truncated or incomplete.', err);
               this.onSaveError?.(new Error(
                 'finalizing the file failed; it may be truncated or incomplete.',
-                { cause: err }), filename);
+                { cause: err }), handle?.name ?? filename);
             }
           })
           .catch((err) => {

@@ -910,9 +910,10 @@ test('a late file close failure reports its session without stopping a new recor
   let rejectClose;
   let filename;
   const failure = new Error('disk commit failed');
+  const chosen = 'take3.mp4';
   globalThis.showSaveFilePicker = async (options) => {
     filename ??= options.suggestedName;
-    return { createWritable: async () => ({
+    return { name: chosen, createWritable: async () => ({
       write: async () => {},
       close: () => new Promise((_, reject) => { rejectClose = reject; }),
     }) };
@@ -935,7 +936,7 @@ test('a late file close failure reports its session without stopping a new recor
   rejectClose(failure);
   await finished();
   assert.equal(failures.length, 1);
-  assert.equal(failures[0].name, filename);
+  assert.equal(failures[0].name, chosen);
   assert.match(filename, /^previous_/);
   assert.equal(failures[0].error.cause, failure);
   assert.match(failures[0].error.message, /truncated or incomplete/);
