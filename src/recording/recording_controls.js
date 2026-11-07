@@ -142,12 +142,10 @@ export function createRecordingControls({
     // there was no session to stop, and the same owner tag would overwrite it.
     if (!wasRecording && !isRecording) return;
     if (!isRecording && (sessionError || sessionEmpty)) { showRecording(false); return; }
-    if (isRecording) {
-      if (recorder.starting) {
-        startNotice = 'Choose a file to start recording.';
-        showNotice(startNotice);
-      } else announceStarted();
-    } else showNotice('Recording stopped.');
+    if (isRecording && recorder.starting) {
+      startNotice = 'Choose a file to start recording.';
+      showNotice(startNotice);
+    } else if (!isRecording) showNotice('Recording stopped.');
     showRecording(isRecording);
   }};
 
