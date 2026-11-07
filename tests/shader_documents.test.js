@@ -2492,6 +2492,16 @@ test('refused replacement restores the previous compiled preset after switching 
   assert.match(harness.elements.get('shader-document-status').textContent, /missing-stage/);
 });
 
+test('a refused interpreter re-apply keeps the error after parity drops', async () => {
+  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
+  harness.elements.get('shader-parity-toggle').dispatch('click');
+  harness.engine.bindings.setShaderChain = () => ({ code: 'ARENA_OVERFLOW', entryIndex: -1 });
+  stageEditor(harness, 'sample')('sample.edge-width', 0.25);
+  const status = harness.elements.get('shader-document-status');
+  assert.equal(status.dataset.status, 'error');
+  assert.match(status.textContent, /ARENA_OVERFLOW/);
+});
+
 test('a compiled slider declaration keeps its control through release and explains the parity drop', async () => {
   const harness = await editorWorkbench({patternCatalog: HEX_PATTERN_CATALOG});
   const mount = harness.elements.get('chain-strip');

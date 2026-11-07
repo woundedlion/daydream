@@ -637,17 +637,18 @@ export function createShaderDocumentController({
         return false;
       }
       releaseOriginalLink();
+      let applied = true;
       if (addsDeclaration) {
         const dropped = syncParity();
-        applyPreset(active.presetId);
-        if (dropped) {
+        applied = applyPreset(active.presetId);
+        if (dropped && applied) {
           rebuildAfterParameterCommit = true;
           showParityDropStatus();
         }
       }
       if (Object.keys(values).length > 1) chainUi.strip.syncParameterValues(values);
       chainUi.strip.syncHistory();
-      if (status.dataset.status === 'error') showPreviewStatus();
+      if (applied && status.dataset.status === 'error') showPreviewStatus();
       scheduleDeepLink();
       return true;
     } catch (error) {
@@ -677,10 +678,10 @@ export function createShaderDocumentController({
       onApply: () => {
         releaseOriginalLink();
         const dropped = syncParity();
-        applyPreset(active?.presetId ?? presetSelect.value);
+        const applied = applyPreset(active?.presetId ?? presetSelect.value);
         if (dropped) {
           chainUi?.strip.render();
-          showParityDropStatus();
+          if (applied) showParityDropStatus();
         }
       },
       presetId: () => active?.presetId ?? null,
