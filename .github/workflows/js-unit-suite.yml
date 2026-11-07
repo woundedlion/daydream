@@ -62,7 +62,7 @@ jobs:
           path: engine
           fetch-depth: 1
           persist-credentials: false
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Lint JavaScript
         run: npm run lint
       - name: Typecheck
