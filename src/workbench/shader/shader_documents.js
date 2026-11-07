@@ -451,6 +451,7 @@ export function createShaderDocumentController({
       // program shape carries the session bypasses.
       const store = chainUi?.store ?? null;
       const paused = getAnimationsPaused();
+      cachedDocumentDefinitions = null;
       const refusal = active.compiledSide
         ? applyFixedShaderDocument(
           engine, module, store ? { document: store.document() } : active.compiled,
@@ -516,6 +517,8 @@ export function createShaderDocumentController({
   let definitionGeneration;
   /** @type {ParameterDefinition[]} */
   let cachedDefinitions = [];
+  /** @type {ReturnType<NonNullable<ReturnType<typeof getEngine>>['getDocumentParameterDefinitions']>|null} */
+  let cachedDocumentDefinitions = null;
   const liveDefinitions = () => {
     const engine = getEngine();
     const generation = engine?.getParamGeneration?.();
@@ -523,6 +526,7 @@ export function createShaderDocumentController({
       definitionEngine = engine;
       definitionGeneration = generation;
       cachedDefinitions = engine?.getParameterDefinitions() ?? [];
+      cachedDocumentDefinitions = null;
     }
     return cachedDefinitions;
   };
@@ -536,7 +540,7 @@ export function createShaderDocumentController({
     if (control.name !== null) return true;
     if (control.refusal) {
       const definition = documentControlFor(descriptor, parameterId,
-        getEngine()?.getDocumentParameterDefinitions?.() ?? []);
+        cachedDocumentDefinitions ??= definitionEngine?.getDocumentParameterDefinitions?.() ?? []);
       if (definition) return !definition.readonly;
     }
     return !BAKED_CONSTANT_IDS.has(parameterId) && !bakedFields.has(fieldSegment(parameterId))
@@ -611,6 +615,7 @@ export function createShaderDocumentController({
                 refusal = `"${parameterId}" was refused: ${enumConstantName(module.ParamSetResult, written)}`;
             }
           } else if (compiledSide) {
+            cachedDocumentDefinitions = null;
             const resolved = resolveFixedWrites(values, definitions,
               engine.getDocumentParameterDefinitions?.() ?? [], descriptor,
               (id) => engineControlName(id, definitions),
