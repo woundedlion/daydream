@@ -158,19 +158,16 @@ function resolveFixedWrites(values, definitions, documentDefinitions, descriptor
 
 /**
  * @param {import('../../../generated/holosphere_wasm.js').HolosphereEngine} engine @param {import('../../../generated/holosphere_wasm.js').HolosphereModule} module @param {CompiledDocument} compiled
- * @param {string} presetId
+ * @param {Record<string, *>} values - Values from the selected document preset.
  * @param {Set<string>} baked - The topology fields the effect bakes in.
  * @param {Set<string>} derived - Validated fields computed by the fixed effect.
  * @param {*} catalog
  * @returns {string|null} Refusal reason, or null once every writable value is written.
  *   Baked and derived values are skipped; an unregistered id refuses before any write.
  */
-function applyDocumentValues(engine, module, compiled, presetId, baked, derived, catalog) {
-  const preset = compiled.document.preset_bank.presets
-    .find((/** @type {*} */ candidate) => candidate.preset_id === presetId)
-    ?? compiled.document.preset_bank.presets[0];
+function applyDocumentValues(engine, module, compiled, values, baked, derived, catalog) {
   const definitions = engine.getParameterDefinitions();
-  const resolved = resolveFixedWrites(preset?.values ?? {}, definitions,
+  const resolved = resolveFixedWrites(values, definitions,
     engine.getDocumentParameterDefinitions?.() ?? [], compiled.document.descriptor,
     (id) => compiledControlFor(id, definitions, baked, compiled.document.descriptor, catalog),
     (id) => derived.has(id));
@@ -196,9 +193,9 @@ export function applyFixedShaderDocument(engine, module, compiled, presetId,
     ? presetId : referencePresetIds[0];
   if (typeof referenceId !== 'string') return 'the effect has no reference preset';
   const preset = compiled.document.preset_bank.presets
-    .find((/** @type {*} */ candidate) => candidate.preset_id === presetId)
-    ?? compiled.document.preset_bank.presets[0];
-  const values = preset?.values ?? {};
+    .find((/** @type {*} */ candidate) => candidate.preset_id === presetId);
+  if (!preset) return `the document has no preset "${presetId}"`;
+  const values = preset.values ?? {};
   const derived = new Set();
   const definitions = engine.getParameterDefinitions();
   for (const parameterId of Object.keys(values)) {
@@ -212,7 +209,7 @@ export function applyFixedShaderDocument(engine, module, compiled, presetId,
   }
   if (engine.selectPresetById?.(referenceId) !== true)
     return `the engine refused reference preset "${referenceId}"`;
-  return applyDocumentValues(engine, module, compiled, presetId, baked, derived, catalog);
+  return applyDocumentValues(engine, module, compiled, values, baked, derived, catalog);
 }
 
 /**
