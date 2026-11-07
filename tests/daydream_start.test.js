@@ -144,11 +144,15 @@ test('response availability follows fidelity without resetting its value', () =>
   const { guis } = startApp();
   const control = (name) => guis[0].controllers.find((c) => c.property === name);
   const response = control('povResponseScale');
+  const arms = control('showSweepBoundary');
+  assert.equal(arms.disabled, true);
   assert.equal(response.disabled, true);
   control('povFidelity').setValue(true);
+  assert.equal(arms.disabled, false);
   assert.equal(response.disabled, false);
   response.setValue(1.5);
   control('povFidelity').setValue(false);
+  assert.equal(arms.disabled, true);
   assert.equal(response.disabled, true);
   assert.equal(response.getValue(), 1.5);
   control('povFidelity').setValue(true);
