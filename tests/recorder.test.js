@@ -1910,9 +1910,24 @@ test('output setup failure releases the capture without starting the encoder', (
   assert.match(captured.messages.join(), /output setup failed/);
 });
 
-test('createWritable rejection preserves every chunk for Downloads', async (t) => {
+test('a throwing fallback hook cannot strand a recording after picker rejection', async (t) => {
   t.after(installRecorderEnv());
-  const captured = installConsoleCapture('warn');
+  const captured = installConsoleCapture('error');
+  t.after(captured.restore);
+  globalThis.showSaveFilePicker = async () => { throw new Error('picker unavailable'); };
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.onSaveFallback = () => { throw new Error('hook failed'); };
+  rec.start('fallback');
+  await drainSink();
+  assert.equal(rec.starting, false);
+  assert.equal(rec.mediaRecorder.state, 'recording');
+  assert.match(captured.messages.join(), /host notification failed/);
+  rec.stop();
+});
+
+test('createWritable rejection preserves every chunk despite a throwing fallback hook', async (t) => {
+  t.after(installRecorderEnv());
+  const captured = installConsoleCapture('warn', 'error');
   t.after(captured.restore);
   globalThis.showSaveFilePicker = async () => ({
     createWritable: async () => { throw new Error('file locked'); },
@@ -1922,7 +1937,10 @@ test('createWritable rejection preserves every chunk for Downloads', async (t) =
   const downloads = [];
   const notices = [];
   const errors = [];
-  rec.onSaveFallback = (error) => notices.push(error);
+  rec.onSaveFallback = (error) => {
+    notices.push(error);
+    throw new Error('hook failed');
+  };
   rec.onSaveError = (error) => errors.push(error);
   rec.download = (encoder, chunks) => downloads.push([...chunks]);
   rec.start('fallback');
@@ -1938,6 +1956,7 @@ test('createWritable rejection preserves every chunk for Downloads', async (t) =
   assert.deepEqual(downloads, [[first, second]]);
   assert.equal(notices.length, 1);
   assert.match(notices[0].message, /could not be opened; saving to Downloads instead/);
+  assert.match(captured.messages.join(), /host notification failed/);
   assert.deepEqual(errors, []);
 });
 
