@@ -106,7 +106,11 @@ jobs:
             echo "::error::no workflow files selected"
             exit 1
           fi
-          actionlint -verbose -oneline "${FILES[@]}" 2> /tmp/actionlint-verbose.txt
+          actionlint -verbose -oneline "${FILES[@]}" 2> /tmp/actionlint-verbose.txt || {
+            status=$?
+            cat /tmp/actionlint-verbose.txt >&2
+            exit "$status"
+          }
           test -s /tmp/actionlint-verbose.txt
           if grep -q 'Rule "shellcheck" was disabled' /tmp/actionlint-verbose.txt; then
             echo "::error::actionlint ran without shellcheck — the run: bodies went unchecked"
