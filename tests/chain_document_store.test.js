@@ -105,6 +105,21 @@ const presetsDifferBy = (document, values) => {
 
 const labels = (store) => store.chain().map((entry) => entry.label);
 
+test('preset views reuse the current values until a committed edit replaces them', async () => {
+  const store = await makeStore();
+  const [{preset_id: id}, {preset_id: other, values: otherValues}] = store.document().preset_bank.presets;
+  const parameter = 'sample.pattern-freq';
+  const view = store.presetValuesView(id);
+  assert.equal(store.presetValuesView(id), view);
+  assert.deepEqual(store.presetValuesView(other), otherValues);
+  assert.equal(store.presetValuesView('unknown'), null);
+
+  const original = view[parameter];
+  assert.equal(store.setPresetValue(id, parameter, 2.5).ok, true);
+  assert.equal(store.presetValuesView(id)[parameter], 2.5);
+  assert.equal(view[parameter], original);
+});
+
 test('the store refuses an invalid starting document', async () => {
   await assert.rejects(
     makeStore({ mutate: (document) => {
