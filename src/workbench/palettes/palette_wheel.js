@@ -434,3 +434,25 @@ export function createHueKeyWheelPainter({ canvas, ctx }) {
     },
   };
 }
+
+/**
+ * Finds the hue-wheel key marker a pointer is over.
+ * @param {number} x - Pointer x, in the space the marker points are given in.
+ * @param {number} y - Pointer y, in the same space.
+ * @param {Array<{x:number, y:number}>} points - Marker centers, in key order.
+ * @param {number} radius - Grab radius around a marker.
+ * @returns {?number} Index of the closest marker within `radius`, the later of
+ *   two equally close ones, or null over blank wheel space.
+ */
+export function hitTestHueKeyMarker(x, y, points, radius) {
+  let nearest = null;
+  let nearestDistance = radius;
+  for (let index = 0; index < points.length; index++) {
+    const distance = Math.hypot(x - points[index].x, y - points[index].y);
+    if (distance <= nearestDistance) {
+      nearest = index;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
