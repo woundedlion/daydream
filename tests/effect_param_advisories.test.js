@@ -120,6 +120,26 @@ test('unchanged frames reuse estimates without querying parameter controls', () 
   h.panel.destroy();
 });
 
+test('advisory snapshots survive a live value view being detached by the bridge', () => {
+  const h = makeHarness({
+    params: [STRENGTH],
+    engineValues: new Float64Array([0.7]),
+    onReadAdvisories: (state) => {
+      const view = state.engineValues;
+      state.engineValues = new Float64Array(view.buffer.transfer());
+    },
+  });
+  h.panel.build();
+  const snapshot = h.panel.active().advisoryValues;
+  assert.deepEqual(snapshot, [0.7]);
+  h.state.engineValues[0] = 0.8;
+  h.panel.sync();
+  assert.equal(h.panel.active().advisoryValues, snapshot);
+  assert.deepEqual(snapshot, [0.8]);
+  h.panel.sync();
+  assert.equal(h.state.advisoryReads, 2);
+});
+
 test('accepted edits refresh estimates before the live value stream advances', () => {
   const h = makeHarness({ params: [STRENGTH], engineValues: [0.7] });
   h.state.advisories = [{ name: STRENGTH.name, foldStrength: 0.2 }];

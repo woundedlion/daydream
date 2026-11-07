@@ -177,6 +177,7 @@ export function makeHarness({
   acceptedStored = {},
   pausesOnWrite = (p) => Boolean(p.animated),
   onEngineParam = () => {},
+  onReadAdvisories = () => {},
   rebuildOnApply = false,
   onSynchronizePreset = () => {},
   presetCount = 0,
@@ -221,7 +222,11 @@ export function makeHarness({
   const panel = createEffectGui({
     engine: {
       getParameterDefinitions: () => { paramDefinitionReads += 1; return state.params; },
-      getParameterAdvisories: () => { state.advisoryReads += 1; return state.advisories; },
+      getParameterAdvisories: () => {
+        state.advisoryReads += 1;
+        onReadAdvisories(state);
+        return state.advisories;
+      },
       paramGeneration: () => state.generation,
       paramValues: () => state.engineValues,
       setParam: (name, value) => {

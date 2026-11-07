@@ -315,6 +315,13 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     for (let index = 0; values && !changed && index < values.length; index += 1)
       changed = !Object.is(values[index], fx.advisoryValues?.[index]);
     if (!fx.advisoriesDirty && !changed) return;
+    if (values) {
+      const snapshot = fx.advisoryValues?.length === values.length
+        ? fx.advisoryValues : new Array(values.length);
+      for (let index = 0; index < values.length; index += 1)
+        snapshot[index] = values[index];
+      fx.advisoryValues = snapshot;
+    } else fx.advisoryValues = null;
     const advisories = getParameterAdvisories();
     const previous = fx.advisoryList;
     if (!previous || previous.length !== advisories.length
@@ -323,7 +330,6 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       syncParamAdvisories(fx.controllerByName, advisories);
       fx.advisoryList = advisories.map(({name, foldStrength}) => ({name, foldStrength}));
     }
-    fx.advisoryValues = values ? Array.from(values) : null;
     fx.advisoriesDirty = false;
   }
 
