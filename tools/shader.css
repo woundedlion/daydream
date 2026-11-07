@@ -614,6 +614,16 @@
   font-size: 0.625rem;
 }
 
+input[type="checkbox"].chain-param-control {
+  grid-column: 2 / span 2;
+  justify-self: start;
+  width: auto;
+}
+
+.chain-chip-params > .chain-strip-note {
+  grid-column: 1 / -1;
+}
+
 .chain-chip-rename {
   grid-column: 2 / span 2;
   min-width: 0;
@@ -744,6 +754,7 @@ select.chain-param-control {
   }
 
   .chain-chip-rename,
+  input[type="checkbox"].chain-param-control,
   select.chain-param-control {
     grid-column: 1 / -1;
   }
