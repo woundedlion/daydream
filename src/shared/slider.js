@@ -27,7 +27,7 @@
  * @param {string} [cfg.labelClass] - Classes for the label span
  * @param {string} [cfg.sliderClass] - Classes for the input
  * @param {string} [cfg.valueClass] - Classes for the readout span
- * @param {Function} onInput - Called with the raw slider value on each input
+ * @param {((raw: number) => void)|null} [onInput] - Called with the raw slider value on each input.
  * @returns {{ slider: HTMLInputElement, valueSpan: HTMLElement, setValue: (display: number) => number, setReadout: (display: number) => void }}
  */
 export function createSlider(containerId, cfg, onInput) {
@@ -111,27 +111,9 @@ export function createSlider(containerId, cfg, onInput) {
   slider.value = String(roundedValue);
   slider.className = sliderClass;
   if (ariaLabel) slider.setAttribute('aria-label', ariaLabel);
-  // The input's value is the scaled integer; announce the display value instead.
-  slider.setAttribute('aria-valuetext', (roundedValue / scale).toFixed(decimals));
-
   const valueSpan = document.createElement('span');
   valueSpan.id = valueSpanId;
   valueSpan.className = valueClass;
-  valueSpan.textContent = (roundedValue / scale).toFixed(decimals);
-
-  container.append(labelElement, slider, valueSpan);
-
-  if (onInput) {
-    slider.addEventListener('input', () => {
-      const raw = parseFloat(slider.value);
-      // Set the readout before onInput so a caller can overwrite it with a
-      // custom (e.g. snapped) value.
-      const display = (raw / scale).toFixed(decimals);
-      valueSpan.textContent = display;
-      slider.setAttribute('aria-valuetext', display);
-      onInput(raw);
-    });
-  }
 
   /**
    * Writes the readout and `aria-valuetext` together, leaving the thumb where it
@@ -145,6 +127,14 @@ export function createSlider(containerId, cfg, onInput) {
     valueSpan.textContent = text;
     slider.setAttribute('aria-valuetext', text);
   };
+
+  setReadout(roundedValue / scale);
+  container.append(labelElement, slider, valueSpan);
+  slider.addEventListener('input', () => {
+    const raw = parseFloat(slider.value);
+    setReadout(raw / scale);
+    onInput?.(raw);
+  });
 
   /**
    * Drives the control from code: thumb, readout, and `aria-valuetext` all move
