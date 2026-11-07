@@ -464,8 +464,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * Re-seat the pause toggle on the engine's own preset pause state after a
    * parameter write: writing an animation-driven param pauses implicitly. The
    * toggle's transition carries the adopted state on to the worker pool.
-   * @param {{animationState: {pause: boolean}, controller: GuiController|null,
-   *   setPaused: (v: boolean) => void}} pause - The effect's pause toggle.
+   * @param {PauseToggle} pause - The effect's pause toggle.
    * @returns {void}
    */
   function adoptEnginePause(pause) {
@@ -478,8 +477,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * Build one controller per engine parameter, recording the value-stream order.
    * @param {EffectRecord} fx - The effect record being built.
    * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
-   * @param {{animationState: {pause: boolean}, controller: GuiController|null, setPaused: (value: boolean) => void}}
-   *   pause - The effect's pause toggle.
+   * @param {PauseToggle} pause - The effect's pause toggle.
    * @param {Set<string>|null} [previousParamNames=null] - Names present before a schema rebuild.
    * @returns {void}
    */
@@ -573,8 +571,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
           controller.object[controller.property] = acceptedControlValue;
           controller.updateDisplay();
         }
-        if (accepted) acceptedControlValue = v;
         if (accepted) {
+          acceptedControlValue = v;
           setWorkerParam(p.name, value);
           fx.advisoriesDirty = true;
         }

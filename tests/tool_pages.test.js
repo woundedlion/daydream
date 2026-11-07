@@ -328,7 +328,7 @@ const CLASS_EXEMPTIONS = new Set([
   'op-param', 'move-op-up', 'move-op-down',
   'fatal-error-message', 'fatal-error-dismiss',
   'chain-chip-replace-option', 'chain-chip--stage',
-  'chain-palette-type', 'chain-modulation-enabled',
+  'chain-palette-type', 'chain-modulation-enabled', 'chain-undo', 'chain-redo',
 ]);
 
 // daydream.js loads the shader-document graph on both simulator pages, but it
@@ -463,7 +463,7 @@ const CONTRAST_SURFACES = {
   },
   'shader.css': {
     '.chain-strip-region': ['.chain-strip-region', '.layout-container'],
-    '.chain-strip-actions button, .chain-undo, .chain-redo': ['.chain-strip-region', '.layout-container'],
+    '.chain-strip-actions button': ['.chain-strip-region', '.layout-container'],
     '.chain-strip-note': ['.chain-strip-region', '.layout-container'],
     '.shader-toolbar': ['.shader-toolbar', '.layout-container'],
     '.shader-toolbar label': ['.shader-toolbar', '.layout-container'],
@@ -549,9 +549,7 @@ const CONTRAST_EXEMPT = {
       'lil-gui supplies its own background in its vendored stylesheet',
     '.gui-container .effect-gui .lil-controller.param-warning > .lil-name::after':
       'lil-gui supplies its own background in its vendored stylesheet',
-    '.gui-container .effect-gui .param-warning-note':
-      'lil-gui supplies its own background in its vendored stylesheet',
-    '.gui-container .effect-gui .param-fold-note':
+    '.gui-container .effect-gui .param-warning-note, .gui-container .effect-gui .param-fold-note':
       'lil-gui supplies its own background in its vendored stylesheet',
     'div.label': 'text over the live canvas',
     '.segment-stats': 'translucent readout over the live canvas',

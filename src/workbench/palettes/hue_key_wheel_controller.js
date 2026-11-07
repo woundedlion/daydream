@@ -74,7 +74,7 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
    *   or the LOOP sweep's closing hue.
    */
   const activateCustomHue = () => {
-    const source = /** @type {PaletteRecipe} */ (model.recipe());
+    const source = model.recipe();
     if (!customHueSweepRepresentable(source)) {
       status.textContent = SWEEP_REFUSAL;
       return false;
@@ -129,7 +129,7 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
       customState.offsets = model.customHueOffsets();
       state = customState;
     } else {
-      state = hueKeyState(/** @type {PaletteRecipe} */ (recipe));
+      state = hueKeyState(recipe);
     }
     let lightness = recipe.lightness.center;
     if (recipe.lightness.curve === PaletteV4.curve.CUSTOM) {

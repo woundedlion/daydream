@@ -96,6 +96,8 @@ export function shaderWorkbenchUrl(location, effect = 'ShaderChain') {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+/** @typedef {ReturnType<typeof createAppTeardown> & {ready: Promise<unknown>}} AppHandle */
+
 /**
  * Builds the simulator: driver, engine host, state, GUI, sidebar, apply
  * pipeline, recording, and the page listeners, then kicks off the WASM load.
@@ -106,7 +108,7 @@ export function shaderWorkbenchUrl(location, effect = 'ShaderChain') {
  * @param {() => Daydream} [dependencies.createDriver] - Builds the three.js driver.
  * @param {(options: ConstructorParameters<typeof GUI>[0], namespace: string) => GUI} [dependencies.createGui] - Builds a namespaced GUI root.
  * @param {() => Promise<HolosphereModule>} [dependencies.loadModule] - Resolves the WASM module.
- * @returns {Object} The teardown handle; ready settles after module startup or failure reporting.
+ * @returns {AppHandle} The teardown handle; ready settles after module startup or failure reporting.
  */
 export function start({
   doc = globalThis.document,
@@ -129,7 +131,6 @@ export function start({
       && SHADER_DOCUMENT_EFFECTS.includes(canonicalRequest) ? canonicalRequest : null;
   if (!shaderWorkbench && workbenchEffect) {
     win.location.replace(shaderWorkbenchUrl(win.location, workbenchEffect));
-    // Same shape as createAppTeardown's handle.
     let redirectDisposed = false;
     return {
       dispose() { redirectDisposed = true; },

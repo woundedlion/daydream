@@ -72,9 +72,11 @@ src/ui/sidebar_logic.js
 src/app/state.js
 src/segments/worker_protocol.js
 
-# Engine module: Emscripten glue plus the binary it loads by name.
+# Engine browser modules and runtime binary.
 generated/holosphere_wasm.js
 generated/holosphere_wasm.wasm
+generated/engine_contract.mjs
+generated/segment_geometry.js
 
 # Tool pages and their shared modules.
 tools/lissajous.html
@@ -151,6 +153,3 @@ LICENSE.txt
 # Documentation supplied by the verified engine bundle.
 README.md
 docs/screenshots/IslamicStars.png
-
-generated/engine_contract.mjs
-generated/segment_geometry.js

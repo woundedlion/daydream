@@ -15,16 +15,6 @@ import {
   BAKED_MODULATION_SCALE_MAX, UNIT_MODULATION_AMOUNT_MIN, UNIT_MODULATION_AMOUNT_MAX,
 } from './chain_presentation.js';
 
-/** @typedef {import('./chain_presentation.js').CatalogOperator} CatalogOperator */
-/** @typedef {import('./chain_presentation.js').OperatorCatalog} OperatorCatalog */
-/** @typedef {import('./chain_presentation.js').ChainEntry} ChainEntry */
-/** @typedef {import('./chain_presentation.js').LegalityEntry} LegalityEntry */
-/** @typedef {import('./chain_presentation.js').SequenceEntry} SequenceEntry */
-/** @typedef {import('./chain_presentation.js').SpanChoice} SpanChoice */
-/** @typedef {import('./chain_document_store.js').ParameterDeclaration} ParameterDeclaration */
-/** @typedef {{name: string, min: number, max: number}} ParameterRange */
-/** @typedef {import('./chain_presentation.js').BandLayout} BandLayout */
-
 import { createFrameScheduler } from '../../shared/page_lifecycle.js';
 import { createPointerDrag } from '../../shared/pointer_drag.js';
 
@@ -35,6 +25,16 @@ import { createPointerDrag } from '../../shared/pointer_drag.js';
  * store's span replacement; the strip is rebuilt whole after every committed
  * edit. Each chip carries its stage's controls inline.
  */
+
+/** @typedef {import('./chain_presentation.js').CatalogOperator} CatalogOperator */
+/** @typedef {import('./chain_presentation.js').OperatorCatalog} OperatorCatalog */
+/** @typedef {import('./chain_presentation.js').ChainEntry} ChainEntry */
+/** @typedef {import('./chain_presentation.js').LegalityEntry} LegalityEntry */
+/** @typedef {import('./chain_presentation.js').SequenceEntry} SequenceEntry */
+/** @typedef {import('./chain_presentation.js').SpanChoice} SpanChoice */
+/** @typedef {import('./chain_document_store.js').ParameterDeclaration} ParameterDeclaration */
+/** @typedef {{name: string, min: number, max: number}} ParameterRange */
+/** @typedef {import('./chain_presentation.js').BandLayout} BandLayout */
 
 /** @typedef {import('./chain_document_store.js').EditResult} EditResult */
 /**
@@ -190,7 +190,6 @@ export function createChainStrip({
     }
     return false;
   };
-
 
   /**
    * Rebuilds the strip after a committed edit, restores focus, and re-applies

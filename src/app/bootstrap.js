@@ -31,6 +31,9 @@ export class StaleModuleError extends Error {
   }
 }
 
+/** Maximum time for importing the application module graph, in milliseconds. */
+export const APPLICATION_IMPORT_DEADLINE_MS = 90000;
+
 /** The application graph did not finish importing before its deadline. */
 export class ModuleImportTimeoutError extends Error {}
 
@@ -40,7 +43,7 @@ export class ModuleImportTimeoutError extends Error {}
  * @returns {Promise<unknown>} The application's start result.
  */
 export async function loadApplication({
-  importModule = () => import('./daydream.js'), timers = globalThis, ms = 90000,
+  importModule = () => import('./daydream.js'), timers = globalThis, ms = APPLICATION_IMPORT_DEADLINE_MS,
 } = {}) {
   const mod = await raceDeadline(importModule, ms, timers,
     () => { throw new ModuleImportTimeoutError('The application module import timed out.'); });

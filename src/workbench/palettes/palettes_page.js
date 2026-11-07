@@ -221,7 +221,7 @@ function renderBaseHue() {
 }
 
 function renderRecipeAvailability() {
-  const availability = paletteRecipeAvailability(/** @type {import('./palette_controls.js').PaletteRecipe} */ (recipeModel.recipe()));
+  const availability = paletteRecipeAvailability(recipeModel.recipe());
   /** @type {Array<[string,string,boolean]>} */
   const controls = [
     ['gen_base_hue_field', PALETTE_CONTROL_IDS.baseHueDegrees, availability.baseHue],
@@ -527,7 +527,7 @@ async function init() {
     canvas: colorStripCanvas,
     ctx: colorStripCtx,
   });
-  hueKeyWheel = createHueKeyWheel({
+  const wheel = createHueKeyWheel({
     model: recipeModel,
     scheduleUpdate,
     onRecipeChange: renderRecipeControls,
@@ -536,6 +536,8 @@ async function init() {
     status: /** @type {HTMLElement} */ (document.getElementById('hue_key_status')),
     painter: createHueKeyWheelPainter({ canvas: hueKeyWheelCanvas, ctx: hueKeyWheelCtx }),
   });
+
+  hueKeyWheel = wheel;
 
   // Tab buttons; activation follows focus.
   const tabButtons = Array.from(/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.tab-btn[data-tab]')));
@@ -550,20 +552,21 @@ async function init() {
     });
   });
 
-  proceduralSliders = mountProceduralSliders({ defaults: DEFAULT_PARAMS, scheduleUpdate });
+  const sliders = mountProceduralSliders({ defaults: DEFAULT_PARAMS, scheduleUpdate });
+  proceduralSliders = sliders;
 
   buildPaletteGallery();
   buildEffectRecipePresets();
 
   // Generative palette controls.
   const baseHueSlider = /** @type {HTMLInputElement} */ (document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees));
-  baseHueSlider.addEventListener('keydown', (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).onBaseHueKeyDown);
+  baseHueSlider.addEventListener('keydown', wheel.onBaseHueKeyDown);
   baseHueSlider.addEventListener('input', handleBaseHueInput);
 
   for (const reading of RECIPE_SELECT_READINGS) {
     /** @type {HTMLSelectElement} */ (document.getElementById(PALETTE_CONTROL_IDS[reading])).addEventListener('change', (event) => {
-      (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).clearStatus();
-      if (reading === 'hueMode') (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).onHueModeChange((/** @type {HTMLInputElement|HTMLSelectElement} */ (event.target)).value);
+      wheel.clearStatus();
+      if (reading === 'hueMode') wheel.onHueModeChange((/** @type {HTMLInputElement|HTMLSelectElement} */ (event.target)).value);
       else recipeModel.setChoice(reading, (/** @type {HTMLInputElement|HTMLSelectElement} */ (event.target)).value);
       renderRecipeControls();
       scheduleUpdate();
@@ -590,7 +593,7 @@ async function init() {
 
   for (const { reading, id, scale } of RECIPE_SLIDER_DEFINITIONS) {
     /** @type {HTMLInputElement} */ (document.getElementById(id)).addEventListener('input', (event) => {
-      (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).clearStatus();
+      wheel.clearStatus();
       recipeModel.setAmount(reading, Number((/** @type {HTMLInputElement|HTMLSelectElement} */ (event.target)).value) / scale);
       renderRecipeControls();
       scheduleUpdate();
@@ -627,12 +630,12 @@ async function init() {
   onPageTeardown(() => {
     scheduleUpdate.cancel();
     scheduleViewportRedraw.cancel();
-    (/** @type {NonNullable<typeof proceduralSliders>} */ (proceduralSliders)).dispose();
+    sliders.dispose();
     teardownExportFlyout();
-    baseHueSlider.removeEventListener('keydown', (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).onBaseHueKeyDown);
+    baseHueSlider.removeEventListener('keydown', wheel.onBaseHueKeyDown);
     window.removeEventListener('resize', scheduleViewportRedraw);
     stripController?.dispose();
-    (/** @type {NonNullable<typeof hueKeyWheel>} */ (hueKeyWheel)).dispose();
+    wheel.dispose();
     setPaletteOps(null);
     if (wasmModule?.HS_MODULE_DEAD !== true)
       paletteOps?.delete();

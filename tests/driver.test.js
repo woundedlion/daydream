@@ -2001,7 +2001,8 @@ test('updateCullUniforms gap-fills columns for a persisting effect', () => {
   const arc = ctx.cullUniforms.uColumnFillArc.value;
   assert.ok(arc > 0);
 
-  // The fill is a per-column half-arc: twice the columns, half the arc.
+  assert.ok(arc > Math.PI * Daydream.SPHERE_RADIUS / ctx.W);
+  // Twice the columns halve the overlapping column arc.
   ctx.W = 192;
   Daydream.prototype.updateCullUniforms.call(ctx);
   assert.ok(Math.abs(ctx.cullUniforms.uColumnFillArc.value - arc / 2) < 1e-9);

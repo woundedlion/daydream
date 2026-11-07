@@ -121,6 +121,7 @@ export class Daydream {
   static KEY_ZOOM_STEP = 1.1;
 
   static SPHERE_RADIUS = 30;
+  static COLUMN_FILL_OVERLAP = 1.15;
   // Rescaled by the live camera distance at use.
   static LABEL_VISIBILITY_FRAMING_RATIO = Daydream.SPHERE_RADIUS / Daydream.CAMERA_Z;
   static DEFAULT_H = 20;
@@ -748,7 +749,7 @@ export class Daydream {
         ? -this.DOT_SIZE / Daydream.SPHERE_RADIUS
         : -2.0;
       this.cullUniforms.uColumnFillArc.value = this.noBlackColumns
-        ? 1.15 * Math.PI * Daydream.SPHERE_RADIUS / this.W
+        ? Daydream.COLUMN_FILL_OVERLAP * Math.PI * Daydream.SPHERE_RADIUS / this.W
         : 0;
     }
   }
@@ -878,7 +879,7 @@ export class Daydream {
              // neighbour cell. Where the neighbour is lit, its own straight body
              // buries this cap (flat join); where the neighbour is dark (culled
              // to nothing) the cap shows as the rounded terminal. ext = the cell
-             // half-arc = uColumnFillArc * sinPhi; sinPhi (latitude
+             // half-arc times COLUMN_FILL_OVERLAP = uColumnFillArc * sinPhi; sinPhi (latitude
              // foreshortening from instPos) shrinks the cell toward the poles.
              // uColumnFillArc == 0 leaves round dots.
              float sinPhi = length(instPos.xz) / max(length(instPos), 1e-6);

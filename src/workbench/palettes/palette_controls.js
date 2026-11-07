@@ -495,7 +495,7 @@ function directedTurnDelta(delta, direction) {
 }
 
 /**
- * @param {PaletteRecipe} recipe - A V4 palette recipe.
+ * @param {import('./palette_recipe_model.js').DeepReadonly<PaletteRecipe>} recipe - A V4 palette recipe.
  * @returns {number} The sweep with the recipe's direction.
  */
 function directedSweepTurns(recipe) {
@@ -507,7 +507,7 @@ function directedSweepTurns(recipe) {
 }
 
 /**
- * @param {PaletteRecipe} recipe - A V4 palette recipe.
+ * @param {import('./palette_recipe_model.js').DeepReadonly<PaletteRecipe>} recipe - A V4 palette recipe.
  * @returns {number[]} The harmony's anchor offsets, in turns.
  */
 // Offsets, not absolute hues: differencing base-shifted hues rounds a
@@ -601,7 +601,7 @@ function resampleCustomAxis(axis, from, to) {
 }
 
 /**
- * @param {PaletteRecipe} recipe - A V4 palette recipe.
+ * @param {import('./palette_recipe_model.js').DeepReadonly<PaletteRecipe>} recipe - A V4 palette recipe.
  * @returns {number[]} The harmony's anchors as absolute hues, in turns, walked
  *   in the recipe's direction so they stay continuous across the 0/1 seam.
  */
@@ -635,7 +635,7 @@ function hueKeyStateFromTurns(turns) {
  * control_key_count), so its second lands on half the sweep under a LOOP, which
  * spaces at sweep*i/key_count, and on the whole sweep under every other domain,
  * which spaces at sweep*i/(key_count-1).
- * @param {PaletteRecipe} recipe - A V4 palette recipe.
+ * @param {import('./palette_recipe_model.js').DeepReadonly<PaletteRecipe>} recipe - A V4 palette recipe.
  * @returns {{baseTurns:number, offsets:number[]}} The first key's wrapped turn
  *   and every key's signed offset from it, so keys that walked past the seam
  *   keep the continuous positions the harmony gave them.
@@ -659,7 +659,7 @@ export function hueKeyState(recipe) {
  * The three keys a switch into CUSTOM hue mode authors: a harmony's anchors
  * resampled to three, a sweep resampled to three keys, or the existing custom
  * keys untouched.
- * @param {PaletteRecipe} recipe - A V4 palette recipe.
+ * @param {import('./palette_recipe_model.js').DeepReadonly<PaletteRecipe>} recipe - A V4 palette recipe.
  * @returns {{baseTurns:number, offsets:number[]}} The base turn and the three keys' offsets from it.
  */
 export function customHueKeyState(recipe) {
@@ -680,7 +680,7 @@ export function customHueKeyState(recipe) {
 }
 
 /**
- * @param {PaletteRecipe} recipe - The recipe before switching to CUSTOM.
+ * @param {import('./palette_recipe_model.js').DeepReadonly<PaletteRecipe>} recipe - The recipe before switching to CUSTOM.
  * @returns {boolean} Whether CUSTOM preserves a LOOP sweep's closing hue.
  */
 export function customHueSweepRepresentable(recipe) {
@@ -975,7 +975,7 @@ const SPREAD_HARMONIES = new Set([
  * Which control groups can still change the palette a recipe describes: a
  * palette with no chroma has no hue to steer, a monochromatic harmony has no
  * direction or color path, and a custom curve authors its own endpoints.
- * @param {PaletteRecipe} recipe - A V4 palette recipe.
+ * @param {import('./palette_recipe_model.js').DeepReadonly<PaletteRecipe>} recipe - A V4 palette recipe.
  * @returns {Object<string, boolean>} One enabled flag per control group.
  */
 export function paletteRecipeAvailability(recipe) {

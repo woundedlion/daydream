@@ -101,6 +101,11 @@
   --carrier-fill: rgb(183 139 255 / 0.1);
 }
 
+[data-carrier="color"] {
+  --carrier: #f2bc63;
+  --carrier-fill: rgb(242 188 99 / 0.1);
+}
+
 /* ── Pipeline strip ──────────────────────────────────────────────────────── */
 
 .main-area {
@@ -150,9 +155,7 @@
   padding-top: 0.25rem;
 }
 
-.chain-strip-actions button,
-.chain-undo,
-.chain-redo {
+.chain-strip-actions button {
   margin: 0;
   padding: 0.0625rem 0.5rem;
   border: 1px solid var(--panel-border);
@@ -732,9 +735,7 @@ select.chain-param-control {
     min-height: 1.5rem;
   }
 
-  .chain-strip-actions button,
-  .chain-undo,
-  .chain-redo {
+  .chain-strip-actions button {
     min-height: 1.5rem;
   }
 }
@@ -758,9 +759,4 @@ select.chain-param-control {
   select.chain-param-control {
     grid-column: 1 / -1;
   }
-}
-
-[data-carrier="color"] {
-  --carrier: #f2bc63;
-  --carrier-fill: rgb(242 188 99 / 0.1);
 }

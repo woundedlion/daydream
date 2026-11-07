@@ -27,7 +27,7 @@ while read -r _old new ref; do
   cur=$(git rev-parse --verify -q "$ref" 2>/dev/null) || cur=''
   [ -z "$cur" ] && continue                                # creation
   case "$new" in
-        "$z")
+    "$z")
       [ ! -e "$gitdir/packed-refs.lock" ] &&
         grep -qxF "$cur $ref" "$gitdir/packed-refs" 2>/dev/null && continue
       kind='deletion'; target=$cur ;;
