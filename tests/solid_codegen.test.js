@@ -1,3 +1,4 @@
+import {dropSlotIndex, dropTargetIndex, reorderPreviewShift, movedOps} from '../src/workbench/solids/solid_op_order.js';
 import { LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
 import { queueSavedSolidRestore } from '../src/workbench/solids/solid_saved_store.js';
 import { fakeModule, stubMesh } from './helpers/fake_meshops.js';
@@ -22,10 +23,6 @@ import {
   snapToStep,
   seedOpParams,
   opsFromRecipe,
-  dropSlotIndex,
-  dropTargetIndex,
-  reorderPreviewShift,
-  movedOps,
   opTopologyKey,
   meshOpFailure,
   requireMeshResult,
