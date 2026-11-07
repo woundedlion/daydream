@@ -80,6 +80,13 @@ test('the reusable JavaScript suite runs all required checks', () => {
   assert.match(suite, /name: Verify committed import map\s+run: \|\s+npm run importmap\s+git diff --exit-code -- vendor-importmap\.js/);
 });
 
+test('workflow dependency installs skip lifecycle scripts', () => {
+  for (const file of ['js-unit-suite.yml', 'browser-smoke.yml']) {
+    const installs = workflowText(file).match(/run: npm ci[^\r\n]*/g);
+    assert.deepEqual(installs, ['run: npm ci --ignore-scripts'], file);
+  }
+});
+
 // No workflow is a tracked *.sh file, so the Lint shell step cannot see the
 // bash inside the `run:` blocks; actionlint is what pipes it through shellcheck.
 test('the reusable suite lints the workflow YAML and the bash inside it', () => {
