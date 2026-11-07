@@ -1669,6 +1669,50 @@ for (const mode of ['buffered', 'picker-fallback']) {
   });
 }
 
+for (const mode of ['buffered', 'streaming']) {
+  test(`dispose saves an active ${mode} recording once with its final chunk`, async (t) => {
+    t.after(installRecorderEnv());
+    const rec = new VideoRecorder(recordableCanvas());
+    const saved = [];
+    let finalized = 0;
+    let waitForSave = async () => {};
+    if (mode === 'streaming') {
+      globalThis.showSaveFilePicker = async () => ({
+        createWritable: async () => ({
+          write: async (data) => { saved.push(data); },
+          close: async () => { finalized += 1; },
+        }),
+      });
+      rec.download = () => assert.fail('the streamed session should save directly');
+      waitForSave = trackSinkFinish(rec);
+    } else {
+      rec.download = (_encoder, chunks) => {
+        saved.push(...chunks);
+        finalized += 1;
+      };
+    }
+    const first = new Blob(['first']);
+    const last = new Blob(['last']);
+    FakeMediaRecorder.stopData = last;
+    rec.start('disposed');
+    await drainSink();
+    const encoder = rec.mediaRecorder;
+    const stream = rec.stream;
+    encoder.ondataavailable({data: first});
+
+    rec.dispose();
+    assert.equal(encoder.state, 'inactive');
+    assert.equal(stream.track.stopped, true);
+    assert.equal(rec.mediaRecorder, null);
+    encoder.onstop();
+    encoder.onstop();
+    await waitForSave();
+
+    assert.deepEqual(saved, [first, last]);
+    assert.equal(finalized, 1);
+  });
+}
+
 test('a failing sink finalizer still releases the live capture', (t) => {
   t.after(installRecorderEnv());
   const rec = new VideoRecorder(recordableCanvas());
