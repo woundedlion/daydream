@@ -134,9 +134,7 @@ export function mountProceduralSliders({ defaults, scheduleUpdate }) {
     const group = GROUP_DEFINITIONS[definition.group];
     const members = [];
     for (const member of group) {
-      const slider = /** @type {HTMLInputElement|null} */ (
-        document.getElementById(`${member.param}_slider`));
-      if (!slider) continue;
+      const { slider } = handles[member.param];
       members.push({
         param: member.param,
         start: startValues[member.param],
@@ -185,9 +183,7 @@ export function mountProceduralSliders({ defaults, scheduleUpdate }) {
       lockedDragOwner = definition.param;
       lockedDragStartValues = {};
       for (const member of GROUP_DEFINITIONS[definition.group]) {
-        const memberSlider = /** @type {HTMLInputElement|null} */ (
-          document.getElementById(`${member.param}_slider`));
-        if (memberSlider) lockedDragStartValues[member.param] = parseFloat(memberSlider.value);
+        lockedDragStartValues[member.param] = parseFloat(handles[member.param].slider.value);
       }
     };
     const releaseLockedDrag = () => {

@@ -130,6 +130,20 @@ test('a locked group stops when a sibling reaches its bound', () => {
   assert.equal(input('D_B').value, '-330', 'the dragged slider is pulled back');
 });
 
+test('locked edits use the mounted sliders even after their ids change', () => {
+  const { sliders, input } = mount({ A: true });
+  const [red, green, blue] = ['A_R', 'A_G', 'A_B'].map(input);
+  sliders.setAll({ ...DEFAULTS, A_R: 0.3334 });
+  for (const slider of [red, green, blue]) slider.id += '_renamed';
+  green.dispatch('mousedown');
+  move(green, 600);
+  assert.equal(sliders.values().A_R, 0.433);
+  assert.equal(sliders.values().A_G, 0.6);
+  assert.equal(sliders.values().A_B, 0.6);
+  assert.equal(red.value, '433');
+  assert.equal(blue.value, '600');
+});
+
 test('a slider whose group lock is missing moves alone', () => {
   const { sliders, input, locks } = mount();
   locks.delete('lock_B');
