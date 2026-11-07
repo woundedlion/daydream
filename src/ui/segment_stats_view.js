@@ -24,6 +24,7 @@ function setText(cell, text) {
 }
 
 const STAT_BAR_IDS = ['global-stats-desktop', 'stats-bar'];
+const SPAWNING_MESSAGE = 'Spawning workers…';
 
 /** @typedef {import('../segments/segment_controller.js').SegmentStatsState} SegmentStatsState */
 
@@ -117,6 +118,9 @@ export class SegmentStatsView {
    */
   update(state) {
     const el = this.element('segment-stats');
+    const spawnStatus = this.element('segment-spawn-status');
+    if (spawnStatus)
+      setText(spawnStatus, state.active && !state.ready && !state.faulted ? SPAWNING_MESSAGE : '');
     if (!state.active) {
       if (el) el.classList.remove('visible');
       this.showStatBars();
@@ -161,11 +165,10 @@ export class SegmentStatsView {
 
     // Spawning: the pool has no timings to show yet.
     if (!state.ready) {
-      if (el.firstElementChild?.getAttribute('role') === 'status') return;
+      if (el.firstElementChild?.className === 'seg-status') return;
       const box = this.doc.createElement('div');
-      box.setAttribute('role', 'status');
       box.className = 'seg-status';
-      box.append('Spawning workers…');
+      box.append(SPAWNING_MESSAGE);
       el.replaceChildren(box);
       this.statsTable = null; // force a rebuild once the pool reports ready
       return;

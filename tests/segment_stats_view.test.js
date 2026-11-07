@@ -14,9 +14,10 @@ restoreDocumentAfterEach();
 
 test('index provides every container the stats view resolves', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  for (const id of ['segment-stats', 'global-stats-desktop', 'stats-bar']) {
+  for (const id of ['segment-stats', 'segment-spawn-status', 'global-stats-desktop', 'stats-bar']) {
     assert.match(html, new RegExp(`id=["']${id}["']`), id);
   }
+  assert.match(html, /<div id="segment-spawn-status"[^>]*role="status"><\/div>/);
 });
 
 /**
@@ -31,20 +32,23 @@ const pageElement = (tag) => fakeElement(tag, { connected: true });
 /**
  * Overlay document stand-in: the stats container plus the two global stat bars
  * the overlay hides. Every element it creates throws on a non-empty innerHTML write.
- * @returns {{doc: Object, stats: Object, desktop: Object, mobile: Object}} Document and its elements.
+ * @returns {{doc: Object, stats: Object, spawnStatus: Object, desktop: Object, mobile: Object}} Document and its elements.
  */
 function makeDoc() {
   const stats = pageElement('div');
+  const spawnStatus = pageElement('div');
   const desktop = pageElement('div');
   const mobile = pageElement('div');
   const byId = {
     'segment-stats': stats,
+    'segment-spawn-status': spawnStatus,
     'global-stats-desktop': desktop,
     'stats-bar': mobile,
   };
   return {
     doc: installDocument(fakeDocumentById(byId)),
     stats,
+    spawnStatus,
     desktop,
     mobile,
   };
@@ -256,7 +260,7 @@ test('a steady-state repaint re-queries nothing and rewrites no class', () => {
   const view = new SegmentStatsView(doc);
 
   view.update(readyState(2));
-  assert.equal(lookups, 3, 'the first repaint resolves the three overlay elements');
+  assert.equal(lookups, 4, 'the first repaint resolves the overlay elements');
 
   // Counting wrapper over the fake element's className accessor, so an
   // unconditional write is visible even when the value is unchanged.
@@ -271,7 +275,7 @@ test('a steady-state repaint re-queries nothing and rewrites no class', () => {
 
   view.update(readyState(2, { timings: [5, 6] }));
   view.update(readyState(2, { timings: [7, 8] }));
-  assert.equal(lookups, 3, 'later repaints reuse the resolved elements');
+  assert.equal(lookups, 4, 'later repaints reuse the resolved elements');
   assert.equal(classWrites, 0, 'an unchanged compute class is not rewritten');
 
   view.update(readyState(2, { timings: [SLOW_FRAME_MS + 1, 1] }));
@@ -482,18 +486,26 @@ test('repeated repaints write stat-bar visibility only when it changes', () => {
 });
 
 test('a spawning pool reports warm-up without a stale worker count', () => {
-  const { doc, stats } = makeDoc();
+  const { doc, stats, spawnStatus } = makeDoc();
   const view = new SegmentStatsView(doc);
+  assert.equal(spawnStatus.textContent, '');
   view.update(readyState(4, { ready: false }));
 
   const box = stats.firstElementChild;
-  assert.equal(box.getAttribute('role'), 'status');
+  assert.equal(box.getAttribute('role'), null);
+  assert.equal(spawnStatus.textContent, 'Spawning workers…');
   assert.deepEqual(box.childNodes, ['Spawning workers…']);
   assert.deepEqual(box.children, [], 'the status is a single text node, not an element');
 
   view.update(readyState(8, { ready: false }));
   assert.equal(stats.firstElementChild, box);
   assert.deepEqual(box.childNodes, ['Spawning workers…']);
+  for (const next of [{}, { active: false }, { ready: false, faulted: true }]) {
+    view.update(readyState(4, { ready: false }));
+    assert.equal(spawnStatus.textContent, 'Spawning workers…');
+    view.update(readyState(4, next));
+    assert.equal(spawnStatus.textContent, '');
+  }
 });
 
 test('each fault code names its own source in the headline', () => {
