@@ -10,6 +10,7 @@ import { MAX_DISPLAY_CAP_PERCENT, createDisplayCapsBinding } from "../renderer/d
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
 import { Daydream } from "../renderer/driver.js";
 import { FPS } from '../renderer/frame_constants.js';
+import { PovSweep } from '../renderer/pov_sweep.js';
 import { MOBILE_MEDIA_QUERY } from "../shared/layout.js";
 import { GUI, resetGUI } from "../ui/gui.js";
 import { EffectSidebar } from "../ui/sidebar.js";
@@ -585,7 +586,8 @@ export function start({
   guiInstance.add(daydream, 'showPip').name('Show PiP').onChange(() => daydream.invalidate());
   let temporalSampling = daydream.povFidelity;
   const povFidelity = guiInstance.add(daydream, 'povFidelity').name(`POV fidelity (${FPS} Hz)`);
-  const povResponse = guiInstance.add(daydream, 'povResponseScale', 0.5, 2, 0.05).name('Response timescale');
+  const povResponse = guiInstance.add(daydream, 'povResponseScale',
+    PovSweep.MIN_RESPONSE_SCALE, PovSweep.MAX_RESPONSE_SCALE, 0.05).name('Response timescale');
   const armPositions = guiInstance.add(daydream, 'showSweepBoundary').name('Show arm positions');
   const syncPovControls = () => {
     for (const control of [povResponse, armPositions]) {

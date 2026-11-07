@@ -156,6 +156,10 @@ test('visual scale and boundary overlays preserve recorded emissions', () => {
   const history = sweep.emissions.map(({ pixels }) => pixels.slice());
   const visual = sweep.visualPixels(0.5).slice();
   assert.notDeepEqual(sweep.visualPixels(0.5, 2), visual);
+  for (const bound of [PovSweep.MIN_RESPONSE_SCALE, PovSweep.MAX_RESPONSE_SCALE]) {
+    const outside = bound === PovSweep.MIN_RESPONSE_SCALE ? 0 : bound + 1;
+    assert.deepEqual(sweep.visualPixels(0.5, outside).slice(), sweep.visualPixels(0.5, bound));
+  }
   sweep.visualPixels(0);
   assert.deepEqual(sweep.visualPixels(0.5), visual);
   sweep.displayPixels(true, sweep.visualPixels(0.5));
