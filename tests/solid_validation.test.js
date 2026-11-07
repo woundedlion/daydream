@@ -456,6 +456,52 @@ test('createOpGate re-sweeps when a param crosses the ambo lowering', async () =
 
 
 /** Verifies a pass the chain outran reports nothing rather than gating on stale probes. */
+test('a gate task yield preserves validator ordering and frees a cancelled standing mesh', async (t) => {
+  let posted = 0;
+  let closed = 0;
+  let release;
+  const paused = Promise.withResolvers();
+  t.mock.method(globalThis, 'MessageChannel', class {
+    constructor() {
+      this.port1 = { onmessage: null, close: () => { closed += 1; } };
+      this.port2 = {
+        close: () => { closed += 1; },
+        postMessage: () => {
+          const deliver = () => this.port1.onmessage();
+          if (++posted === 2) {
+            release = deliver;
+            paused.resolve();
+          } else queueMicrotask(deliver);
+        },
+      };
+    }
+  });
+  const { Mod, state } = fakeModule();
+  const validator = createChainValidator(async () => Mod);
+  const gate = createOpGate(validator);
+  const stale = gate.refresh('cube', [], ['kis', 'ambo']);
+  await paused.promise;
+  assert.deepEqual(state.calls, ['base:cube', 'kis', 'classifyFaces']);
+  assert.equal(state.live, 1);
+
+  const edit = validator.chainIsValid('tetrahedron', ['dual']);
+  const current = gate.refresh('octahedron', [], ['zip']);
+  await Promise.resolve();
+  assert.deepEqual(state.calls, ['base:cube', 'kis', 'classifyFaces']);
+  release();
+
+  assert.equal(await stale, null);
+  assert.equal((await edit).ok, true);
+  assert.equal((await current).complete, true);
+  assert.deepEqual(state.calls, [
+    'base:cube', 'kis', 'classifyFaces',
+    'base:tetrahedron', 'dual', 'classifyFaces',
+    'base:octahedron', 'zip', 'classifyFaces',
+  ]);
+  assert.equal(state.live, 0);
+  assert.equal(closed, posted * 2);
+});
+
 test('createOpGate discards a pass the chain changed under', async () => {
   const { Mod } = fakeModule();
   const gate = createOpGate(createChainValidator(async () => Mod));
