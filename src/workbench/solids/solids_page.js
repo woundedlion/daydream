@@ -89,6 +89,16 @@ const state = {
   showIndices: false
 };
 
+const VIEW_TOGGLES = /** @type {const} */ ({
+  toggleRotate: 'autoRotate',
+  toggleGeo: 'showGeodesics',
+  toggleFaces: 'showFaces',
+  toggleColorize: 'colorizeFaces',
+  toggleVerts: 'showVertices',
+  toggleNormals: 'showNormals',
+  toggleIndices: 'showIndices',
+});
+
 const baseThumbnails = {};
 
 let currentMesh = null;
@@ -197,41 +207,7 @@ async function init() {
     result.dispose();
   });
 
-  // Presentation toggles: redraw the cached mesh via renderMesh().
-  document.getElementById('toggleRotate').addEventListener('click', () => {
-    setAutoRotate(!state.autoRotate);
-  });
-  document.getElementById('toggleGeo').addEventListener('click', () => {
-    state.showGeodesics = !state.showGeodesics;
-    updateToggles();
-    renderMesh();
-  });
-  document.getElementById('toggleFaces').addEventListener('click', () => {
-    state.showFaces = !state.showFaces;
-    updateToggles();
-    renderMesh();
-  });
-  document.getElementById('toggleColorize').addEventListener('click', () => {
-    state.colorizeFaces = !state.colorizeFaces;
-    updateToggles();
-    renderMesh();
-  });
-  document.getElementById('toggleVerts').addEventListener('click', () => {
-    state.showVertices = !state.showVertices;
-    updateToggles();
-    renderMesh();
-  });
-  document.getElementById('toggleNormals').addEventListener('click', () => {
-    state.showNormals = !state.showNormals;
-    updateToggles();
-    renderMesh();
-  });
-  document.getElementById('toggleIndices').addEventListener('click', () => {
-    state.showIndices = !state.showIndices;
-    updateToggles();
-    renderMesh();
-  });
-
+  wireViewToggles();
   wireCanvasTap(document.getElementById('canvas'));
 
   labelsContainer = document.getElementById('labels');
@@ -470,21 +446,26 @@ function selectBaseSolid(key, btn) {
   });
 }
 
+function wireViewToggles() {
+  for (const [id, flag] of Object.entries(VIEW_TOGGLES)) {
+    const toggle = flag === 'autoRotate'
+      ? () => setAutoRotate(!state.autoRotate)
+      : () => {
+        state[flag] = !state[flag];
+        updateToggles();
+        renderMesh();
+      };
+    document.getElementById(id).addEventListener('click', toggle);
+  }
+}
+
 function updateToggles() {
-  const toggleState = {
-    toggleRotate: state.autoRotate,
-    toggleGeo: state.showGeodesics,
-    toggleFaces: state.showFaces,
-    toggleColorize: state.colorizeFaces,
-    toggleVerts: state.showVertices,
-    toggleNormals: state.showNormals,
-    toggleIndices: state.showIndices,
-  };
-  for (const [id, on] of Object.entries(toggleState)) {
+  for (const [id, flag] of Object.entries(VIEW_TOGGLES)) {
     const btn = document.getElementById(id);
     if (!btn) continue;
-    btn.classList.toggle('is-on', !!on);
-    btn.setAttribute('aria-checked', on ? 'true' : 'false'); // role="switch" state
+    const on = state[flag];
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-checked', String(on));
   }
 }
 
