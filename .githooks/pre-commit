@@ -32,7 +32,8 @@ fi
 
 SNAPSHOT_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/daydream-pre-commit.XXXXXX")"
 SNAPSHOT="$SNAPSHOT_ROOT/repo"
-trap 'rm -rf "$SNAPSHOT_ROOT"' EXIT INT TERM
+trap 'rm -rf "$SNAPSHOT_ROOT"' EXIT
+trap 'exit 130' INT TERM
 mkdir "$SNAPSHOT"
 git checkout-index --all --force --prefix="$SNAPSHOT/"
 LOCAL_GIT_ENV="$(git rev-parse --local-env-vars)"

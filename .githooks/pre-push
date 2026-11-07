@@ -32,6 +32,7 @@ if [ "${DAYDREAM_PUSH_SNAPSHOT:-0}" != 1 ]; then
       rm -rf "$scratch"
     }
     trap cleanup EXIT
+    trap 'exit 130' INT TERM
     git clone --quiet --shared --no-checkout "$source_root" "$scratch/repo" || exit 1
     git -C "$scratch/repo" -c core.hooksPath=/dev/null checkout --quiet --detach "$local_oid" || exit 1
     (
@@ -45,7 +46,7 @@ if [ "${DAYDREAM_PUSH_SNAPSHOT:-0}" != 1 ]; then
       DAYDREAM_PUSH_SNAPSHOT=1 sh "$source_root/.githooks/pre-push" </dev/null
     ) || exit 1
     cleanup || exit 1
-    trap - EXIT
+    trap - EXIT INT TERM
   done
   [ "$checked" = 0 ] || exit 0
 fi
