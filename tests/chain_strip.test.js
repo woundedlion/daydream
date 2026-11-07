@@ -1536,6 +1536,16 @@ test('a chip renames its instance through the store', async () => {
   assert.equal(renameIn(h, 'mirror').value, 'mirror');
 });
 
+test('a modulation chip can rename its instance', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'modulation').dispatch('click');
+  const field = renameIn(h, 'modulation');
+  field.value = 'motion';
+  field.dispatch('change');
+  assert.equal(renameIn(h, 'motion').value, 'motion');
+  assert.ok(h.store.chain().some(entry => entry.label === 'motion'));
+});
+
 test('a refused rename reports and restores the field', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'warp2').dispatch('click');

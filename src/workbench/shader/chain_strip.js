@@ -938,7 +938,7 @@ export function createChainStrip({
       rows.set(declaration.id, row);
       parent.appendChild(row);
     }
-    if (palette) region.appendChild(renameRow(entry));
+    if (color) region.appendChild(renameRow(entry));
     return region;
   };
 
