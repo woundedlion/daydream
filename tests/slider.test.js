@@ -87,6 +87,14 @@ test('building a slider replaces existing container content', () => {
   assert.equal(container.children.length, 3);
 });
 
+test('input updates the display value without a callback', () => {
+  const { slider, valueSpan } = createSlider('c', { ...base, scale: 10, decimals: 1 });
+  slider.value = '70';
+  slider.dispatch('input');
+  assert.equal(valueSpan.textContent, '7.0');
+  assert.equal(slider.getAttribute('aria-valuetext'), '7.0');
+});
+
 test('input updates the readout and aria-valuetext before onInput', () => {
   let observed;
   const { slider, valueSpan } = createSlider(
