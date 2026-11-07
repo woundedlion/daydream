@@ -1234,29 +1234,34 @@ export function createShaderDocumentController({
   };
   const onParityToggle = () => {
     if (active === null || !parityArmed()) return;
-    const official = /** @type {OfficialDocument} */ (active.official);
-    const compiledSide = !active.compiledSide;
-    const effect = compiledSide ? official.effectId : CHAIN_EFFECT;
-    if (!selectEffect(effect)) {
-      announce(`The preview engine rejected effect "${effectDisplayName(effect)}".`);
-      return;
-    }
-    active.compiledSide = compiledSide;
-    syncParity();
-    chainUi?.strip.render();
-    const presetId = active.presetId ?? presetSelect.value;
-    if (!applyPreset(presetId)) {
-      const refusal = status.textContent ?? 'The preset could not be applied.';
-      const previousEffect = compiledSide ? CHAIN_EFFECT : official.effectId;
-      if (!selectEffect(previousEffect)) {
-        announce(`The preview engine rejected effect "${effectDisplayName(previousEffect)}".`);
+    try {
+      const official = /** @type {OfficialDocument} */ (active.official);
+      const compiledSide = !active.compiledSide;
+      const effect = compiledSide ? official.effectId : CHAIN_EFFECT;
+      if (!selectEffect(effect)) {
+        announce(`The preview engine rejected effect "${effectDisplayName(effect)}".`);
         return;
       }
-      active.compiledSide = !compiledSide;
+      active.compiledSide = compiledSide;
       syncParity();
       chainUi?.strip.render();
-      applyPreset(presetId);
-      showError(refusal);
+      const presetId = active.presetId ?? presetSelect.value;
+      if (!applyPreset(presetId)) {
+        const refusal = status.textContent ?? 'The preset could not be applied.';
+        const previousEffect = compiledSide ? CHAIN_EFFECT : official.effectId;
+        if (!selectEffect(previousEffect)) {
+          announce(`The preview engine rejected effect "${effectDisplayName(previousEffect)}".`);
+          return;
+        }
+        active.compiledSide = !compiledSide;
+        syncParity();
+        chainUi?.strip.render();
+        applyPreset(presetId);
+        showError(refusal);
+      }
+    } catch (error) {
+      showError(`The preview edit failed: ${errorDetail(error)}`);
+      showAnimationState();
     }
   };
   const onDigest = async () => {
