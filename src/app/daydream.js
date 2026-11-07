@@ -375,7 +375,7 @@ export function start({
       });
       host.adapter = renderAdapter;
 
-      host.recorder = new VideoRecorder(daydream.canvas, undefined, undefined, doc);
+      host.recorder = new VideoRecorder(daydream.canvas, { frameInterval: display.frameInterval, doc });
       recording.attach(host.recorder);
 
       const loadingOverlay = doc.getElementById('loading-overlay');

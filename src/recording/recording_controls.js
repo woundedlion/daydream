@@ -30,7 +30,7 @@ function recorderReason(err) {
  * @param {Document} deps.doc - Document the duration overlay mounts into.
  * @param {{addFolder: (title: string) => *}} deps.gui - The global GUI root the
  *   folder is added under.
- * @param {*} deps.driver - The driver: its frame interval, its axis-label state,
+ * @param {*} deps.driver - The driver: its axis-label state,
  *   the recorder handle it renders through, and the invalidate that redraws the
  *   PiP a session suppresses.
  * @param {() => import("./recorder.js").VideoRecorder|null} deps.getRecorder - Reads the live recorder, null until
@@ -167,7 +167,6 @@ export function createRecordingControls({
      * @returns {void}
      */
     attach(recorder) {
-      recorder.frameInterval = driver.frameInterval;
       recordingSettings.replay();
       recorder.onStarted = announceStarted;
       recorder.onFormatFallback = (extension) => {

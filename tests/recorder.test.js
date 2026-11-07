@@ -304,11 +304,12 @@ const visibilityDocument = (hidden) => Object.assign(new EventTarget(), {
 
 /**
  * Builds a recorder whose download is a no-op and starts it.
- * @param {...any} args - VideoRecorder constructor arguments.
+ * @param {HTMLCanvasElement} canvas - Source canvas.
+ * @param {ConstructorParameters<typeof VideoRecorder>[1]} [options] - Recorder options.
  * @returns {VideoRecorder} The started recorder.
  */
-const startRecorder = (...args) => {
-  const rec = new VideoRecorder(...args);
+const startRecorder = (canvas, options) => {
+  const rec = new VideoRecorder(canvas, options);
   rec.download = () => {};
   rec.start('e');
   return rec;
@@ -324,7 +325,7 @@ test('background visibility pauses recording time and remains stoppable', (t) =>
     removeEventListener(type, listener, options);
   };
   let now = 1000;
-  const rec = startRecorder(recordableCanvas(), 1 / 16, () => now, doc);
+  const rec = startRecorder(recordableCanvas(), { now: () => now, doc });
   const media = rec.mediaRecorder;
   assert.equal(media.state, 'recording');
   now = 2000;
@@ -352,7 +353,7 @@ test('a recording started on a hidden page begins paused', (t) => {
   t.after(installRecorderEnv());
   const doc = visibilityDocument(true);
   let now = 1000;
-  const rec = startRecorder(recordableCanvas(), 1 / 16, () => now, doc);
+  const rec = startRecorder(recordableCanvas(), { now: () => now, doc });
   const media = rec.mediaRecorder;
   assert.equal(media.state, 'paused');
   assert.equal(rec.isRecording, true);
@@ -404,9 +405,11 @@ test('elapsed time follows the recording wall-clock lifecycle', (t) => {
   t.after(installRecorderEnv());
   let nowMs = 10_000;
   let clockReads = 0;
-  const rec = startRecorder(recordableCanvas(), 1 / 16, () => {
-    clockReads++;
-    return nowMs;
+  const rec = startRecorder(recordableCanvas(), {
+    now: () => {
+      clockReads++;
+      return nowMs;
+    },
   });
   const recorder = rec.mediaRecorder;
   const clockReadsAtStart = clockReads;
@@ -441,7 +444,7 @@ test('a pending save dialog shows zero elapsed after a prior session', (t) => {
   const warnings = installConsoleCapture('warn');
   t.after(warnings.restore);
   let nowMs = 0;
-  const rec = startRecorder(recordableCanvas(), 1 / 16, () => nowMs);
+  const rec = startRecorder(recordableCanvas(), { now: () => nowMs });
   nowMs = 42_000;
   const first = rec.mediaRecorder;
   rec.stop();
@@ -1385,7 +1388,7 @@ test('captureFrame pillarboxes a taller-than-target source to fit height', () =>
 test('captureFrame leaves elapsed time clock-driven without requestFrame', (t) => {
   t.after(installRecorderEnv());
   let nowMs = 0;
-  const rec = startRecorder(recordableCanvas(), 1 / 16, () => nowMs);
+  const rec = startRecorder(recordableCanvas(), { now: () => nowMs });
   delete rec.track.requestFrame;
   rec.captureFrame();
   rec.captureFrame();
