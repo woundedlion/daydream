@@ -65,6 +65,7 @@ const initThree = () => {
 };
 
 const regenerateCurve = () => {
+  if (!scene) return;
   if (line) {
     scene.remove(line);
     line.geometry.dispose();
