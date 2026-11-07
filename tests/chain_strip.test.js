@@ -27,8 +27,9 @@ test('a budget-exhausted chain offers no band insertion buttons', async () => {
 test('the strip lays the chain out as editable carrier bands with sockets between them', async () => {
   const h = await makeStrip();
   const strip = h.container.querySelector('.chain-strip');
-  assert.equal(strip.getAttribute('role'), 'group');
-  assert.equal(strip.getAttribute('aria-label'), 'Shader chain');
+  assert.equal(strip.getAttribute('role'), null);
+  assert.equal(strip.getAttribute('aria-label'), null);
+  assert.equal(strip.parentNode.getAttribute('aria-label'), 'Scrollable shader chain');
 
   const bands = strip.querySelectorAll('.chain-band');
   assert.deepEqual(bands.map((band) => band.dataset.carrier),
