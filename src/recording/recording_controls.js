@@ -77,6 +77,7 @@ export function createRecordingControls({
   let recordingShown = false;
 
   let startNotice = '';
+  let saveFallbackNotice = '';
   let sessionError = false;
   let sessionEmpty = false;
 
@@ -112,12 +113,13 @@ export function createRecordingControls({
     const sweepWarning = driver.povFidelity
       ? ' POV fidelity recordings capture simulation ticks; the sweep animation samples only the beginning of each sweep.'
       : '';
-    const memoryNotice = typeof globalThis.showSaveFilePicker !== 'function'
+    const memoryNotice = saveFallbackNotice || typeof globalThis.showSaveFilePicker !== 'function'
       ? ` This browser saves up to ${MEMORY_BUFFER_LIMIT_BYTES / 1_000_000} MB per recording`
         + ` (about ${Math.floor(MEMORY_BUFFER_LIMIT_BYTES * 8 / (recSettings.recQuality * 1_000_000))} seconds at this quality).`
       : '';
+    const fallbackNotice = saveFallbackNotice ? ` ${saveFallbackNotice}` : '';
     startNotice = 'Recording started.'
-      + `${axisWarning}${sweepWarning}${memoryNotice}`;
+      + `${axisWarning}${sweepWarning}${fallbackNotice}${memoryNotice}`;
     showNotice(startNotice);
   };
 
@@ -128,7 +130,11 @@ export function createRecordingControls({
       return;
     }
     const wasRecording = recordingShown;
-    if (!wasRecording) { sessionError = false; sessionEmpty = false; }
+    if (!wasRecording) {
+      sessionError = false;
+      sessionEmpty = false;
+      saveFallbackNotice = '';
+    }
     const isRecording = recorder.toggle(getEffect());
     // A start that never began a session has already reported why through onError;
     // there was no session to stop, and the same owner tag would overwrite it.
@@ -186,7 +192,8 @@ export function createRecordingControls({
         showRecording(false);
       };
       recorder.onSaveFallback = (err) => {
-        showNotice(recorderReason(err));
+        saveFallbackNotice = recorderReason(err);
+        showNotice(saveFallbackNotice);
       };
       recorder.onSaveError = (err, filename) => {
         showNotice(`Recording save failed for ${filename}: ${recorderReason(err)}`);

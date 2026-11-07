@@ -398,6 +398,23 @@ test('Save dialog notices wait for the encoder before announcing recording', () 
   assert.match(rig.notices.at(-1), /^Recording started\./);
 });
 
+test('recording start preserves the picker fallback and memory limit', () => {
+  const picker = Object.getOwnPropertyDescriptor(globalThis, 'showSaveFilePicker');
+  Object.defineProperty(globalThis, 'showSaveFilePicker', { configurable: true, value: () => {} });
+  try {
+    const rig = recordingRig();
+    const recorder = rig.attach(fakeRecorder());
+    rig.button.object.record();
+    recorder.onSaveFallback(new Error('Saving to Downloads instead.'));
+    recorder.onStarted();
+    assert.match(rig.notices.at(-1), /^Recording started.*Saving to Downloads instead/);
+    assert.match(rig.notices.at(-1), /up to [\d.]+ MB/);
+  } finally {
+    if (picker) Object.defineProperty(globalThis, 'showSaveFilePicker', picker);
+    else Reflect.deleteProperty(globalThis, 'showSaveFilePicker');
+  }
+});
+
 test('a recorder fault reports its reason and stops offering to stop', () => {
   const rig = recordingRig();
   const recorder = rig.attach(fakeRecorder());
