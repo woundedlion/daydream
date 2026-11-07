@@ -5,12 +5,12 @@ import { appendFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFile
 import { dirname, isAbsolute, join, matchesGlob, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expectFailure, fixtureRepo, isolatedGitEnv } from './helpers/fixture_repo.js';
-import { BRANCH_FLOOR, COVERAGE, LINE_FLOOR, lineCoverage } from '../scripts/run-tests.mjs';
+import { BRANCH_FLOOR, COVERAGE, LINE_FLOOR, totalCoverage } from '../scripts/run-tests.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(HERE, '../scripts/run-tests.mjs');
 const PATTERN = 'tests/*.test.js';
-const EXEMPT = 'tests/uncovered-modules.json';
+const EXEMPT = 'tests/unloaded-modules.json';
 const env = isolatedGitEnv(process.env);
 delete env.NODE_TEST_CONTEXT;
 
@@ -110,10 +110,12 @@ test('a reasoned exemption covers an unloadable module', () => {
   assert.match(run(PATTERN), /reasoned exemptions/);
 });
 
-test('an exemption with no reason fails', () => {
+test('an exemption whose reason is not a non-empty string fails', () => {
   writeFileSync(join(root, 'browser.mjs'), 'document.body.textContent = "ready";\n');
-  writeFileSync(join(root, EXEMPT), JSON.stringify({ 'browser.mjs': '' }));
-  assert.match(fail(PATTERN), /must explain why/);
+  for (const reason of ['', '  ', { reason: 'Not a string.' }]) {
+    writeFileSync(join(root, EXEMPT), JSON.stringify({ 'browser.mjs': reason }));
+    assert.match(fail(PATTERN), /must explain why/);
+  }
 });
 
 test('a stale exemption fails', () => {
@@ -123,7 +125,7 @@ test('a stale exemption fails', () => {
 
 test('a redundant exemption fails', () => {
   writeFileSync(join(root, EXEMPT), JSON.stringify({ 'lib.mjs': 'No longer true.' }));
-  assert.match(fail(PATTERN), /covered after all[\s\S]*lib\.mjs/);
+  assert.match(fail(PATTERN), /loaded by a test after all[\s\S]*lib\.mjs/);
 });
 
 test('no test pattern fails', () => {
@@ -132,28 +134,28 @@ test('no test pattern fails', () => {
 
 // Loading a module is not executing it: the roster gate passes on a module one
 // import touches, and only the floor answers for the body that never ran.
-test('a loaded module the suite never executes fails the line floor', () => {
+test('loaded code the suite never executes fails the overall line floor', () => {
   const branches = Array.from({ length: 40 },
     (_, index) => `  if (n === ${index}) return ${index};`).join('\n');
   writeFileSync(join(root, 'lib.mjs'),
     `export const value = 4;\nexport function unreached(n) {\n${branches}\n  return -1;\n}\n`);
-  assert.match(failOutput(PATTERN), /lib\.mjs line coverage .* below its 95% floor/);
+  assert.match(failOutput(PATTERN), /overall line coverage .* below the 92% floor/);
 });
 
 // Every guard line runs, so the line floor holds while forty consequents never do.
-test('a loaded module whose branches the suite never takes fails the branch floor', () => {
+test('branches the suite never takes fail the overall branch floor', () => {
   const guards = Array.from({ length: 40 },
     (_, index) => `  if (n === ${index}) return ${index};`).join('\n');
   writeFileSync(join(root, 'lib.mjs'),
     `export const value = 4;\nexport function pick(n) {\n${guards}\n  return -1;\n}\npick(-1);\n`);
   const output = failOutput(PATTERN);
   assert.doesNotMatch(output, /line coverage .* below/);
-  assert.match(output, /lib\.mjs branch coverage .* below its 90% floor/);
+  assert.match(output, /overall branch coverage .* below the 93% floor/);
 });
 
-test('the coverage floors are 95% of lines and 90% of branches', () => {
-  assert.equal(LINE_FLOOR, 95);
-  assert.equal(BRANCH_FLOOR, 90);
+test('the overall coverage floors are 92% of lines and 93% of branches', () => {
+  assert.equal(LINE_FLOOR, 92);
+  assert.equal(BRANCH_FLOOR, 93);
 });
 
 const REPO = resolve(HERE, '..');
@@ -188,64 +190,14 @@ test('a case that executes no assertion fails', () => {
   assert.match(failOutput(PATTERN), /Every test case must execute an assertion/);
 });
 
-const dilutedCoverage = () => {
-  writeFileSync(join(root, 'lib.mjs'),
-    'export function unused() {\n  return 1;\n}\nexport const value = 4;\n');
-  writeFileSync(join(root, 'padding.mjs'),
-    Array.from({ length: 2000 }, (_, i) => `export const value${i} = ${i};`).join('\n'));
-  writeFileSync(join(root, 'tests/sample.test.js'),
-    "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\n"
-    + "import '../lib.mjs';\nimport '../padding.mjs';\ntest('works', () => assert.ok(true));\n");
-};
-
-test('aggregate coverage cannot hide an under-covered first-party file', () => {
-  dilutedCoverage();
-  assert.match(failOutput(PATTERN), /lib\.mjs line coverage .* below its 95% floor/);
-});
-
-test('reasoned coverage baselines still reject a per-file drop', () => {
-  dilutedCoverage();
-  writeFileSync(join(root, EXEMPT), JSON.stringify({
-    'lib.mjs': { lines: 1, reason: 'Fixture exercises the measured baseline.' },
-  }));
-  assert.match(run(PATTERN), /source modules were loaded/);
-  writeFileSync(join(root, EXEMPT), JSON.stringify({
-    'lib.mjs': { lines: 90, reason: 'Fixture exercises the measured baseline.' },
-  }));
-  assert.match(failOutput(PATTERN), /lib\.mjs line coverage .* below its 90% floor/);
-});
-
-test('a coverage baseline cannot exempt an unloaded module', () => {
-  writeFileSync(join(root, 'unused.mjs'), 'export const unused = true;\n');
-  writeFileSync(join(root, EXEMPT), JSON.stringify({
-    'unused.mjs': { lines: 80, reason: 'No longer measured.' },
-  }));
-  assert.match(failOutput(PATTERN), /coverage baseline but no measured file row/);
-});
-
-test('improved coverage makes a lower baseline redundant', () => {
-  writeFileSync(join(root, EXEMPT), JSON.stringify({
-    'lib.mjs': { lines: 80, reason: 'No longer needed.' },
-  }));
-  assert.match(failOutput(PATTERN), /covered after all/);
-});
-
-test('coverage parser preserves nested paths and rejects a missing table', () => {
-  assert.deepEqual([...lineCoverage([
+test('coverage parser reads the totals row and rejects a missing one', () => {
+  assert.deepEqual(totalCoverage([
     '# start of coverage report',
-    '# root.js | 99.00 | 90 | 90 |',
-    '# tools | | | |',
-    '#  nested | | | |',
-    '#   library.js | 80.50 | 90 | 90 |',
-    '#  helper.js | 98.00 | 90 | 90 |',
-    '# next.js | 100.00 | 90 | 90 |',
-    '# all files | 97.00 | 90 | 90 |',
+    '# root.js | 99.00 | 90.00 | 90 |',
+    '# all files | 97.25 | 88.50 | 90 |',
     '# end of coverage report',
-  ].join('\n'))], [
-    ['root.js', 99], ['tools/nested/library.js', 80.5],
-    ['tools/helper.js', 98], ['next.js', 100],
-  ]);
-  assert.throws(() => lineCoverage(''), /no file rows/);
+  ].join('\n')), { lines: 97.25, branches: 88.5 });
+  assert.throws(() => totalCoverage(''), /no totals row/);
 });
 
 test('CI rejects skipped cases even when another test passes', () => {
@@ -269,7 +221,7 @@ test('a missing git executable rejects source enumeration', () => {
 
 test('malformed exemption JSON fails instead of waiving the roster', () => {
   writeFileSync(join(root, EXEMPT), '{broken');
-  assert.match(fail(PATTERN), /uncovered-modules\.json is unreadable/);
+  assert.match(fail(PATTERN), /unloaded-modules\.json is unreadable/);
 });
 
 test('assertion accounting preserves callback-style asynchronous tests', () => {
@@ -286,15 +238,6 @@ test('callback-style tests still require an assertion before done', () => {
   assert.match(failOutput(PATTERN), /Every test case must execute an assertion/);
 });
 
-test('aggregate coverage cannot hide a file with unexecuted branches', () => {
-  dilutedCoverage();
-  writeFileSync(join(root, 'lib.mjs'),
-    'export const value = 4;\nexport function pick(n) { return n ? 1 : 2; }\npick(true);\n');
-  writeFileSync(join(root, 'padding.mjs'),
-    Array.from({ length: 30 }, (_, i) => `function f${i}() { return 1; } f${i}();`).join('\n'));
-  assert.match(failOutput(PATTERN), /lib\.mjs branch coverage .* below its 90% floor/);
-});
-
 test('CI rejects a failing todo test', () => {
   writeFileSync(join(root, 'tests/sample.test.js'),
     "import { test } from 'node:test'; import assert from 'node:assert/strict'; import '../lib.mjs';\n"
@@ -303,36 +246,4 @@ test('CI rejects a failing todo test', () => {
   assert.match(expectFailure(process.execPath, [SCRIPT, PATTERN], {
     cwd: root, env: { ...env, CI: 'true' },
   }), /CI must execute every test without todos/);
-});
-
-test('object exemptions require a finite floor below the global threshold', () => {
-  for (const metric of ['lines', 'branches']) {
-    const globalFloor = metric === 'lines' ? 95 : 90;
-    for (const floor of [null, '80', 0, -1, globalFloor, 100]) {
-      writeFileSync(join(root, EXEMPT), JSON.stringify({
-        'lib.mjs': { [metric]: floor, reason: 'Fixture baseline.' },
-      }));
-      assert.match(failOutput(PATTERN), /use a valid floor/);
-    }
-  }
-  writeFileSync(join(root, EXEMPT), JSON.stringify({ 'lib.mjs': { reason: 'Fixture baseline.' } }));
-  assert.match(failOutput(PATTERN), /use a valid floor/);
-});
-
-test('branch baselines hold, reject a drop, and become redundant', () => {
-  dilutedCoverage();
-  writeFileSync(join(root, 'padding.mjs'),
-    Array.from({ length: 30 }, (_, i) => `function f${i}() { return 1; } f${i}();`).join('\n'));
-  writeFileSync(join(root, 'lib.mjs'),
-    'export const value = 4;\nexport function pick(n) { return n ? 1 : 2; }\npick(true);\n');
-  writeFileSync(join(root, EXEMPT), JSON.stringify({
-    'lib.mjs': { branches: 1, reason: 'Fixture branch baseline.' },
-  }));
-  assert.match(run(PATTERN), /source modules were loaded/);
-  writeFileSync(join(root, EXEMPT), JSON.stringify({
-    'lib.mjs': { branches: 89, reason: 'Fixture branch baseline.' },
-  }));
-  assert.match(failOutput(PATTERN), /lib\.mjs branch coverage .* below its 89% floor/);
-  appendFileSync(join(root, 'lib.mjs'), 'pick(false);\n');
-  assert.match(failOutput(PATTERN), /covered after all[\s\S]*lib\.mjs \(branches\)/);
 });

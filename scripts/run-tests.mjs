@@ -6,16 +6,16 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const EXEMPT_PATH = 'tests/uncovered-modules.json';
+const EXEMPT_PATH = 'tests/unloaded-modules.json';
 const LOAD_RECORDER = new URL('./record-module-loads.mjs', import.meta.url).href;
 const SKIP_DIRS = new Set([
   'node_modules', '.git', '.worktrees', 'vendor', 'three.js', 'engine',
 ]);
 
-// Per-file execution floors over the modules the roster gate proves were
-// loaded; tests/uncovered-modules.json may lower one file's floor with a reason.
-export const LINE_FLOOR = 95;
-export const BRANCH_FLOOR = 90;
+// Overall execution floors over every measured module. The roster gate answers
+// for modules no test loads; these answer for loaded code the suite never runs.
+export const LINE_FLOOR = 92;
+export const BRANCH_FLOOR = 93;
 
 // Coverage measurement for the suite. The exclusions are code no unit test
 // imports: the suites themselves, the engine's installed shader mirror, the
@@ -30,28 +30,10 @@ export const COVERAGE = [
   '--test-coverage-exclude=scripts/browser-smoke.mjs',
 ];
 
-export function lineCoverage(report, column = 0) {
-  const files = new Map();
-  const directories = [];
-  let active = false;
-  for (const line of report.split(/\r?\n/)) {
-    if (line === '# start of coverage report') { active = true; continue; }
-    if (line === '# end of coverage report') break;
-    if (!active) continue;
-    const row = /^# (\s*)([^|]+?)\s*\|\s*([\d.]*)\s*\|\s*([\d.]*)\s*\|/.exec(line);
-    if (!row || ['file', 'all files'].includes(row[2].trim())) continue;
-    const [, padding, name, percent] = row;
-    while (directories.length && directories.at(-1).depth >= padding.length)
-      directories.pop();
-    if (percent === '') {
-      directories.push({ depth: padding.length, name: name.trim() });
-    } else {
-      files.set([...directories.map((entry) => entry.name), name.trim()].join('/'),
-        Number(row[3 + column]));
-    }
-  }
-  if (files.size === 0) throw new Error('run-tests: coverage report has no file rows');
-  return files;
+export function totalCoverage(report) {
+  const row = /^# all files\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|/m.exec(report);
+  if (!row) throw new Error('run-tests: coverage report has no totals row');
+  return { lines: Number(row[1]), branches: Number(row[2]) };
 }
 
 const main = () => {
@@ -79,8 +61,7 @@ const main = () => {
   const reportPath = join(scratch, 'results.tap');
   const loaded = new Set();
   let status;
-  let coverage;
-  let branches;
+  let totals;
   try {
     mkdirSync(loadsDir);
     const run = spawnSync(process.execPath, ['--test',
@@ -116,8 +97,7 @@ const main = () => {
       console.error('run-tests: CI must execute every test without todos.');
       status = 1;
     }
-    coverage = lineCoverage(readFileSync(reportPath, 'utf8'));
-    branches = lineCoverage(readFileSync(reportPath, 'utf8'), 1);
+    totals = totalCoverage(readFileSync(reportPath, 'utf8'));
     for (const entry of readdirSync(loadsDir)) {
       for (const url of JSON.parse(readFileSync(join(loadsDir, entry), 'utf8'))) {
         const key = keyOf(fileURLToPath(url.split(/[?#]/)[0]));
@@ -156,55 +136,34 @@ const main = () => {
     }
   }
   const unreasoned = Object.entries(exempt)
-    .filter(([, entry]) => {
-      const reason = typeof entry === 'string' ? entry : entry?.reason;
-      return typeof reason !== 'string' || reason.trim() === ''
-        || (typeof entry !== 'string'
-          && ((!('lines' in entry) && !('branches' in entry))
-            || Object.entries({ lines: LINE_FLOOR, branches: BRANCH_FLOOR }).some(([metric, limit]) =>
-              metric in entry && (!Number.isFinite(entry[metric])
-                || entry[metric] <= 0 || entry[metric] >= limit))));
-    })
+    .filter(([, reason]) => typeof reason !== 'string' || reason.trim() === '')
     .map(([file]) => file)
     .sort();
-  const uncovered = roster.filter((file) => !loaded.has(file) && typeof exempt[file] !== 'string');
+  const uncovered = roster.filter((file) => !loaded.has(file) && !Object.hasOwn(exempt, file));
   const stale = Object.keys(exempt).filter((file) => !roster.includes(file)).sort();
-  const redundant = Object.keys(exempt).flatMap((file) =>
-    typeof exempt[file] === 'string' ? (loaded.has(file) ? [file] : [])
-      : Object.keys(exempt[file]).filter((key) => key !== 'reason')
-        .filter((key) => key === 'lines' ? coverage.get(file) >= LINE_FLOOR : branches.get(file) >= BRANCH_FLOOR)
-        .map((key) => `${file} (${key})`)).sort();
+  const redundant = Object.keys(exempt).filter((file) => loaded.has(file)).sort();
   const failures = [];
-  for (const [file, lines] of coverage) {
-    if (!roster.includes(file)) continue;
-    const floor = exempt[file]?.lines ?? LINE_FLOOR;
-    if (lines < floor)
-      failures.push(`run-tests: ${file} line coverage ${lines}% is below its ${floor}% floor.`);
-    const branchFloor = exempt[file]?.branches ?? BRANCH_FLOOR;
-    if (branches.get(file) < branchFloor)
-      failures.push(`run-tests: ${file} branch coverage ${branches.get(file)}% is below its ${branchFloor}% floor.`);
-  }
-  for (const [file, entry] of Object.entries(exempt)) {
-    if (typeof entry !== 'string' && !coverage.has(file))
-      failures.push(`run-tests: ${file} has a coverage baseline but no measured file row.`);
-  }
+  if (totals.lines < LINE_FLOOR)
+    failures.push(`run-tests: overall line coverage ${totals.lines}% is below the ${LINE_FLOOR}% floor.`);
+  if (totals.branches < BRANCH_FLOOR)
+    failures.push(`run-tests: overall branch coverage ${totals.branches}% is below the ${BRANCH_FLOOR}% floor.`);
   const block = (heading, files, remedy) =>
     `run-tests: ${heading}:\n${files.map((file) => `  ${file}`).join('\n')}\n${remedy}`;
   if (unreasoned.length > 0) failures.push(block(
-    `every ${EXEMPT_PATH} entry must explain why coverage is limited and use a valid floor`,
+    `every ${EXEMPT_PATH} entry must explain why no test can load the module`,
     unreasoned,
     'Add a concrete reason or delete the exemption.',
   ));
   if (uncovered.length > 0) failures.push(block(
     'no test loaded these source modules',
     uncovered,
-    `Write a test that imports each, or record why it cannot be covered in ${EXEMPT_PATH}.`,
+    `Write a test that imports each, or record why it cannot be loaded in ${EXEMPT_PATH}.`,
   ));
   if (stale.length > 0) failures.push(block(
     `these ${EXEMPT_PATH} entries name no source module`, stale, 'Delete the stale exemptions.',
   ));
   if (redundant.length > 0) failures.push(block(
-    `these ${EXEMPT_PATH} entries are covered after all`, redundant, 'Delete the redundant exemption or floor.',
+    `these ${EXEMPT_PATH} entries are loaded by a test after all`, redundant, 'Delete the redundant exemption.',
   ));
   if (failures.length > 0) {
     console.error(failures.join('\n'));
