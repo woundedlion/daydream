@@ -232,15 +232,16 @@ export function start({
    * truthiness (every enum value is a truthy object).
    * @param {string} name - The engine parameter name.
    * @param {number} value - The float value to write.
+   * @param {object} [gesture] - Shared by the edits of one pointer gesture.
    * @returns {boolean} True when the engine accepted the value.
    */
-  function setEngineParam(name, value) {
+  function setEngineParam(name, value, gesture) {
     const result = loaded.engine.setParameter(name, value);
     if (result !== loaded.module.ParamSetResult.APPLIED) {
       const message = `Parameter "${name}" was rejected: `
         + `${enumConstantName(loaded.module.ParamSetResult, result)}.`;
       console.warn(message);
-      applyNotice.show(message, PARAM_NOTICE);
+      applyNotice.show(message, PARAM_NOTICE, gesture);
     } else {
       applyNotice.show(null, PARAM_NOTICE);
     }

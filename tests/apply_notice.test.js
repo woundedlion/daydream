@@ -187,10 +187,11 @@ test('a clear with no recorded owner hides a visible notice', () => {
   assert.equal(h.notice.owner(), null);
 });
 
-test('showing the same notice restarts its dwell', () => {
+test('showing the same notice re-announces it and restarts its dwell', () => {
   const h = makeApplyNotice();
   h.notice.show('Effect change was rejected.', 'switch');
   h.notice.show('Effect change was rejected.', 'switch');
+  assert.equal(h.text.textContent, 'Effect change was rejected.\u200b');
   assert.deepEqual(h.timer.cancelled, [1]);
   assert.equal(h.timer.handle, 2);
   assert.equal(h.body.hidden, false);

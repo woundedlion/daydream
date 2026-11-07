@@ -10,7 +10,8 @@ const TEXT_ENTRY_TYPES = new Set(['text', 'number']);
 
 /** Edit lifetime and persistence deferred until a slider gesture ends. */
 export class EffectPanelEdits {
-  activeDragEnds = new Set();
+  /** @type {Map<object, (event: Event) => void>} */
+  activeDragEnds = new Map();
   activeKeyEdits = new Set();
   activeTextEntries = new Set();
   pending = null;
@@ -40,6 +41,11 @@ export class EffectPanelEdits {
     if (edited !== null) this.write(edited);
   }
 
+  /** @param {object} controller @returns {object|undefined} The active pointer gesture. */
+  dragGesture(controller) {
+    return this.activeDragEnds.get(controller);
+  }
+
   /** @param {import("./effect_panel_view.js").PanelController & {dragging: boolean}} controller */
   trackDrag(controller) {
     controller.domElement.addEventListener('pointerdown', (event) => {
@@ -50,10 +56,10 @@ export class EffectPanelEdits {
         if (release.type !== 'blur' && release.pointerId !== pointerId) return;
         controller.dragging = false;
         for (const type of DRAG_END_EVENTS) this.dragTarget.removeEventListener(type, end);
-        this.activeDragEnds.delete(end);
+        this.activeDragEnds.delete(controller);
         this.flush();
       };
-      this.activeDragEnds.add(end);
+      this.activeDragEnds.set(controller, end);
       for (const type of DRAG_END_EVENTS) this.dragTarget.addEventListener(type, end);
     });
   }
@@ -82,7 +88,7 @@ export class EffectPanelEdits {
 
   /** Remove drag listeners and flush any held URL write. */
   dispose() {
-    for (const end of this.activeDragEnds) {
+    for (const end of this.activeDragEnds.values()) {
       for (const type of DRAG_END_EVENTS) this.dragTarget.removeEventListener(type, end);
     }
     this.activeDragEnds.clear();
