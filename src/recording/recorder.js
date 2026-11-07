@@ -416,6 +416,13 @@ export class VideoRecorder {
     }
   }
 
+  /** @param {MediaRecorder} recorder @returns {boolean} Whether the session owned the recorder. */
+  stopLive(recorder) {
+    if (this.mediaRecorder !== recorder) return false;
+    this.stop();
+    return true;
+  }
+
   /** Stops the elapsed clock at its current value. */
   freezeElapsed() {
     if (this.recordingStartedAtMs === null) return;
@@ -547,7 +554,7 @@ export class VideoRecorder {
    * @param {string} cause - Why the video is held in memory, for the report.
    * @returns {(data: Blob) => void} The bounded chunk sink.
    */
-  memorySink(recorder, chunks, cause) {
+  boundedBuffer(recorder, chunks, cause) {
     let bufferedBytes = 0;
     let full = false;
     return (data) => {
@@ -555,8 +562,7 @@ export class VideoRecorder {
       bufferedBytes += data.size;
       if (bufferedBytes > MEMORY_BUFFER_LIMIT_BYTES) {
         full = true;
-        if (this.mediaRecorder === recorder) {
-          this.stop();
+        if (this.stopLive(recorder)) {
           this.reportFailure(
             `${cause}, so the whole video is held in memory and reached `
             + `${Math.round(MEMORY_BUFFER_LIMIT_BYTES / 1_000_000)} MB. `
@@ -586,29 +592,40 @@ export class VideoRecorder {
    * @returns {VideoSink} The session sink; callers may ignore finish()'s promise.
    */
   openSink(recorder, effectName, chunks, bitrateMbps = DEFAULT_BITRATE_MBPS) {
-    const saveBuffered = () => {
-      try {
-        this.download(recorder, chunks, effectName);
-      } catch (cause) {
-        const message = 'buffered video could not be saved.';
-        console.error(`VideoRecorder: ${message}`, cause);
-        this.onSaveError?.(new Error(message, { cause }),
-          this.timestampedName(effectName, this.extension(recorder)));
-      }
-    };
-    if (typeof globalThis.showSaveFilePicker !== 'function') {
-      return {
-        write: this.memorySink(recorder, chunks, 'this browser has no streaming save'),
-        finish: () => {
-          if (chunks.length) saveBuffered();
-          else {
-            console.warn('VideoRecorder: session produced no data; nothing to download');
-            this.onEmptySession?.();
-          }
-        },
-      };
+    if (typeof globalThis.showSaveFilePicker === 'function') {
+      return this.streamingSink(recorder, effectName, chunks, bitrateMbps);
     }
+    return {
+      write: this.boundedBuffer(recorder, chunks, 'this browser has no streaming save'),
+      finish: () => this.finishBuffered(recorder, effectName, chunks),
+    };
+  }
 
+  /**
+   * @param {MediaRecorder} recorder @param {string} effectName @param {Blob[]} chunks
+   * @returns {void}
+   */
+  finishBuffered(recorder, effectName, chunks) {
+    if (chunks.length === 0) {
+      console.warn('VideoRecorder: session produced no data; nothing to download');
+      this.onEmptySession?.();
+      return;
+    }
+    try {
+      this.download(recorder, chunks, effectName);
+    } catch (cause) {
+      const message = 'buffered video could not be saved.';
+      console.error(`VideoRecorder: ${message}`, cause);
+      this.onSaveError?.(new Error(message, { cause }),
+        this.timestampedName(effectName, this.extension(recorder)));
+    }
+  }
+
+  /**
+   * @param {MediaRecorder} recorder @param {string} effectName @param {Blob[]} chunks
+   * @param {number} bitrateMbps @returns {VideoSink} The file sink with a bounded download fallback.
+   */
+  streamingSink(recorder, effectName, chunks, bitrateMbps) {
     // The picker needs the user gesture; a browser-default type may still be unknown.
     const ext = recorder.mimeType ? this.extension(recorder) : 'video';
     const filename = this.timestampedName(effectName, ext);
@@ -626,7 +643,7 @@ export class VideoRecorder {
     let backlogBytes = 0;
     let overflowed = false;
     const maxBacklogBytes = (bitrateMbps * 1_000_000 / 8) * WRITE_BACKLOG_SECONDS;
-    const hold = this.memorySink(recorder, chunks, 'the streaming save was unavailable');
+    const hold = this.boundedBuffer(recorder, chunks, 'the streaming save was unavailable');
     const opened = globalThis.showSaveFilePicker({
       suggestedName: filename,
       ...(recorder.mimeType ? { types: [{ description: 'Video',
@@ -636,8 +653,7 @@ export class VideoRecorder {
       .catch((err) => {
         if (err?.name === 'AbortError') {
           // Stop and notify the host only if this recorder still owns the cancelled session.
-          if (this.mediaRecorder === recorder) {
-            this.stop();
+          if (this.stopLive(recorder)) {
             notifyHost(() => this.reportFailure('the Save dialog was cancelled, so nothing was saved.'));
           }
         } else {
@@ -655,8 +671,7 @@ export class VideoRecorder {
         if (!handle && backlogBytes === 0) { hold(data); return; }
         if (backlogBytes + data.size > maxBacklogBytes) {
           overflowed = true;
-          if (this.mediaRecorder === recorder) {
-            this.stop();
+          if (this.stopLive(recorder)) {
             this.reportFailure(
               'the streaming save could not keep up '
               + `while ${Math.round(maxBacklogBytes / 1_000_000)} MB of video `
@@ -687,8 +702,7 @@ export class VideoRecorder {
             await writable.write(data);
           } catch (err) {
             failed = true;
-            if (this.mediaRecorder === recorder) {
-              this.stop();
+            if (this.stopLive(recorder)) {
               this.reportFailure(
                 'streaming write failed mid-session; recording stopped.',
                 err);
@@ -709,11 +723,7 @@ export class VideoRecorder {
             // or the session streamed no data (the chosen file was never
             // truncated). Download the buffer if there is one.
             if (!writable) {
-              if (chunks.length) saveBuffered();
-              else {
-                console.warn('VideoRecorder: session produced no data; nothing to download');
-                this.onEmptySession?.();
-              }
+              this.finishBuffered(recorder, effectName, chunks);
               return;
             }
             if (failed) {
@@ -739,7 +749,7 @@ export class VideoRecorder {
           })
           .catch((err) => {
             saveFailure('streaming save failed; any buffered video will be saved to Downloads.', err);
-            if (chunks.length) saveBuffered();
+            if (chunks.length) this.finishBuffered(recorder, effectName, chunks);
           });
       },
     };
