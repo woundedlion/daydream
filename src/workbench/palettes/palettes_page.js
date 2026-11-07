@@ -20,7 +20,7 @@ import {
   paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
   PALETTE_CONTROL_IDS,
   PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
-  zoomRecipeWindow, waveGraphLabel,
+  waveGraphLabel,
 } from './palette_controls.js';
 import { PaletteRecipeModel } from './palette_recipe_model.js';
 import { mountProceduralSliders } from './procedural_sliders.js';
@@ -104,15 +104,6 @@ function renderRecipeWindow() {
   spanSlider.setAttribute('aria-valuetext', spanText);
   /** @type {HTMLElement} */ (document.getElementById('gen_offset_value')).textContent = offsetText;
   /** @type {HTMLElement} */ (document.getElementById('gen_span_value')).textContent = spanText;
-}
-
-/** @param {number} startPosition @param {number} endPosition */
-function zoomRecipeWindowControls(startPosition, endPosition) {
-  const { offset, span } = zoomRecipeWindow(
-    recipeModel.window, startPosition, endPosition);
-  recipeModel.setWindow(offset, span);
-  renderRecipeWindow();
-  scheduleUpdate();
 }
 
 function visiblePhaseRange() {
@@ -622,7 +613,7 @@ async function init() {
 
   stripController = createStripController({canvas: colorStripCanvas, viewport: paletteViewport,
     model: recipeModel, getTab: () => activeTab, getPalette: () => palette, visiblePhaseRange,
-    drawColorStrip, redrawForViewport, zoomRecipeWindowControls, renderRecipeWindow, scheduleUpdate,
+    drawColorStrip, redrawForViewport, renderRecipeWindow, scheduleUpdate,
     resetZoomButton, paletteRangeHeading,
     feedback: {root: copyFeedback, swatch: copyFeedbackSwatch, status: copyFeedbackStatus, hex: copyFeedbackHex}});
 

@@ -8,7 +8,7 @@
 import {copyToClipboard as copyToClipboardDefault} from '../../shared/clipboard.js';
 import {linearRgbToHex} from '../../shared/color.js';
 import {createPointerDrag, innerRect} from '../../shared/pointer_drag.js';
-import {paletteStripView, stripDragIntent} from './palette_controls.js';
+import {paletteStripView, stripDragIntent, zoomRecipeWindow} from './palette_controls.js';
 
 /**
  * Binds strip selection, viewport zoom and color-copy feedback.
@@ -21,7 +21,6 @@ import {paletteStripView, stripDragIntent} from './palette_controls.js';
  * @param {() => {start:number,end:number}} options.visiblePhaseRange - Reads the displayed phase interval.
  * @param {(selection?:{start:number,end:number}|null) => void} options.drawColorStrip - Paints the strip and optional drag selection.
  * @param {() => void} options.redrawForViewport - Redraws after procedural viewport changes.
- * @param {(start:number,end:number) => void} options.zoomRecipeWindowControls - Sets the recipe window to the selected range.
  * @param {() => void} options.renderRecipeWindow - Refreshes the recipe window controls.
  * @param {() => void} options.scheduleUpdate - Schedules a palette preview update.
  * @param {HTMLElement} options.resetZoomButton - Restores the full phase range.
@@ -34,7 +33,7 @@ import {paletteStripView, stripDragIntent} from './palette_controls.js';
  *   updateView: () => void, syncResetZoom: () => void, dispose: () => void}} Strip controls and cleanup.
  */
 export function createStripController({canvas: colorStripCanvas, viewport, model, getTab, getPalette,
-  visiblePhaseRange, drawColorStrip, redrawForViewport, zoomRecipeWindowControls, renderRecipeWindow,
+  visiblePhaseRange, drawColorStrip, redrawForViewport, renderRecipeWindow,
   scheduleUpdate, resetZoomButton, paletteRangeHeading, feedback, copy: copyToClipboard = copyToClipboardDefault,
   createDrag = createPointerDrag, timers = globalThis}) {
   const {root:copyFeedback, swatch:copyFeedbackSwatch, status:copyFeedbackStatus, hex:copyFeedbackHex} = feedback;
@@ -45,6 +44,19 @@ export function createStripController({canvas: colorStripCanvas, viewport, model
   let copyFeedbackTimer = null;
   let copyRequestId = 0;
   const zoomed = () => paletteStripView(visiblePhaseRange()).zoomed;
+
+  /** @param {number} offset @param {number} span */
+  function setRecipeWindow(offset, span) {
+    model.setWindow(offset, span);
+    renderRecipeWindow();
+    scheduleUpdate();
+  }
+
+  /** @param {number} start @param {number} end */
+  function zoomWindow(start, end) {
+    const {offset, span} = zoomRecipeWindow(model.window, start, end);
+    setRecipeWindow(offset, span);
+  }
   /**
    * The normalized (0-1) X coordinate of a pointer event over the strip.
    * @param {PointerEvent} event - Pointer position.
@@ -116,7 +128,7 @@ export function createStripController({canvas: colorStripCanvas, viewport, model
       viewport.zoom(start, end);
       redrawForViewport();
     } else {
-      zoomRecipeWindowControls(start, end);
+      zoomWindow(start, end);
     }
   }
 
@@ -196,7 +208,7 @@ export function createStripController({canvas: colorStripCanvas, viewport, model
       viewport.zoom(0.4, 0.6);
       redrawForViewport();
     } else {
-      zoomRecipeWindowControls(0.4, 0.6);
+      zoomWindow(0.4, 0.6);
     }
   }
 
@@ -220,9 +232,7 @@ export function createStripController({canvas: colorStripCanvas, viewport, model
       viewport.reset();
       redrawForViewport();
     } else {
-      model.setWindow(0, 1);
-      renderRecipeWindow();
-      scheduleUpdate();
+      setRecipeWindow(0, 1);
     }
   }
 
