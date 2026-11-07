@@ -121,6 +121,14 @@ test('the angle parameter is the one that carries a degree suffix', () => {
   assert.equal(relax.querySelectorAll('.op-param')[0].children.at(-1).textContent, '');
 });
 
+test('a number box preserves authored values outside the parameter grid', () => {
+  for (const t of [0.08726646, 0.87266463]) {
+    const { el } = build({ op: 'truncate', params: { t } });
+    const [row] = el.querySelectorAll('.op-param');
+    assert.equal(row.children.find((c) => c.type === 'number').value, String(t));
+  }
+});
+
 test('the chain ends disable the move button that would run off them', () => {
   const first = build({ op: 'kis', params: {} }, 0, 3).el;
   assert.equal(first.querySelector('.move-op-up').disabled, true);

@@ -8,7 +8,7 @@
  * values come from localStorage, so rows are built node-by-node, never via innerHTML.
  */
 
-import { authoredParamRange, unsweepableReason } from './solid_codegen.js';
+import { authoredParamRange, snapToStep, unsweepableReason } from './solid_codegen.js';
 
 /** @typedef {import('./solid_codegen.js').OpParamDef} OpParamDef */
 
@@ -70,14 +70,16 @@ function buildButton(doc, className, text, ariaLabel) {
 }
 
 /**
- * Formats a parameter value for its number box: whole for an integer-stepped
- * parameter, two decimals otherwise.
+ * Formats the number box value without rounding off-grid parameters.
  * @param {number|string} value - The value to display.
- * @param {{step: number}} [def] - The parameter's OP_DEFS range.
+ * @param {OpParamDef} [def] - The parameter's OP_DEFS range.
  * @returns {string} The formatted value, or 'NaN' for a non-numeric one.
  */
 export function formatParamValue(value, def) {
-  return Number(value).toFixed(Number.isInteger(def?.step) ? 0 : 2);
+  const number = Number(value);
+  if (def && Math.abs(number - snapToStep(number, def)) > def.step * 1e-6)
+    return String(number);
+  return number.toFixed(Number.isInteger(def?.step) ? 0 : 2);
 }
 
 /**
