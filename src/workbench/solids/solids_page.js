@@ -5,6 +5,7 @@
  * Page module for tools/solids.html.
  */
 import * as THREE from 'three';
+import {dropSlotIndex, dropTargetIndex, reorderPreviewShift, movedOps} from './solid_op_order.js';
 import { buildSavedCard } from './solid_saved_cards.js';
 import { createCommitQueue, createChainValidator, createOpGate } from './solid_validation.js';
 import { initScene, copyWithFeedback, showFatalError, bootstrapTool, formatKB } from '../shared.js';
@@ -19,10 +20,6 @@ import {
   authoredParamRange, snapToStep,
   seedOpParams,
   opsFromRecipe,
-  dropSlotIndex,
-  dropTargetIndex,
-  reorderPreviewShift,
-  movedOps,
   opTopologyKey,
 } from './solid_codegen.js';
 import { SAVED_SOLIDS_KEY, SAVED_SOLIDS_MAX, captureSavedSolidThumbnail, queueSavedSolidRestore,
