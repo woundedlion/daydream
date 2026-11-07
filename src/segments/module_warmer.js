@@ -77,7 +77,7 @@ export class ModuleWarmer {
       if (this.warmEpoch === epoch) this.module = compiled;
     };
     /** @type {Promise<void>} */
-    let warm;
+    let settled;
     try {
       const workerJs = drain('./segment_worker.js');
       const glueJs = drain('../../generated/holosphere_wasm.js');
@@ -93,7 +93,7 @@ export class ModuleWarmer {
         if (!path) throw new Error('WASM glue has no versioned binary URL');
         return drain(new URL(path, probe).href);
       });
-      warm = Promise.allSettled([
+      settled = Promise.allSettled([
         workerJs,
         glueJs,
         layoutJs,
@@ -125,7 +125,7 @@ export class ModuleWarmer {
         + 'will fetch and compile its own', error);
       return Promise.resolve();
     }
-    warm = raceDeadline(() => warm, deadlineMs, timers, () => {
+    const warm = raceDeadline(() => settled, deadlineMs, timers, () => {
       controller.abort();
       // The warm did not finish, so a module held from an earlier warm can no
       // longer be claimed to match the one being served.
