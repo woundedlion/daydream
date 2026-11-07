@@ -1107,6 +1107,21 @@ test('preset advancement refreshes nonanimated requested selectors', () => {
   assert.equal(h.gui().ctrl('Mode').getValue(), 1);
 });
 
+test('a focused static selector matching the new preset needs no further definition reads', () => {
+  const mode = {name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'], animated: false};
+  const h = makeHarness({params: [mode], engineValues: [0], presetCount: 3});
+  h.panel.build();
+  h.state.focused = h.gui().ctrl('Mode').$select;
+  h.state.presetIndex = 1;
+  const before = h.paramDefinitionReads();
+
+  h.panel.sync(true);
+  assert.equal(h.paramDefinitionReads(), before + 1);
+  h.panel.sync(false);
+  h.panel.sync(false);
+  assert.equal(h.paramDefinitionReads(), before + 1);
+});
+
 test('a focused static selector adopts a pending preset after focus leaves', () => {
   const mode = {name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'], animated: false};
   const h = makeHarness({params: [mode], engineValues: [0], presetCount: 3});
