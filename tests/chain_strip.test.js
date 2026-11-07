@@ -56,6 +56,7 @@ async function makeStrip({
   const doc = installDocument({
     body: fakeElement('body', { connected: true }),
     activeElement: null,
+    defaultView: documentEvents(),
     createElement: (/** @type {string} */ tag) => fakeElement(tag),
     ...documentEvents(),
   });
@@ -378,6 +379,34 @@ test('wheel events over the operator palette remain available to its own scroll 
   const wheel = viewport.dispatch('wheel', { target: entry, deltaY: 120 });
   assert.equal(viewport.scrollTop, 50);
   assert.equal(wheel.defaultPrevented, false);
+});
+
+test('scrolling the strip closes its open operator palette', async () => {
+  const h = await makeStrip();
+  const viewport = h.container.querySelector('.chain-strip-viewport');
+  viewport.clientHeight = 400;
+  viewport.scrollHeight = 1600;
+  bandFor(h, 'sphere').querySelector('.chain-band-add').dispatch('click');
+  assert.ok(paletteOf(h));
+
+  viewport.dispatch('wheel', { deltaY: 120 });
+  assert.equal(paletteOf(h), null);
+});
+
+test('window resize closes the operator palette', async () => {
+  const h = await makeStrip();
+  bandFor(h, 'sphere').querySelector('.chain-band-add').dispatch('click');
+  assert.ok(paletteOf(h));
+
+  h.doc.defaultView.dispatch('resize');
+  assert.equal(paletteOf(h), null);
+});
+
+test('destroying the strip removes its window resize listener', async () => {
+  const h = await makeStrip();
+  assert.equal(h.doc.defaultView.listenerCount('resize'), 1);
+  h.strip.destroy();
+  assert.equal(h.doc.defaultView.listenerCount('resize'), 0);
 });
 
 test('the viewport offset survives the rebuild a committed edit forces', async () => {

@@ -1294,6 +1294,7 @@ export function createChainStrip({
       const height = Number(viewport.clientHeight ?? 0);
       const overflow = Number(viewport.scrollHeight ?? 0) - height;
       if (overflow <= 0) return;
+      closePalette();
       // deltaMode counts pixels, lines or pages.
       const scale = event.deltaMode === 1 ? WHEEL_LINE_PX
         : event.deltaMode === 2 ? Math.max(MIN_SCROLL_STEP, height) : 1;
@@ -1360,6 +1361,8 @@ export function createChainStrip({
   render();
   container.addEventListener('keydown', historyKeydown);
   doc.addEventListener('pointerdown', pointerDown, true);
+  const view = doc.defaultView;
+  view?.addEventListener('resize', closePalette);
 
   return {
     render,
@@ -1406,6 +1409,7 @@ export function createChainStrip({
       pendingSliderEdit = null;
       container.removeEventListener('keydown', historyKeydown);
       doc.removeEventListener('pointerdown', pointerDown, true);
+      view?.removeEventListener('resize', closePalette);
       for (const drag of drags) drag.remove();
       drags.length = 0;
       container.replaceChildren();
