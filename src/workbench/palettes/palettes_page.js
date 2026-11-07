@@ -98,8 +98,12 @@ function renderRecipeWindow() {
   spanSlider.value = String(span);
   offsetSlider.max = String(1 - span);
   offsetSlider.value = String(offset);
-  /** @type {HTMLElement} */ (document.getElementById('gen_offset_value')).textContent = offset.toFixed(3);
-  /** @type {HTMLElement} */ (document.getElementById('gen_span_value')).textContent = span.toFixed(3);
+  const offsetText = offset.toFixed(3);
+  const spanText = span.toFixed(3);
+  offsetSlider.setAttribute('aria-valuetext', offsetText);
+  spanSlider.setAttribute('aria-valuetext', spanText);
+  /** @type {HTMLElement} */ (document.getElementById('gen_offset_value')).textContent = offsetText;
+  /** @type {HTMLElement} */ (document.getElementById('gen_span_value')).textContent = spanText;
 }
 
 /** @param {number} startPosition @param {number} endPosition */
@@ -208,16 +212,21 @@ function renderRecipeSliders() {
   /** @type {HTMLInputElement} */ (document.getElementById(PALETTE_CONTROL_IDS.sweepTurns)).step = loopSweep ? '1' : '0.5';
   for (const { reading, id, scale, digits, suffix } of RECIPE_SLIDER_DEFINITIONS) {
     const value = Number(recipeModel.reading(reading)) * scale;
-    /** @type {HTMLInputElement} */ (document.getElementById(id)).value = String(value);
-    /** @type {HTMLElement} */ (document.getElementById(`${id}_value`)).textContent = `${value.toFixed(digits)}${suffix}`;
+    const input = /** @type {HTMLInputElement} */ (document.getElementById(id));
+    const text = `${value.toFixed(digits)}${suffix}`;
+    input.value = String(value);
+    input.setAttribute('aria-valuetext', text);
+    /** @type {HTMLElement} */ (document.getElementById(`${id}_value`)).textContent = text;
   }
 }
 
 function renderBaseHue() {
   const degrees = recipeModel.baseHueTurns * 360;
-  /** @type {HTMLInputElement} */ (document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees)).value = String(degrees);
-  /** @type {HTMLElement} */ (document.getElementById('gen_base_hue_value')).textContent =
-    `${Number(degrees.toFixed(1)) % 360}°`;
+  const input = /** @type {HTMLInputElement} */ (document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees));
+  const text = `${Number(degrees.toFixed(1)) % 360}°`;
+  input.value = String(degrees);
+  input.setAttribute('aria-valuetext', text);
+  /** @type {HTMLElement} */ (document.getElementById('gen_base_hue_value')).textContent = text;
 }
 
 function renderRecipeAvailability() {
