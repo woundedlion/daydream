@@ -636,10 +636,11 @@ export class VideoRecorder {
           // Stop and notify the host only if this recorder still owns the cancelled session.
           if (this.mediaRecorder === recorder) {
             this.stop();
-            this.reportFailure('the Save dialog was cancelled, so nothing was saved.');
+            notifyHost(() => this.reportFailure('the Save dialog was cancelled, so nothing was saved.'));
           }
         } else {
-          this.onSaveFallback?.(new Error('Streaming save unavailable; saving to Downloads instead.', { cause: err }));
+          notifyHost(() => this.onSaveFallback?.(
+            new Error('Streaming save unavailable; saving to Downloads instead.', { cause: err })));
         }
       });
 
@@ -673,9 +674,10 @@ export class VideoRecorder {
             try {
               writable = await handle.createWritable();
             } catch (err) {
-              this.onSaveFallback?.(new Error('The selected file could not be opened; saving to Downloads instead.', { cause: err }));
               handle = null;
               hold(data);
+              notifyHost(() => this.onSaveFallback?.(
+                new Error('The selected file could not be opened; saving to Downloads instead.', { cause: err })));
               return;
             }
           }
