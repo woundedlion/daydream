@@ -21,8 +21,10 @@ import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../../effects/effect_persistence.js'
 import { copyToClipboard } from '../../shared/copy_text.js';
 import { downloadBlob } from '../../shared/download_file.js';
 import {
-  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
+  createShaderLinkWriter, decodeShaderStateHash, replaceShaderStateHash,
 } from './shader_deeplink.js';
+
+export { SHADER_LINK_DEBOUNCE_MS, SHADER_LINK_MAX_WAIT_MS } from './shader_deeplink.js';
 
 const PATTERN_CATALOG_URL = '../../../generated/shader/patterns/catalog.json';
 const CATALOG_URL = '../../../generated/shader/engine_catalog.json';
@@ -35,9 +37,6 @@ const DIGEST_ABBREVIATION = 12;
 
 // The download name used by Save for the scratch document.
 const SCRATCH_FILENAME = 'scratch.shader.json';
-
-export const SHADER_LINK_DEBOUNCE_MS = 200;
-export const SHADER_LINK_MAX_WAIT_MS = 1000;
 
 /** @param {*} expected @param {*} actual @returns {boolean} Float32 snapshot equality. */
 function snapshotValueEqual(expected, actual) {
@@ -323,22 +322,6 @@ export function createShaderDocumentController({
   let rebuildAfterParameterCommit = false;
   /** @type {number} Save As copies this session, which their ids count off. */
   let copies = 0;
-  let linkGeneration = 0;
-  /** @type {Promise<void>} */
-  let linkWrite = Promise.resolve();
-  /** @type {ReturnType<typeof setTimeout>|null} */
-  let linkDebounceTimer = null;
-  /** @type {ReturnType<typeof setTimeout>|null} */
-  let linkMaxTimer = null;
-  let linkPending = false;
-  let linkDisposed = false;
-  let preserveRefusedLink = false;
-  const releaseOriginalLink = () => {
-    if (!preserveRefusedLink) return;
-    preserveRefusedLink = false;
-    onOriginalLinkReleased();
-  };
-
   /** @param {string} message @param {boolean} error */
   const writeStatus = (message, error) => {
     if (notice) notice.textContent = error ? '' : message;
@@ -479,7 +462,7 @@ export function createShaderDocumentController({
       chainUi?.strip.syncParameterRows();
       showPreviewStatus();
       showDigest();
-      scheduleDeepLink();
+      linkWriter.schedule();
       return true;
     } catch (error) {
       markHalted(error);
@@ -647,7 +630,7 @@ export function createShaderDocumentController({
           : `"${parameterId}" was refused: ${diagnostic.message}`);
         return false;
       }
-      releaseOriginalLink();
+      linkWriter.releaseOriginalLink();
       let applied = true;
       if (addsDeclaration) {
         const dropped = syncParity();
@@ -660,7 +643,7 @@ export function createShaderDocumentController({
       if (Object.keys(values).length > 1) chainUi.strip.syncParameterValues(values);
       chainUi.strip.syncHistory();
       if (applied && status.dataset.status === 'error') showPreviewStatus();
-      scheduleDeepLink();
+      linkWriter.schedule();
       return true;
     } catch (error) {
       markHalted(error);
@@ -687,7 +670,7 @@ export function createShaderDocumentController({
       catalog: operatorCatalog,
       announce,
       onApply: () => {
-        releaseOriginalLink();
+        linkWriter.releaseOriginalLink();
         const dropped = syncParity();
         const applied = applyPreset(active?.presetId ?? presetSelect.value);
         if (dropped) {
@@ -723,7 +706,7 @@ export function createShaderDocumentController({
   const loadSourceNow = async (source, filename = 'import.shader.json',
                                precompiled = null, session = null) => {
     await flushDeepLink();
-    linkGeneration += 1;
+    linkWriter.invalidate();
     compiler ??= await importCompiler();
     let compiled = precompiled;
     if (compiled === null) {
@@ -891,48 +874,26 @@ export function createShaderDocumentController({
     ? chainUi.store.exportDocument()
     : structuredClone((/** @type {ActiveDocument} */ (active)).compiled.document);
 
-  const clearLinkTimers = () => {
-    if (linkDebounceTimer !== null) clearTimeout(linkDebounceTimer);
-    if (linkMaxTimer !== null) clearTimeout(linkMaxTimer);
-    linkDebounceTimer = null;
-    linkMaxTimer = null;
-  };
-
-  const writeDeepLink = () => {
-    clearLinkTimers();
-    if (!linkPending || !active || active.presetId === null) return linkWrite;
-    linkPending = false;
-    const generation = ++linkGeneration;
-    const chainSnapshot = getChainSnapshot(getEngine());
-    const state = {
-      document: currentDocument(),
-      preset: active.presetId,
-      bypassed: chainUi?.store.bypassedLabels() ?? [],
-      paused: getAnimationsPaused() === true,
-      ...(chainSnapshot ? {chainSnapshot} : {}),
-    };
-    linkWrite = encodeShaderStateHash(state).then((hash) => {
-      if (generation === linkGeneration) replaceShaderStateHash(hash, win);
-    }).catch((error) => {
-      if (generation !== linkGeneration) return;
-      replaceShaderStateHash('', win);
-      const detail = errorDetail(error);
-      showError(`The shader link could not be updated: ${detail}.`);
-    });
-    return linkWrite;
-  };
+  const linkWriter = createShaderLinkWriter({
+    canWrite: () => active !== null && active.presetId !== null,
+    readState: () => {
+      const chainSnapshot = getChainSnapshot(getEngine());
+      return {
+        document: currentDocument(),
+        preset: active?.presetId,
+        bypassed: chainUi?.store.bypassedLabels() ?? [],
+        paused: getAnimationsPaused() === true,
+        ...(chainSnapshot ? {chainSnapshot} : {}),
+      };
+    },
+    replace: (hash) => replaceShaderStateHash(hash, win),
+    onError: (error) => showError(`The shader link could not be updated: ${errorDetail(error)}.`),
+    onOriginalLinkReleased,
+  });
 
   const flushDeepLink = () => {
     chainUi?.strip.flushParameterEdit();
-    return writeDeepLink();
-  };
-
-  const scheduleDeepLink = () => {
-    if (linkDisposed || preserveRefusedLink || !active || active.presetId === null) return;
-    linkPending = true;
-    if (linkDebounceTimer !== null) clearTimeout(linkDebounceTimer);
-    linkDebounceTimer = setTimeout(writeDeepLink, SHADER_LINK_DEBOUNCE_MS);
-    linkMaxTimer ??= setTimeout(writeDeepLink, SHADER_LINK_MAX_WAIT_MS);
+    return linkWriter.flush();
   };
 
   /**
@@ -1020,13 +981,6 @@ export function createShaderDocumentController({
    */
   const loadScratch = () =>
     loadSource(scratchChainDocument(operatorCatalog), SCRATCH_FILENAME);
-
-  const refuseLink = () => {
-    preserveRefusedLink = true;
-    clearLinkTimers();
-    linkPending = false;
-    linkGeneration += 1;
-  };
 
   /** @type {HTMLOptionElement | null} */
   let loadedSourceOption = null;
@@ -1118,7 +1072,7 @@ export function createShaderDocumentController({
       linkError = status.textContent || 'the linked state was refused';
     }
     if (linkError) {
-      refuseLink();
+      linkWriter.refuseLink();
     }
     const query = new URLSearchParams(win.location?.search ?? '');
     const chainText = query.get(`fx.${CHAIN_SNAPSHOT_STORAGE_KEY}`);
@@ -1140,13 +1094,13 @@ export function createShaderDocumentController({
         selectLoadedSource(null, 'imported.shader.json', 'Imported');
         syncEffectGui();
         invalidate();
-        scheduleDeepLink();
+        linkWriter.schedule();
         await flushDeepLink();
         showStatus('Restored the chain snapshot.');
         return true;
       } catch (error) {
         linkError = errorDetail(error);
-        refuseLink();
+        linkWriter.refuseLink();
       }
     }
     const requested = sourceCatalog.get(canonicalEffectId(initialEffect ?? ''))
@@ -1165,8 +1119,8 @@ export function createShaderDocumentController({
   /** @param {string|null} effectId @param {string} filename @param {string} kind */
   const adoptLoadedSource = async (effectId, filename, kind) => {
     selectLoadedSource(effectId, filename, kind);
-    releaseOriginalLink();
-    scheduleDeepLink();
+    linkWriter.releaseOriginalLink();
+    linkWriter.schedule();
     await flushDeepLink();
   };
 
@@ -1213,8 +1167,8 @@ export function createShaderDocumentController({
       showError(refusal);
       return;
     }
-    releaseOriginalLink();
-    scheduleDeepLink();
+    linkWriter.releaseOriginalLink();
+    linkWriter.schedule();
     chainUi?.strip.render();
     void flushDeepLink();
   };
@@ -1240,11 +1194,11 @@ export function createShaderDocumentController({
   const onAnimationToggle = () => {
     const paused = getAnimationsPaused();
     if (paused === null) return;
-    releaseOriginalLink();
+    linkWriter.releaseOriginalLink();
     setAnimationsPaused(!paused);
     showAnimationState();
     invalidate();
-    scheduleDeepLink();
+    linkWriter.schedule();
   };
   const onParityToggle = () => {
     if (active === null || !parityArmed()) return;
@@ -1291,7 +1245,7 @@ export function createShaderDocumentController({
       const linked = await decodeShaderStateHash(win.location.hash);
       if (!linked) return;
       if (!allowSourceChange()) {
-        scheduleDeepLink();
+        linkWriter.schedule();
         return;
       }
       if (!await loadLinkedSource(linked))
@@ -1313,8 +1267,8 @@ export function createShaderDocumentController({
   digestButton?.addEventListener('click', onDigest);
 
   const dispose = () => {
-    const finalLinkWrite = flushDeepLink();
-    linkDisposed = true;
+    chainUi?.strip.flushParameterEdit();
+    const finalLinkWrite = linkWriter.dispose();
     win.removeEventListener?.('hashchange', onHashChange);
     sourceSelect.removeEventListener('change', onSourceChange);
     presetSelect.removeEventListener('change', onPresetChange);
@@ -1333,6 +1287,6 @@ export function createShaderDocumentController({
     init, loadSource, save, saveAs, applyPreset,
     dispose,
     flushDeepLink,
-    preservesOriginalLink: () => preserveRefusedLink,
+    preservesOriginalLink: linkWriter.preservesOriginalLink,
   };
 }

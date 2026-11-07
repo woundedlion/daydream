@@ -5,11 +5,42 @@ import {gzipSync} from 'node:zlib';
 import {compileShaderDocument, DEFAULT_LIMITS} from '../generated/shader/shader_workbench.mjs';
 import {scratchChainDocument} from '../src/workbench/shader/chain_document_store.js';
 import {
-  CHAIN_SNAPSHOT_SCHEMA_VERSION, decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
+  CHAIN_SNAPSHOT_SCHEMA_VERSION, createShaderLinkWriter, decodeShaderStateHash,
+  encodeShaderStateHash, replaceShaderStateHash,
 } from '../src/workbench/shader/shader_deeplink.js';
 
 const SCRATCH = scratchChainDocument(JSON.parse(readFileSync(
   new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8')));
+
+test('refusing a shader link invalidates an active encode until the link is released', async () => {
+  const hashes = [];
+  let releases = 0;
+  const writer = createShaderLinkWriter({
+    canWrite: () => true,
+    readState: () => ({document: SCRATCH, preset: 'one', bypassed: [], paused: false}),
+    replace: (hash) => hashes.push(hash),
+    onError: (error) => assert.fail(error),
+    onOriginalLinkReleased: () => { releases += 1; },
+  });
+  writer.schedule();
+  const stale = writer.flush();
+  writer.refuseLink();
+  writer.schedule();
+  await stale;
+  await writer.flush();
+  assert.deepEqual(hashes, []);
+  assert.equal(writer.preservesOriginalLink(), true);
+
+  writer.releaseOriginalLink();
+  writer.releaseOriginalLink();
+  assert.equal(releases, 1);
+  writer.schedule();
+  await writer.dispose();
+  writer.schedule();
+  await writer.flush();
+  assert.equal(hashes.length, 1);
+  assert.equal((await decodeShaderStateHash(hashes[0])).preset, 'one');
+});
 
 test('shader state hashes round-trip the complete authoring state', async () => {
   const state = {
