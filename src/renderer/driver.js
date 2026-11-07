@@ -1078,6 +1078,7 @@ export class Daydream {
       this.dotMesh = null;
     }
     this.pixels = null;
+    this.povSweep = null;
     // Injected sink; not disposed here.
     this.recorder = null;
     this.matrixCache.clear();
