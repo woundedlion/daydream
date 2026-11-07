@@ -88,16 +88,16 @@ export const OP_DEFS = {
  * Solids::is_morphable_step (core/mesh/recipe.h) and the sweep clamps it reads
  * (core/mesh/conway_graph.h). An empty object is an op that always sweeps,
  * `null` an op that never sweeps, and a parameter entry the band the leg
- * covers, with any excluded topology transitions. Composite ops are absent:
- * they lower to primitives before the check.
- * @type {Object<string, ?Object<string, {min: number, max: number, excluded?: number[]}>>}
+ * covers, with any excluded interval (above the lower bound through the upper
+ * bound). Composite ops lower to primitives before the check.
+ * @type {Object<string, ?Object<string, {min: number, max: number, excluded?: {lower: number, upper: number}}>>}
  */
 export const MORPH_SWEEP = {
   kis: {},
   ambo: {},
   snub: {},
   dual: {},
-  truncate: { t: { min: 0.002, max: 0.995, excluded: [0.5] } },
+  truncate: { t: { min: 0.002, max: 0.995, excluded: { lower: 0.495, upper: 0.5 } } },
   chamfer: { t: { min: 0.02, max: 0.63 } },
   expand: null,
   hankin: {},
@@ -122,11 +122,12 @@ export function unsweepableReason(o) {
     const value = typeof o === 'string' ? NaN : Number(o?.params?.[key]);
     if (!Number.isFinite(value)) continue;
     const engineValue = Math.fround(value);
-    if (excluded?.includes(engineValue)) {
+    if (excluded && engineValue > Math.fround(excluded.lower)
+        && engineValue <= Math.fround(excluded.upper)) {
       return `${opName} cannot sweep ${key} at ${engineValue}: the shape is `
         + 'generated whole rather than built on screen.';
     }
-    if (value >= min && value <= max) continue;
+    if (engineValue >= Math.fround(min) && engineValue <= Math.fround(max)) continue;
     return `${opName} sweeps ${key} only over ${min} to ${max}: at ${value} the `
       + 'shape is generated whole rather than built on screen.';
   }

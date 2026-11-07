@@ -570,7 +570,7 @@ test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip
     'the truncate far bound changed form; update the parity reader',
   );
   const truncate = recipe.match(
-    /case Op::TRUNCATE:\s*return step\.param >= ConwayGraph::T_TRUNCATE_ARRIVAL_MIN &&\s*step\.param <= ConwayGraph::T_TRUNCATE_FAR_MAX &&\s*step\.param != ([0-9.]+)f;/,
+    /case Op::TRUNCATE:\s*return step\.param >= ConwayGraph::T_TRUNCATE_ARRIVAL_MIN &&\s*step\.param <= ConwayGraph::T_TRUNCATE_FAR_MAX &&\s*\(step\.param <= ([0-9.]+)f - ConwayGraph::T_EPS_AMBO \|\| step\.param > ([0-9.]+)f\);/,
   );
   assert.ok(truncate,
     'is_morphable_step no longer uses the parsed truncate bounds and exclusion');
@@ -586,7 +586,11 @@ test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip
       chamfer: MORPH_SWEEP.chamfer.t,
     },
     {
-      truncate: { min: truncateMin, max: 1 - amboEpsilon, excluded: [Number(truncate[1])] },
+      truncate: {
+        min: truncateMin,
+        max: 1 - amboEpsilon,
+        excluded: { lower: Number(truncate[1]) - amboEpsilon, upper: Number(truncate[2]) },
+      },
       chamfer: { min: chamferMin, max: chamferMax },
     },
     'src/workbench/solids/solid_codegen.js MORPH_SWEEP drifted from the installed engine pin',

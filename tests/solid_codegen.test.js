@@ -1016,12 +1016,17 @@ test('unsweepableReason names the ops the engine morph path declines', () => {
     'the slider also reaches below it');
 });
 
-test('truncate reports the topology pinch after conversion to engine float precision', () => {
+test('truncate reports the excluded topology interval at engine float precision', () => {
   for (const t of [0.5, 0.5 - 2 ** -26, 0.5 + 2 ** -26]) {
     assert.match(unsweepableReason({ op: 'truncate', params: { t } }),
       /^truncate cannot sweep t at 0\.5:/, `${t} becomes the engine pinch`);
   }
-  for (const t of [0.5 - 2 ** -25, 0.5 + 2 ** -24]) {
+  const lower = Math.fround(0.495);
+  for (const t of [lower + 2 ** -25, 0.499, 0.5 - 2 ** -25]) {
+    assert.match(unsweepableReason({ op: 'truncate', params: { t } }),
+      /^truncate cannot sweep t at /, `${t} lies inside the excluded interval`);
+  }
+  for (const t of [lower - 2 ** -25, lower, lower + 2 ** -27, 0.5 + 2 ** -24]) {
     assert.equal(unsweepableReason({ op: 'truncate', params: { t } }), null,
       `${t} remains outside the pinch`);
   }
@@ -1033,13 +1038,14 @@ test('a slider reaching past its swept band is reported rather than silent', () 
   const overreaching = [];
   for (const [op, band] of Object.entries(MORPH_SWEEP)) {
     if (!band) continue;
-    for (const [key, { min, max, excluded = [] }] of Object.entries(band)) {
+    for (const [key, { min, max, excluded }] of Object.entries(band)) {
       const def = OP_DEFS[op].params[key];
       assert.ok(def, `MORPH_SWEEP bounds ${op}.${key}, which OP_DEFS does not declare`);
       if (def.min >= min && def.max <= max) {
         for (const endpoint of [def.min, def.max]) {
           const reason = unsweepableReason({ op, params: { [key]: endpoint } });
-          if (excluded.includes(Math.fround(endpoint))) {
+          if (excluded && Math.fround(endpoint) > Math.fround(excluded.lower)
+              && Math.fround(endpoint) <= Math.fround(excluded.upper)) {
             assert.match(reason, new RegExp(`^${op} cannot sweep ${key}`));
           } else {
             assert.equal(reason, null, `${op}.${key}=${endpoint} remains inside its band`);
