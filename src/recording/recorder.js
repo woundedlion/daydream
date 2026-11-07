@@ -96,14 +96,16 @@ export class VideoRecorder {
   /**
    * Constructs a recorder bound to a source canvas.
    * @param {HTMLCanvasElement} canvas - Source canvas to record.
-   * @param {number} frameInterval - Seconds per frame for timed capture fallback
+   * @param {object} [options] - Capture timing and document.
+   * @param {number} [options.frameInterval] - Seconds per frame for timed capture fallback
    *   (defaults to the simulation rate, 1/FPS).
-   * @param {() => number} now - Monotonic clock returning milliseconds.
-   * @param {Document} [doc] - Document the capture canvas and download anchor are
+   * @param {() => number} [options.now] - Monotonic clock returning milliseconds.
+   * @param {Document} [options.doc] - Document the capture canvas and download anchor are
    *   created in; defaults to the global `document`.
    */
-  constructor(canvas, frameInterval = 1 / FPS, now = () => performance.now(),
-              doc = globalThis.document) {
+  constructor(canvas, {
+    frameInterval = 1 / FPS, now = () => performance.now(), doc = globalThis.document,
+  } = {}) {
     this.canvas = canvas;
     this.doc = doc;
     this.visibilityChanged = () => {
