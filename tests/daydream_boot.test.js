@@ -480,6 +480,23 @@ test('a failed engine load disposes the app through the retained teardown', asyn
     'a listener that outlives the failed load reports into a dead app');
 });
 
+test('a WASM link failure reports a load failure and the stale module remedy', async () => {
+  const capture = installConsoleCapture('error', 'warn', 'log');
+  try {
+    const app = startApp({
+      loadModule: () => Promise.reject(new WebAssembly.RuntimeError('Aborted(LinkError: incompatible module)')),
+    });
+    await app.teardown.ready;
+    const overlay = app.elements.get('loading-overlay');
+    assert.equal(overlay.querySelector('.load-error-title').textContent,
+      'Failed to load the rendering engine.');
+    assert.match(overlay.querySelector('.load-error-remedy').textContent,
+      /Reload re-fetches the whole module graph/);
+  } finally {
+    capture.restore();
+  }
+});
+
 test('a module that lands after the page was discarded builds no engine', async () => {
   const module = fakeWasmModule();
   let deliver;

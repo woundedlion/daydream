@@ -337,7 +337,7 @@ export function start({
       testAllController.setValue(false);
       testAllController.disable();
     }
-    if (host.moduleDead(err)) {
+    if (host.module && host.moduleDead(err)) {
       reportBootFailure(MODULE_TRAP_NOTICE, { document: doc, location: win.location });
       return;
     }

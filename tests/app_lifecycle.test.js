@@ -1049,7 +1049,10 @@ test('a startup module trap reports its remedy and stops the test walk before te
     });
   const handlers = createModuleLoadHandlers({
     teardown: () => ({ disposed: () => false, dispose: () => log.push('dispose') }),
-    start: () => { throw new WebAssembly.RuntimeError('unreachable'); },
+    start: (module) => {
+      host.module = module;
+      throw new WebAssembly.RuntimeError('unreachable');
+    },
     reportFailure,
   });
   await Promise.resolve({}).then(handlers.onModuleReady).catch(handlers.onModuleFailed);

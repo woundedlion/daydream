@@ -163,6 +163,7 @@ export function bootRemedy(error) {
   if (error instanceof StaleModuleError) return STALE_MODULE_REMEDY;
   if (error instanceof ModuleImportTimeoutError) return VENDOR_REMEDY;
   if (detail.startsWith('SyntaxError')
+      || /^RuntimeError: Aborted\((?:CompileError|LinkError)\b/.test(detail)
       || (typeof globalThis.WebAssembly?.LinkError === 'function'
         && error instanceof globalThis.WebAssembly.LinkError)
       || (typeof globalThis.WebAssembly?.CompileError === 'function'

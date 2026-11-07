@@ -365,7 +365,7 @@ test('shell lint has no workflow-wide excluded diagnostics', () => {
   assert.doesNotMatch(suite, /actionlint[^\n]*\s-ignore\b/);
 });
 
-test('engine bundle API failures stop the gate instead of entering its poll timeout', () => {
+test('an inaccessible engine CI run list fails fast on the first poll', () => {
   const gate = workflowText('engine-bundle.yml');
   assert.match(gate, /Cannot query engine CI; check token access[^\n]+\n\s+exit 1/);
   assert.match(gate, /actions: read/);
