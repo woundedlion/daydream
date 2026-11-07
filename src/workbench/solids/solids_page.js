@@ -519,7 +519,7 @@ function reloadSavedSolids(event) {
   if (event.key !== SAVED_SOLIDS_KEY && event.key !== null) return;
   const loaded = loadSavedSolids(savedStore.storage);
   savedSolids.splice(0, savedSolids.length, ...loaded.entries);
-  savedStorage.rejected.push(...loaded.rejected);
+  savedStorage.rejected.splice(0, savedStorage.rejected.length, ...loaded.rejected);
   savedStorage.notice = [savedStore.notice, loaded.notice].filter(Boolean).join(' ');
   if (savedStorageStatus) savedStorageStatus.textContent = savedStorage.notice;
   renderSavedList();
