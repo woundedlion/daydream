@@ -574,6 +574,7 @@ export class Daydream {
       this.povResetPending = false;
       this.needsRender = true;
     }
+    const panelDue = advanced || this.paused || this.needsRender;
     if (this.povSweep && isViewLive(this.pixels)) {
       if (!this.povResetPending && (this.paused ? captureReady : advanced))
         this.povSweep.beginFrame(this.pixels);
@@ -582,7 +583,7 @@ export class Daydream {
       if (this.timeAccumulator !== previousSweepTime)
         this.needsRender = true;
     }
-    if (advanced || this.paused || this.needsRender) adapter?.sync?.(advanced);
+    if (panelDue) adapter?.sync?.(advanced);
 
     // Services live pointer interaction; emits 'change' (→ needsRender).
     this.controls.update();
