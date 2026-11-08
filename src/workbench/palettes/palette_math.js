@@ -141,50 +141,9 @@ export class ProceduralPalette {
 }
 
 /**
- * The named procedural palettes, mirrored from HS_PROCEDURAL_PALETTE_LIST in
- * core/color/palettes.h. Each entry's a/b/c/d are the cosine-formula
- * coefficient vec3s in that macro's order.
- * @type {{name:string, a:number[], b:number[], c:number[], d:number[]}[]}
- */
-export const NAMED_PROCEDURAL_PALETTES = [
-  { name: 'DARK_RAINBOW', a: [0.367, 0.367, 0.367], b: [0.500, 0.500, 0.500], c: [1.000, 1.000, 1.000], d: [0.000, 0.330, 0.670] },
-  { name: 'BLOOD_STREAM', a: [0.169, 0.169, 0.169], b: [0.313, 0.313, 0.313], c: [0.231, 0.231, 0.231], d: [0.036, 0.366, 0.706] },
-  { name: 'VINTAGE_SUNSET', a: [0.256, 0.256, 0.256], b: [0.500, 0.080, 0.500], c: [0.277, 0.277, 0.277], d: [0.000, 0.330, 0.670] },
-  { name: 'RICH_SUNSET', a: [0.309, 0.500, 0.500], b: [1.000, 1.000, 0.500], c: [0.149, 0.148, 0.149], d: [0.132, 0.222, 0.521] },
-  { name: 'UNDERSEA', a: [0.000, 0.000, 0.000], b: [0.500, 0.276, 0.423], c: [0.296, 0.296, 0.296], d: [0.374, 0.941, 0.000] },
-  { name: 'LATE_SUNSET', a: [0.337, 0.500, 0.096], b: [0.500, 1.000, 0.176], c: [0.261, 0.261, 0.261], d: [0.153, 0.483, 0.773] },
-  { name: 'MANGO_PEEL', a: [0.500, 0.500, 0.500], b: [0.500, 0.080, 0.500], c: [0.431, 0.431, 0.431], d: [0.566, 0.896, 0.236] },
-  { name: 'ICE_MELT', a: [0.500, 0.500, 0.500], b: [0.500, 0.500, 0.500], c: [0.083, 0.147, 0.082], d: [0.579, 0.353, 0.244] },
-  { name: 'LEMON_LIME', a: [0.455, 0.455, 0.455], b: [0.571, 0.151, 0.571], c: [0.320, 0.320, 0.320], d: [0.087, 0.979, 0.319] },
-  { name: 'ALGAE', a: [0.210, 0.210, 0.210], b: [0.500, 1.000, 0.021], c: [0.086, 0.086, 0.075], d: [0.419, 0.213, 0.436] },
-  { name: 'EMBERS', a: [0.500, 0.500, 0.500], b: [0.500, 0.500, 0.500], c: [0.265, 0.285, 0.198], d: [0.577, 0.440, 0.358] },
-  { name: 'FIRE_GLOW', a: [0.000, 0.000, 0.000], b: [0.560, 0.560, 0.560], c: [0.216, 0.346, 0.174], d: [0.756, 0.542, 0.279] },
-  { name: 'DARK_PRIMARY', a: [0.500, 0.500, 0.500], b: [0.500, 0.610, 0.500], c: [0.746, 0.347, 0.000], d: [0.187, 0.417, 0.670] },
-  { name: 'MAUVE_FADE', a: [0.583, 0.000, 0.583], b: [1.000, 0.000, 1.000], c: [0.191, 0.348, 0.191], d: [0.175, 0.045, 0.150] },
-  { name: 'LAVENDER_LAKE', a: [0.473, 0.473, 0.473], b: [0.500, 0.500, 0.500], c: [0.364, 0.124, 0.528], d: [0.142, 0.378, 0.876] },
-  { name: 'DESERT_ROSE', a: [0.500, 0.500, 0.500], b: [0.500, 0.270, 0.442], c: [0.303, 1.012, 0.585], d: [0.985, 0.720, 0.212] },
-  { name: 'BRUISED_MOSS', a: [0.500, 0.500, 0.500], b: [0.500, 0.500, 0.500], c: [0.142, 0.252, 0.000], d: [0.492, 0.200, 0.670] },
-  { name: 'BRUISED_BANANA', a: [0.175, 0.470, 0.171], b: [1.000, 0.622, 0.000], c: [0.191, 0.191, 0.191], d: [0.629, -0.417, 0.444] },
-  { name: 'BRIGHT_SUNRISE', a: [0.620, 0.620, 0.620], b: [0.742, 0.742, 0.742], c: [0.162, 0.286, 0.012], d: [0.090, 0.205, 0.688] },
-  { name: 'FIRE_AND_ICE', a: [0.500, 0.500, 0.500], b: [0.500, 0.500, 0.500], c: [0.955, 1.004, 0.910], d: [0.167, 0.018, 0.930] },
-  { name: 'PEACH_POP', a: [1.000, 0.144, 0.175], b: [0.543, 0.543, 0.543], c: [0.507, 0.409, 0.507], d: [0.001, 0.002, 0.620] },
-  { name: 'TIDAL_JADE', a: [0.075, 0.405, 0.430], b: [0.065, 0.365, 0.320], c: [0.500, 0.500, 0.500], d: [0.500, 0.500, 0.500] },
-  { name: 'BLUE_LAGOON', a: [0.253, 0.500, 1.000], b: [0.500, 0.844, 1.000], c: [0.232086, 0.232086, 0.232086], d: [0.279882, 0.609882, 0.949882] },
-  { name: 'ORANGE_CRUSH', a: [0.575, 0.168, 0.464], b: [0.406, 0.697, 0.357], c: [0.000, -0.10051, -0.042778], d: [0.141, 0.25551, 0.579778] },
-  { name: 'PLUM_SUNRISE', a: [0.407, 0.000, 0.296], b: [0.332, 0.592, 0.029], c: [0.358961, 0.331145, 0.274519], d: [0.500342, 0.505109, 0.278634] },
-  { name: 'CORAL_BLUE', a: [0.4, 0.347, 0.801], b: [0.5, 0.303, 0.5], c: [0.75363518, -0.20031623, 0.0110030736], d: [0.9144297, -0.16868377, 0.40006184] },
-  { name: 'BRUISED_MANGO', a: [0.385, 0.470, 0.171], b: [1.000, 0.518, 0.000], c: [0.191, 0.191, 5.000], d: [0.619, -0.427, 0.887] },
-];
-for (const entry of NAMED_PROCEDURAL_PALETTES) {
-  for (const coefficients of [entry.a, entry.b, entry.c, entry.d]) Object.freeze(coefficients);
-  Object.freeze(entry);
-}
-Object.freeze(NAMED_PROCEDURAL_PALETTES);
-
-/**
  * Flattens a palette's a/b/c/d coefficient vec3s into the tool's 12-key
  * `parameters` object (A_R..D_B).
- * @param {{a:number[], b:number[], c:number[], d:number[]}} palette - A {a,b,c,d} coefficient set (e.g. a NAMED_PROCEDURAL_PALETTES entry).
+ * @param {{a:number[], b:number[], c:number[], d:number[]}} palette - A {a,b,c,d} coefficient set (e.g. a named_procedural_palettes() entry).
  * @returns {ProceduralParams} The flattened coefficients.
  */
 export function proceduralPaletteParams({ a, b, c, d }) {
@@ -198,7 +157,7 @@ export function proceduralPaletteParams({ a, b, c, d }) {
 
 /**
  * Title-cases an UPPER_SNAKE palette name for display.
- * @param {string} name - A NAMED_PROCEDURAL_PALETTES name, e.g. 'DARK_RAINBOW'.
+ * @param {string} name - An UPPER_SNAKE palette name, e.g. 'DARK_RAINBOW'.
  * @returns {string} The display name, e.g. 'Dark Rainbow'.
  */
 export function prettyPaletteName(name) {
@@ -213,7 +172,7 @@ const GRADIENT_STOPS = 96;
 /**
  * A left-to-right CSS gradient previewing a named palette, sampled through
  * ProceduralPalette.
- * @param {{a:number[], b:number[], c:number[], d:number[]}} entry - A NAMED_PROCEDURAL_PALETTES entry.
+ * @param {{a:number[], b:number[], c:number[], d:number[]}} entry - A named_procedural_palettes() entry.
  * @param {number} [stopCount] - How many colors the gradient carries.
  * @returns {string} A `linear-gradient(...)` value for the swatch background.
  */

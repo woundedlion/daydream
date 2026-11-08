@@ -183,19 +183,27 @@ test('ProceduralPalette golden linear values (absolute pin)', () => {
   assert.deepEqual(at(0.25), [14028, 338, 56614]);
 });
 
-/**
- * Pins palette_math.js's NAMED_PROCEDURAL_PALETTES table, a transcription of
- * core/color/palettes.h, to the engine's own roster: name, order and all twelve
- * a/b/c/d coefficients. Each mirrored coefficient is rounded through
- * Math.fround, so the comparison is exact.
- */
-test('NAMED_PROCEDURAL_PALETTES matches the engine table (named_procedural_palettes)', () => {
-  const toFloat32 = (vec3) => vec3.map((v) => Math.fround(v));
-  const mirror = P.NAMED_PROCEDURAL_PALETTES.map(({ name, a, b, c, d }) => ({
-    name,
-    a: toFloat32(a), b: toFloat32(b), c: toFloat32(c), d: toFloat32(d),
-  }));
-  assert.deepEqual(M.named_procedural_palettes(), mirror);
+test('the exported named procedural palettes are uniquely named, labelled and render a gradient', () => {
+  const palettes = M.named_procedural_palettes();
+  assert.ok(palettes.length > 0);
+  assert.equal(new Set(palettes.map(({ name }) => name)).size, palettes.length, 'repeated name');
+  for (const { name, a, b, c, d } of palettes) {
+    assert.match(name, /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/);
+    assert.doesNotMatch(P.prettyPaletteName(name), /_/, name);
+    for (const vec3 of [a, b, c, d]) {
+      assert.ok(vec3.length === 3 && vec3.every(Number.isFinite), name);
+    }
+    const palette = new P.ProceduralPalette(a, b, c, d);
+    const ramp = [];
+    for (let i = 0; i <= 32; i++) ramp.push(palette.get(i / 32));
+    const bad = ramp.flat().find((channel) => !(Number.isFinite(channel) && channel >= 0 && channel <= 1));
+    assert.equal(bad, undefined, `${name} renders ${bad} outside [0, 1]`);
+    const spans = [0, 1, 2].map((channel) => {
+      const samples = ramp.map((rgb) => rgb[channel]);
+      return Math.max(...samples) - Math.min(...samples);
+    });
+    assert.ok(Math.max(...spans) > 0.05, `${name} renders a flat ramp`);
+  }
 });
 
 const PALETTE_V4_ENUM_CONTRACT = Object.freeze({
@@ -727,8 +735,7 @@ test('mobius golden images (absolute pin)', () => {
 });
 
 test('every named procedural palette evaluates within one linear LSB', () => {
-  assert.ok(P.NAMED_PROCEDURAL_PALETTES.length > 0);
-  for (const { name, a, b, c, d } of P.NAMED_PROCEDURAL_PALETTES) {
+  for (const { name, a, b, c, d } of M.named_procedural_palettes()) {
     const palette = new P.ProceduralPalette(a, b, c, d);
     for (const t of [-1, 0, 0.25, 0.5, 0.75, 1, 2]) {
       const color = M.procedural_palette_linear(...a, ...b, ...c, ...d, t);

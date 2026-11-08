@@ -7,7 +7,7 @@ import {
   mapValue, waveGraphBand, WAVE_GRAPH_VALUE_RANGE,
   proceduralPaletteCpp, proceduralParamsForViewport,
   generativePaletteCpp, setPaletteOps,
-  NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
+  proceduralPaletteParams,
   paletteCompileError, paletteAdjustmentSummary,
   prettyPaletteName, paletteGradientCss,
 } from '../src/workbench/palettes/palette_math.js';
@@ -89,50 +89,20 @@ test('ProceduralPalette.get at t=0, t=0.25 and t=0.5 for a known coefficient set
   assert.ok(Math.abs(p.getChannelValues(0.5)[0] - 0.0) < NEAR);
 });
 
-/** Verifies the named-palette table is a non-empty set of uniquely named {name, a,b,c,d} vec3 entries. */
-test('NAMED_PROCEDURAL_PALETTES is a well-formed table of coefficient vec3s', () => {
-  assert.ok(Array.isArray(NAMED_PROCEDURAL_PALETTES) && NAMED_PROCEDURAL_PALETTES.length > 0);
-  const names = new Set();
-  for (const entry of NAMED_PROCEDURAL_PALETTES) {
-    assert.equal(typeof entry.name, 'string');
-    assert.ok(entry.name.length > 0);
-    assert.ok(!names.has(entry.name), `duplicate palette name ${entry.name}`);
-    names.add(entry.name);
-    for (const key of ['a', 'b', 'c', 'd']) {
-      assert.ok(Array.isArray(entry[key]) && entry[key].length === 3, `${entry.name}.${key} is a vec3`);
-      for (const ch of entry[key]) assert.ok(Number.isFinite(ch), `${entry.name}.${key} channel finite`);
-    }
-  }
-  assert.ok(names.has('DARK_RAINBOW'));
-});
+// Cosine coefficient sets spanning in-phase, offset and negative channel frequencies.
+const COEFFICIENT_FIXTURES = [
+  { name: 'PHASE_OFFSET', a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1, 1, 1], d: [0, 0.33, 0.67] },
+  { name: 'WARM', a: [1, 0.144, 0.175], b: [0.543, 0.543, 0.543], c: [0.507, 0.409, 0.507], d: [0.001, 0.002, 0.62] },
+  { name: 'NEGATIVE', a: [0.575, 0.168, 0.464], b: [0.406, 0.697, 0.357], c: [0, -0.10051, -0.042778], d: [0.141, 0.25551, 0.579778] },
+];
 
 /**
- * Verifies every named palette, including the negative-frequency entries,
- * renders finite in-range linear color across the domain, and that the ramp
- * carries a gradient rather than one flat color.
- */
-test('NAMED_PROCEDURAL_PALETTES all render across the domain', () => {
-  for (const entry of NAMED_PROCEDURAL_PALETTES) {
-    const pal = new ProceduralPalette(entry.a, entry.b, entry.c, entry.d);
-    const ramp = [];
-    for (let i = 0; i <= 32; i++) ramp.push(pal.get(i / 32));
-    const bad = ramp.flat().find((ch) => !(Number.isFinite(ch) && ch >= 0 && ch <= 1));
-    assert.equal(bad, undefined, `${entry.name} renders ${bad} outside [0, 1]`);
-    const spans = [0, 1, 2].map((channel) => {
-      const samples = ramp.map((rgb) => rgb[channel]);
-      return Math.max(...samples) - Math.min(...samples);
-    });
-    assert.ok(Math.max(...spans) > 0.05, `${entry.name} renders a flat ramp`);
-  }
-});
-
-/**
- * Verifies the cosine's range reduction handles negative frequencies: PEACH_POP
+ * Verifies the cosine's range reduction handles negative frequencies: a palette
  * with C negated and D advanced by C is the same sweep reversed, so it must
- * equal PEACH_POP sampled at 1 - t.
+ * equal the original sampled at 1 - t.
  */
 test('ProceduralPalette negative frequency reverses the positive-frequency twin', () => {
-  const forward = NAMED_PROCEDURAL_PALETTES.find(entry => entry.name === 'PEACH_POP');
+  const forward = COEFFICIENT_FIXTURES[1];
   const reverse = {
     ...forward,
     c: forward.c.map(c => -c),
@@ -188,7 +158,7 @@ test('the reparameterized palette samples the window it stands for', () => {
   const viewport = { start: 0.2, end: 0.6 };
   const span = viewport.end - viewport.start;
 
-  for (const entry of NAMED_PROCEDURAL_PALETTES) {
+  for (const entry of COEFFICIENT_FIXTURES) {
     const parameters = proceduralPaletteParams(entry);
     const full = ProceduralPalette.fromParams(parameters);
     const windowed = ProceduralPalette.fromParams(proceduralParamsForViewport(parameters, viewport));
@@ -438,13 +408,10 @@ test('palette names are title-cased for the gallery', () => {
   assert.equal(prettyPaletteName('DARK_RAINBOW'), 'Dark Rainbow');
   assert.equal(prettyPaletteName('EMBERS'), 'Embers');
   assert.equal(prettyPaletteName('FIRE_AND_ICE'), 'Fire And Ice');
-  for (const entry of NAMED_PROCEDURAL_PALETTES)
-    assert.doesNotMatch(prettyPaletteName(entry.name), /_/,
-      'every shipped palette gets a readable label');
 });
 
 test('a gallery swatch is a gradient sampled off the palette it loads', () => {
-  const entry = NAMED_PROCEDURAL_PALETTES[0];
+  const entry = COEFFICIENT_FIXTURES[0];
   const palette = new ProceduralPalette(entry.a, entry.b, entry.c, entry.d);
   const stops = paletteGradientCss(entry, 4)
     .match(/^linear-gradient\(to right, (.*)\)$/)[1].split(', ');

@@ -11,7 +11,7 @@ import {
   ProceduralPalette, GenerativePalette,
   proceduralPaletteCpp, proceduralParamsForViewport,
   generativePaletteCpp, setPaletteOps,
-  NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
+  proceduralPaletteParams,
   paletteGradientCss, prettyPaletteName, paletteAdjustmentSummary,
 } from './palette_math.js';
 import {
@@ -80,6 +80,8 @@ let wasmModule = null;
 const recipeModel = new PaletteRecipeModel();
 /** @type {Array<{name:string,randomHue:boolean,recipe:import('./palette_controls.js').PaletteRecipe}>} */
 let effectPalettePresets = [];
+/** @type {Array<{name:string, a:number[], b:number[], c:number[], d:number[]}>} */
+let namedPalettes = [];
 const paletteViewport = createPaletteViewport();
 
 /** @type {HTMLCanvasElement} */
@@ -390,12 +392,12 @@ function loadNamedPalette(entry) {
 
 /**
  * Populates the named-palette gallery with a clickable gradient swatch per
- * entry in NAMED_PROCEDURAL_PALETTES.
+ * named procedural palette the engine exports.
  */
 function buildPaletteGallery() {
   const gallery = /** @type {HTMLElement} */ (document.getElementById('palette_gallery'));
   if (!gallery) return;
-  NAMED_PROCEDURAL_PALETTES.forEach(entry => {
+  namedPalettes.forEach(entry => {
     const label = prettyPaletteName(entry.name);
 
     const button = document.createElement('button');
@@ -491,6 +493,7 @@ async function init() {
     paletteOps = /** @type {NonNullable<typeof paletteOps>} */ (new wasm.PaletteOps());
     setPaletteOps(paletteOps, wasm);
     effectPalettePresets = /** @type {typeof effectPalettePresets} */ (Array.from(paletteOps.effectPresetsV4()));
+    namedPalettes = Array.from(wasm.named_procedural_palettes());
   } catch (e) {
     if (wasmModule && engineTrapped(e)) return;
     setPaletteOps(null);
