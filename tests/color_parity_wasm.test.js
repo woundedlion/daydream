@@ -7,7 +7,6 @@
 import {oklchLinearRgb, maxSrgbGamutChroma} from '../src/workbench/palettes/palette_wheel.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import createHolosphereModule from '../generated/holosphere_wasm.js';
 import * as C from '../src/shared/color.js';
@@ -119,30 +118,31 @@ test('widest sRGB gamut chroma tracks the engine boundary solver', () => {
 });
 
 /**
- * Pins the engine's integer HSV sextant split (hsv_to_rgb) to fixed golden bytes.
- * The C++ path splits the wheel into six 43-wide regions (primaries land on
- * 0/86/172) and mixes channels with >>8 fixed-point math. The out-of-range rows
- * confirm the uint8_t cast wraps mod 256.
+ * Checks the engine's integer HSV conversion (hsv_to_rgb) against the defining
+ * properties of HSV: the largest channel is the value, the smallest falls by
+ * the saturation, the primaries sit on the sextant boundaries 0/86/172, and the
+ * uint8_t hue wraps mod 256.
  */
-test('HSV sextant golden bytes (hsv_to_rgb, absolute pin)', () => {
-  const golden = [
-    [[0, 255, 255], [255, 0, 0]],
-    [[43, 255, 255], [254, 255, 0]],
-    [[86, 255, 255], [0, 255, 0]],
-    [[128, 255, 255], [0, 255, 252]],
-    [[172, 255, 255], [0, 0, 255]],
-    [[215, 255, 255], [255, 0, 254]],
-    [[30, 128, 200], [200, 170, 99]],
-    [[100, 0, 180], [180, 180, 180]],
-    [[50, 255, 0], [0, 0, 0]],
-    [[256, 128, 200], [200, 100, 99]],
-    [[-1, 128, 200], [200, 99, 105]],
-  ];
-  for (const [[h, s, v], [r, g, b]] of golden) {
+test('HSV conversion keeps value, saturation, primaries and hue wrap (hsv_to_rgb)', () => {
+  const channels = (h, s, v) => {
     const w = M.hsv_to_rgb(h, s, v);
-    assert.ok(w.r === r && w.g === g && w.b === b,
-      `hsv_to_rgb(${h},${s},${v}): wasm(${w.r},${w.g},${w.b}) golden(${r},${g},${b})`);
+    return [w.r, w.g, w.b];
+  };
+  for (let h = 0; h < 256; h += 5) {
+    for (const s of [0, 1, 64, 128, 200, 255]) {
+      for (const v of [0, 1, 50, 128, 200, 255]) {
+        const rgb = channels(h, s, v);
+        const label = `hsv_to_rgb(${h},${s},${v}) = ${rgb}`;
+        assert.equal(Math.max(...rgb), v, label);
+        assert.ok(Math.abs(Math.min(...rgb) - v * (255 - s) / 255) <= 1.5, label);
+        assert.deepEqual(channels(h + 256, s, v), rgb, label);
+        assert.deepEqual(channels(h - 256, s, v), rgb, label);
+      }
+    }
   }
+  assert.deepEqual(channels(0, 255, 255), [255, 0, 0]);
+  assert.deepEqual(channels(86, 255, 255), [0, 255, 0]);
+  assert.deepEqual(channels(172, 255, 255), [0, 0, 255]);
 });
 
 /**
@@ -170,18 +170,38 @@ test('ProceduralPalette cosine parity (procedural_palette_linear)', () => {
 });
 
 /**
- * Pins the engine's procedural_palette_linear output to fixed golden 16-bit
- * linear values.
+ * Checks procedural_palette_linear against the cosine formula
+ * clamp(a + b cos(2π(c t + d)), 0, 1), evaluated in the test, for coefficient
+ * sets that clamp at both ends, wrap the phase, flip the amplitude and run at
+ * high frequency. The engine's 16-bit linear output must land within one 8-bit
+ * sRGB code of the formula.
  */
-test('ProceduralPalette golden linear values (absolute pin)', () => {
-  const a = [0.5, 0.5, 0.5], b = [0.5, 0.5, 0.5], c = [1, 1, 1], d = [0, 0.33, 0.67];
-  const at = (t) => {
-    const w = M.procedural_palette_linear(
-      a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], d[0], d[1], d[2], t);
-    return [w.r, w.g, w.b];
+test('ProceduralPalette follows the clamped cosine formula (procedural_palette_linear)', () => {
+  const sets = {
+    clampHigh: { a: [0.9, 0.8, 0.7], b: [0.5, 0.5, 0.5], c: [1, 1, 1], d: [0, 0.25, 0.5] },
+    clampLow: { a: [0.1, 0.2, 0.3], b: [0.5, 0.5, 0.5], c: [1, 1, 1], d: [0, 0.25, 0.5] },
+    phaseWrap: { a: [0.5, 0.5, 0.5], b: [0.4, 0.4, 0.4], c: [1, 1, 1], d: [1.3, -0.6, 2.75] },
+    negativeB: { a: [0.5, 0.5, 0.5], b: [-0.45, -0.3, -0.15], c: [1, 2, 0.5], d: [0.1, 0.2, 0.3] },
+    highFrequency: { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [7.3, 11, 16], d: [0, 0.33, 0.67] },
   };
-  assert.deepEqual(at(0.5), [0, 33327, 33327]);
-  assert.deepEqual(at(0.25), [14028, 338, 56614]);
+  const clamped = { low: 0, high: 0 };
+  for (const [name, { a, b, c, d }] of Object.entries(sets)) {
+    for (let i = 0; i <= 256; i++) {
+      const t = i / 256;
+      const w = M.procedural_palette_linear(
+        a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], d[0], d[1], d[2], t);
+      [w.r, w.g, w.b].forEach((linear, ch) => {
+        const raw = a[ch] + b[ch] * Math.cos(2 * Math.PI * (c[ch] * t + d[ch]));
+        if (raw < 0) clamped.low++;
+        if (raw > 1) clamped.high++;
+        const expected = Math.min(1, Math.max(0, raw));
+        const actual = C.linearToSrgbFloat(linear / 65535);
+        assert.ok(Math.abs(actual - expected) * 255 <= 1,
+          `${name} t=${t} ch=${ch}: engine ${actual} formula ${expected}`);
+      });
+    }
+  }
+  assert.ok(clamped.low > 0 && clamped.high > 0, 'the sets reach both clamps');
 });
 
 test('the exported named procedural palettes are uniquely named, labelled and render a gradient', () => {
@@ -207,101 +227,224 @@ test('the exported named procedural palettes are uniquely named, labelled and re
   }
 });
 
-const PALETTE_V4_ENUM_CONTRACT = Object.freeze({
-  hueMode: { field: 4, members: [
-    ['HARMONY', 0, '5d91f7f1d76267a7'],
-    ['SWEEP', 1, 'a60244b6c2fe8333'],
-    ['CUSTOM', 2, 'd08915eb2126bec3'],
-  ] },
-  harmony: { field: 5, members: [
-    ['MONOCHROMATIC', 0, 'a946d6234a3cc136'],
-    ['ANALOGOUS', 1, '5d91f7f1d76267a7'],
-    ['ACCENTED_ANALOGOUS', 2, '4e1bc86da232c6eb'],
-    ['COMPLEMENTARY', 3, 'f83c70aa7a5ee830'],
-    ['SPLIT_COMPLEMENTARY', 4, '0a8168162973aa82'],
-    ['TRIADIC', 5, 'f8be02ee017c1394'],
-    ['TETRADIC', 6, 'ee8ed641095ec256'],
-    ['SQUARE', 7, 'f7dd21d3e85cca1b'],
-  ] },
-  direction: { field: 6, members: [
-    ['SHORTEST', 0, '5d91f7f1d76267a7'],
-    ['CLOCKWISE', 1, '92a5f30fdc6bd1b6'],
-    ['COUNTERCLOCKWISE', 2, '0098cc1e5cedb9a5'],
-  ] },
-  curve: { field: 14, members: [
-    ['CONSTANT', 0, 'de720b6cd67848b9'],
-    ['ASCENDING', 1, '46fb015e6a9bbc0c'],
-    ['DESCENDING', 2, '3704b0e3e560dac8'],
-    ['BELL', 3, '5d91f7f1d76267a7'],
-    ['CUP', 4, 'b3cf93fad7188763'],
-    ['CUSTOM', 5, '5be955544e7c0607'],
-  ] },
-  chromaCurve: { field: 21, members: [
-    ['CONSTANT', 0, 'd550412f08500229'],
-    ['ASCENDING', 1, '645e06f0bafb23d2'],
-    ['DESCENDING', 2, 'b27b4bd77c5de496'],
-    ['BELL', 3, '2b9bcda303cb2108'],
-    ['CUP', 4, '5d91f7f1d76267a7'],
-    ['CUSTOM', 5, '5843f69773c4f711'],
-  ] },
-  chromaBasis: { field: 22, members: [
-    ['LOCAL_GAMUT', 0, '5d91f7f1d76267a7'],
-    ['PATH_MINIMUM', 1, 'error:3:22'],
-    ['ABSOLUTE', 2, '9106f369ad1de6e7'],
-  ] },
-  colorPath: { field: 3, members: [
-    ['OKLCH_ARC', 0, '5d91f7f1d76267a7'],
-    ['OKLAB_CARTESIAN', 1, 'd0f0481579c8d202'],
-  ] },
-  domain: { field: 1, members: [
-    ['STRAIGHT', 0, '451451b07735d920'],
-    ['MIRROR', 1, '7699281a94883cd7'],
-    ['VIGNETTE', 2, '2633c3c8ec269acd'],
-    ['FALLOFF', 3, '693c9a874a07cb2a'],
-    ['LOOP', 4, '5d91f7f1d76267a7'],
-  ] },
-  easing: { field: 2, members: [
-    ['LINEAR', 0, 'd3b388c66941525e'],
-    ['COSINE', 1, '5d91f7f1d76267a7'],
-    ['SMOOTHSTEP', 2, 'b277e8d7d2d3f97d'],
-  ] },
+// Recipe-field ordinals the engine names when it refuses an enum value.
+const PALETTE_V4_ENUM_FIELDS = Object.freeze({
+  hueMode: 4, harmony: 5, direction: 6, curve: 14, chromaCurve: 21, chromaBasis: 22,
+  colorPath: 3, domain: 1, easing: 2,
 });
 
-function paletteEnumProbeRecipe() {
+// Persisted spellings and ordinals: deep links and saved recipes store them.
+const PALETTE_V4_ENUM_ROSTER = Object.freeze({
+  hueMode: [['HARMONY', 0], ['SWEEP', 1], ['CUSTOM', 2]],
+  harmony: [['MONOCHROMATIC', 0], ['ANALOGOUS', 1], ['ACCENTED_ANALOGOUS', 2],
+    ['COMPLEMENTARY', 3], ['SPLIT_COMPLEMENTARY', 4], ['TRIADIC', 5], ['TETRADIC', 6],
+    ['SQUARE', 7]],
+  direction: [['SHORTEST', 0], ['CLOCKWISE', 1], ['COUNTERCLOCKWISE', 2]],
+  curve: [['CONSTANT', 0], ['ASCENDING', 1], ['DESCENDING', 2], ['BELL', 3], ['CUP', 4],
+    ['CUSTOM', 5]],
+  chromaCurve: [['CONSTANT', 0], ['ASCENDING', 1], ['DESCENDING', 2], ['BELL', 3], ['CUP', 4],
+    ['CUSTOM', 5]],
+  chromaBasis: [['LOCAL_GAMUT', 0], ['PATH_MINIMUM', 1], ['ABSOLUTE', 2]],
+  colorPath: [['OKLCH_ARC', 0], ['OKLAB_CARTESIAN', 1]],
+  domain: [['STRAIGHT', 0], ['MIRROR', 1], ['VIGNETTE', 2], ['FALLOFF', 3], ['LOOP', 4]],
+  easing: [['LINEAR', 0], ['COSINE', 1], ['SMOOTHSTEP', 2]],
+});
+
+test('Palette V4 enum spellings and ordinals match the public roster', () => {
+  for (const [group, roster] of Object.entries(PALETTE_V4_ENUM_ROSTER)) {
+    const enumGroup = group === 'chromaCurve' ? 'curve' : group;
+    assert.deepEqual(Object.entries(PaletteV4[enumGroup]), roster, `${group} public roster`);
+    assert.deepEqual(roster.map(([, ordinal]) => paletteEnumName(enumGroup, ordinal)),
+      roster.map(([name]) => name), `${group} inverse roster`);
+  }
+});
+
+const TURN = 2 * Math.PI;
+const SPREAD_TURNS = 0.1;
+const BASE_TURNS = 0.1;
+const LIGHTNESS = { center: 0.5, range: 0.4, custom: [0.2, 0.75, 0.35, 0.65] };
+const CHROMA = { center: 0.45, range: 0.3, custom: [0.15, 0.7, 0.3, 0.6] };
+const SWEEP_TURNS = 0.6;
+const CUSTOM_TURNS = [0.05, 0.3, 0.7, 0];
+const ABSOLUTE_CHROMA = 0.08;
+const HEADROOM = 0.94;
+const FALLOFF_START = 0.85;
+
+/**
+ * The test-owned probe recipe: an analogous harmony over linear segments with
+ * mid-gamut lightness and chroma axes, so each enum member's effect is
+ * measurable in the inspected diagnostics.
+ * @param {(recipe: Object) => void} edit - Sets the member under test.
+ * @returns {Object} The recipe.
+ */
+function probeRecipe(edit) {
   const recipe = defaultPaletteRecipe();
-  recipe.input = { offset: 0.07, span: 0.83 };
-  recipe.easing = 1;
-  // LOOP (4) bakes the closing travel from the last key back to the first, the
-  // only step that crosses the wrap under a harmony, so SHORTEST and
-  // COUNTERCLOCKWISE bake differently. LOOP also demands a whole-turn sweep.
-  recipe.domain = 4;
-  recipe.hue = {
-    mode: 0,
-    harmony: 1,
-    direction: 0,
-    baseTurns: 0.17,
-    spreadTurns: 0.19,
-    sweepTurns: 2,
-    customTurns: [0, 0.13, 0.4, 0.83],
-  };
-  recipe.lightness = {
-    curve: 3,
-    center: 0.55,
-    range: 0.35,
-    custom: [0.2, 0.75, 0.35, 0.65],
-  };
-  recipe.chroma = {
-    curve: 4,
-    basis: 0,
-    center: 0.45,
-    range: 0.35,
-    headroom: 0.82,
-    custom: [0.15, 0.7, 0.3, 0.6],
-  };
-  recipe.hueTorsion = 0.4;
-  recipe.falloffStart = 0.9;
+  recipe.easing = PaletteV4.easing.LINEAR;
+  Object.assign(recipe.hue, {
+    baseTurns: BASE_TURNS, spreadTurns: SPREAD_TURNS, sweepTurns: SWEEP_TURNS,
+    customTurns: [...CUSTOM_TURNS],
+  });
+  Object.assign(recipe.lightness, { ...LIGHTNESS, custom: [...LIGHTNESS.custom] });
+  Object.assign(recipe.chroma, { ...CHROMA, custom: [...CHROMA.custom], headroom: HEADROOM });
+  recipe.falloffStart = FALLOFF_START;
+  edit(recipe);
   return recipe;
 }
+
+/**
+ * Inspects a recipe and splits its per-entry diagnostics into columns.
+ * @param {Object} ops - A PaletteOps handle.
+ * @param {Object} recipe - The recipe to inspect.
+ * @returns {Object} Status, LUT bytes and the L, C, q, Cmax and hue columns.
+ */
+function inspectColumns(ops, recipe) {
+  const result = ops.inspectV4(recipe);
+  if (result.status.code !== M.PaletteCompileCode.OK) return { status: result.status };
+  const diagnostics = Array.from(result.diagnostics);
+  const column = (k) => Array.from({ length: 256 }, (_, j) => diagnostics[j * 6 + k]);
+  return {
+    status: result.status, lut: Array.from(result.lut), fallback: Array.from(result.fallback),
+    L: column(0), C: column(1), q: column(2), Cmax: column(3), hue: column(4),
+  };
+}
+
+const within = (a, b, eps) => Math.abs(a - b) <= eps;
+/** @param {number[]} values @param {number} t - Position in [0, 1]. @returns {number} The value at t. */
+const sampleAt = (values, t) => {
+  const x = t * 255;
+  const lo = Math.floor(x), hi = Math.ceil(x);
+  return values[lo] + (values[hi] - values[lo]) * (x - lo);
+};
+/** @param {number} radians @returns {number} The angle in turns, wrapped into [0, 1). */
+const turnsOf = (radians) => ((radians / TURN) % 1 + 1) % 1;
+/** @param {number} a @param {number} b @returns {number} Shortest distance between two turn values. */
+const turnGap = (a, b) => Math.abs(((a - b) % 1 + 1.5) % 1 - 0.5);
+/** @param {number[]} hue @returns {number} Net winding of a hue column, in turns. */
+const winding = (hue) => hue.slice(1).reduce((sum, h, i) => {
+  const step = ((h - hue[i]) % TURN + TURN * 1.5) % TURN - TURN / 2;
+  return sum + step;
+}, 0) / TURN;
+const monotone = (values, sign) => values.slice(1).every((v, i) => sign * (v - values[i]) >= -1e-4);
+const rgbAt = (lut, j) => lut.slice(j * 3, j * 3 + 3);
+
+// Each member's defining property, checked on the probe recipe with only that
+// enum changed. Harmony offsets are the key hues relative to the base, in turns.
+const HARMONY_OFFSETS = {
+  MONOCHROMATIC: [0, 0],
+  ANALOGOUS: [-SPREAD_TURNS, 0, SPREAD_TURNS],
+  ACCENTED_ANALOGOUS: [-SPREAD_TURNS, 0, SPREAD_TURNS, 0.5],
+  COMPLEMENTARY: [0, 0.5],
+  SPLIT_COMPLEMENTARY: [0, 0.5 - SPREAD_TURNS, 0.5 + SPREAD_TURNS],
+  TRIADIC: [0, 1 / 3, 2 / 3],
+  TETRADIC: [0, SPREAD_TURNS, 0.5, 0.5 + SPREAD_TURNS],
+  SQUARE: [0, 0.25, 0.5, 0.75],
+};
+const keysAt = (offsets) => offsets.map((offset, i) => [i / (offsets.length - 1), offset]);
+const assertKeyHues = (b, keys, base, label) => {
+  for (const [t, turns] of keys) {
+    assert.ok(turnGap(turnsOf(sampleAt(b.hue, t)), base + turns) < 0.005,
+      `${label}: hue at ${t} is ${turnsOf(sampleAt(b.hue, t))}, expected ${(base + turns) % 1}`);
+  }
+};
+const low = (axis) => axis.center - axis.range / 2;
+const high = (axis) => axis.center + axis.range / 2;
+const assertCurve = (values, axis, member, label) => {
+  const at = (t) => sampleAt(values, t);
+  const eps = 0.005;
+  const shapes = {
+    CONSTANT: () => values.every((v) => within(v, axis.center, eps)),
+    ASCENDING: () => monotone(values, 1) && within(at(0), low(axis), eps) && within(at(1), high(axis), eps),
+    DESCENDING: () => monotone(values, -1) && within(at(0), high(axis), eps) && within(at(1), low(axis), eps),
+    BELL: () => within(at(0), low(axis), eps) && within(at(1), low(axis), eps)
+      && within(at(0.5), high(axis), eps),
+    CUP: () => within(at(0), high(axis), eps) && within(at(1), high(axis), eps)
+      && within(at(0.5), low(axis), eps),
+    CUSTOM: () => [0, 0.5, 1].every((t, i) => within(at(t), axis.custom[i], eps)),
+  };
+  assert.ok(shapes[member](), `${label}: ${[0, 0.25, 0.5, 0.75, 1].map(at)}`);
+};
+const easeOf = {
+  LINEAR: (p) => p,
+  COSINE: (p) => 0.5 - 0.5 * Math.cos(Math.PI * p),
+  SMOOTHSTEP: (p) => p * p * (3 - 2 * p),
+};
+
+const PALETTE_V4_PROPERTIES = {
+  hueMode: {
+    HARMONY: (b) => assertKeyHues(b, keysAt(HARMONY_OFFSETS.ANALOGOUS), BASE_TURNS, 'HARMONY'),
+    SWEEP: (b) => {
+      assert.ok(within(sampleAt(b.hue, 1) - sampleAt(b.hue, 0), SWEEP_TURNS * TURN, 0.01));
+      assertKeyHues(b, [[0, 0], [0.5, SWEEP_TURNS / 2], [1, SWEEP_TURNS]], BASE_TURNS, 'SWEEP');
+    },
+    CUSTOM: (b) => assertKeyHues(b, [[0, CUSTOM_TURNS[0]], [0.5, CUSTOM_TURNS[1]],
+      [1, CUSTOM_TURNS[2]]], 0, 'CUSTOM'),
+  },
+  harmony: Object.fromEntries(Object.entries(HARMONY_OFFSETS).map(([name, offsets]) =>
+    [name, (b) => assertKeyHues(b, keysAt(offsets), BASE_TURNS, name)])),
+  direction: {
+    SHORTEST: (b) => assert.ok(within(winding(b.hue), 0, 0.01), `winding ${winding(b.hue)}`),
+    CLOCKWISE: (b) => assert.ok(within(winding(b.hue), -1, 0.01), `winding ${winding(b.hue)}`),
+    COUNTERCLOCKWISE: (b) => assert.ok(within(winding(b.hue), 1, 0.01), `winding ${winding(b.hue)}`),
+  },
+  curve: Object.fromEntries(Object.keys(PaletteV4.curve).map((member) =>
+    [member, (b) => assertCurve(b.L, LIGHTNESS, member, `lightness ${member}`)])),
+  chromaCurve: Object.fromEntries(Object.keys(PaletteV4.curve).map((member) =>
+    [member, (b) => {
+      assertCurve(b.q, CHROMA, member, `chroma ${member}`);
+      assert.ok(b.C.every((c, j) => c <= b.Cmax[j] + 1e-6), `chroma ${member} leaves the gamut`);
+    }])),
+  chromaBasis: {
+    LOCAL_GAMUT: (b) => assert.ok(b.C.every((c, j) =>
+      within(c, Math.min(b.q[j], HEADROOM) * b.Cmax[j], 1e-3)), 'chroma is relative to the local gamut'),
+    PATH_MINIMUM: null,
+    ABSOLUTE: (b) => assert.ok(b.C.every((c, j) => b.fallback[j] !== 0 || within(c, ABSOLUTE_CHROMA, 1e-3)),
+      'chroma is the absolute OKLCh chroma'),
+  },
+  colorPath: {
+    OKLCH_ARC: (b) => assert.ok(b.C.every((c) => within(c, ABSOLUTE_CHROMA, 1e-3)),
+      'an arc keeps chroma between complementary keys'),
+    OKLAB_CARTESIAN: (b) => assert.ok(Math.min(...b.C) < ABSOLUTE_CHROMA / 10,
+      'a straight Lab segment passes near grey between complementary keys'),
+  },
+  domain: {
+    STRAIGHT: (b) => assert.ok(within(winding(b.hue), 2 * SPREAD_TURNS, 0.01),
+      'hue runs across the keys once'),
+    MIRROR: (b) => {
+      for (let j = 0; j < 128; j++) assert.deepEqual(rgbAt(b.lut, j), rgbAt(b.lut, 255 - j), `entry ${j}`);
+    },
+    VIGNETTE: (b) => {
+      assert.deepEqual([rgbAt(b.lut, 0), rgbAt(b.lut, 255)], [[0, 0, 0], [0, 0, 0]]);
+      assert.ok(Math.max(...rgbAt(b.lut, 128)) > 0);
+    },
+    FALLOFF: (b) => {
+      const start = Math.ceil(FALLOFF_START * 255);
+      for (let j = start; j < 256; j++) assert.deepEqual(rgbAt(b.lut, j), [0, 0, 0], `entry ${j}`);
+      assert.ok(Math.max(...rgbAt(b.lut, Math.floor(255 * 2 / 3))) > 0);
+    },
+    LOOP: (b) => {
+      assert.deepEqual(rgbAt(b.lut, 255), rgbAt(b.lut, 0), 'the loop closes on its first color');
+      assert.ok(turnGap(turnsOf(b.hue[255]), turnsOf(b.hue[0])) < 0.005);
+    },
+  },
+  easing: Object.fromEntries(Object.entries(easeOf).map(([member, ease]) => [member, (b) => {
+    const [first, middle] = [sampleAt(b.hue, 0), sampleAt(b.hue, 0.5)];
+    for (const j of [16, 32, 64, 96]) {
+      const expected = first + (middle - first) * ease((j / 255) / 0.5);
+      assert.ok(within(b.hue[j], expected, 0.002), `${member} entry ${j}: ${b.hue[j]} vs ${expected}`);
+    }
+  }])),
+};
+
+const PROBE_SETUP = {
+  direction: (recipe) => { recipe.domain = PaletteV4.domain.LOOP; },
+  chromaBasis: (recipe) => {
+    Object.assign(recipe.chroma, { center: ABSOLUTE_CHROMA, range: 0 });
+  },
+  colorPath: (recipe) => {
+    recipe.hue.harmony = PaletteV4.harmony.COMPLEMENTARY;
+    Object.assign(recipe.chroma, { basis: PaletteV4.chromaBasis.ABSOLUTE, center: ABSOLUTE_CHROMA, range: 0 });
+  },
+};
 
 function setPaletteEnum(recipe, group, ordinal) {
   if (group === 'hueMode') recipe.hue.mode = ordinal;
@@ -313,43 +456,32 @@ function setPaletteEnum(recipe, group, ordinal) {
   else recipe[group] = ordinal;
 }
 
-function paletteResultFingerprint(result) {
-  if (result.status.code !== M.PaletteCompileCode.OK) {
-    return `error:${result.status.code.value}:${result.status.field.value}`;
-  }
-  return createHash('sha256')
-    .update(Uint8Array.from(result.lut))
-    .digest('hex')
-    .slice(0, 16);
-}
-
-test('Palette V4 enum spellings and ordinals match the shipped engine', () => {
+test('each Palette V4 enum member bakes its defining property in the shipped engine', () => {
   const ops = new M.PaletteOps();
   try {
-    for (const [group, { field, members }] of
-      Object.entries(PALETTE_V4_ENUM_CONTRACT)) {
-      const enumGroup = group === 'chromaCurve' ? 'curve' : group;
-      const roster = members.map(([name, ordinal]) => [name, ordinal]);
-      assert.deepEqual(Object.entries(PaletteV4[enumGroup]), roster, `${group} public roster`);
-      assert.deepEqual(roster.map(([, ordinal]) => paletteEnumName(enumGroup, ordinal)),
-        roster.map(([name]) => name),
-        `${group} inverse roster`);
+    for (const [group, roster] of Object.entries(PALETTE_V4_ENUM_ROSTER)) {
+      const luts = [];
+      for (const [name, ordinal] of roster) {
+        const baked = inspectColumns(ops, probeRecipe((recipe) => {
+          PROBE_SETUP[group]?.(recipe);
+          setPaletteEnum(recipe, group, ordinal);
+        }));
+        const property = PALETTE_V4_PROPERTIES[group][name];
+        if (property === null) {
+          assert.deepEqual([baked.status.code, baked.status.field.value],
+            [M.PaletteCompileCode.INVALID_ENUM, PALETTE_V4_ENUM_FIELDS[group]],
+            `${group} ${name} is a reserved ordinal the engine refuses`);
+          continue;
+        }
+        assert.equal(baked.status.code, M.PaletteCompileCode.OK, `${group} ${name}`);
+        property(baked);
+        luts.push(baked.lut.join());
+      }
+      assert.equal(new Set(luts).size, luts.length, `${group} members bake distinctly`);
 
-      const engineMembers = members.map(([name, ordinal]) => {
-        const recipe = paletteEnumProbeRecipe();
-        setPaletteEnum(recipe, group, ordinal);
-        return [name, ordinal, paletteResultFingerprint(ops.compileAndBakeV4(recipe))];
-      });
-      assert.deepEqual(engineMembers, members, `${group} engine ordinals`);
-      // A shared fingerprint would let the engine swap two ordinals undetected.
-      assert.equal(new Set(members.map(([, , mark]) => mark)).size, members.length,
-        `${group} probe recipe separates every member`);
-
-      const rejectedRecipe = paletteEnumProbeRecipe();
-      setPaletteEnum(rejectedRecipe, group, members.length);
-      const rejected = ops.compileAndBakeV4(rejectedRecipe);
-      assert.deepEqual([rejected.status.code.value, rejected.status.field.value], [3, field],
-        `${group} engine roster length`);
+      const rejected = ops.inspectV4(probeRecipe((recipe) => setPaletteEnum(recipe, group, roster.length)));
+      assert.deepEqual([rejected.status.code, rejected.status.field.value],
+        [M.PaletteCompileCode.INVALID_ENUM, PALETTE_V4_ENUM_FIELDS[group]], `${group} engine roster length`);
     }
   } finally {
     ops.delete();
