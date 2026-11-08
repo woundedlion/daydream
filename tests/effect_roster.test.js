@@ -1,7 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { favoritesFor, resolutionEffects, resolveActiveEffect, SHADER_DOCUMENT_EFFECTS } from '../src/effects/effect_roster.js';
+import { EFFECT_IDENTITIES } from '../generated/engine_contract.mjs';
+import {
+  favoritesFor, resolutionEffects, resolutionPresets, resolveActiveEffect, SHADER_DOCUMENT_EFFECTS,
+  unlistedEffects,
+} from '../src/effects/effect_roster.js';
 
 test('the shader-document roster names exactly the documents that ship', () => {
   const manifest = JSON.parse(readFileSync(
@@ -32,14 +36,36 @@ test('GridWorms is offered at both display resolutions', () => {
   }
 });
 
-test('resolution favorites share their ordered prefix before explicit extras', () => {
+test('resolution lists order their shared effects alike and repeat none', () => {
   const high = favoritesFor('Phantasm (288x144)');
   const low = favoritesFor('Holosphere (96x20)');
-  const common = high.filter((name) => low.includes(name));
-  assert.equal(common[0], 'BZReactionDiffusion');
-  assert.deepEqual(high.slice(0, common.length), common);
-  assert.deepEqual(low.slice(0, common.length), common);
+  assert.deepEqual(high.filter((name) => low.includes(name)), low.filter((name) => high.includes(name)));
   for (const favorites of [high, low]) assert.equal(new Set(favorites).size, favorites.length);
+});
+
+test('unlistedEffects keeps registry order and omits listed effects and ShaderChain', () => {
+  const identities = ['C', 'ShaderChain', 'A', 'B', 'D'].map((display_name) => ({ display_name }));
+  assert.deepEqual(unlistedEffects(identities, [['A'], ['A', 'B']]), ['C', 'D']);
+  assert.deepEqual(unlistedEffects(identities, [['A', 'B', 'C', 'D']]), []);
+});
+
+test('a registered effect absent from every curated list is offered once at every resolution', async (t) => {
+  const unlisted = { id: 'unlisted-study', display_name: 'UnlistedStudy' };
+  t.mock.module(new URL('../generated/engine_contract.mjs', import.meta.url).href, {
+    namedExports: { EFFECT_IDENTITIES: [...EFFECT_IDENTITIES, unlisted] },
+  });
+  const roster = await import('../src/effects/effect_roster.js?unlisted-effect');
+  for (const [label, preset] of Object.entries(roster.resolutionPresets)) {
+    assert.equal(preset.favorites.filter((name) => name === unlisted.display_name).length, 1, label);
+    assert.equal(roster.favoritesFor(label).includes(unlisted.display_name), true, label);
+  }
+});
+
+test('every registered simulator effect is offered at some resolution', () => {
+  const offered = new Set(Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
+  const missing = EFFECT_IDENTITIES.map(({ display_name }) => display_name)
+    .filter((name) => name !== 'ShaderChain' && !offered.has(name));
+  assert.deepEqual(missing, []);
 });
 
 const RESO_EFFECTS = ['ShapeShifter', 'Comets', 'MobiusGrid'];

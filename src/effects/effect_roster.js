@@ -3,6 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { EFFECT_IDENTITIES } from '../../generated/engine_contract.mjs';
 import { SHADER_DOCUMENT_EFFECTS } from '../../generated/shader/composed_effect_roster.mjs';
 export { SHADER_DOCUMENT_EFFECTS };
 
@@ -87,6 +88,22 @@ const LoResFavorites = [
   "Thrusters",
 ];
 
+/**
+ * The registered effects no curated list names, in registry order.
+ * @param {Array<{display_name: string}>} identities - The engine's effect registry.
+ * @param {Array<Array<string>>} lists - The curated effect lists.
+ * @returns {Array<string>} Display names of the simulator effects absent from
+ *   every list; the workbench-only ShaderChain is never included.
+ */
+export function unlistedEffects(identities, lists) {
+  const listed = new Set(lists.flat());
+  return identities.map(({ display_name }) => display_name)
+    .filter((name) => name !== 'ShaderChain' && !listed.has(name));
+}
+
+// Registered effects missing from every curated list are offered at every resolution.
+const AllFallback = unlistedEffects(EFFECT_IDENTITIES, [HiResFavorites, LoResFavorites]);
+
 // The effect the simulator seeds when the URL names none.
 export const DEFAULT_EFFECT = 'Millefiori';
 
@@ -95,8 +112,8 @@ export const DEFAULT_EFFECT = 'Millefiori';
 // key ("constructor", "toString") would answer as a preset.
 /** @type {Record<string, {h: number, w: number, dotSize: number, favorites: string[]}>} */
 export const resolutionPresets = Object.assign(Object.create(null), {
-  "Holosphere (96x20)": { h: 20, w: 96, dotSize: 2, favorites: LoResFavorites },
-  "Phantasm (288x144)": { h: 144, w: 288, dotSize: 0.25, favorites: HiResFavorites },
+  "Holosphere (96x20)": { h: 20, w: 96, dotSize: 2, favorites: [...LoResFavorites, ...AllFallback] },
+  "Phantasm (288x144)": { h: 144, w: 288, dotSize: 0.25, favorites: [...HiResFavorites, ...AllFallback] },
 });
 
 /**
@@ -109,7 +126,7 @@ export function favoritesFor(resolution) {
   const favorites = resolutionEffects(resolutionPresets, resolution);
   if (!favorites) {
     console.error(`No effect list for resolution "${resolution}"; offering the high-res list.`);
-    return HiResFavorites;
+    return resolutionPresets["Phantasm (288x144)"].favorites;
   }
   return favorites;
 }
