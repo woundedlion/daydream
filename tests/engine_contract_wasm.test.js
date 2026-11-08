@@ -1359,7 +1359,7 @@ test('generated effect IDs and display names install the same preset and paramet
 test('palette CUSTOM transitions send canonical recipes to WASM', () => {
   const ops = new M.PaletteOps();
   try {
-    const template = Array.from(ops.effectPresetsV4()).find((preset) => /BZ.*Reaction/i.test(preset.name)).recipe;
+    const template = Array.from(ops.effectPresetsV4())[0].recipe;
     const controls = paletteControlsFromRecipe(template);
     controls.hueMode = 'HARMONY';
     controls.lightnessCurve = controls.chromaCurve = 'CONSTANT';

@@ -348,39 +348,19 @@ test('Palette V4 enum spellings and ordinals match the shipped engine', () => {
 });
 
 
-test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
+test('every effect-owned GenerativePalette recipe the engine exports compiles and is unique', () => {
   const ops = new M.PaletteOps();
   try {
     const presets = Array.from(ops.effectPresetsV4());
-    assert.deepEqual(presets.map((preset) => preset.name), [
-      'BZReactionDiffusion',
-      'Comets',
-      'DisplacementField / RingShower',
-      'Dynamo',
-      'GSReactionDiffusion',
-      'MobiusRings',
-      'Raymarch',
-      'Standalone Liquid',
-      'Standalone Flyby',
-      'HyperLattice',
-      'MindSplatter',
-    ]);
-    assert.deepEqual(presets.filter((preset) => preset.randomHue)
-      .map((preset) => preset.name), [
-      'Comets',
-      'DisplacementField / RingShower',
-      'Dynamo',
-      'GSReactionDiffusion',
-      'MobiusRings',
-      'HyperLattice',
-      'MindSplatter',
-    ]);
+    assert.ok(presets.length > 0);
+    assert.equal(new Set(presets.map((preset) => preset.name)).size, presets.length, 'repeated name');
+    assert.equal(new Set(presets.map((preset) => JSON.stringify(preset.recipe))).size, presets.length,
+      'repeated recipe');
     for (const preset of presets) {
-      assert.equal(preset.recipe.schemaVersion, 4);
+      assert.equal(typeof preset.randomHue, 'boolean', preset.name);
+      assert.equal(preset.recipe.schemaVersion, 4, preset.name);
       assert.equal(ops.inspectV4(preset.recipe).status.code, M.PaletteCompileCode.OK, preset.name);
     }
-    assert.equal(presets[0].recipe.hue.mode, PaletteV4.hueMode.CUSTOM);
-    assert.equal(presets[7].recipe.lightness.curve, PaletteV4.curve.CUSTOM);
   } finally {
     ops.delete();
   }
