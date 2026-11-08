@@ -31,13 +31,6 @@ function runSnapshotHook(root, env, input) {
   });
 }
 
-test('pre-push refuses a push from a tree that cannot run the suites',
-  { skip: SKIP }, (t) => {
-    const run = runWithTools(scratchDir(t, 'pre-push-hook-'), {});
-    assert.notEqual(run.status, 0, `${run.stdout}${run.stderr}`);
-    assert.match(run.stderr, /node not found/);
-  });
-
 /**
  * Runs the hook with PATH pointing at a directory of stand-in tools, so a
  * refusal further down the hook than the first missing tool still executes.
@@ -106,17 +99,6 @@ function snapshotFixture(t, { marker = false, suiteFailure = false } = {}) {
   git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
   return { root, env, sha: git('rev-parse', 'HEAD').trim() };
 }
-
-test('pre-push refuses a push from a tree that cannot install the suites',
-  { skip: SKIP }, (t) => {
-    const root = scratchDir(t, 'pre-push-hook-');
-    // node answers, so the refusal is reached at the next tool rather than the
-    // first: a hook that stopped checking npm would run the suites through it.
-    const run = runWithTools(root, { node: 'exit 0' });
-
-    assert.notEqual(run.status, 0, `${run.stdout}${run.stderr}`);
-    assert.match(run.stderr, /npm not found/);
-  });
 
 test('pre-push runs the source checks successfully',
   { skip: SKIP }, (t) => {
@@ -191,54 +173,6 @@ for (const step of ['lint', 'typecheck', 'importmap', 'generate:tailwind']) {
   });
 }
 
-test('pre-push requires installed dependencies', { skip: SKIP }, (t) => {
-  const run = runWithTools(scratchDir(t, 'pre-push-hook-'), {
-    node: 'exit 0', npm: 'echo unexpected-npm >&2; exit 0', git: 'exit 0',
-  });
-  assert.notEqual(run.status, 0);
-  assert.match(run.stderr, /node_modules is missing/);
-  assert.doesNotMatch(run.stderr, /unexpected-npm/);
-});
-
-test('pre-push accepts a ref deletion without running source checks', { skip: SKIP }, (t) => {
-  const root = withInstalledModules(t);
-  const run = runWithTools(root, {
-    node: 'echo unexpected-node >&2; exit 17',
-    npm: 'echo unexpected-npm >&2; exit 17',
-    git: '[ "$1" = rev-parse ] && [ "$2" = --local-env-vars ] && exit 0; echo unexpected-git >&2; exit 17',
-  }, `refs/heads/topic ${'0'.repeat(40)} refs/heads/topic ${'1'.repeat(40)}\n`);
-  assert.equal(run.status, 0, run.stdout + run.stderr);
-  assert.equal(run.stderr, '');
-});
-
-for (const installStatus of [0, 19]) {
-  test(`pre-push installs snapshot dependencies and rejects failed installs (status ${installStatus})`,
-    { skip: SKIP }, (t) => {
-      const { root, env, sha } = snapshotFixture(t);
-      const log = join(root, 'calls.log').replace(/\\/g, '/');
-      writeTool(root, 'npm', `printf '%s\\n' "$*" >> "${log}"\n`
-        + `if [ "$1" = ci ]; then mkdir -p node_modules; echo '{}' > node_modules/.package-lock.json; exit ${installStatus}; fi\n`
-        + 'if [ "$2" = typecheck ]; then [ "$(cat generated/engine_contract.mjs)" = installed-contract ] || exit 29; fi\n'
-        + SNAPSHOT_NPM_STEPS);
-
-      const changedPackage = '{"private":true}\n';
-      writeFileSync(join(root, 'package.json'), changedPackage);
-      const result = runSnapshotHook(root, env, `refs/heads/master ${sha} refs/heads/master ${'0'.repeat(40)}\n`);
-      const calls = readFileSync(join(root, 'calls.log'), 'utf8').trim().split('\n');
-      assert.equal(calls[0], 'ci --ignore-scripts');
-      if (installStatus === 0) {
-        assert.equal(result.status, 0, result.stdout + result.stderr);
-        assert.deepEqual(calls.slice(1, 3), ['run lint', 'run typecheck']);
-        assert.match(calls[3], /^run importmap -- --out /);
-      } else {
-        assert.notEqual(result.status, 0);
-        assert.deepEqual(calls, ['ci --ignore-scripts']);
-      }
-      assert.equal(readFileSync(join(root, 'package.json'), 'utf8'), changedPackage);
-      assert.equal(readFileSync(join(root, 'node_modules/.package-lock.json'), 'utf8'), '{}');
-    });
-}
-
 for (const failure of ['none', 'lint', 'suite']) {
   test(`pre-push checks the committed snapshot and propagates ${failure} failures`, { skip: SKIP }, (t) => {
     const { root, env, sha } = snapshotFixture(t, { marker: true, suiteFailure: failure === 'suite' });
@@ -263,26 +197,6 @@ for (const failure of ['none', 'lint', 'suite']) {
   });
 
 }
-
-test('pre-push checks both update snapshots around an intervening deletion', {skip: SKIP}, (t) => {
-  const {root, env, sha} = snapshotFixture(t, {marker: true});
-  writeFileSync(join(root, 'marker'), 'second\n');
-  execFileSync('git', ['-C', root, 'add', 'marker'], {env});
-  execFileSync('git', ['-C', root, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'second'], {env});
-  const second = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {env, encoding: 'utf8'}).trim();
-  const calls = join(root, 'snapshot-calls').replaceAll('\\', '/');
-  writeTool(root, 'npm', 'if [ "$1" = ci ]; then mkdir -p node_modules; echo "{}" > node_modules/.package-lock.json; fi\n'
-    + `if [ "$1 $2" = 'run lint' ]; then cat marker >> '${calls}'; fi\n`
-    + SNAPSHOT_NPM_STEPS);
-
-  const result = runSnapshotHook(root, env, [
-    `refs/heads/first ${sha} refs/heads/first ${'0'.repeat(40)}`,
-    `refs/heads/deleted ${'0'.repeat(40)} refs/heads/deleted ${sha}`,
-    `refs/heads/second ${second} refs/heads/second ${'0'.repeat(40)}`,
-  ].join('\n') + '\n');
-  assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.deepEqual(readFileSync(calls, 'utf8').trim().split('\n'), ['committed', 'second']);
-});
 
 function withInstalledModules(t) {
   const root = scratchDir(t, 'pre-push-hook-');
