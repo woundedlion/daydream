@@ -82,9 +82,11 @@ test('the wheel draws compiled harmony anchors', () => {
   const {wheel, model, draws, handles} = setup();
   wheel.draw(model.recipe());
   assert.deepEqual(draws[0].state, hueKeyState(defaultPaletteRecipe()));
-  assert.equal(draws[0].lightness, 0.62);
+  assert.equal(draws[0].lightness, defaultPaletteRecipe().lightness.center);
   assert.equal(handles.length, 4);
-  assert.deepEqual(handles.map((handle) => handle.hidden), [false, false, false, true]);
+  const shown = hueKeyState(defaultPaletteRecipe()).offsets.length;
+  assert.deepEqual(handles.map((handle) => handle.hidden),
+    handles.map((_, index) => index >= shown));
 
 });
 

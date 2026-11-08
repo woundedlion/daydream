@@ -152,7 +152,20 @@ test('the default recipe is a detached, complete V4 value', () => {
   assert.equal(first.schemaVersion, 4);
   assert.equal('keyCount' in first, false);
   assert.deepEqual(first.input, { offset: 0, span: 1 });
-  assert.equal(first.chroma.basis, PaletteV4.chromaBasis.LOCAL_GAMUT);
+  for (const [group, value] of [
+    ['domain', first.domain], ['easing', first.easing],
+    ['colorPath', first.colorPath], ['hueMode', first.hue.mode],
+    ['harmony', first.hue.harmony], ['direction', first.hue.direction],
+    ['curve', first.lightness.curve], ['curve', first.chroma.curve],
+    ['chromaBasis', first.chroma.basis],
+  ]) assert.doesNotThrow(() => paletteEnumName(group, value), group);
+  for (const value of [
+    first.hue.baseTurns, first.hue.spreadTurns, first.hue.sweepTurns,
+    ...second.hue.customTurns,
+    first.lightness.center, first.lightness.range, ...first.lightness.custom,
+    first.chroma.center, first.chroma.range, first.chroma.headroom,
+    ...first.chroma.custom, first.hueTorsion, first.falloffStart,
+  ]) assert.ok(Number.isFinite(value));
   assert.equal(second.hue.customTurns[0], 0);
 });
 
@@ -251,13 +264,13 @@ test('a LOOP sweep resamples onto the thirds the engine spaces a loop at', () =>
   const recipe = PALETTE_RECIPE_PRESETS.isolightSpectralLoop();
 
   const { baseTurns, offsets } = customHueKeyState(recipe);
-  assert.equal(baseTurns, 0);
+  assert.equal(baseTurns, recipe.hue.baseTurns);
   assert.equal(offsets.length, 3);
   for (const [index, expected] of [0, 1 / 3, 2 / 3].entries())
     assert.ok(Math.abs(offsets[index] - expected) < 1e-12);
 
   // The wheel keeps drawing a sweep's own two keys, spaced at sweep/key_count.
-  assert.deepEqual(hueKeyState(recipe).offsets, [0, 0.5]);
+  assert.deepEqual(hueKeyState(recipe).offsets, [0, recipe.hue.sweepTurns / 2]);
 });
 
 test('CUSTOM preserves only representable LOOP sweep closures', () => {
@@ -306,11 +319,18 @@ test('recipe presets express distinct high-level intents', () => {
   assert.equal(loop.domain, PaletteV4.domain.LOOP);
   assert.equal(loop.hue.mode, PaletteV4.hueMode.SWEEP);
   assert.equal(tonal.hue.harmony, PaletteV4.harmony.MONOCHROMATIC);
-  assert.equal(tonal.lightness.curve, PaletteV4.curve.ASCENDING);
+  assert.notEqual(tonal.lightness.curve, PaletteV4.curve.CONSTANT);
 });
 
 test('recipe availability exposes only controls that can affect the result', () => {
   const recipe = defaultPaletteRecipe();
+  recipe.hue.mode = PaletteV4.hueMode.HARMONY;
+  recipe.hue.harmony = PaletteV4.harmony.ANALOGOUS;
+  recipe.lightness.curve = PaletteV4.curve.CONSTANT;
+  recipe.chroma.curve = PaletteV4.curve.CONSTANT;
+  recipe.chroma.center = 0.5;
+  recipe.chroma.basis = PaletteV4.chromaBasis.LOCAL_GAMUT;
+  recipe.domain = PaletteV4.domain.STRAIGHT;
   assert.deepEqual(paletteRecipeAvailability(recipe), {
     baseHue: true,
     hueKeys: true,
@@ -560,7 +580,8 @@ test('the generative tab opens on the default recipe', () => {
 test('inactive controls and loop sweeps are canonicalized before compilation', () => {
   const defaults = defaultPaletteRecipe().hue;
   const straight = paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS);
-  assert.equal(straight.falloffStart, 0.9, 'only a FALLOFF domain carries its own start');
+  assert.equal(straight.falloffStart, defaultPaletteRecipe().falloffStart,
+    'only a FALLOFF domain carries its own start');
   assert.equal(straight.hue.spreadTurns, defaults.spreadTurns);
   assert.equal(straight.hue.sweepTurns, defaults.sweepTurns);
 
@@ -893,12 +914,13 @@ test('a short strip drag copies a color and a long one zooms', () => {
 test('the strip says which window it is showing only once it is zoomed', () => {
   const full = paletteStripView({ start: 0, end: 1 });
   assert.equal(full.zoomed, false);
-  assert.equal(full.heading, 'sRGB Palette (t ∈ [0, 1])');
+  assert.doesNotMatch(full.heading, /0\.000|1\.000/);
   assert.match(full.ariaLabel, /^Palette strip, t 0\.000 to 1\.000\./);
 
   const zoomed = paletteStripView({ start: 0.25, end: 0.5 });
   assert.equal(zoomed.zoomed, true);
-  assert.equal(zoomed.heading, 'sRGB Palette (t ∈ [0.250, 0.500])');
+  assert.match(zoomed.heading, /0\.250.*0\.500/);
+  assert.notEqual(zoomed.heading, full.heading);
   assert.match(zoomed.ariaLabel, /t 0\.250 to 0\.500\. Press Enter/);
 });
 

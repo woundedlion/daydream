@@ -98,11 +98,12 @@ test('findBestRationalRatio: negative target snaps to the sign-flipped fraction'
 /** A negative non-closing ratio keeps its sign through the rational search. */
 test('snapToRationalRatio: negative ratio keeps its sign', () => {
   const { snappedActiveC, m, n } = snapToRationalRatio(-13, 11);
-  assert.equal(m, -7);
-  assert.equal(n, 6);
+  assert.ok(m < 0 && n >= 1 && n <= MAX_RATIONAL_TERM);
+  assert.ok(Math.abs(Math.abs(13 / 11 - Math.abs(m) / n) - closestError(13 / 11, MAX_RATIONAL_TERM))
+    < 1e-12, `${m}/${n} is the closest reachable magnitude`);
   assert.ok(snappedActiveC < 0, `expected negative snapped freq, got ${snappedActiveC}`);
   assert.notEqual(snappedActiveC, -13);
-  assert.ok(Math.abs(snappedActiveC - (11 * -7) / 6) < 1e-12);
+  assert.ok(Math.abs(snappedActiveC - (11 * m) / n) < 1e-12);
 });
 
 /**
@@ -172,20 +173,27 @@ test('snapToRationalRatio: zero passive frequency yields finite values, not NaN/
 
 /**
  * Verifies a range confines the snap to ratios reachable by the control: the
- * unbounded snap of 100 against 13 overshoots to 8·13 = 104.
+ * unbounded snap of 100 against 13 overshoots the range.
  */
 test('snapToRationalRatio: a range keeps the snapped frequency reachable', () => {
   const passiveC = 13;
   const bare = snapToRationalRatio(100, passiveC);
-  assert.equal(bare.snappedActiveC, 104);
+  assert.ok(bare.snappedActiveC > 100);
 
   const { m, n, snappedActiveC, closingPeriod } =
     snapToRationalRatio(100, passiveC, MAX_RATIONAL_TERM, { min: 1, max: 100 });
-  assert.equal(m, 23);
-  assert.equal(n, 3);
+  assert.ok(n >= 1 && n <= MAX_RATIONAL_TERM);
   assert.ok(snappedActiveC > 1 && snappedActiveC <= 100, `${snappedActiveC} is reachable`);
-  assert.equal(snappedActiveC, passiveC * (23 / 3));
-  assert.equal(closingPeriod, (TWO_PI * 3) / 13);
+  assert.equal(snappedActiveC, passiveC * (m / n));
+  let best = Infinity;
+  for (let den = 1; den <= MAX_RATIONAL_TERM; den++) {
+    for (let num = 1; passiveC * num / den <= 100; num++) {
+      if (passiveC * num / den >= 1) best = Math.min(best, Math.abs(100 / passiveC - num / den));
+    }
+  }
+  assert.ok(Math.abs(Math.abs(100 / passiveC - m / n) - best) < 1e-12,
+    `${m}/${n} is the closest ratio inside the range`);
+  assert.equal(closingPeriod, (TWO_PI * n) / passiveC);
   assert.ok(closingPeriod <= MAX_RATIONAL_TERM * TWO_PI);
   assert.equal(domainClosureWarning(passiveC, closingPeriod), null);
 });

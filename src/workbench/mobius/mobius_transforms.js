@@ -37,12 +37,17 @@ export function mobiusDeterminant({ A, B, C, D }) {
 }
 
 /**
+ * Determinant magnitude below which the coefficients are flagged degenerate.
+ */
+export const DEGENERATE_DETERMINANT_EPS = 1e-3;
+
+/**
  * @param {Parameters<typeof mobiusDeterminant>[0]} coefficients
- * @returns {boolean} Whether the determinant magnitude is below the warning threshold.
+ * @returns {boolean} Whether the determinant magnitude is below DEGENERATE_DETERMINANT_EPS.
  */
 export function isDegenerate(coefficients) {
   const { re, im } = mobiusDeterminant(coefficients);
-  return Math.hypot(re, im) < 1e-3;
+  return Math.hypot(re, im) < DEGENERATE_DETERMINANT_EPS;
 }
 
 /**

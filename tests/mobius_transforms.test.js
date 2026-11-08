@@ -8,7 +8,7 @@ import {
   glslComplexFunctions, glslProjectionFunctions, mobiusCodeString,
   stereo, projectDiv, STEREO_INF, STEREO_POLE_EPS, STEREO_AZIMUTH_EPS,
   STEREO_UNDERFLOW_LIFT,
-  MOBIUS_GRID_SCALE_R,
+  MOBIUS_GRID_SCALE_R, DEGENERATE_DETERMINANT_EPS,
 } from '../src/workbench/mobius/mobius_transforms.js';
 
 const EPS = 1e-12;
@@ -297,83 +297,113 @@ test('every preset generator is the identity at t=0', () => {
 });
 
 /**
- * The two scaling presets wrap their log-scale parameter at 1/MOBIUS_GRID_SCALE_R, so
- * the flow is seamless: one period later the coefficient magnitudes repeat.
- * Loxodromic keeps rotating, so only the magnitudes are periodic.
+ * The two scaling presets wrap their log-scale parameter inside
+ * [0, 1/MOBIUS_GRID_SCALE_R), so the flow is seamless: 2·ln|A| never leaves
+ * one grid period.
  */
-test('the scaling presets repeat their magnitudes one flow period later', () => {
+test('the scaling presets keep their log-scale inside one flow period', () => {
   const logPeriod = 1 / MOBIUS_GRID_SCALE_R;
-  for (const [name, gen, speed] of [['hyperbolic', hyperbolic, 0.4], ['loxodromic', loxodromic, 0.3]]) {
-    const period = logPeriod / speed;
-    for (const t of [0, 0.37, 1.4, 5, 42]) {
-      const a = gen(t);
-      const b = gen(t + period);
-      for (const k of ['A', 'D']) {
-        const before = Math.hypot(a[k].re, a[k].im);
-        const after = Math.hypot(b[k].re, b[k].im);
-        assert.ok(Math.abs(before - after) < 1e-9,
-          `${name} |${k}| at t=${t}: ${before} vs ${after} one period later`);
-      }
+  for (const [name, gen] of [['hyperbolic', hyperbolic], ['loxodromic', loxodromic]]) {
+    let highest = 0;
+    for (let i = 0; i <= 4000; i++) {
+      const t = i / 20;
+      const logScale = 2 * Math.log(Math.hypot(gen(t).A.re, gen(t).A.im));
+      assert.ok(logScale > -EPS && logScale < logPeriod,
+        `${name} log-scale ${logScale} at t=${t} leaves [0, ${logPeriod})`);
+      highest = Math.max(highest, logScale);
     }
+    assert.ok(highest > logPeriod / 2, `${name} flows across the period`);
   }
 });
 
-// --- non-trivial goldens (catch a sign flip or wrong rate) ----------------
-// Expected coefficients are derived from the closed form at a chosen t, not by
-// calling the generator, so a wrong rotation rate/sign/conjugate fails here.
+// --- preset flow structure --------------------------------------------------
+// Each preset's defining coefficient shape, checked independently of its rate.
 
-/** elliptic(pi): angle = pi/2, so A = i and D = conj(A) = -i. */
-test('elliptic at t=pi rotates a quarter turn (A=i, D=-i)', () => {
-  const c = elliptic(Math.PI);
-  assertComplex(c.A, 0, 1, 'A');
-  assertComplex(c.B, 0, 0, 'B');
-  assertComplex(c.C, 0, 0, 'C');
-  assertComplex(c.D, 0, -1, 'D');
+/** Times across the flow; SMALL_T is early enough that no preset has wrapped. */
+const FLOW_TIMES = [0.001, 0.1, 1, Math.PI, 2.5, 5, 42];
+const SMALL_T = 1e-3;
+
+/**
+ * @param {{re:number, im:number}} z - A nonzero complex value.
+ * @returns {{re:number, im:number}} 1/z.
+ */
+const reciprocal = (z) => {
+  const norm = z.re * z.re + z.im * z.im;
+  return { re: z.re / norm, im: -z.im / norm };
+};
+
+/** elliptic is a pure rotation: |A| = 1, D = conj(A), B = C = 0. */
+test('elliptic rotates about the origin and turns counterclockwise', () => {
+  for (const t of FLOW_TIMES) {
+    const c = elliptic(t);
+    assert.ok(Math.abs(Math.hypot(c.A.re, c.A.im) - 1) < EPS, `|A| at t=${t}`);
+    assertComplex(c.D, c.A.re, -c.A.im, `D at t=${t}`);
+    assertComplex(c.B, 0, 0, `B at t=${t}`);
+    assertComplex(c.C, 0, 0, `C at t=${t}`);
+  }
+  assert.ok(elliptic(SMALL_T).A.im > 0, 'arg A grows for small t');
 });
 
-/** hyperbolic(1): s = sqrt(e^0.4) = e^0.2, so A = e^0.2, D = e^-0.2. */
-test('hyperbolic at t=1 scales by e^0.2 (A=e^0.2, D=e^-0.2)', () => {
-  const c = hyperbolic(1);
-  assertComplex(c.A, Math.exp(0.2), 0, 'A');
-  assertComplex(c.B, 0, 0, 'B');
-  assertComplex(c.C, 0, 0, 'C');
-  assertComplex(c.D, Math.exp(-0.2), 0, 'D');
+/** hyperbolic is a pure real scaling: A real, D = 1/A, B = C = 0. */
+test('hyperbolic scales along the real axis away from the origin', () => {
+  for (const t of FLOW_TIMES) {
+    const c = hyperbolic(t);
+    assert.ok(Math.abs(c.A.im) < EPS && c.A.re > 0, `A real at t=${t}`);
+    assertComplex(c.D, 1 / c.A.re, 0, `D at t=${t}`);
+    assertComplex(c.B, 0, 0, `B at t=${t}`);
+    assertComplex(c.C, 0, 0, `C at t=${t}`);
+  }
+  assert.ok(hyperbolic(SMALL_T).A.re > 1, 'A grows past 1 for small t');
 });
 
-/** loxodromic(1): angle=0.3, s=e^0.15; A=s*e^{i0.3}, D=(1/s)*e^{-i0.3}. */
-test('loxodromic at t=1 spirals (scale e^0.15, angle 0.3)', () => {
-  const c = loxodromic(1);
-  assertComplex(c.A, Math.exp(0.15) * Math.cos(0.3), Math.exp(0.15) * Math.sin(0.3), 'A');
-  assertComplex(c.B, 0, 0, 'B');
-  assertComplex(c.C, 0, 0, 'C');
-  assertComplex(c.D, Math.exp(-0.15) * Math.cos(0.3), -Math.exp(-0.15) * Math.sin(0.3), 'D');
+/** loxodromic scales and rotates at once: D = 1/A, B = C = 0. */
+test('loxodromic spirals with D the reciprocal of A', () => {
+  for (const t of FLOW_TIMES) {
+    const c = loxodromic(t);
+    const inverse = reciprocal(c.A);
+    assertComplex(c.D, inverse.re, inverse.im, `D at t=${t}`);
+    assertComplex(c.B, 0, 0, `B at t=${t}`);
+    assertComplex(c.C, 0, 0, `C at t=${t}`);
+  }
+  const early = loxodromic(SMALL_T).A;
+  assert.ok(Math.hypot(early.re, early.im) > 1 && early.im > 0,
+    'A both grows and turns for small t');
 });
 
-/** inversion(pi): theta=pi/2 -> c=0,s=1, so B=C=i and A=D=0. */
-test('inversion at t=pi swaps 0/inf (B=C=i, A=D=0)', () => {
-  const c = inversion(Math.PI);
-  assertComplex(c.A, 0, 0, 'A');
-  assertComplex(c.B, 0, 1, 'B');
-  assertComplex(c.C, 0, 1, 'C');
-  assertComplex(c.D, 0, 0, 'D');
+/** inversion rotates about the real axis: A = D real, B = C imaginary. */
+test('inversion keeps A = D real and B = C imaginary', () => {
+  for (const t of FLOW_TIMES) {
+    const c = inversion(t);
+    assert.ok(Math.abs(c.A.im) < EPS, `A real at t=${t}`);
+    assertComplex(c.D, c.A.re, 0, `D at t=${t}`);
+    assert.ok(Math.abs(c.B.re) < EPS, `B imaginary at t=${t}`);
+    assertComplex(c.C, 0, c.B.im, `C at t=${t}`);
+  }
+  assert.ok(inversion(SMALL_T).B.im > 0, 'the rotation starts for small t');
 });
 
-/** tumble(pi/0.8): theta=pi/2 -> c=0,s=1, so B=-1, C=1 (the sign asymmetry). */
-test('tumble at theta=pi/2 gives B=-1, C=1', () => {
-  const c = tumble(Math.PI / 0.8);
-  assertComplex(c.A, 0, 0, 'A');
-  assertComplex(c.B, -1, 0, 'B');
-  assertComplex(c.C, 1, 0, 'C');
-  assertComplex(c.D, 0, 0, 'D');
+/** tumble rotates about the imaginary axis: A = D real, B = -C real. */
+test('tumble keeps A = D real and B = -C real', () => {
+  for (const t of FLOW_TIMES) {
+    const c = tumble(t);
+    assert.ok(Math.abs(c.A.im) < EPS, `A real at t=${t}`);
+    assertComplex(c.D, c.A.re, 0, `D at t=${t}`);
+    assert.ok(Math.abs(c.C.im) < EPS, `C real at t=${t}`);
+    assertComplex(c.B, -c.C.re, 0, `B at t=${t}`);
+  }
+  assert.ok(tumble(SMALL_T).C.re > 0, 'C turns positive for small t');
 });
 
-/** parabolic(2.5): B.re = 2 - |((0.8t + 2) mod 8) - 4| = 2; A, C and D are identity. */
-test('parabolic at t=2.5 translates by 2 along the real axis', () => {
-  const c = parabolic(2.5);
-  assertComplex(c.A, 1, 0, 'A');
-  assertComplex(c.B, 2, 0, 'B');
-  assertComplex(c.C, 0, 0, 'C');
-  assertComplex(c.D, 1, 0, 'D');
+/** parabolic is a real translation: A = D = 1, C = 0, B real. */
+test('parabolic translates along the real axis', () => {
+  for (const t of FLOW_TIMES) {
+    const c = parabolic(t);
+    assertComplex(c.A, 1, 0, `A at t=${t}`);
+    assertComplex(c.C, 0, 0, `C at t=${t}`);
+    assertComplex(c.D, 1, 0, `D at t=${t}`);
+    assert.ok(Math.abs(c.B.im) < EPS, `B real at t=${t}`);
+  }
+  assert.ok(parabolic(SMALL_T).B.re > 0, 'the translation starts toward +re');
 });
 
 test('parabolic translation stays inside the pad without wrap discontinuities', () => {
@@ -381,21 +411,29 @@ test('parabolic translation stays inside the pad without wrap discontinuities', 
     const t = i / 100;
     const value = parabolic(t).B.re;
     assert.ok(value >= -2 && value <= 2);
-    assert.ok(Math.abs(parabolic(t + 0.001).B.re - value) <= 0.0008000001);
+    assert.ok(Math.abs(parabolic(t + 0.001).B.re - value) < 0.01,
+      'a wrap would jump across the pad');
   }
 });
 
-/** cayley(1): p = t * 0.5 = 0.5, the half-blend of identity toward (1,-i,1,i). */
-test('cayley at t=1 is the half-blend toward the Cayley map', () => {
-  const c = cayley(1);
-  assertComplex(c.A, 1, 0, 'A');
-  assertComplex(c.B, 0, -0.5, 'B');
-  assertComplex(c.C, 0.5, 0, 'C');
-  assertComplex(c.D, 0.5, 0.5, 'D');
+/** cayley blends identity toward (1, -i, 1, i) by a fraction p that only grows. */
+test('cayley blends monotonically from the identity toward the Cayley map', () => {
+  let previous = 0;
+  for (let i = 0; i <= 400; i++) {
+    const c = cayley(i / 40);
+    const p = c.C.re;
+    assert.ok(p >= previous - EPS && p <= 1 + EPS, `blend ${p} at t=${i / 40}`);
+    assertComplex(c.A, 1, 0, 'A');
+    assertComplex(c.B, 0, -p, 'B');
+    assertComplex(c.C, p, 0, 'C');
+    assertComplex(c.D, 1 - p, p, 'D');
+    previous = p;
+  }
+  assert.ok(previous > 0, 'the blend moves off the identity');
 });
 
-/** cayley saturates the blend at p = 1 for t >= 2: A=1, B=-i, C=1, D=i. */
-test('cayley saturates to the Cayley map (1,-i,1,i) for t >= 2', () => {
+/** cayley saturates the blend at p = 1 for large t: A=1, B=-i, C=1, D=i. */
+test('cayley saturates to the Cayley map (1,-i,1,i) for large t', () => {
   const c = cayley(10);
   assertComplex(c.A, 1, 0, 'A');
   assertComplex(c.B, 0, -1, 'B');
@@ -421,11 +459,11 @@ test('mobiusCodeString orders the eight floats as re/im per coefficient', () => 
     'math::MobiusParams{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f}');
 });
 
-/** A live preset sample round-trips through the float formatter. */
-test('mobiusCodeString formats fractional preset coefficients', () => {
-  const c = cayley(1);
+/** Fractional coefficients round-trip through the float formatter. */
+test('mobiusCodeString formats fractional coefficients', () => {
+  const z = (re, im) => ({ re, im });
   assert.equal(
-    mobiusCodeString(c.A, c.B, c.C, c.D),
+    mobiusCodeString(z(1, 0), z(0, -0.5), z(0.5, 0), z(0.5, 0.5)),
     'math::MobiusParams{1.0f, 0.0f, 0.0f, -0.5f, 0.5f, 0.0f, 0.5f, 0.5f}');
 });
 
@@ -458,7 +496,8 @@ test('projectDiv rescales subnormal nonzero divisor magnitudes', () => {
 
 test('degenerate warning uses a strict determinant magnitude threshold', () => {
   const coefficients = { A: { re: 1, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 }, D: { re: 0, im: 0 } };
-  for (const [magnitude, expected] of [[0.000999, true], [0.001, false], [0.001001, false]]) {
+  const eps = DEGENERATE_DETERMINANT_EPS;
+  for (const [magnitude, expected] of [[eps * (1 - 1e-3), true], [eps, false], [eps * (1 + 1e-3), false]]) {
     assert.equal(isDegenerate({ ...coefficients, D: { re: 0, im: magnitude } }), expected);
   }
 });

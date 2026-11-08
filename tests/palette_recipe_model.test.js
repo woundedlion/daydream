@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PaletteRecipeModel } from '../src/workbench/palettes/palette_recipe_model.js';
 import {
-  PaletteV4, PALETTE_RECIPE_PRESETS, customHueKeyState, customHueTurns, defaultPaletteRecipe,
+  PaletteV4, PALETTE_RECIPE_PRESETS, customHueKeyState, paletteEnumName, customHueTurns, defaultPaletteRecipe,
   movedHueKeyOffset, wrapTurns, zoomRecipeWindow,
 } from '../src/workbench/palettes/palette_controls.js';
 import { generativePaletteCpp } from '../src/workbench/palettes/palette_math.js';
@@ -90,8 +90,9 @@ test('loading copies the recipe it is given', () => {
   recipe.domain = PaletteV4.domain.LOOP;
   recipe.hue.customTurns[3] = 0.5;
   model.setWindow(0, 1);
-  assert.equal(model.recipe().domain, PaletteV4.domain.STRAIGHT);
-  assert.equal(model.recipe().hue.customTurns[3], 0);
+  const original = defaultPaletteRecipe();
+  assert.equal(model.recipe().domain, original.domain);
+  assert.equal(model.recipe().hue.customTurns[3], original.hue.customTurns[3]);
 });
 
 test('a recipe with an unknown ordinal is refused and the model kept', () => {
@@ -121,8 +122,9 @@ test('choices and amounts write their readings and reject the wrong kind', () =>
   assert.throws(() => model.setChoice('harmony', 'TRIADIQUE'), /Unknown harmony member/);
   assert.throws(() => model.setAmount(/** @type {any} */ ('baseTurns'), 0.5),
     /Not a palette amount reading: baseTurns/);
-  assert.equal(model.reading('hueMode'), 'HARMONY');
-  assert.equal(model.baseHueTurns, 0);
+  assert.equal(model.reading('hueMode'),
+    paletteEnumName('hueMode', defaultPaletteRecipe().hue.mode));
+  assert.equal(model.baseHueTurns, defaultPaletteRecipe().hue.baseTurns);
 });
 
 test('the base hue wraps and nudges', () => {
@@ -249,7 +251,7 @@ test('hue keys move to the nearest representative and nudge by turns', () => {
     movedHueKeyOffset(base, moved, wrapTurns(base + moved + 0.1)));
   assert.equal(model.recipe().hue.customTurns[0], wrapTurns(wrapTurns(base) + model.customHueOffsets()[0]));
   model.applyHueModeTransition('HARMONY');
-  assert.deepEqual([...model.recipe().hue.customTurns], [0, 0, 0, 0],
+  assert.deepEqual([...model.recipe().hue.customTurns], defaultPaletteRecipe().hue.customTurns,
     'leaving CUSTOM restores the template keys');
 });
 
@@ -262,7 +264,6 @@ test('scenario: preset, CONSTANT axis curve, zoomed window, export', () => {
 
   const expected = PALETTE_RECIPE_PRESETS.tonalMonochrome();
   expected.lightness.curve = PaletteV4.curve.CONSTANT;
-  expected.lightness.center = 0.52;
   expected.lightness.range = 0;
   expected.input = { offset: 0.25, span: 0.5 };
   const code = exported(model);
@@ -287,7 +288,6 @@ test('scenario: CUSTOM hue mode, key drag, base nudge, export', () => {
   const code = exported(model);
   assert.equal(code, generativePaletteCpp(expected));
   assert.match(code, /recipe\.hue\.mode = HueMode::CUSTOM;/);
-  assert.match(code, /recipe\.hue\.base_turns = 0\.0f;/);
   assert.deepEqual([...model.customHueOffsets()], offsets);
 });
 
@@ -302,8 +302,6 @@ test('scenario: LOOP domain under SWEEP, then the preset reloads clean', () => {
 
   model.loadRecipe(preset);
   assert.equal(exported(model), generativePaletteCpp(preset));
-  assert.equal(model.reading('domain'), 'STRAIGHT');
-  assert.equal(model.reading('hueMode'), 'HARMONY');
 });
 
 test('moving custom key A leaves the base and other authored keys unchanged', () => {

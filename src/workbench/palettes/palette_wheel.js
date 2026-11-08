@@ -117,15 +117,20 @@ export const HUE_KEY_GRAB_RADIUS = 23;
 
 // Slate-900, outside the gamut.
 const BACKDROP = Object.freeze([15, 23, 42]);
-const RASTER_RADIUS = 0.47;
+/**
+ * Gamut raster radius, as a fraction of the canvas's shorter side.
+ */
+export const RASTER_RADIUS = 0.47;
 const MARKER_RADIUS = 0.405;
 const MARKER_DOT_RADIUS = 8;
 const LABEL_FONT = '700 20px Inter, sans-serif';
 const LABEL_HEIGHT = 28;
 const LABEL_PADDING_X = 7;
 const LABEL_INSET = 18;
-// Quantized lightness keys for the raster cache.
-const LIGHTNESS_STEPS = 64;
+/**
+ * Quantized lightness keys for the raster cache.
+ */
+export const LIGHTNESS_STEPS = 64;
 
 /**
  * Paints the OKLCH gamut slice at one lightness into an RGBA pixel buffer: hue

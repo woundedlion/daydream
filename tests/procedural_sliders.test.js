@@ -45,6 +45,19 @@ function mount(locked = {}) {
 }
 
 /**
+ * @param {string} param - A coefficient.
+ * @returns {ProceduralSliderDefinition} Its slider definition.
+ */
+const definitionOf = (param) => PROCEDURAL_SLIDER_DEFINITIONS.find((d) => d.param === param);
+
+/**
+ * @param {string} param - A coefficient.
+ * @param {number} value - A coefficient value.
+ * @returns {string} The raw slider value that shows it.
+ */
+const rawOf = (param, value) => String(Math.round(value * definitionOf(param).scale));
+
+/**
  * Moves a slider the way the browser does: value first, then its input event.
  * @param {any} slider - The fake range input.
  * @param {number} raw - The raw value it moves to.
@@ -59,7 +72,7 @@ test('the sliders open on a copy of the defaults', () => {
   const { sliders, input } = mount();
   assert.deepEqual({ ...sliders.values() }, DEFAULTS);
   assert.notEqual(sliders.values(), DEFAULTS);
-  assert.equal(input('D_G').value, '330');
+  assert.equal(input('D_G').value, rawOf('D_G', DEFAULTS.D_G));
   assert.equal(input('C_B').getAttribute('aria-label'), 'Frequency blue');
   assert.equal(input('A_R').getAttribute('aria-label'), 'Offset red');
 });
@@ -79,8 +92,8 @@ test('setAll replaces every coefficient and moves its slider', () => {
   const next = { ...DEFAULTS, A_R: 0.1, C_G: -2, D_B: 1.5 };
   sliders.setAll(next);
   assert.deepEqual({ ...sliders.values() }, next);
-  assert.equal(input('C_G').value, '-2000');
-  assert.equal(input('D_B').value, '1500');
+  assert.equal(input('C_G').value, rawOf('C_G', -2));
+  assert.equal(input('D_B').value, rawOf('D_B', 1.5));
 });
 
 test('a previous slider blur preserves the new locked drag', () => {
@@ -108,26 +121,32 @@ test('an unseeded slider input moves the whole locked group', () => {
   const values = sliders.values();
   assert.equal(values.C_R, 1.5);
   assert.equal(values.C_G, 1.5);
-  assert.equal(input('C_B').value, '1500');
+  assert.equal(input('C_B').value, rawOf('C_B', values.C_B));
   move(input('C_R'), 1700);
   assert.equal(values.C_G, 1.7);
 });
 
 test('a locked group stops when a sibling reaches its bound', () => {
   const { sliders, input } = mount({ D: true });
-  input('D_G').dispatch('keydown');
-  move(input('D_G'), 2000);
+  const near = (actual, expected, message) =>
+    assert.ok(Math.abs(actual - expected) < 1e-12, `${message}: ${actual} vs ${expected}`);
+  const keepsOffsets = () => {
+    near(values.D_G - values.D_R, DEFAULTS.D_G - DEFAULTS.D_R, 'red keeps its offset');
+    near(values.D_B - values.D_G, DEFAULTS.D_B - DEFAULTS.D_G, 'blue keeps its offset');
+  };
   const values = sliders.values();
-  assert.ok(Math.abs(values.D_B - 2) < 1e-12, 'blue caps the rise');
-  assert.ok(Math.abs(values.D_G - 1.66) < 1e-12);
-  assert.ok(Math.abs(values.D_R - 1.33) < 1e-12);
-  assert.equal(input('D_G').value, '1660', 'the dragged slider is pulled back');
+  input('D_G').dispatch('keydown');
+  move(input('D_G'), definitionOf('D_G').max * definitionOf('D_G').scale);
+  near(values.D_B, definitionOf('D_B').max, 'blue caps the rise');
+  keepsOffsets();
+  assert.equal(input('D_G').value, rawOf('D_G', values.D_G), 'the dragged slider is pulled back');
+  assert.ok(values.D_G < definitionOf('D_G').max);
   input('D_G').dispatch('keyup');
-  move(input('D_B'), -1000);
-  assert.ok(Math.abs(values.D_R - (-1)) < 1e-12, 'red caps the drop');
-  assert.ok(Math.abs(values.D_G - (-0.67)) < 1e-12);
-  assert.ok(Math.abs(values.D_B - (-0.33)) < 1e-12);
-  assert.equal(input('D_B').value, '-330', 'the dragged slider is pulled back');
+  move(input('D_B'), definitionOf('D_B').min * definitionOf('D_B').scale);
+  near(values.D_R, definitionOf('D_R').min, 'red caps the drop');
+  keepsOffsets();
+  assert.equal(input('D_B').value, rawOf('D_B', values.D_B), 'the dragged slider is pulled back');
+  assert.ok(values.D_B > definitionOf('D_B').min);
 });
 
 test('locked edits use the mounted sliders even after their ids change', () => {
@@ -140,8 +159,8 @@ test('locked edits use the mounted sliders even after their ids change', () => {
   assert.equal(sliders.values().A_R, 0.433);
   assert.equal(sliders.values().A_G, 0.6);
   assert.equal(sliders.values().A_B, 0.6);
-  assert.equal(red.value, '433');
-  assert.equal(blue.value, '600');
+  assert.equal(red.value, rawOf('A_R', sliders.values().A_R));
+  assert.equal(blue.value, rawOf('A_B', sliders.values().A_B));
 });
 
 test('a slider whose group lock is missing moves alone', () => {
@@ -153,17 +172,66 @@ test('a slider whose group lock is missing moves alone', () => {
   assert.equal(sliders.values().B_G, 0.5);
 });
 
-test('dispose removes the seed and release listeners', () => {
-  const { sliders, input } = mount({ A: true });
-  const slider = input('A_R');
-  const types = (node) => node.listeners.map((listener) => listener.type).sort();
-  assert.deepEqual(types(slider), ['blur', 'input', 'keydown', 'keyup', 'mousedown',
-    'mouseup', 'touchend', 'touchstart', 'wheel']);
+test('seed events start a locked drag, release events end it, and dispose removes both', () => {
+  const { sliders, input } = mount({ A: true, C: true });
+  const values = sliders.values();
+  const near = (actual, expected, message) =>
+    assert.ok(Math.abs(actual - expected) < 1e-9, `${message}: ${actual} vs ${expected}`);
+  /**
+   * Drags a locked group's green slider one hundred raw steps from an
+   * off-grid red coefficient, so a drag seeded from the thumbs and one started
+   * from the committed coefficients land on different red values.
+   * @param {string} group - A locked group.
+   * @param {string|null} seed - The event dispatched before the move.
+   * @param {string|null} release - The event dispatched after the seed.
+   * @returns {{red: number, seeded: number, unseeded: number, blue: number, blueMoved: number}}
+   *   Where red landed and where each start would put it; blue and where it should land.
+   */
+  const drag = (group, seed, release = null) => {
+    sliders.setAll({ ...DEFAULTS, A_R: 0.3334, C_R: 1.0004 });
+    const red = input(`${group}_R`);
+    const green = input(`${group}_G`);
+    const { scale } = PROCEDURAL_SLIDER_DEFINITIONS.find((d) => d.param === `${group}_R`);
+    const thumb = Number(red.value);
+    const committed = values[`${group}_R`];
+    if (seed) green.dispatch(seed);
+    if (release) green.dispatch(release);
+    move(green, Number(green.value) + 100);
+    return {
+      red: values[`${group}_R`],
+      seeded: (thumb + 100) / scale,
+      unseeded: committed + 100 / scale,
+      blue: values[`${group}_B`],
+      blueMoved: DEFAULTS[`${group}_B`] + 100 / scale,
+    };
+  };
+  const SEEDS = ['mousedown', 'touchstart', 'keydown', 'wheel'];
+  const RELEASES = ['mouseup', 'touchend', 'keyup', 'blur'];
+
+  for (const seed of SEEDS) {
+    const result = drag('A', seed);
+    assert.ok(Math.abs(result.seeded - result.unseeded) > 1e-6, 'the two starts differ');
+    near(result.red, result.seeded, `${seed} seeds the drag from the thumbs`);
+    for (const release of RELEASES) input('A_G').dispatch(release);
+  }
+  for (const release of RELEASES) {
+    const result = drag('A', 'mousedown', release);
+    near(result.red, result.unseeded, `${release} releases the drag`);
+  }
+
+  drag('A', 'mousedown');
   sliders.dispose();
   for (const definition of PROCEDURAL_SLIDER_DEFINITIONS)
-    assert.deepEqual(types(input(definition.param)), ['input'], definition.param);
+    assert.deepEqual(input(definition.param).listeners.map((l) => l.type), ['input'],
+      definition.param);
   sliders.dispose();
-  slider.dispatch('mousedown');
-  move(slider, 800);
-  assert.equal(sliders.values().A_G, 0.8, 'the slider still edits its group');
+  for (const release of RELEASES) {
+    const result = drag('A', null, release);
+    near(result.red, result.seeded, `${release} no longer releases the drag`);
+  }
+  for (const seed of SEEDS) {
+    const result = drag('C', seed);
+    near(result.red, result.unseeded, `${seed} no longer seeds a drag`);
+    near(result.blue, result.blueMoved, 'the slider still edits its group');
+  }
 });

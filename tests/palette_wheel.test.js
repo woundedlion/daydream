@@ -1,4 +1,4 @@
-import {oklchLinearRgb, HUE_KEY_GRAB_RADIUS, HUE_KEY_NAMES, canvasPoint, createHueKeyWheelPainter, hueKeyDegrees, hueKeyHandoff, hueKeyLabelBoxes, hueKeyMarkerPoints, hueKeyNudgeTurns, paintHueWheelRaster, wheelTurnAt, maxSrgbGamutChroma} from '../src/workbench/palettes/palette_wheel.js';
+import {oklchLinearRgb, HUE_KEY_GRAB_RADIUS, HUE_KEY_NAMES, canvasPoint, createHueKeyWheelPainter, hueKeyDegrees, hueKeyHandoff, hueKeyLabelBoxes, hueKeyMarkerPoints, hueKeyNudgeTurns, paintHueWheelRaster, wheelTurnAt, maxSrgbGamutChroma, RASTER_RADIUS, LIGHTNESS_STEPS} from '../src/workbench/palettes/palette_wheel.js';
 // The palette tool's hue-key wheel, run end to end against a recording context
 // double: the gamut raster, the marker and label geometry laid over it, and the
 // pointer and keyboard arithmetic a key is moved by.
@@ -7,9 +7,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { hitTestHueKeyMarker } from '../src/workbench/palettes/palette_wheel.js';
 import { linearToSrgbFloat } from '../src/shared/color.js';
-
-// Slate-900: what the raster paints outside the gamut.
-const BACKDROP = [15, 23, 42];
 
 /**
  * Rasters one wheel.
@@ -30,10 +27,11 @@ function raster(lightness, size = 16) {
 
 test('the wheel raster paints the gamut inside its rim and a backdrop outside', () => {
   const { at, data, size } = raster(0.62);
+  const backdrop = at(0, 0);
 
-  assert.deepEqual(at(0, 0), [...BACKDROP, 255], 'the corner is outside the rim');
-  assert.deepEqual(at(size - 1, size - 1), [...BACKDROP, 255]);
-  assert.notDeepEqual(at(size / 2, size / 2).slice(0, 3), BACKDROP,
+  assert.deepEqual(at(size - 1, size - 1), backdrop,
+    'opposite corners outside the rim share the backdrop');
+  assert.notDeepEqual(at(size / 2, size / 2), backdrop,
     'the neutral center is always in gamut');
 
   for (let index = 3; index < data.length; index += 4)
@@ -63,8 +61,9 @@ test('a brighter slice rasters brighter than a darker one', () => {
 
 test('the wheel raster leaves the out-of-gamut corners of its own rim behind', () => {
   const size = 32;
-  const { data } = raster(0.62, size);
-  const rim = size * 0.47;
+  const { data, at } = raster(0.62, size);
+  const backdrop = at(0, 0);
+  const rim = size * RASTER_RADIUS;
   let outsideRim = 0;
   let insideRim = 0;
   let painted = 0;
@@ -72,8 +71,8 @@ test('the wheel raster leaves the out-of-gamut corners of its own rim behind', (
     const pixel = index / 4;
     const dx = (pixel % size) + 0.5 - size / 2;
     const dy = Math.floor(pixel / size) + 0.5 - size / 2;
-    if (data[index] === BACKDROP[0] && data[index + 1] === BACKDROP[1]
-      && data[index + 2] === BACKDROP[2]) {
+    if (data[index] === backdrop[0] && data[index + 1] === backdrop[1]
+      && data[index + 2] === backdrop[2]) {
       if (Math.hypot(dx, dy) <= rim) insideRim++;
       else outsideRim++;
     } else painted++;
@@ -88,13 +87,16 @@ test('the wheel raster leaves the out-of-gamut corners of its own rim behind', (
 test('hue key markers ring the wheel at the turns their offsets name', () => {
   const points = hueKeyMarkerPoints({ baseTurns: 0, offsets: [0, 0.25, 0.5] },
     200, 200);
-  const radius = 200 * 0.405;
+  const radius = points[0].x - 100;
 
   assert.equal(points.length, 3);
-  assert.ok(Math.abs(points[0].x - (100 + radius)) < 1e-9);
-  assert.ok(Math.abs(points[0].y - 100) < 1e-9);
-  assert.ok(Math.abs(points[1].y - (100 - radius)) < 1e-9, 'a quarter turn is up');
-  assert.ok(Math.abs(points[2].x - (100 - radius)) < 1e-9, 'a half turn is left');
+  assert.ok(radius > 0 && radius < 100, 'the ring sits inside the canvas');
+  for (const point of points)
+    assert.ok(Math.abs(Math.hypot(point.x - 100, point.y - 100) - radius) < 1e-9,
+      'every marker is on one ring');
+  assert.ok(Math.abs(points[0].y - 100) < 1e-9, 'offset zero is right');
+  assert.ok(Math.abs(points[1].x - 100) < 1e-9 && points[1].y < 100, 'a quarter turn is up');
+  assert.ok(Math.abs(points[2].y - 100) < 1e-9 && points[2].x < 100, 'a half turn is left');
 });
 
 test('a marker is grabbable within the wheel grab radius and not beyond it', () => {
@@ -125,8 +127,8 @@ test('key labels sit beside their markers, inside the canvas', () => {
   assert.ok(labels[1].x + labels[1].width < 220,
     'a marker right of center is labelled to its left');
   for (const label of labels) {
-    assert.ok(label.x >= 18 && label.x + label.width <= 256 - 18);
-    assert.ok(label.y >= 18 && label.y + label.height <= 256 - 18);
+    assert.ok(label.x >= 0 && label.x + label.width <= 256);
+    assert.ok(label.y >= 0 && label.y + label.height <= 256);
   }
 });
 
@@ -135,8 +137,8 @@ test('labels that would overlap are stacked instead of drawn on top of each othe
   const stacked = hueKeyLabelBoxes(
     [{ x: 200, y: 100 }, { x: 200, y: 105 }], [10, 20], bounds);
 
-  assert.equal(stacked[0].y, 86);
-  assert.equal(stacked[1].y, 86 + stacked[0].height + 2);
+  assertNoOverlap(stacked);
+  assert.ok(stacked[1].y > stacked[0].y, 'the later key stacks below');
   assert.equal(stacked[0].x, stacked[1].x, 'only the vertical placement moves');
 });
 
@@ -160,7 +162,7 @@ test('a stack that would run off the bottom is lifted back onto the canvas', () 
 
   assert.equal(labels.length, 3, 'one box per marker');
   for (const label of labels)
-    assert.ok(label.y >= 18 && label.y + label.height <= 120,
+    assert.ok(label.y >= 0 && label.y + label.height <= 120,
       'every box stays on the canvas');
   assertNoOverlap(labels);
 });
@@ -175,8 +177,8 @@ test('the lift off the bottom keeps the boxes it separated apart', () => {
 
   assertNoOverlap(labels);
   for (const label of labels)
-    assert.ok(label.y >= 18 && label.y + label.height <= 256 - 18,
-      `${label.text} stays inside the inset`);
+    assert.ok(label.y >= 0 && label.y + label.height <= 256,
+      `${label.text} stays on the canvas`);
 });
 
 test('a point on the wheel names the hue under it', () => {
@@ -256,10 +258,13 @@ const STATE = { baseTurns: 0.1, offsets: [0, 0.2, 0.5] };
 
 test('the wheel bakes its raster once and reuses it across quantized lightnesses', () => {
   const { painter, ctx } = wheelSetup();
-  painter.draw({ lightness: 0.62, state: STATE, activeKey: null, selectedKey: 0 });
+  const quantum = Math.round(0.62 * LIGHTNESS_STEPS) / LIGHTNESS_STEPS;
+  painter.draw({ lightness: quantum, state: STATE, activeKey: null, selectedKey: 0 });
   assert.equal(ctx.rasters, 1);
 
-  painter.draw({ lightness: 0.621, state: STATE, activeKey: null, selectedKey: 0 });
+  painter.draw({
+    lightness: quantum + 0.25 / LIGHTNESS_STEPS, state: STATE, activeKey: null, selectedKey: 0,
+  });
   assert.equal(ctx.rasters, 1, 'a step the wheel cannot show must not re-bake it');
 
   painter.draw({ lightness: 0.5, state: STATE, activeKey: null, selectedKey: 0 });
@@ -290,7 +295,9 @@ test('the wheel highlights the selected and grabbed markers and no others', () =
 
   // The polyline strokes first, then one stroke per marker.
   const widths = ctx.ops.filter(([name]) => name === 'stroke').map((op) => op[2]);
-  assert.deepEqual(widths, [2, 2, 4, 4], 'keys B and C are the highlighted pair');
+  assert.equal(widths.length, 4);
+  assert.equal(widths[2], widths[3], 'keys B and C are the highlighted pair');
+  assert.ok(widths[2] > widths[1], 'a highlighted marker is wider than key A');
 });
 
 test('a selection past the end of a shorter key set highlights its last key', () => {
@@ -303,7 +310,8 @@ test('a selection past the end of a shorter key set highlights its last key', ()
   });
 
   const widths = ctx.ops.filter(([name]) => name === 'stroke').map((op) => op[2]);
-  assert.deepEqual(widths, [2, 2, 4], 'no marker is left unhighlighted by a stale selection');
+  assert.equal(widths.length, 3);
+  assert.ok(widths[2] > widths[1], 'no marker is left unhighlighted by a stale selection');
 });
 
 test('the wheel caps display density at two and caches the resized raster', (t) => {

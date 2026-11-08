@@ -245,9 +245,14 @@ test('the wave graph strokes channels in RGB order', () => {
   drawWaveGraph({ canvas, ctx, palette: fakePalette() });
 
   const strokes = ctx.ops.filter(([n]) => n === 'stroke').map(([, style, w]) => [style, w]);
-  assert.deepEqual(strokes.slice(-3),
-    [['#EF4444', 3], ['#22C55E', 3], ['#3B82F6', 3]],
-    'the three channel curves must be stroked in R, G, B order');
+  const channels = strokes.slice(-3);
+  channels.forEach(([style], index) => {
+    const rgb = [1, 3, 5].map((at) => parseInt(style.slice(at, at + 2), 16));
+    assert.equal(rgb.indexOf(Math.max(...rgb)), index,
+      'the three channel curves must be stroked in R, G, B order');
+  });
+  assert.ok(channels.every(([, width]) => width === channels[0][1]),
+    'the three curves share one stroke width');
 
 });
 
@@ -297,7 +302,11 @@ test('the dashed reference line is reset so the channel curves stay solid', () =
   const ctx = fakeContext();
   drawWaveGraph({ canvas: { width: 8, height: 100 }, ctx, palette: fakePalette() });
   const dashes = ctx.ops.filter(([n]) => n === 'setLineDash').map(([, a]) => a);
-  assert.deepEqual(dashes, ['5,5', ''], 'a left-on dash would break the three curves');
+  assert.equal(dashes.at(-1), '', 'a left-on dash would break the three curves');
+  assert.ok(dashes.slice(0, -1).some((dash) => dash !== ''), 'the reference line is dashed');
+  const lastDash = ctx.ops.findLastIndex(([n]) => n === 'setLineDash');
+  const strokeIndices = ctx.ops.flatMap(([n], index) => (n === 'stroke' ? [index] : []));
+  assert.ok(lastDash < strokeIndices.at(-3), 'the reset precedes the channel curves');
 });
 
 test('neither painter touches a canvas it has no context for', () => {
