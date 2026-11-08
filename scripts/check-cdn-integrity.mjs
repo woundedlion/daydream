@@ -4,6 +4,9 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { pathToFileURL } from 'node:url';
 
+/** Waits before each retry of a failed CDN fetch, in milliseconds. */
+export const RETRY_WAITS_MS = Object.freeze([5_000, 15_000, 45_000]);
+
 export async function checkCdnIntegrity(source, fetchModule = fetch, wait = delay) {
   let map;
   runInNewContext(source, {
@@ -21,15 +24,15 @@ export async function checkCdnIntegrity(source, fetchModule = fetch, wait = dela
     if (!url.startsWith('https://cdn.jsdelivr.net/npm/'))
       throw new Error(`Unexpected CDN URL: ${url}`);
     let bytes;
-    for (let attempt = 0; attempt < 4; attempt++) {
+    for (let attempt = 0; attempt <= RETRY_WAITS_MS.length; attempt++) {
       try {
         const response = await fetchModule(url, { signal: AbortSignal.timeout(30_000) });
         if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
         bytes = Buffer.from(await response.arrayBuffer());
         break;
       } catch (error) {
-        if (attempt === 3) throw error;
-        await wait([5_000, 15_000, 45_000][attempt]);
+        if (attempt === RETRY_WAITS_MS.length) throw error;
+        await wait(RETRY_WAITS_MS[attempt]);
       }
     }
     const actual = `sha384-${createHash('sha384')

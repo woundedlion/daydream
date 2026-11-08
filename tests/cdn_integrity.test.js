@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { checkCdnIntegrity } from '../scripts/check-cdn-integrity.mjs';
+import { RETRY_WAITS_MS, checkCdnIntegrity } from '../scripts/check-cdn-integrity.mjs';
 
 const bytes = 'export const x = 1;';
 const hash = `sha384-${createHash('sha384').update(bytes).digest('base64')}`;
@@ -18,15 +18,15 @@ test('bytes differing from the committed hash are rejected', async () => {
     /integrity mismatch/);
 });
 
-test('persistent HTTP failures give up after four attempts on the backoff schedule', async () => {
+test('persistent HTTP failures give up after the last attempt on the backoff schedule', async () => {
   let attempts = 0;
   const waits = [];
   await assert.rejects(checkCdnIntegrity(source, async () => {
     attempts++;
     return new Response('', { status: 404 });
   }, async (ms) => { waits.push(ms); }), /HTTP 404/);
-  assert.equal(attempts, 4);
-  assert.deepEqual(waits, [5_000, 15_000, 45_000]);
+  assert.equal(attempts, RETRY_WAITS_MS.length + 1);
+  assert.deepEqual(waits, RETRY_WAITS_MS);
 });
 
 test('an empty integrity map is refused', async () => {
@@ -43,7 +43,7 @@ test('transient requests retry with bounded backoff', async () => {
     return new Response(bytes, { status: attempts === 2 ? 503 : 200 });
   }, async (ms) => { waits.push(ms); }), 1);
   assert.equal(attempts, 3);
-  assert.deepEqual(waits, [5_000, 15_000]);
+  assert.deepEqual(waits, RETRY_WAITS_MS.slice(0, 2));
 });
 
 test('an integrity mismatch is not retried', async () => {

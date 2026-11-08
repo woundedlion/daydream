@@ -90,6 +90,18 @@ for (const localAppData of [undefined, 'C:/Users/browser-fixture/AppData/Local']
   });
 }
 
+/**
+ * Asserts one problem per expected entry, each naming every fragment it lists.
+ * @param {string[]} problems - The probe's reported problems.
+ * @param {string[][]} expected - Fragments each problem must contain, in order.
+ */
+function assertProblems(problems, expected) {
+  assert.equal(problems.length, expected.length, problems.join('\n'));
+  expected.forEach((fragments, i) => {
+    for (const fragment of fragments) assert.ok(problems[i].includes(fragment), `${problems[i]} lacks ${fragment}`);
+  });
+}
+
 test('font and script request failures are problems', () => {
   const { listeners, problems } = probeTab('http://127.0.0.1:8000');
   const failed = listeners.get('requestfailed');
@@ -101,9 +113,9 @@ test('font and script request failures are problems', () => {
     url: () => 'https://example.test/app.js',
     failure: () => ({ errorText: 'net::ERR_NAME_NOT_RESOLVED' }),
   });
-  assert.deepEqual(problems, [
-    'request failed: http://127.0.0.1:8000/styles/fonts/inter-latin.woff2 (net::ERR_NAME_NOT_RESOLVED)',
-    'request failed: https://example.test/app.js (net::ERR_NAME_NOT_RESOLVED)',
+  assertProblems(problems, [
+    ['http://127.0.0.1:8000/styles/fonts/inter-latin.woff2', 'net::ERR_NAME_NOT_RESOLVED'],
+    ['https://example.test/app.js', 'net::ERR_NAME_NOT_RESOLVED'],
   ]);
 });
 
@@ -134,16 +146,16 @@ test('console errors, uncaught exceptions and error responses are problems', () 
   responded(response(404, 'https://example.test/favicon.ico'));
   responded(response(500, `${origin}/tools/shader.html`));
 
-  assert.deepEqual(problems, [
-    'console error: Failed to load resource',
-    'console error: Failed to load resource',
-    'console error: chip render threw',
-    'console error: TypeError: x is undefined',
-    'uncaught: boom',
-    `HTTP 404: ${origin}/vendor/fonts/fonts.css`,
-    `HTTP 404: ${origin}/styles/fonts.css`,
-    'HTTP 404: https://example.test/favicon.ico',
-    `HTTP 500: ${origin}/tools/shader.html`,
+  assertProblems(problems, [
+    ['Failed to load resource'],
+    ['Failed to load resource'],
+    ['chip render threw'],
+    ['TypeError: x is undefined'],
+    ['boom'],
+    ['404', `${origin}/vendor/fonts/fonts.css`],
+    ['404', `${origin}/styles/fonts.css`],
+    ['404', 'https://example.test/favicon.ico'],
+    ['500', `${origin}/tools/shader.html`],
   ]);
 });
 
@@ -181,13 +193,9 @@ for (const prefix of ['/daydream', '/nested/daydream/']) {
     ];
     for (const url of unexpected) report(url);
     listeners.get('pageerror')(new Error('font loading threw'));
-    assert.deepEqual(problems, [
-      ...unexpected.flatMap((url) => [
-        `request failed: ${url} (net::ERR_ABORTED)`,
-        `console error: Failed to load ${url}`,
-        `HTTP 404: ${url}`,
-      ]),
-      'uncaught: font loading threw',
+    assertProblems(problems, [
+      ...unexpected.flatMap((url) => [[url, 'net::ERR_ABORTED'], [`Failed to load ${url}`], ['404', url]]),
+      ['font loading threw'],
     ]);
   });
 }

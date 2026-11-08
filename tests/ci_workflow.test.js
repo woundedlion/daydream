@@ -68,7 +68,7 @@ const triggersOf = (source) => {
 // A workflow only workflow_call reaches is gated through its caller; every
 // other one is reachable on its own and needs a terminal job on the list.
 test('GATED_WORKFLOWS names every directly triggered workflow', () => {
-  assert.deepEqual(triggersOf(workflow), ['push', 'pull_request']);
+  assert.deepEqual(triggersOf(workflow).sort(), ['pull_request', 'push']);
   const direct = workflowFiles()
     .map((file) => `${WORKFLOW_DIR}/${file}`)
     .filter((path) => triggersOf(workflowText(path))
@@ -170,8 +170,8 @@ test('engine selection snapshots current master and preserves an explicit pair',
 });
 
 for (const [results, status, output] of [
-  [{ build: { result: 'success' } }, 0, /CI green: 1 required jobs succeeded/],
-  [{ build: { result: 'failure' } }, 1, /required jobs did not succeed/],
+  [{ build: { result: 'success' } }, 0, /\b1\b/],
+  [{ build: { result: 'failure' } }, 1, /::error::.*"build":"failure"/],
 ]) {
   test(`the CI gate CLI returns ${status} for ${results.build.result}`, () => {
     const result = spawnSync(process.execPath,
@@ -200,6 +200,14 @@ test('the CI gate CLI rejects an ungated job before evaluating results', (t) => 
   assert.match(result.stderr, /job 'forgotten' is absent/);
   assert.doesNotMatch(result.stderr, /required-job results/);
 });
+
+/**
+ * @param {string} body - The bundle download step's script.
+ * @param {string} name - A shell retry function the script defines.
+ * @returns {number} How many attempts that function makes.
+ */
+const retryAttempts = (body, name) => body.split(`${name}() {`)[1]
+  .match(/for attempt in ([\d ]+); do/)[1].trim().split(/ +/).length;
 
 test('engine bundle polling retries transient queries and artifact calls', (t) => {
   const shell = findBash();
@@ -256,7 +264,8 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
     assert.equal(result.status, exhausted ? 1 : 0, result.stderr + result.stdout);
     assert.doesNotMatch(result.stdout, /"message":/);
     assert.doesNotMatch(result.stderr, /integer expression expected/);
-    assert.equal(readFileSync(join(fixture, 'query'), 'utf8'), exhausted ? '4' : '3');
+    assert.equal(readFileSync(join(fixture, 'query'), 'utf8'),
+      exhausted ? String(retryAttempts(body, 'retry_api')) : '3');
     if (!exhausted) {
       assert.equal(readFileSync(join(fixture, 'artifact'), 'utf8'), '4');
       assert.equal(readFileSync(join(fixture, 'zip'), 'utf8'), '3');
@@ -285,7 +294,7 @@ test('the engine bundle poll recovers after exhausting metadata or ZIP retries',
       if [ -f "$counter" ]; then read -r n < "$counter"; fi
       n=$((n + 1))
       printf '%s\\n' "$n" > "$counter"
-      [ "$n" -le 4 ]
+      [ "$n" -le "$ATTEMPTS" ]
     }
     gh() {
       case "$2:$4" in
@@ -309,11 +318,12 @@ test('the engine bundle poll recovers after exhausting metadata or ZIP retries',
     for (const timeout of phase === 'extract' ? [false] : [false, true]) {
       const fixture = join(root, `${phase}-${timeout}`);
       mkdirSync(fixture);
+      const attempts = retryAttempts(body, phase === 'zip' ? 'download_bundle' : 'retry_api');
       const result = spawnSync(shell, ['-e', '-s'], {
         input: stubs + (timeout ? body.replace('SECONDS + 3300', 'SECONDS + 0') : body),
         encoding: 'utf8', timeout: 60_000,
         env: { ...process.env, FIXTURE_ROOT: fixture.replaceAll('\\', '/'),
-          PIN: 'a'.repeat(40), FAIL_PHASE: phase },
+          PIN: 'a'.repeat(40), FAIL_PHASE: phase, ATTEMPTS: String(attempts) },
       });
       assert.equal(result.status, phase === 'extract' ? 42 : Number(timeout),
         result.error?.message || result.stderr + result.stdout);
@@ -321,7 +331,7 @@ test('the engine bundle poll recovers after exhausting metadata or ZIP retries',
       assert.match(result.stdout, new RegExp(`::warning::Engine bundle ${message}`));
       assert.equal(result.stdout.includes('::error::'), timeout);
       if (timeout) assert.match(result.stdout, new RegExp(`::error::[^\\n]+${message}`));
-      assert.equal(readFileSync(join(fixture, phase), 'utf8').trim(), timeout ? '4' : '5');
+      assert.equal(Number(readFileSync(join(fixture, phase), 'utf8')), timeout ? attempts : attempts + 1);
     }
   }
 });

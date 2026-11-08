@@ -25,7 +25,7 @@ test('cancelled deployment attempts can retry', async () => {
 test('pair selection snapshots trusted master heads and rejects malformed revisions', async () => {
   const paths = [];
   assert.deepEqual(await snapshotPair(async (path) => { paths.push(path); return heads(path); }, repo), pair);
-  assert.deepEqual(paths, ['repos/example/daydream/commits/master', 'repos/woundedlion/pov/commits/master']);
+  assert.deepEqual(paths.sort(), ['repos/example/daydream/commits/master', 'repos/woundedlion/pov/commits/master']);
   for (const value of [null, {}, { ...pair, daydream: 'master' }, { ...pair, holosphere: pair.holosphere + '-dirty' }])
     assert.throws(() => validatePair(value), /full commit/);
   assert.equal(samePair(pair, { ...pair }), true);
