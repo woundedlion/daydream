@@ -13,7 +13,7 @@ import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 
 
 import {
-  FakeChainEngine, ChainSnapshotRestoreResult, ChainStatus,
+  FakeChainEngine, ChainSnapshotRestoreResult, ChainStatus, PALETTE_FADE_FRAMES, PALETTE_HUE_STEP,
 } from './helpers/fake_engine.js';
 
 import {resolutionPresets} from '../src/effects/effect_roster.js';
@@ -486,9 +486,10 @@ test('chain snapshot seeds respect signed 32-bit bounds', () => {
 test('palette snapshot restores retain active fade state', () => {
   const {fake, saved} = chainFixture();
   const advanced = structuredClone(saved);
-  advanced.paletteBank.hues.fill(318);
+  const nextSequence = 3;
+  advanced.paletteBank.hues.fill((nextSequence - 1) * PALETTE_HUE_STEP);
   for (const cycle of advanced.paletteBank.cycles) {
-    cycle.nextSequence = 3;
+    cycle.nextSequence = nextSequence;
     cycle.fadeActive = true;
     cycle.frame = 1;
   }
@@ -501,9 +502,10 @@ test('palette snapshot restores retain active fade state', () => {
 test('palette snapshot restores reject inconsistent fade state', () => {
   const {fake, saved} = chainFixture();
   const advanced = structuredClone(saved);
-  advanced.paletteBank.hues.fill(318);
+  const nextSequence = 3;
+  advanced.paletteBank.hues.fill((nextSequence - 1) * PALETTE_HUE_STEP);
   for (const cycle of advanced.paletteBank.cycles) {
-    cycle.nextSequence = 3;
+    cycle.nextSequence = nextSequence;
     cycle.fadeActive = true;
     cycle.frame = 1;
   }
@@ -516,7 +518,7 @@ test('palette snapshot restores reject inconsistent fade state', () => {
     (snapshot) => { snapshot.paletteBank.chroma = 1.1; },
     (snapshot) => { snapshot.paletteBank.cycles[0].nextSequence = 1; },
     (snapshot) => { snapshot.paletteBank.hues[0] += 1; },
-    (snapshot) => { snapshot.paletteBank.cycles[0].frame = 600; },
+    (snapshot) => { snapshot.paletteBank.cycles[0].frame = PALETTE_FADE_FRAMES; },
     (snapshot) => { snapshot.paletteBank.cycles[0].fadeActive = false; },
   ]) {
     const snapshot = structuredClone(advanced);
@@ -589,22 +591,26 @@ test('field integer dropdowns and mode gates follow the real engine catalog', ()
       ...DEFAULT_CHAIN.slice(1),
     ]).code, 'APPLIED');
     const definitions = () => engine.getParameterDefinitions();
-    for (const name of ['field.term-1-l', 'field.term-1-m']) {
-      const control = definitions().find((entry) => entry.name === name);
-      assert.deepEqual(control.options, ['zero', 'one', 'two', 'three', 'four',
-        'five', 'six', 'seven', 'eight']);
+    const catalog = JSON.parse(M.ShaderChainBindings.getShaderChainCatalog());
+    const operator = catalog.operators.find((entry) => entry.id === 'sphere.displace.potential.v1');
+    const catalogField = (operatorId, field) => catalog.operators
+      .find((entry) => entry.id === operatorId).params.find((param) => param.id === field);
+    for (const field of ['term-1-l', 'term-1-m']) {
+      const control = definitions().find((entry) => entry.name === `field.${field}`);
+      assert.deepEqual(control.options, catalogField(operator.id, field).values);
       assert.equal(control.step, 1);
     }
     const order = definitions().find((entry) => entry.name === 'wave.order');
-    assert.deepEqual(order.options, ['one', 'two', 'three', 'four', 'five', 'six', 'seven']);
+    const orderField = catalogField('sphere.displace.rossby-haurwitz.v1', 'order');
+    assert.deepEqual(order.options, orderField.values);
     assert.equal(order.step, 1);
-    assert.equal(order.requestedValue, 3);
+    assert.equal(order.requestedValue, orderField.values.indexOf(orderField.default));
     assert.equal(engine.setParameter('field.term-1-l', 2), M.ParamSetResult.APPLIED);
     assert.equal(engine.setParameter('field.term-1-m', 3), M.ParamSetResult.INADMISSIBLE);
-    assert.equal(definitions().find((entry) => entry.name === 'field.term-1-m').requestedValue, 0);
+    const degree = catalogField(operator.id, 'term-1-m');
+    assert.equal(definitions().find((entry) => entry.name === 'field.term-1-m').requestedValue,
+      degree.values.indexOf(degree.default));
 
-    const catalog = JSON.parse(M.ShaderChainBindings.getShaderChainCatalog());
-    const operator = catalog.operators.find((entry) => entry.id === 'sphere.displace.potential.v1');
     const declarations = operator.params.map((field) => declarationFromCatalogField('field', field, operator.id));
     const chain = [{label: 'field', operator: operator.id}];
     const inactive = () => deactivatedParameterIds(declarations,

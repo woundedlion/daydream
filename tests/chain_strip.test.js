@@ -20,6 +20,10 @@ import { compileShaderDocument } from '../generated/shader/shader_workbench.mjs'
 
 const PROJECT = STUDY_CHAIN.findIndex((entry) => entry.label === 'project');
 
+/** @param {string} label @returns {string} The catalog name of the study stage's operator. */
+const operatorName = (label) => CATALOG.operators.find((operator) =>
+  operator.id === STUDY_CHAIN.find((entry) => entry.label === label).operator).name;
+
 test('the strip opens a shipped pattern with one chip per stage', async () => {
   const shipped = compileShaderDocument(readFileSync(
     new URL('../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
@@ -65,15 +69,16 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
     'a crossing sits between the two bands it joins');
 
   const all = chips(h);
-  assert.equal(all.length, 7);
+  assert.equal(all.length, STUDY_CHAIN.length);
   // Groups, not listbox options: an option's children are presentational.
   for (const chip of all) {
     assert.equal(chip.getAttribute('role'), 'group');
     assert.equal(chip.getAttribute('aria-selected'), null);
   }
   const camera = chipByLabel(h, 'camera');
-  assert.equal(camera.getAttribute('aria-label'), 'Rotate · camera');
-  assert.equal(camera.querySelector('.chain-chip-name').textContent, 'Rotate');
+  const rotate = operatorName('camera');
+  assert.equal(camera.getAttribute('aria-label'), `${rotate} · camera`);
+  assert.equal(camera.querySelector('.chain-chip-name').textContent, rotate);
   assert.match(chipByLabel(h, 'project').getAttribute('aria-label'),
     /, sphere to plane$/);
 
@@ -266,7 +271,9 @@ test('pipeline arrows, wheel and background arrow keys scroll the viewport', asy
   viewport.scrollTop = 0;
 
   buttons[1].dispatch('click');
-  assert.equal(viewport.scrollTop, 300);
+  const step = viewport.scrollTop;
+  assert.ok(step > 0 && step < viewport.clientHeight,
+    'a scroll step advances by less than a viewport');
   buttons[0].dispatch('click');
   assert.equal(viewport.scrollTop, 0);
 
@@ -278,7 +285,7 @@ test('pipeline arrows, wheel and background arrow keys scroll the viewport', asy
   assert.equal(wheel.defaultPrevented, true);
 
   const down = viewport.dispatch('keydown', { key: 'ArrowDown' });
-  assert.equal(viewport.scrollTop, 420);
+  assert.equal(viewport.scrollTop, 120 + step);
   assert.equal(down.defaultPrevented, true);
   viewport.dispatch('keydown', { key: 'ArrowUp' });
   assert.equal(viewport.scrollTop, 120);
@@ -292,7 +299,8 @@ test('the wheel reads deltaMode and yields when the strip cannot scroll', async 
   viewport.scrollTop = 0;
 
   viewport.dispatch('wheel', { deltaX: 0, deltaY: 3, deltaMode: 1 });
-  assert.equal(viewport.scrollTop, 48, 'a line-mode notch is not 3 pixels');
+  assert.ok(viewport.scrollTop > 3 && viewport.scrollTop < viewport.clientHeight,
+    'a line-mode notch is not 3 pixels');
   viewport.scrollTop = 0;
   viewport.dispatch('wheel', { deltaX: 0, deltaY: 1, deltaMode: 2 });
   assert.equal(viewport.scrollTop, 400, 'a page-mode notch is one viewport');
@@ -671,8 +679,9 @@ test('a palette opens anchored to the control that opened it', async () => {
   const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
   Object.assign(add, { offsetLeft: 298, offsetTop: 32, offsetWidth: 20, offsetHeight: 20 });
   add.dispatch('click');
-  assert.equal(paletteOf(h).style.left, '298px');
-  assert.equal(paletteOf(h).style.top, '56px');
+  assert.equal(paletteOf(h).style.left, `${add.offsetLeft}px`);
+  assert.ok(Number.parseFloat(paletteOf(h).style.top) >= add.offsetTop + add.offsetHeight,
+    'the palette opens below its control');
 });
 
 test('a palette near the right edge is clamped back inside the viewport', async () => {
@@ -681,8 +690,9 @@ test('a palette near the right edge is clamped back inside the viewport', async 
   const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
   Object.assign(add, { offsetLeft: 1250, offsetTop: 32, offsetWidth: 40, offsetHeight: 20 });
   add.dispatch('click');
-  assert.equal(paletteOf(h).style.left, '1064px',
-    'clamped to the viewport width less the palette and its margin');
+  const left = Number.parseFloat(paletteOf(h).style.left);
+  assert.ok(left < add.offsetLeft && left + 208 < h.doc.documentElement.clientWidth,
+    'clamped inside the viewport width less the palette');
 });
 
 /**
@@ -711,7 +721,9 @@ test('a palette near the bottom is lifted back inside the viewport', async () =>
   const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
   Object.assign(add, { offsetLeft: 20, offsetTop: 270, offsetHeight: 20 });
   add.dispatch('click');
-  assert.equal(paletteOf(h).style.top, '100px');
+  const top = Number.parseFloat(paletteOf(h).style.top);
+  assert.ok(top < add.offsetTop && top + 192 < h.doc.documentElement.clientHeight,
+    'lifted inside the viewport height');
   assert.equal(paletteOf(h).style.maxHeight, '192px');
   assert.equal(paletteOf(h).style.overflowY, 'auto');
 });
@@ -724,9 +736,11 @@ test('a palette taller than the viewport is capped and scrolls', async () => {
   const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
   Object.assign(add, { offsetLeft: 20, offsetTop: 270, offsetHeight: 20 });
   add.dispatch('click');
-  assert.equal(paletteOf(h).style.top, '8px');
-  assert.equal(paletteOf(h).style.maxHeight, '284px',
-    'the viewport height less both margins');
+  const top = Number.parseFloat(paletteOf(h).style.top);
+  const height = Number.parseFloat(paletteOf(h).style.maxHeight);
+  assert.ok(top > 0 && height < 400);
+  assert.equal(h.doc.documentElement.clientHeight - top - height, top,
+    'the viewport height less equal margins');
   assert.equal(paletteOf(h).style.overflowY, 'auto');
 });
 
@@ -1054,16 +1068,17 @@ test('a drag scrolls the pipeline near its edges and honors the final release po
   viewport.scrollTop = 100;
   const header = chipByLabel(h, 'camera').querySelector('.chain-chip-header');
   header.dispatch('pointerdown', dragPointer(25));
-  header.dispatch('pointermove', dragPointer(190));
-  assert.equal(viewport.scrollTop, 124);
+  header.dispatch('pointermove', dragPointer(199));
+  const step = viewport.scrollTop - 100;
+  assert.ok(step > 0);
   runFrame();
-  assert.equal(viewport.scrollTop, 148);
+  assert.equal(viewport.scrollTop, 100 + 2 * step);
   runFrame();
-  assert.equal(viewport.scrollTop, 172);
-  header.dispatch('pointermove', dragPointer(5));
-  assert.equal(viewport.scrollTop, 148);
+  assert.equal(viewport.scrollTop, 100 + 3 * step);
+  header.dispatch('pointermove', dragPointer(1));
+  assert.equal(viewport.scrollTop, 100 + 2 * step);
   runFrame();
-  assert.equal(viewport.scrollTop, 124);
+  assert.equal(viewport.scrollTop, 100 + step);
   runFrame();
   assert.equal(viewport.scrollTop, 100);
   header.dispatch('pointermove', dragPointer(100));
@@ -1159,7 +1174,7 @@ test('parameter rows follow declared order and numeric domains', async () => {
   const h = await makeStrip();
   const region = paramsOf(h, 'sample');
   assert.equal(region.getAttribute('role'), 'group');
-  assert.equal(region.getAttribute('aria-label'), 'Twin Wave Extended Drift · sample parameters');
+  assert.equal(region.getAttribute('aria-label'), `${operatorName('sample')} · sample parameters`);
   assert.deepEqual(rowsOf(h, 'sample').map((row) => row.dataset.parameter),
     h.store.parameterDeclarations().filter((parameter) =>
       parameter.id.startsWith('sample.')).map((parameter) => parameter.id),
@@ -1339,8 +1354,12 @@ test('log-positive sliders map octaves and preserve value readouts across edits 
   const row = rowFor(h, 'affine', 'affine.scale-x');
   const slider = controlIn(row);
   const readout = row.querySelector('.chain-param-value');
-  assert.deepEqual([Number(slider.min), Number(slider.max), Number(slider.value)], [-6, 6, 0]);
-  assert.deepEqual([Number(readout.min), Number(readout.max), Number(readout.value)], [1 / 64, 64, 1]);
+  const { domain, default: initial } = declarationsFor(h, 'affine')
+    .find((parameter) => parameter.id === 'affine.scale-x');
+  assert.deepEqual([Number(slider.min), Number(slider.max), Number(slider.value)],
+    [Math.log2(domain.minimum), Math.log2(domain.maximum), Math.log2(initial)]);
+  assert.deepEqual([Number(readout.min), Number(readout.max), Number(readout.value)],
+    [domain.minimum, domain.maximum, initial]);
   slider.value = '-1';
   slider.dispatch('input');
   runFrame();

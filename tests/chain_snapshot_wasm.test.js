@@ -160,7 +160,7 @@ test('snapshot validation refuses malformed state transactionally', () => {
     [(value) => { value.modulation[0].recipe.sine.offset = 1000; }, result.INVALID_VALUE],
     [(value) => { value.modulation[0].recipe.sine.axis = [100, 0, 0]; }, result.INVALID_VALUE],
     [(value) => { value.modulation[0].recipe.noise.variant = 7; }, result.INVALID_VALUE],
-    [(value) => { value.modulation = Array(33).fill(value.modulation[0]); }, result.INVALID_LENGTH],
+    [(value) => { value.modulation = Array(catalog.budgets.max_chain_ops + 1).fill(value.modulation[0]); }, result.INVALID_LENGTH],
     [(value) => { value.runtime.pop(); }, result.INVALID_VALUE],
     [(value) => { value.runtime[0].state.walkTime = -1; }, result.INVALID_VALUE],
     [(value) => { value.paletteBank.cycles[0].frame = -1; }, result.INVALID_VALUE],

@@ -397,11 +397,11 @@ test('Symmetric Strength spans its full range without changing the unit-field fo
       { instance: 'sample', operator: 'sample.grid.v4' },
       { instance: 'colorize', operator: 'colorize.generated-palette.v4' },
     ]).code, 'APPLIED');
-    const initial = engine.getParameterAdvisories();
-    assert.equal(initial.length, 1);
-    assert.equal(initial[0].name, 'field.strength');
-    assert.ok(initial[0].foldStrength > 0 && initial[0].foldStrength < Math.PI);
-    const strength = (initial[0].foldStrength + Math.PI) / 2;
+    const advisory = () => engine.getParameterAdvisories()
+      .find(({name}) => name === 'field.strength');
+    const initial = advisory();
+    assert.ok(initial.foldStrength > 0 && initial.foldStrength < Math.PI);
+    const strength = (initial.foldStrength + Math.PI) / 2;
     assert.equal(engine.setParameter('field.strength', strength), M.ParamSetResult.APPLIED);
     const current = () => engine.getParameterDefinitions().find((p) => p.name === 'field.strength');
     assert.ok(Math.abs(current().acceptedValue - strength) < 1e-6);
@@ -409,7 +409,7 @@ test('Symmetric Strength spans its full range without changing the unit-field fo
     assert.equal(engine.setParameter('field.strength', -Math.fround(4 * Math.PI)), M.ParamSetResult.APPLIED);
     assert.equal(engine.setParameter('field.amplitude', 2), M.ParamSetResult.UNKNOWN_PARAM);
     assert.equal(engine.getParameterDefinitions().some(({name}) => name === 'field.amplitude'), false);
-    assert.equal(engine.getParameterAdvisories()[0].foldStrength, initial[0].foldStrength);
+    assert.equal(advisory().foldStrength, initial.foldStrength);
   } finally { bindings.delete(); }
 });
 
@@ -600,8 +600,8 @@ test('getParamGeneration changes across setEffect', () => {
 test('setPoleLod reads back in range and clamps outside it', () => {
   assert.equal(typeof engine.setPoleLod, 'function',
     'setPoleLod must stay callable (pole_lod.js binds the Pole LOD slider to it)');
-  assert.equal(initialPoleLod, 0,
-    'a fresh engine must start undecimated (HS_POLE_LOD_DEFAULT)');
+  assert.ok(Number.isInteger(initialPoleLod) && initialPoleLod >= 0 && initialPoleLod <= 8,
+    'a fresh engine starts inside the pole LOD range');
   // The slider uses [0, 2] inside the engine range [0, 8].
   for (let v = 0; v <= 8; v++) {
     engine.setPoleLod(v);

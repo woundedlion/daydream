@@ -1,13 +1,18 @@
 import { enumeration } from './fake_enums.js';
 import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../../src/workbench/shader/shader_deeplink.js';
 import { canonicalEffectId } from "../../src/effects/effect_identity.js";
+import {
+  BAKED_MODULATION_SCALE_MAX, UNIT_MODULATION_AMOUNT_MAX, UNIT_MODULATION_AMOUNT_MIN,
+} from '../../src/workbench/shader/chain_presentation.js';
 import { readFileSync } from 'node:fs';
 
 // Engine fakes consume the installed, generated binding contract.
 import { CLASS_METHODS } from '../../generated/engine_contract.mjs';
 
-const PALETTE_FADE_FRAMES = 600;
-const PALETTE_HUE_STEP = 159;
+/** Frames each palette fade spans; mirror of `GeneratedPaletteBank::FADE_FRAMES`. */
+export const PALETTE_FADE_FRAMES = 600;
+/** Base-hue advance per generated palette; mirror of `GeneratedPaletteBank::HUE_STEP`. */
+export const PALETTE_HUE_STEP = 159;
 const RIPPLE_WAVE_COUNT = 16;
 
 const SHADER_CHAIN_BINDING_METHODS = CLASS_METHODS.ShaderChainBindings;
@@ -68,8 +73,10 @@ function validModulationRecipe(recipe, definitions, instance) {
         || Math.fround(numeric) < definition.min || Math.fround(numeric) > definition.max
         || (definition.options && !Number.isInteger(numeric))) return false;
   }
-  if (recipe.mechanic.kind !== 0 && (recipe.mechanic.amount < 0 || recipe.mechanic.amount > 1)) return false;
-  if (recipe.evaluation === 1 && (recipe.source !== 0 || recipe.noise.scale > 8)) return false;
+  if (recipe.mechanic.kind !== 0 && (recipe.mechanic.amount < UNIT_MODULATION_AMOUNT_MIN
+      || recipe.mechanic.amount > UNIT_MODULATION_AMOUNT_MAX)) return false;
+  if (recipe.evaluation === 1 && (recipe.source !== 0
+      || recipe.noise.scale > BAKED_MODULATION_SCALE_MAX)) return false;
   if (recipe.source === 4) return recipe.evaluation === 0;
   if (recipe.source === 0) {
     if (recipe.noise.variant === 0 && (recipe.noise.basis !== 0 || recipe.noise.contrast !== 0)) return false;

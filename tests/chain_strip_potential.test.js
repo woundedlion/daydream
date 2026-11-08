@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {scratchChainDocument} from '../src/workbench/shader/chain_document_store.js';
+import {POTENTIAL_PARAMETER_GROUPS} from '../src/workbench/shader/chain_presentation.js';
 import {CATALOG, BASE, makeStrip, paramsOf, rowFor, controlIn, chipByLabel, runFrame} from './helpers/chain_strip_harness.js';
 
 function potentialDocument(values = {}, labels = ['potential']) {
@@ -27,10 +28,13 @@ test('Potential Lens groups overall controls and names each independent term', a
   chipByLabel(h, 'potential').dispatch('click');
   const groups = paramsOf(h, 'potential').querySelectorAll('.chain-param-group');
   assert.deepEqual(groups.map((group) => group.getAttribute('aria-label')),
-    ['Overall', 'Term 1', 'Term 2', 'Term 3', 'Term 4']);
-  assert.deepEqual(potentialGroup(h, 'Overall').querySelectorAll('.chain-param')
-    .map((row) => row.dataset.parameter), ['potential.strength', 'potential.integrator',
-    'potential.orientation-azimuth', 'potential.orientation-polar', 'potential.drift']);
+    POTENTIAL_PARAMETER_GROUPS.map((group) => group.name));
+  for (const { name, fields } of POTENTIAL_PARAMETER_GROUPS) {
+    const rows = name.startsWith('Term ') ? potentialFields(h, name.slice('Term '.length))
+      : potentialGroup(h, name);
+    assert.deepEqual(rows.querySelectorAll('.chain-param').map((row) => row.dataset.parameter),
+      fields.map((field) => `potential.${field}`));
+  }
   assert.equal(paramsOf(h, 'potential').querySelector('.chain-param-note'), null);
   assert.equal(rowFor(h, 'potential', 'potential.drift').querySelector('.chain-param-name')
     .getAttribute('title'), null);
@@ -39,8 +43,6 @@ test('Potential Lens groups overall controls and names each independent term', a
     assert.equal(group.getAttribute('role'), 'group');
     assert.deepEqual(group.querySelectorAll('.chain-param-name').map((label) => label.textContent),
       ['Type', 'Kind', 'Degree', 'Order', 'Amplitude', 'Phase']);
-    assert.deepEqual(group.querySelectorAll('.chain-param').map((row) => row.dataset.parameter),
-      ['type', 'kind', 'l', 'm', 'amplitude', 'phase'].map((field) => `potential.term-${term}-${field}`));
     const toggle = potentialToggle(h, term);
     assert.equal(toggle.tagName, 'BUTTON');
     assert.equal(toggle.type, 'button');

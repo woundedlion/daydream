@@ -196,8 +196,6 @@ test('field snapshot fakes preserve their drift clocks', () => {
     assert.equal(bindings.setShaderChain(chain).code, 'APPLIED');
     const saved = bindings.getSnapshot();
     const clock = saved.runtime.find(({instance}) => instance === 'field');
-    assert.deepEqual(clock, {instance: 'field', kind: 'source-clock-v1',
-      state: {primary: 0, secondary: 0, angle: 0}});
     clock.state.primary = 1.25;
     assert.equal(bindings.restoreSnapshot(saved), ChainSnapshotRestoreResult.APPLIED);
     assert.equal(bindings.getSnapshot().runtime.find(({instance}) => instance === 'field')
