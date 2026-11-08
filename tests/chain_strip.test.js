@@ -504,9 +504,10 @@ test('Enter and Space insert and pin the palette choice without pointer activati
   for (const key of ['Enter', ' ']) {
     const h = await makeStrip();
     bandFor(h, 'sphere').querySelector('.chain-band-add').dispatch('click');
-    const option = paletteEntries(h).find((entry) => entry.dataset.operator === 'sphere.lens.twist.v2');
+    const option = paletteEntries(h).find((entry) =>
+      !h.store.chain().some(({operator}) => operator === entry.dataset.operator));
     option.dispatch('keydown', {key});
-    const inserted = h.store.chain().find((entry) => entry.operator === 'sphere.lens.twist.v2');
+    const inserted = h.store.chain().find((entry) => entry.operator === option.dataset.operator);
     assert.ok(inserted);
     assert.equal(h.applied.length, 1);
     assert.equal(h.store.selectedLabel(), inserted.label);
@@ -714,9 +715,7 @@ test('a palette taller than the viewport is capped and scrolls', async () => {
 test('undo and redo revert and reapply whole edits through the same apply path', async () => {
   const h = await makeStrip();
   bandFor(h, 'plane').querySelector('.chain-band-add').dispatch('click');
-  paletteEntries(h)
-    .find((entry) => entry.dataset.operator === 'warp.wave-shear.v2')
-    .dispatch('click');
+  paletteEntries(h)[0].dispatch('click');
   assert.equal(labels(h).length, 8);
   assert.equal(h.applied.length, 1);
 
@@ -1094,9 +1093,7 @@ test('a strip whose first render throws binds nothing to the mount', async () =>
 test('destroy detaches the strip listeners and empties the strip', async () => {
   const h = await makeStrip();
   bandFor(h, 'plane').querySelector('.chain-band-add').dispatch('click');
-  paletteEntries(h)
-    .find((entry) => entry.dataset.operator === 'warp.wave-shear.v2')
-    .dispatch('click');
+  paletteEntries(h)[0].dispatch('click');
   assert.deepEqual(h.container.listeners.map((listener) => listener.type), ['keydown'],
     'the history shortcut is the one listener the strip binds to its mount');
 
@@ -1199,10 +1196,11 @@ test('Enter and Space toggle a tile while focus and Tab leave it collapsed', asy
 test('a fixed stage expands to explain its parameters and allow renaming', async () => {
   const h = await makeStrip();
   bandFor(h, 'field').querySelector('.chain-band-add').dispatch('click');
-  paletteEntries(h).find((entry) => entry.dataset.operator === 'field.transfer.ridge.v2')
-    .dispatch('click');
+  const fixed = paletteEntries(h).find((entry) => CATALOG.operators
+    .find(({id}) => id === entry.dataset.operator).params.length === 0);
+  fixed.dispatch('click');
   const label = h.store.chain()
-    .find((entry) => entry.operator === 'field.transfer.ridge.v2').label;
+    .find((entry) => entry.operator === fixed.dataset.operator).label;
   assert.deepEqual(declarationsFor(h, label), []);
 
   const chip = chipByLabel(h, label);
