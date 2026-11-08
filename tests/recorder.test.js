@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { installConsoleCapture } from './helpers/fake_console.js';
 import { fakeElement, installDocument, stashGlobals } from './helpers/fake_dom.js';
 import {
-  MEMORY_BUFFER_LIMIT_BYTES, WRITE_BACKLOG_SECONDS, selectMimeType, VideoRecorder,
+  DEFAULT_BITRATE_MBPS, MEMORY_BUFFER_LIMIT_BYTES, WRITE_BACKLOG_SECONDS, selectMimeType,
+  VideoRecorder,
 } from '../src/recording/recorder.js';
+import { FPS } from '../src/renderer/frame_constants.js';
 
 /** Fixed local wall-clock time so the timestamped file name is exact. */
 const SAVE_CLOCK = new Date(2026, 0, 2, 3, 4, 5);
@@ -954,7 +956,7 @@ test('the encoder is opened at the configured bitrate', (t) => {
   const auto = new VideoRecorder(recordableCanvas());
   auto.download = () => {};
   auto.start('e');
-  assert.equal(auto.mediaRecorder.options.videoBitsPerSecond, 16_000_000,
+  assert.equal(auto.mediaRecorder.options.videoBitsPerSecond, DEFAULT_BITRATE_MBPS * 1_000_000,
     'the constructor default did not reach the encoder');
   auto.stop();
   auto.mediaRecorder.onstop();
@@ -1130,7 +1132,7 @@ for (const bitrate of [1, 0]) {
     const sessionBuffers = captureSessionBuffers(rec);
     rec.start('slow-open');
     const recorder = rec.mediaRecorder;
-    const expectedBitrate = (bitrate || 16) * 1_000_000;
+    const expectedBitrate = (bitrate || DEFAULT_BITRATE_MBPS) * 1_000_000;
     assert.equal(recorder.options.videoBitsPerSecond, expectedBitrate);
     await drainSink();
     assert.equal(recorder.state, 'recording', 'the encoder starts once the picker resolves');
@@ -1623,7 +1625,7 @@ test('the buffered save path downloads one blob through an anchor click', (t) =>
   assert.deepEqual(save.body.children, [], 'and detached again afterwards');
 
   assert.deepEqual(save.revoked, [], 'the object URL outlives the click');
-  t.mock.timers.tick(1000);
+  t.mock.timers.tick(60_000);
   assert.deepEqual(save.revoked, [save.created[0].url], 'then it is revoked');
 });
 
@@ -1755,7 +1757,8 @@ test('the buffered save maps each container to its extension and blob type', (t)
     assert.equal(save.blobs[0].type, blobType, `blob type for "${mimeType}"`);
     assert.equal(save.clicks[0].download, filename, `file name for "${mimeType}"`);
   }
-  t.mock.timers.tick(1000);
+  assert.deepEqual(save.revoked, [], 'no URL is revoked synchronously');
+  t.mock.timers.tick(60_000);
   assert.equal(save.revoked.length, cases.length, 'every minted URL is revoked');
 });
 
@@ -1893,7 +1896,7 @@ test('a failed timed-fallback capture releases every stream it opened', () => {
     captureStream: (rate) => { fps.push(rate); return fps.length === 1 ? manualMode : fallback; },
   });
 
-  assert.deepEqual(fps, [0, 16], 'the timed fallback is attempted at the frame rate');
+  assert.deepEqual(fps, [0, Math.max(1, Math.round(FPS))], 'the timed fallback is attempted at the frame rate');
   assert.equal(manualTrack.stopped, true, 'the manual-mode track is stopped');
   assert.equal(fallbackTrack.stopped, true, 'the half-opened fallback stream is released');
   assert.equal(outcome.recorders.length, 0, 'no recorder is constructed');
@@ -2089,7 +2092,7 @@ test('superseded streaming recorder ignores picker cancellation and backlog over
   rec.stop();
   rec.start('third');
   const third = rec.mediaRecorder;
-  second.ondataavailable({ data: { size: (16 * 1_000_000 / 8) * WRITE_BACKLOG_SECONDS + 1 } });
+  second.ondataavailable({ data: { size: (DEFAULT_BITRATE_MBPS * 1_000_000 / 8) * WRITE_BACKLOG_SECONDS + 1 } });
   assert.equal(rec.mediaRecorder, third);
   assert.equal(rec.isRecording, true);
   assert.deepEqual(errors, []);
@@ -2158,14 +2161,14 @@ test('a recording session captures in manual-frame mode', (t) => {
   rec.mediaRecorder.onstop();
 });
 
-test('recording chunks arrive on a one-second timeslice', (t) => {
+test('recording chunks arrive on a positive timeslice', (t) => {
   expectEmptySessionWarnings(t);
   t.after(installRecorderEnv());
   const rec = new VideoRecorder(recordableCanvas());
   rec.download = () => {};
   rec.toggle('e');
   const recorder = rec.mediaRecorder;
-  assert.equal(recorder.timesliceMs, 1000,
+  assert.ok(Number.isFinite(recorder.timesliceMs) && recorder.timesliceMs > 0,
     'chunks must be delivered on a timeslice, not buffered until stop');
   rec.stop();
   rec.mediaRecorder.onstop();

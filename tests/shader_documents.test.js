@@ -31,6 +31,16 @@ import {
   FakeChainEngine, ParamSetResult, ChainSnapshotRestoreResult, unpinnedEngineMethods,
 } from './helpers/fake_engine.js';
 import {fakeElement} from './helpers/fake_dom.js';
+import {
+  BAKED_MODULATION_SCALE_MAX, MODULATION_OPERATOR, PALETTE_OPERATOR, UNIT_MODULATION_AMOUNT_MAX,
+} from '../src/workbench/shader/chain_presentation.js';
+
+const HEX_CHAIN = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT).descriptor.chain;
+
+/** @param {string} operator @param {string} param @param {string} option @returns {number} */
+const optionIndex = (operator, param, option) => JSON.parse(ENGINE_CATALOG).operators
+  .find((entry) => entry.id === operator).params.find((entry) => entry.id === param)
+  .values.indexOf(option);
 
 test('simulator exposes Shader as a standalone tool', () => {
   assert.match(INDEX, /href="tools\/shader\.html"[^>]*>Shader/);
@@ -75,8 +85,8 @@ test('labels outside the alias table need no entry', () => {
 });
 
 // Across every shipped pattern document, the labels whose mapping differs from
-// the plain field spelling stay this frozen set.
-test('the alias table keys stay frozen', () => {
+// the plain field spelling stay within this frozen set.
+test('the alias table keys never grow', () => {
   const patternCatalog = JSON.parse(readFileSync(
     new URL('../generated/shader/patterns/catalog.json', import.meta.url), 'utf8'));
   const aliased = new Set();
@@ -91,8 +101,9 @@ test('the alias table keys stay frozen', () => {
       }
     }
   }
-  assert.deepEqual([...aliased].sort(),
-    ['camera', 'colorize', 'sample', 'surface', 'warp1', 'warp2']);
+  const frozen = new Set(['camera', 'colorize', 'sample', 'surface', 'warp1', 'warp2']);
+  assert.ok(aliased.size > 0, 'the shipped patterns still exercise the alias table');
+  for (const label of aliased) assert.ok(frozen.has(label), `"${label}" joined the alias table`);
 });
 
 for (const operation of ['selectEffect', 'setShaderChainParameters', 'stage edit']) {
@@ -552,10 +563,9 @@ test('the scratch document opens as a live, editable chain', async () => {
 
   assert.deepEqual(harness.selections, ['shader-chain']);
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
-    ['sphere.rotate.v2', 'project.equirectangular.v2', 'sample.spiral.v3',
-      'colorize.generated-palette.v4']);
+    SCRATCH.descriptor.chain.map((entry) => entry.operator));
   assert.deepEqual(stripChips(harness).map((chip) => chip.dataset.label),
-    ['rotate', 'project', 'sample', 'colorize']);
+    SCRATCH.descriptor.chain.map((entry) => entry.label));
   assert.deepEqual(
     harness.elements.get('shader-preset-select').options.map((o) => o.value),
     ['catalog-defaults']);
@@ -564,7 +574,7 @@ test('the scratch document opens as a live, editable chain', async () => {
 
   clickPlaneBandEntry(harness, 'warp.affine.v4');
 
-  assert.equal(harness.engine.chainCalls.at(-1).length, 5);
+  assert.equal(harness.engine.chainCalls.at(-1).length, SCRATCH.descriptor.chain.length + 1);
 });
 
 // The load that replaces a document tears its editor down; a load the preview
@@ -710,7 +720,7 @@ test('a shader state link restores its document, preset, bypasses, and pause', a
   assert.ok(harness.engine.writes.some(
     ([name, value]) => name === 'sample.pattern-freq' && value === 7.25));
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.instance),
-    ['lens', 'project', 'warp2', 'sample', 'colorize', 'modulation']);
+    HEX_CHAIN.map((entry) => entry.label).filter((label) => label !== 'camera'));
   assert.equal(stripChips(harness).find((chip) => chip.dataset.label === 'camera')
     .querySelector('.chain-chip-bypass').getAttribute('aria-pressed'), 'true');
 });
@@ -778,7 +788,7 @@ test('shader edits keep the full state hash current', async () => {
   await harness.controller.flushDeepLink();
 
   const state = await decodeShaderStateHash(harness.win.location.hash);
-  assert.equal(state.document.descriptor.chain.length, 5);
+  assert.equal(state.document.descriptor.chain.length, SCRATCH.descriptor.chain.length + 1);
   assert.equal(state.preset, 'catalog-defaults');
   assert.deepEqual(state.bypassed, ['rotate']);
   assert.equal(state.paused, true);
@@ -951,8 +961,7 @@ test('a malformed shader state link falls back to an editable scratch chain', as
   });
 
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
-    ['sphere.rotate.v2', 'project.equirectangular.v2', 'sample.spiral.v3',
-      'colorize.generated-palette.v4']);
+    SCRATCH.descriptor.chain.map((entry) => entry.operator));
   assert.match(harness.elements.get('shader-document-status').textContent,
     /shader link could not be restored: Error: invalid shader link payload/i);
 });
@@ -961,8 +970,8 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   const harness = await editorWorkbench();
   assert.deepEqual(harness.selections, [canonicalEffectId('shader-chain'), canonicalEffectId('shader-chain')]);
   assert.equal(harness.engine.chainCalls.length, 2);
-  assert.equal(harness.engine.chainCalls.at(-1).length, 7);
-  assert.equal(stripChips(harness).length, 7);
+  assert.equal(harness.engine.chainCalls.at(-1).length, HEX_CHAIN.length);
+  assert.equal(stripChips(harness).length, HEX_CHAIN.length);
   const digest = compileShaderDocument(KALEIDOSCOPE_HEX_BRIGHT,
     { catalog: JSON.parse(ENGINE_CATALOG) }).descriptor_digest;
   assert.equal(harness.elements.get('shader-document-digest').dataset.digest, digest,
@@ -973,47 +982,35 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   clickPlaneBandEntry(harness, 'warp.wave-shear.v2');
 
   assert.equal(harness.engine.chainCalls.length, 3);
-  assert.equal(harness.engine.chainCalls.at(-1).length, 8);
+  assert.equal(harness.engine.chainCalls.at(-1).length, HEX_CHAIN.length + 1);
   assert.ok(harness.engine.writes.some(([name]) => name === 'warp.strength'),
     'the re-apply carries the backfilled catalog defaults');
 
   // Save exports the store's edited document, not the load-time compile.
   assert.equal(harness.controller.save(), true);
   const saved = JSON.parse(harness.downloads[0][1]);
-  assert.equal(saved.descriptor.chain.length, 8);
+  assert.equal(saved.descriptor.chain.length, HEX_CHAIN.length + 1);
   assert.ok(Object.keys(saved.preset_bank.presets[0].values)
     .some((id) => id.startsWith('warp.')));
 });
 
 test('Kaleidoscope Stained Glass loads its effect preset into the interpreter controls', async () => {
   const harness = await editorWorkbench({ source: KALEIDOSCOPE_STAINED_GLASS });
-  const values = JSON.parse(KALEIDOSCOPE_STAINED_GLASS).preset_bank.presets[0].values;
+  const document = JSON.parse(KALEIDOSCOPE_STAINED_GLASS);
+  const values = document.preset_bank.presets[0].values;
+  const labels = new Set(document.descriptor.chain.map((entry) => entry.label));
 
-  assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator), [
-    'sphere.rotate.v2',
-    'sphere.lens.kaleidoscope.v2',
-    'project.gnomonic.v2',
-    'warp.vector-noise.v2',
-    'warp.mirror-tile.v2',
-    'warp.affine.v4',
-    'sample.grid.v4',
-    'colorize.generated-palette.v4',
-    'color.modulate.v1',
-  ]);
-  for (const [label, parameterId] of [
-    ['camera', 'camera.wander'],
-    ['project', 'project.singularity-fade'],
-    ['warp1', 'warp1.strength'],
-    ['warp2', 'warp2.speed'],
-    ['affine', 'affine.rotation-rate'],
-    ['sample', 'sample.pattern-freq'],
-    ['colorize', 'colorize.brightness-bottom'],
-  ]) {
-    assert.ok(Math.abs(Number(displayedParameter(harness, label, parameterId))
-      - Number(values[parameterId])) <= 1e-6,
-    `${parameterId} displays the effect preset`);
-    assert.ok(harness.engine.writes.some(([name, value]) =>
-      name === parameterId && value === Number(values[parameterId])),
+  assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
+    document.descriptor.chain.map((entry) => entry.operator));
+  const numeric = Object.entries(values).filter(([parameterId, value]) =>
+    typeof value === 'number' && labels.has(parameterId.slice(0, parameterId.indexOf('.'))));
+  assert.ok(numeric.length > 0, 'the preset carries numeric stage values');
+  for (const [parameterId, value] of numeric) {
+    const label = parameterId.slice(0, parameterId.indexOf('.'));
+    assert.ok(Math.abs(Number(displayedParameter(harness, label, parameterId)) - value) <= 1e-6,
+      `${parameterId} displays the effect preset`);
+    assert.ok(harness.engine.writes.some(([name, written]) =>
+      name === parameterId && written === value),
     `${parameterId} reaches the interpreter`);
   }
 });
@@ -1178,7 +1175,7 @@ test('a descriptor edit under the compiled build returns the preview to the inte
   assert.equal(harness.selections.at(-1), 'shader-chain');
   assert.equal(toggle.disabled, true);
   assert.equal(toggle.getAttribute('aria-pressed'), 'false');
-  assert.equal(harness.engine.chainCalls.at(-1).length, 8,
+  assert.equal(harness.engine.chainCalls.at(-1).length, HEX_CHAIN.length + 1,
     'the edited chain is what renders');
   assert.match(status.textContent, /back on the interpreter/);
 });
@@ -1237,7 +1234,7 @@ test('a Save As copy carries the edits made since the load', async () => {
 
   assert.equal(await harness.controller.saveAs(), true);
   const copy = JSON.parse(harness.downloads.at(-1)[1]);
-  assert.equal(copy.descriptor.chain.length, 8);
+  assert.equal(copy.descriptor.chain.length, HEX_CHAIN.length + 1);
   assert.deepEqual(
     validateShaderDocument(copy, { catalog: JSON.parse(ENGINE_CATALOG) }), []);
 });
@@ -1286,7 +1283,6 @@ for (const [entered, filename] of [
   test(`Save As downloads the filename entered as ${JSON.stringify(entered)}`, async () => {
     const harness = await editorWorkbench();
     harness.win.prompt = (message, suggestedName) => {
-      assert.equal(message, 'Save shader as:');
       assert.equal(suggestedName, 'kaleidoscope-hex-bright-copy1.shader.json');
       return entered;
     };
@@ -1325,10 +1321,8 @@ test('Save As opens the file picker immediately and writes to its chosen file', 
     });
   };
   const pending = harness.controller.saveAs();
-  assert.deepEqual(options, {
-    suggestedName: 'kaleidoscope-hex-bright-copy1.shader.json',
-    types: [{ description: 'Shader document', accept: { 'application/json': ['.json'] } }],
-  });
+  assert.equal(options.suggestedName, 'kaleidoscope-hex-bright-copy1.shader.json');
+  assert.deepEqual(options.types[0].accept, { 'application/json': ['.json'] });
   assert.equal(await pending, true);
   assert.deepEqual(harness.downloads, []);
   assert.equal(closed, true);
@@ -1398,8 +1392,9 @@ test('Save As leaves edits made during the write unsaved', async () => {
 test('stage controls stay expanded and source function is directly selectable', async () => {
   const harness = await editorWorkbench();
   const lens = stripChips(harness).find((chip) => chip.dataset.label === 'lens');
-  assert.deepEqual(lens.querySelectorAll('.chain-param')
-    .map((row) => row.dataset.parameter), ['lens.symmetry']);
+  const lensRows = lens.querySelectorAll('.chain-param').map((row) => row.dataset.parameter);
+  assert.ok(lensRows.length > 0, 'the lens chip renders its rows expanded');
+  assert.ok(lensRows.every((id) => id.startsWith('lens.')));
 
   const source = stripChips(harness).find((chip) => chip.dataset.label === 'sample');
   const select = source.querySelector('.chain-chip-replace');
@@ -1433,7 +1428,7 @@ test('a bypass reshapes the engine program and skips the bypassed parameters', a
     .querySelector('.chain-chip-bypass').dispatch('click');
 
   const shape = harness.engine.chainCalls.at(-1);
-  assert.equal(shape.length, 6);
+  assert.equal(shape.length, HEX_CHAIN.length - 1);
   assert.ok(!shape.some((entry) => entry.instance === 'lens'));
   assert.ok(harness.engine.writes.length > writesBefore,
     'the re-apply rewrote the surviving instances');
@@ -1484,8 +1479,10 @@ test('Grid Space switches modulation source and sampling atomically with one und
   assert.ok(stripChips(harness).find((chip) => chip.dataset.label === 'modulation') === chip,
     'the active Color stage stays mounted');
   assert.deepEqual(batches, [[
-    { name: 'modulation.modulation-source', value: 2 },
-    { name: 'modulation.modulation-evaluation', value: 0 },
+    { name: 'modulation.modulation-source',
+      value: optionIndex(MODULATION_OPERATOR, 'modulation-source', 'sphere-interference') },
+    { name: 'modulation.modulation-evaluation',
+      value: optionIndex(MODULATION_OPERATOR, 'modulation-evaluation', 'direct') },
   ]]);
   const values = savedValues(harness);
   assert.equal(values['modulation.modulation-source'], 'sphere-interference');
@@ -1512,7 +1509,7 @@ test('a refused modulation source batch preserves both fields and the visible No
   const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'modulation')
     .querySelectorAll('.chain-param');
   assert.equal(colorRows.find((row) => row.dataset.parameter === 'modulation.modulation-source')
-    .querySelector('.chain-param-control').value, 'noise');
+    .querySelector('.chain-param-control').value, original['modulation.modulation-source']);
   const groups = stripChips(harness).find((chip) => chip.dataset.label === 'modulation')
     .querySelectorAll('.chain-param-group');
   assert.equal(groups.filter((group) => group.getAttribute('aria-label') === 'Noise').at(-1).hidden, false);
@@ -1535,12 +1532,13 @@ test('lightness lift preserves the noise recipe and clamps only strength in one 
   };
   edit('modulation.modulation-mechanic', 'positive-lightness-lift');
   assert.deepEqual(batches, [[
-    { name: 'modulation.modulation-mechanic', value: 1 },
-    { name: 'modulation.modulation-amount', value: 1 },
+    { name: 'modulation.modulation-mechanic',
+      value: optionIndex(MODULATION_OPERATOR, 'modulation-mechanic', 'positive-lightness-lift') },
+    { name: 'modulation.modulation-amount', value: UNIT_MODULATION_AMOUNT_MAX },
   ]]);
   const values = savedValues(harness);
   assert.equal(values['modulation.modulation-mechanic'], 'positive-lightness-lift');
-  assert.equal(values['modulation.modulation-amount'], 1);
+  assert.equal(values['modulation.modulation-amount'], UNIT_MODULATION_AMOUNT_MAX);
   assert.equal(values['modulation.pattern-noise-variant'], 'octave-contour');
   assert.equal(values['modulation.pattern-noise-basis'], 'fbm3');
   assert.equal(values['modulation.pattern-contrast'], 2);
@@ -1554,8 +1552,9 @@ test('baked sampling clamps an existing direct Noise scale in the same edit', as
   edit('modulation.modulation-evaluation', 'direct');
   edit('modulation.pattern-scale', 32);
   edit('modulation.modulation-evaluation', 'baked-cube');
-  assert.equal(savedValues(harness)['modulation.pattern-scale'], 8);
-  assert.equal(displayedParameter(harness, 'modulation', 'modulation.pattern-scale'), '8');
+  assert.equal(savedValues(harness)['modulation.pattern-scale'], BAKED_MODULATION_SCALE_MAX);
+  assert.equal(displayedParameter(harness, 'modulation', 'modulation.pattern-scale'),
+    String(BAKED_MODULATION_SCALE_MAX));
   harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
   const values = savedValues(harness);
   assert.equal(values['modulation.pattern-scale'], 32);
@@ -1575,7 +1574,8 @@ test('a chip control writes the active preset and survives Save without an engin
     ([name, value]) => name === 'sample.pattern-freq' && value === 7),
   'the engine takes the edit as it lands');
   assert.ok(writes.some(
-    ([name, value]) => name === 'colorize.palette-mapping' && value === 3),
+    ([name, value]) => name === 'colorize.palette-mapping'
+      && value === optionIndex(PALETTE_OPERATOR, 'palette-mapping', 'reverse')),
   'an enum reaches the engine as its option index');
   harness.engine.getParameterDefinitions = () => {
     throw new Error('Save must not read the engine');

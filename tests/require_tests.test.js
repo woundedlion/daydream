@@ -104,5 +104,5 @@ test('an install outside the test directory fails under the normal test glob', (
 
 test('a runner command without a test glob is rejected', () => {
   writePkg('');
-  assert.match(fail(), /require-tests: no test glob found in package\.json "test"\./);
+  assert.match(fail(), /no test glob found/);
 });

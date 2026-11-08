@@ -140,12 +140,16 @@ test('visual history bounds cover the slowest response tail', () => {
     tail += age ** 8 * Math.exp(-age) / 40320 * 0.01;
   assert.ok(Math.abs(sustainedSurvival(40) - tail) < 1e-14);
   assert.ok(tail > 8.56e-10 && tail < 8.58e-10);
+  const slowestTau = PovSweep.RESPONSE_TAU_MS * PovSweep.MAX_RESPONSE_SCALE;
+  const tailMs = PovSweep.RESPONSE_TAIL_TAU * slowestTau;
   for (const frameMs of [62.5, 40, 100]) {
     const sweep = new PovSweep(8, 2, frame(10000), 0, frameMs);
     for (let i = 0; i < 30; i++) sweep.beginFrame(frame(10000));
-    assert.equal(sweep.emissions.length, Math.ceil(40 * 4.94 * 2 / frameMs) + 1);
-    assert.ok((sweep.emissions.length - 1) * frameMs >= 40 * 4.94 * 2);
-    if (frameMs === 62.5) assert.equal(sweep.emissions.length, 8);
+    const spanMs = (sweep.emissions.length - 1) * frameMs;
+    assert.ok(spanMs >= tailMs, `${frameMs} ms: the history covers the retained tail`);
+    assert.ok(spanMs - frameMs < tailMs, `${frameMs} ms: one fewer epoch would not cover it`);
+    assert.ok(sustainedSurvival(spanMs / slowestTau) < 1 / 0xffff,
+      `${frameMs} ms: the dropped tail is below one display code`);
   }
 });
 

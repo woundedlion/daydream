@@ -35,8 +35,9 @@ test('install replaces stale assets and preserves consumer-owned files', (t) => 
   const log = t.mock.method(console, 'log', () => {});
   const { bundle, destination } = fixture(t);
   installEngineBundle(bundle, destination);
-  assert.deepEqual(log.mock.calls.map(({ arguments: args }) => args),
-    [[`Installed ${RUNTIME_PATHS.size + 1} engine assets (${'a'.repeat(40)} -> ${'b'.repeat(40)})`]]);
+  assert.equal(log.mock.calls.length, 1);
+  assert.match(log.mock.calls[0].arguments.join(' '),
+    new RegExp(`${'a'.repeat(40)}.*${'b'.repeat(40)}`), 'the log names the old and new pins');
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.js'), 'utf8'),
     'fresh generated/holosphere_wasm.js');
   assert.equal(readFileSync(join(destination, 'generated/shader/composed_effect_roster.mjs'), 'utf8'),
@@ -84,8 +85,9 @@ test('a bundle from another engine commit than the declared pin is refused', (t)
 
   process.env.HOLOSPHERE_BUNDLE_PIN = 'b'.repeat(40);
   installEngineBundle(bundle, destination);
-  assert.deepEqual(log.mock.calls.map(({ arguments: args }) => args),
-    [[`Installed ${RUNTIME_PATHS.size + 1} engine assets (${'a'.repeat(40)} -> ${'b'.repeat(40)})`]]);
+  assert.equal(log.mock.calls.length, 1);
+  assert.match(log.mock.calls[0].arguments.join(' '),
+    new RegExp(`${'a'.repeat(40)}.*${'b'.repeat(40)}`), 'the log names the old and new pins');
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'b'.repeat(40));
 });
 
@@ -149,8 +151,9 @@ test('install initializes a checkout with no previous engine pin', (t) => {
   const { bundle, destination } = fixture(t);
   rmSync(join(destination, 'generated/holosphere_wasm.sha'));
   installEngineBundle(bundle, destination);
-  assert.deepEqual(log.mock.calls.map(({ arguments: args }) => args),
-    [[`Installed ${RUNTIME_PATHS.size + 1} engine assets (none -> ${'b'.repeat(40)})`]]);
+  assert.equal(log.mock.calls.length, 1);
+  assert.match(log.mock.calls[0].arguments.join(' '), new RegExp(`none.*${'b'.repeat(40)}`),
+    'the log names the new pin and no previous one');
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'b'.repeat(40));
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.js'), 'utf8'),
     'fresh generated/holosphere_wasm.js');

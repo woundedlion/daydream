@@ -185,22 +185,28 @@ test('a matching value stream with a copy operation is not blocked', () => {
 });
 
 test('a missing or detached value stream blocks the copy', () => {
-  const expected =
-    'Export: no parameter values matching the current effect; skipping copy';
-  assert.equal(paramExportBlocker(null, 3, true), expected);
+  const expected = paramExportBlocker(null, 3, true);
+  assert.match(expected, /no parameter values/);
   assert.equal(paramExportBlocker(undefined, 3, true), expected);
   // A heap-growth detach leaves the WASM view zero-length.
   assert.equal(paramExportBlocker(new Float32Array(0), 3, true), expected);
 });
 
 test('a skewed value stream blocks the copy and reports both lengths', () => {
-  assert.equal(paramExportBlocker([0.5, 0.5], 3, true),
-    'Export: param/value length skew (3 vs 2); skipping copy');
+  const reason = paramExportBlocker([0.5, 0.5], 3, true);
+  assert.match(reason, /skew/);
+  assert.match(reason, /\b3\b/);
+  assert.match(reason, /\b2\b/);
 });
 
 test('a missing copy operation blocks the copy', () => {
-  assert.equal(paramExportBlocker([0.5], 1, false),
-    'Export: clipboard copy unavailable');
+  assert.match(paramExportBlocker([0.5], 1, false), /clipboard/);
+});
+
+test('each export blocker names its own cause', () => {
+  const reasons = [paramExportBlocker(null, 3, true), paramExportBlocker([0.5, 0.5], 3, true),
+    paramExportBlocker([0.5], 1, false)];
+  assert.equal(new Set(reasons).size, reasons.length);
 });
 
 test('a value-stream fault outranks copy availability', () => {

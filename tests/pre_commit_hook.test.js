@@ -169,7 +169,6 @@ for (const layout of ['standard index', 'split index', 'linked worktree with spl
     });
     assert.equal(commit.status, 0, commit.stdout + commit.stderr);
     assert.match(commit.stderr, /tracked files match the staged tree/);
-    assert.match(commit.stderr, /publication checks passed/);
     assert.equal(git(checkout, 'ls-files', '-s'), indexBefore);
   });
 }

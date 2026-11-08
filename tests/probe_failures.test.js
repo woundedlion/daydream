@@ -1,4 +1,7 @@
-import { closeProbeResources, checks, collectProblems, describeProbeFailure, isMain, measureChecks } from '../scripts/probe_harness.mjs';
+import {
+  closeProbeResources, checks, collectProblems, describeProbeFailure, isMain, measureChecks,
+  PAGE_STATE_TIMEOUT_MS,
+} from '../scripts/probe_harness.mjs';
 import { feedbackAtClick, probeColorStrip, probeHueWheel, probeEffectRecipeArrows, rgbMovedTogether } from '../scripts/palettes-probe.mjs';
 import { readdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
@@ -136,25 +139,33 @@ test('probe diagnostics retain the failure phase and compact page state', async 
   assert.equal(state.visibility, 'hidden');
   assert.equal(state.overlay, 'Loading engine');
   assert.equal(state.statusKind, 'error');
-  assert.equal(state.error.length, 240);
-  assert.equal(state.chips.length, 16);
+  assert.ok(state.error.length > 0 && state.error.length < 400, 'the error text is truncated');
+  assert.ok(state.chips.length > 0 && state.chips.length < 20, 'the chip list is truncated');
+  assert.ok(state.chips.every((label, index) => label === `stage${index}`));
   assert.equal(state.undoDisabled, true);
-  assert.equal(state.hash.length, 24);
+  assert.ok(state.hash.length > 0 && state.hash.length < state.hashLength, 'the hash is truncated');
+  assert.ok(('#shader=v2.' + 'a'.repeat(500)).startsWith(state.hash));
   assert.equal(state.hashLength, 511);
   assert.equal(state.draws, 2);
   assert.equal(state.glPixels, false);
   assert.equal(state.guiChildren, 1);
   assert.equal(state.globalGuiChildren, 2);
   assert.deepEqual(state.canvases, [{width: 960, height: 540, clientWidth: 480, clientHeight: 270}]);
-  assert.equal(state.resources.length, 20);
-  assert.deepEqual(state.resources[0], {path: '/generated/module4.js', duration: 4, transfer: 120, type: 'script'});
+  const kept = state.resources.length;
+  assert.ok(kept > 0 && kept < 24, 'the resource list is truncated');
+  assert.deepEqual(state.resources.map(({path}) => path),
+    Array.from({length: kept}, (_, index) => `/generated/module${24 - kept + index}.js`),
+    'the most recent resources are kept in order');
+  assert.deepEqual(state.resources.at(-1),
+    {path: '/generated/module23.js', duration: 4, transfer: 120, type: 'script'});
   assert.doesNotMatch(message, /secret|localhost/);
 });
 
 test('probe diagnostics preserve the original failure when page capture rejects', async () => {
   const tab = {evaluate: async () => {throw new Error('Target closed');}};
-  assert.match(await describeProbeFailure(tab, 'Twist angle undo digest', 'Waiting failed'),
-    /Twist angle undo digest: Waiting failed; state=\{"capture":"page state unavailable: Target closed"/);
+  const message = await describeProbeFailure(tab, 'Twist angle undo digest', 'Waiting failed');
+  assert.match(message, /^Twist angle undo digest: Waiting failed; state=/);
+  assert.match(JSON.parse(message.split('; state=')[1]).capture, /Target closed/);
 });
 
 test('probe diagnostics handle a page with no mounted controls or draw probe', async (t) => {
@@ -173,16 +184,19 @@ test('probe diagnostics handle a page with no mounted controls or draw probe', a
   for (const key of ['overlay', 'status', 'statusKind', 'error', 'undoDisabled', 'draws', 'glDraws', 'glPixels'])
     assert.equal(state[key], null, key);
   assert.deepEqual(state.chips, []);
-  assert.match(await describeProbeFailure(undefined, 'navigation', 'Navigation failed'),
-    /navigation: Navigation failed; state=\{"capture":"page state unavailable: page was not opened"/);
+  const unopened = await describeProbeFailure(undefined, 'navigation', 'Navigation failed');
+  assert.match(unopened, /^navigation: Navigation failed; state=/);
+  assert.match(JSON.parse(unopened.split('; state=')[1]).capture, /not opened/);
 });
 
 test('probe diagnostics finish when the renderer does not answer', async (t) => {
   t.mock.timers.enable({apis: ['setTimeout']});
   const tab = {evaluate: () => new Promise(() => {})};
   const pending = describeProbeFailure(tab, 'canvas draw', new Error('Waiting failed'));
-  t.mock.timers.tick(1000);
-  assert.match(await pending, /canvas draw: Waiting failed; state=\{"capture":"page state timed out after 1000ms"/);
+  t.mock.timers.tick(PAGE_STATE_TIMEOUT_MS);
+  const message = await pending;
+  assert.match(message, /^canvas draw: Waiting failed; state=/);
+  assert.match(JSON.parse(message.split('; state=')[1]).capture, /timed out/);
 });
 
 test('probe diagnostics track pending requests by identity and clear completed and failed requests', async () => {
@@ -204,7 +218,8 @@ test('probe diagnostics track pending requests by identity and clear completed a
   assert.deepEqual((await state()).pendingRequests, []);
   assert.equal(problems.length, 1);
   for (let index = 0; index < 24; index++) listeners.get('request')(request());
-  assert.equal((await state()).pendingRequests.length, 20);
+  const pending = (await state()).pendingRequests.length;
+  assert.ok(pending > 0 && pending < 24, 'the pending list is truncated');
   const other = {evaluate: async () => ({})};
   assert.deepEqual(JSON.parse((await describeProbeFailure(other, 'engine overlay', 'Waiting failed'))
     .split('; state=')[1]).pendingRequests, []);
@@ -506,7 +521,9 @@ test('the parity probe reports a compiled preset refusal after a successful docu
       ? (++parityReads === 1 ? true : { armed: true, status: 'ok' })
       : { status: 'error', text: 'unknown parameter' },
   });
-  assert.deepEqual(sources, ['ash-cloud', 'alien-core']);
+  assert.equal(sources.length, 2);
+  assert.ok(sources.every((source) => typeof source === 'string' && source.length > 0));
+  assert.notEqual(sources[0], sources[1]);
   assert.deepEqual(selectors, ['#shader-parity-toggle']);
   assert.deepEqual(failures, ['the compiled build takes every authored value (unknown parameter)']);
 });

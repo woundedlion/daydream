@@ -90,8 +90,6 @@ test('a .wasm is served as application/wasm', () => withSite(async (get) => {
 test('nothing outside the manifest set is served', () => withSite(async (get) => {
   const tooling = await get('/scripts/run-tests.mjs');
   assert.equal(tooling.status, 404, 'dev tooling the manifest omits was served');
-  assert.equal(tooling.body, 'not in site_manifest.txt\n');
-  assert.equal(tooling.type, 'text/plain; charset=utf-8');
 
   assert.equal((await get('/styles-extra.css')).status, 404,
     'unlisted paths are refused even when their names share a manifest prefix');

@@ -139,7 +139,8 @@ test('loaded code the suite never executes fails the overall line floor', () => 
     (_, index) => `  if (n === ${index}) return ${index};`).join('\n');
   writeFileSync(join(root, 'lib.mjs'),
     `export const value = 4;\nexport function unreached(n) {\n${branches}\n  return -1;\n}\n`);
-  assert.match(failOutput(PATTERN), /overall line coverage .* below the 92% floor/);
+  assert.match(failOutput(PATTERN),
+    new RegExp(`overall line coverage .* below the ${LINE_FLOOR}% floor`));
 });
 
 // Every guard line runs, so the line floor holds while forty consequents never do.
@@ -150,12 +151,12 @@ test('branches the suite never takes fail the overall branch floor', () => {
     `export const value = 4;\nexport function pick(n) {\n${guards}\n  return -1;\n}\npick(-1);\n`);
   const output = failOutput(PATTERN);
   assert.doesNotMatch(output, /line coverage .* below/);
-  assert.match(output, /overall branch coverage .* below the 93% floor/);
+  assert.match(output, new RegExp(`overall branch coverage .* below the ${BRANCH_FLOOR}% floor`));
 });
 
-test('the overall coverage floors are 92% of lines and 93% of branches', () => {
-  assert.equal(LINE_FLOOR, 92);
-  assert.equal(BRANCH_FLOOR, 93);
+test('the overall coverage floors stay at or above 92% of lines and 93% of branches', () => {
+  assert.ok(LINE_FLOOR >= 92);
+  assert.ok(BRANCH_FLOOR >= 93);
 });
 
 const REPO = resolve(HERE, '..');

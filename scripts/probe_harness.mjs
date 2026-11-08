@@ -19,6 +19,9 @@ import { serveStagedSite } from './vendor-stage.mjs';
 const reason = (error) => (error instanceof Error ? error.message : String(error));
 const pendingRequests = new WeakMap();
 
+/** Milliseconds a failure report waits for the page to answer its state capture. */
+export const PAGE_STATE_TIMEOUT_MS = 1000;
+
 /**
  * Reports the failed phase and a bounded snapshot of the page.
  * @param {import('puppeteer-core').Page|undefined} tab
@@ -63,7 +66,8 @@ export async function describeProbeFailure(tab, phase, error) {
         };
       }),
       new Promise((resolve) => {
-        timer = setTimeout(() => resolve('page state timed out after 1000ms'), 1000);
+        timer = setTimeout(() => resolve(`page state timed out after ${PAGE_STATE_TIMEOUT_MS}ms`),
+          PAGE_STATE_TIMEOUT_MS);
       }),
     ]);
   } catch (captureError) {

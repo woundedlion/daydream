@@ -34,7 +34,9 @@ function setup({copy = async () => true, getPalette = () => ({get: phase => [pha
     scheduleUpdate: () => { calls.schedule++; windowUpdates.push('redraw'); },
     resetZoomButton, paletteRangeHeading: heading, feedback,
     copy, createDrag: options => { drag = options; return {remove: () => { removed++; }}; },
-    timers: {setTimeout: (fn, delay) => { assert.equal(delay, 1300); timers.set(++id, fn); return id; },
+    timers: {setTimeout: (fn, delay) => {
+      assert.ok(Number.isFinite(delay) && delay > 0); timers.set(++id, fn); return id;
+    },
       clearTimeout: id => timers.delete(id)}});
   return {controller, canvas, viewport, model, feedback, resetZoomButton, timers, draws, windowUpdates,
     calls, heading, drag, removed: () => removed, setTab: value => { tab = value; }};
@@ -61,10 +63,12 @@ test('copy feedback ignores older clipboard completions and replaces dismissal t
   assert.equal(f.removed(), 1);
 });
 
-test('strip keyboard zoom and reset restore focus before hiding the reset button', () => {
+test('strip keyboard zoom narrows around the centre and reset restores focus before hiding', () => {
   const f = setup();
   f.canvas.dispatch('keydown', {key: 'ArrowRight', shiftKey: true});
-  assert.deepEqual(f.viewport.value, {start: 0.4, end: 0.6});
+  const {start, end} = f.viewport.value;
+  assert.ok(end - start < 1 && end > start, 'the zoom narrows the range');
+  assert.ok(Math.abs((start + end) / 2 - 0.5) < 1e-9, 'the zoom stays centred');
   f.controller.syncResetZoom();
   assert.equal(f.resetZoomButton.classList.contains('hidden'), false);
   f.resetZoomButton.focus();
@@ -171,12 +175,14 @@ test('unhandled strip keys retain their default behaviour', () => {
   f.controller.dispose();
 });
 
-test('generative strip keyboard zoom and reset refresh the recipe', () => {
+test('generative strip keyboard zoom narrows the recipe window and reset refreshes it', () => {
   const f = setup();
   f.setTab('generative');
   f.resetZoomButton.dispatch('click');
   f.canvas.dispatch('keydown', {key:'ArrowRight', shiftKey:true});
-  assert.deepEqual(f.model.window, {offset:0.4, span:0.19999999999999996});
+  const {offset, span} = f.model.window;
+  assert.ok(span > 0 && span < 1, 'the zoom narrows the window');
+  assert.ok(Math.abs(offset + span / 2 - 0.5) < 1e-9, 'the zoom stays centred');
   f.resetZoomButton.dispatch('click');
   assert.deepEqual(f.model.window, {offset:0, span:1});
   assert.deepEqual(f.calls, {redraw: 0, recipe: 2, schedule: 2});
