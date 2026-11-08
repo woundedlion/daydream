@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildOpRow, formatParamValue, syncSweepWarning } from '../src/workbench/solids/solid_op_rows.js';
-import { authoredParamRange, MORPH_SWEEP, OP_DEFS, seedOpParams, snapToStep, unsweepableReason } from '../src/workbench/solids/solid_codegen.js';
+import { authoredParamRange, OP_DEFS, seedOpParams, snapToStep, unsweepableReason } from '../src/workbench/solids/solid_codegen.js';
+import { MORPH_SWEEP } from '../generated/engine_contract.mjs';
 import { fakeElement } from './helpers/fake_dom.js';
 
 // fakeElement throws on any non-empty innerHTML assignment, so a row must be
@@ -188,10 +189,10 @@ test('the drag grip is built as namespaced SVG nodes, not markup', () => {
   assert.equal(path.namespaceURI, 'http://www.w3.org/2000/svg');
 });
 
-const unswept = Object.keys(MORPH_SWEEP).find((op) => MORPH_SWEEP[op] === null);
+const [unswept] = MORPH_SWEEP.unswept;
 
 test('a row marks an op the engine morph path declines', { skip: !unswept && 'every op is swept' }, () => {
-  const swept = build({ op: 'chamfer', params: { t: MORPH_SWEEP.chamfer.t.min } }).el.querySelector('.op-unsweepable');
+  const swept = build({ op: 'chamfer', params: { t: MORPH_SWEEP.bands.chamfer.t.min } }).el.querySelector('.op-unsweepable');
   assert.equal(swept.textContent, '', 'a swept op carries no marker');
   assert.equal(swept.hidden, true);
 
@@ -210,7 +211,7 @@ test('a row marks an op the engine morph path declines', { skip: !unswept && 'ev
 });
 
 test('the sweep marker follows a slider across its band', () => {
-  const band = MORPH_SWEEP.chamfer.t;
+  const band = MORPH_SWEEP.bands.chamfer.t;
   const op = { op: 'chamfer', params: { t: band.min } };
   const { el } = build(op);
   const flag = el.querySelector('.op-unsweepable');

@@ -26,9 +26,9 @@ import {
   opTopologyKey,
   meshOpFailure,
   requireMeshResult,
-  MORPH_SWEEP,
   unsweepableReason,
 } from '../src/workbench/solids/solid_codegen.js';
+import { MORPH_SWEEP } from '../generated/engine_contract.mjs';
 
 /**
  * Builds an op whose params object records every key a code path reads, in read
@@ -980,18 +980,18 @@ test('restored float32 ambo aliases use the engine topology and bevel lowering',
   }
 });
 
-test('MORPH_SWEEP covers the primitive ops and no composite', () => {
-  const COMPOSITES = Object.keys(LOWERING);
-  for (const op of COMPOSITES) {
-    assert.equal(op in MORPH_SWEEP, false,
+test('the engine sweep contract names authored primitive ops', () => {
+  for (const op of [...Object.keys(MORPH_SWEEP.bands), ...MORPH_SWEEP.unswept]) {
+    assert.ok(op in OP_DEFS, `the engine names ${op}, which OP_DEFS does not author`);
+    assert.equal(op in LOWERING, false,
       `${op} lowers to primitives before the engine's morph check reads it`);
   }
-  // unsweepableReason answers null for an op the table omits, so a primitive
-  // added to OP_DEFS and forgotten here reads as fully swept.
-  assert.deepEqual(
-    [...Object.keys(MORPH_SWEEP), ...COMPOSITES].sort(),
-    Object.keys(OP_DEFS).sort(),
-    'every authored op is either swept or a known composite');
+});
+
+test('composite sweep exemptions stay inside the engine primitive bands', () => {
+  const { min, max } = MORPH_SWEEP.bands.truncate.t;
+  assert.ok(OP_DEFS.bevel.params.t.min >= min);
+  assert.ok(OP_DEFS.bevel.params.t.max <= max);
 });
 
 test('unsweepableReason names the ops the engine morph path declines', () => {
@@ -1005,14 +1005,14 @@ test('unsweepableReason names the ops the engine morph path declines', () => {
     'a missing param is a different defect, reported by savedChainShapeError');
   assert.equal(unsweepableReason('truncate'), null);
 
-  const unswept = Object.keys(MORPH_SWEEP).find((op) => MORPH_SWEEP[op] === null);
+  const [unswept] = MORPH_SWEEP.unswept;
   if (unswept) {
     assert.match(unsweepableReason({ op: unswept, params: seedOpParams(unswept, null) }),
       new RegExp(`^${unswept} is not swept by the morph path`),
       'an op with a leg kind but no sweep coverage is generated whole');
   }
 
-  const { min, max } = MORPH_SWEEP.chamfer.t;
+  const { min, max } = MORPH_SWEEP.bands.chamfer.t;
   assert.equal(unsweepableReason({ op: 'chamfer', params: { t: max } }), null,
     'the band is inclusive at both ends');
   assert.equal(unsweepableReason({ op: 'chamfer', params: { t: min } }), null);
@@ -1033,7 +1033,7 @@ test('truncate reports the excluded topology interval at engine float precision'
     assert.match(unsweepableReason({ op: 'truncate', params: { t } }),
       /^truncate cannot sweep t at 0\.5:/, `${t} becomes the engine pinch`);
   }
-  const lower = Math.fround(MORPH_SWEEP.truncate.t.excluded.lower);
+  const lower = Math.fround(MORPH_SWEEP.bands.truncate.t.excluded.lower);
   for (const t of [lower + 2 ** -25, 0.499, 0.5 - 2 ** -25]) {
     assert.match(unsweepableReason({ op: 'truncate', params: { t } }),
       /^truncate cannot sweep t at /, `${t} lies inside the excluded interval`);
@@ -1048,8 +1048,7 @@ test('truncate reports the excluded topology interval at engine float precision'
 
 test('a slider reaching past its swept band is reported rather than silent', () => {
   const overreaching = [];
-  for (const [op, band] of Object.entries(MORPH_SWEEP)) {
-    if (!band) continue;
+  for (const [op, band] of Object.entries(MORPH_SWEEP.bands)) {
     for (const [key, { min, max, excluded }] of Object.entries(band)) {
       const def = OP_DEFS[op].params[key];
       assert.ok(def, `MORPH_SWEEP bounds ${op}.${key}, which OP_DEFS does not declare`);

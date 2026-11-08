@@ -8,7 +8,7 @@
 import {
   COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns, formatFloatCpp, float32Decimal,
 } from '../../shared/cpp_format.js';
-import { NUMERIC_ENUMS } from '../../../generated/engine_contract.mjs';
+import { MORPH_SWEEP, NUMERIC_ENUMS } from '../../../generated/engine_contract.mjs';
 
 /**
  * One op parameter's slider default and range.
@@ -84,41 +84,19 @@ export const OP_DEFS = {
 };
 
 /**
- * Which authored ops the engine's morph path can build on screen, mirrored from
- * Solids::is_morphable_step (core/mesh/recipe.h) and the sweep clamps it reads
- * (core/mesh/conway_graph.h). An empty object is an op that always sweeps,
- * `null` an op that never sweeps, and a parameter entry the band the leg
- * covers, with any excluded interval (above the lower bound through the upper
- * bound). Composite ops lower to primitives before the check.
- * @type {Object<string, ?Object<string, {min: number, max: number, excluded?: {lower: number, upper: number}}>>}
- */
-export const MORPH_SWEEP = {
-  kis: {},
-  ambo: {},
-  snub: {},
-  dual: {},
-  truncate: { t: { min: 0.002, max: 0.995, excluded: { lower: 0.495, upper: 0.5 } } },
-  chamfer: { t: { min: 0.02, max: 0.63 } },
-  expand: null,
-  hankin: {},
-  relax: {},
-};
-
-/**
  * Why the engine's morph path would decline a chain step, which makes the entry
- * generate whole instead of op by op.
+ * generate whole instead of op by op, per the engine contract's MORPH_SWEEP.
  * @param {ChainOp} o - The op as the chain holds it.
  * @returns {?string} A sentence naming the reason, or null when the step sweeps.
  */
 export function unsweepableReason(o) {
   const opName = chainOpName(o);
-  if (!(opName in MORPH_SWEEP)) return null;
-  const band = MORPH_SWEEP[opName];
-  if (!band) {
+  if (MORPH_SWEEP.unswept.includes(opName)) {
     return `${opName} is not swept by the morph path: a shape using it is generated whole `
       + 'rather than built on screen.';
   }
-  for (const [key, { min, max, excluded }] of Object.entries(band)) {
+  if (!Object.hasOwn(MORPH_SWEEP.bands, opName)) return null;
+  for (const [key, { min, max, excluded }] of Object.entries(MORPH_SWEEP.bands[opName])) {
     const value = typeof o === 'string' ? NaN : Number(o?.params?.[key]);
     if (!Number.isFinite(value)) continue;
     const engineValue = Math.fround(value);

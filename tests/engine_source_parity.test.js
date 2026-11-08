@@ -15,7 +15,7 @@ import { generativePaletteCpp } from '../src/workbench/palettes/palette_math.js'
 import { defaultPaletteRecipe } from '../src/workbench/palettes/palette_controls.js';
 import { closingDomain, lissajousCodeString } from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
-import { generateFuncAndRecipe, DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS, MORPH_SWEEP, OP_DEFS } from '../src/workbench/solids/solid_codegen.js';
+import { generateFuncAndRecipe, DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../src/workbench/solids/solid_codegen.js';
 import { generateRegistryCpp, MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount } from '../src/workbench/solids/solid_registry_codegen.js';
 
 const enginePin = readFileSync(new URL('../generated/holosphere_wasm.sha', import.meta.url), 'utf8').trim();
@@ -526,56 +526,6 @@ test('closingDomain follows the pinned Comets traversal', { skip: engineSkip }, 
     [4.01, 3.132], [62.16, 0.404], [8.75, 2.872]]) {
     assert.equal(closingDomain(m2, domain), engineClosingDomain({ m2, domain }));
   }
-});
-
-test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip }, () => {
-  const graphPath = 'core/mesh/conway_graph.h';
-  const recipePath = 'core/mesh/recipe.h';
-  const graph = header(graphPath);
-  const recipe = header(recipePath);
-  const truncateMin = engineConstant(graph, 'T_TRUNCATE_ARRIVAL_MIN', graphPath);
-  const amboEpsilon = engineConstant(graph, 'T_EPS_AMBO', graphPath);
-  const chamferMin = engineConstant(graph, 'T_EPS', graphPath);
-  const chamferMax = engineConstant(recipe, 'CHAMFER_T_MAX', recipePath);
-
-  assert.match(
-    graph,
-    /inline\s+constexpr\s+float\s+T_TRUNCATE_FAR_MAX\s*=\s*1\.0f\s*-\s*T_EPS_AMBO\s*;/,
-    'the truncate far bound changed form; update the parity reader',
-  );
-  const truncate = recipe.match(
-    /case Op::TRUNCATE:\s*return step\.param >= ConwayGraph::T_TRUNCATE_ARRIVAL_MIN &&\s*step\.param <= ConwayGraph::T_TRUNCATE_FAR_MAX &&\s*\(step\.param <= ([0-9.]+)f - ConwayGraph::T_EPS_AMBO \|\| step\.param > ([0-9.]+)f\);/,
-  );
-  assert.ok(truncate,
-    'is_morphable_step no longer uses the parsed truncate bounds and exclusion');
-  assert.match(
-    recipe,
-    /case Op::CHAMFER:\s*return step\.param >= ConwayGraph::T_EPS && step\.param <= CHAMFER_T_MAX;/,
-    'is_morphable_step no longer uses the parsed chamfer bounds',
-  );
-
-  assert.deepEqual(
-    {
-      truncate: MORPH_SWEEP.truncate.t,
-      chamfer: MORPH_SWEEP.chamfer.t,
-    },
-    {
-      truncate: {
-        min: truncateMin,
-        max: 1 - amboEpsilon,
-        excluded: { lower: Number(truncate[1]) - amboEpsilon, upper: Number(truncate[2]) },
-      },
-      chamfer: { min: chamferMin, max: chamferMax },
-    },
-    'src/workbench/solids/solid_codegen.js MORPH_SWEEP drifted from the installed engine pin',
-  );
-});
-
-test('composite sweep exemptions stay inside the engine primitive bands', { skip: engineSkip }, () => {
-  const graphPath = 'core/mesh/conway_graph.h';
-  const graph = header(graphPath);
-  assert.ok(OP_DEFS.bevel.params.t.min >= engineConstant(graph, 'T_TRUNCATE_ARRIVAL_MIN', graphPath));
-  assert.ok(OP_DEFS.bevel.params.t.max <= 1 - engineConstant(graph, 'T_EPS_AMBO', graphPath));
 });
 
 test('solid exports name engine categories and generator identifiers', { skip: engineSkip }, () => {
