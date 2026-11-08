@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import {
   loadApplication, ModuleImportTimeoutError, bootRemedy, bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
   StaleModuleError, STALE_MODULE_REMEDY, VENDOR_REMEDY, REFRESH_DEADLINE_MS,
-  APPLICATION_IMPORT_DEADLINE_MS,
+  APPLICATION_IMPORT_DEADLINE_MS, REFRESH_CONCURRENCY,
 } from '../src/app/bootstrap.js';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
@@ -375,7 +375,8 @@ test('refreshModuleCache bounds how many re-fetches are in flight', async () => 
   await sweep;
 
   assert.ok(peak > 1, 'the sweep runs re-fetches in parallel');
-  assert.ok(peak <= 6, `${peak} re-fetches were in flight at once`);
+  assert.ok(peak <= REFRESH_CONCURRENCY && peak < urls.length,
+    `${peak} re-fetches were in flight at once`);
 });
 
 // An unread response body is aborted on collection and leaves the cache entry stale.

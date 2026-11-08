@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createDisplayCapsBinding } from '../src/renderer/display_caps.js';
+import { MAX_DISPLAY_CAP_PERCENT, createDisplayCapsBinding } from '../src/renderer/display_caps.js';
 
 test('caps replay defaults and pre-load edits using the accepted engine angles', () => {
   let engine = null;
@@ -37,7 +37,7 @@ test('invalid or rejected caps do not publish geometry', () => {
     onChange: () => assert.fail('invalid geometry published'),
   });
   for (const key of ['topCap', 'bottomCap']) {
-    for (const value of [-1, 25.1, NaN, Infinity]) {
+    for (const value of [-1, MAX_DISPLAY_CAP_PERCENT + 0.1, NaN, Infinity]) {
       accepting.state[key] = value;
       assert.equal(accepting.apply(), false);
       assert.equal(calls, 0);
@@ -46,7 +46,7 @@ test('invalid or rejected caps do not publish geometry', () => {
   }
   const unloaded = createDisplayCapsBinding({ getEngine: () => null, onChange: () => {} });
   for (const key of ['topCap', 'bottomCap']) {
-    for (const value of [0, 25]) {
+    for (const value of [0, MAX_DISPLAY_CAP_PERCENT]) {
       unloaded.state[key] = value;
       assert.equal(unloaded.apply(), true);
     }

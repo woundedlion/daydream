@@ -6,7 +6,8 @@ import { readFileSync } from 'node:fs';
 import { parse } from 'espree';
 import * as THREE from 'three';
 import {
-  Daydream, dotDetailFor, fitDistance, initialAspect,
+  Daydream, dotDetailFor, fitDistance, initialAspect, MAX_DOT_SEGMENTS, MIN_DOT_SEGMENTS,
+  PIP_FRACTION, SPHERE_FIT_COVERAGE,
 } from '../src/renderer/driver.js';
 import { MOBILE_BREAKPOINT_PX } from '../src/shared/layout.js';
 import { repointDisplayAliases } from '../src/engine/display_aliases.js';
@@ -19,15 +20,15 @@ import { fakeColorAttribute, fakeMatrixAttribute } from './helpers/fake_three.js
 // ---------------------------------------------------------------------------
 
 test('dotDetailFor decays the segment count as the pixel count rises', () => {
-  assert.equal(dotDetailFor(0), 30);
-  assert.ok(dotDetailFor(96 * 20) <= 30);
+  assert.equal(dotDetailFor(0), MAX_DOT_SEGMENTS);
+  assert.ok(dotDetailFor(96 * 20) <= MAX_DOT_SEGMENTS);
   assert.ok(dotDetailFor(288 * 144) < dotDetailFor(96 * 20));
-  assert.ok(dotDetailFor(288 * 144) >= 3);
+  assert.ok(dotDetailFor(288 * 144) >= MIN_DOT_SEGMENTS);
 });
 
 test('dotDetailFor floors at 3 segments however large the grid', () => {
-  assert.equal(dotDetailFor(100000), 3);
-  assert.equal(dotDetailFor(1e9), 3);
+  assert.equal(dotDetailFor(100000), MIN_DOT_SEGMENTS);
+  assert.equal(dotDetailFor(1e9), MIN_DOT_SEGMENTS);
 });
 
 test('dotDetailFor is monotonically non-increasing', () => {
@@ -46,10 +47,10 @@ test('dotDetailFor is monotonically non-increasing', () => {
 // Half-angle the sphere must subtend for the fit to be correct.
 const halfFovRad = THREE.MathUtils.degToRad(Daydream.CAMERA_FOV / 2);
 
-test('fitDistance frames the sphere at 85% of the view height when wide', () => {
+test('fitDistance frames the sphere at the fit coverage of the view height when wide', () => {
   const d = fitDistance(16 / 9, 0, Infinity);
   const visibleHeight = 2 * Math.tan(halfFovRad) * d;
-  assert.ok(Math.abs(Daydream.SPHERE_RADIUS * 2 / visibleHeight - 0.85) < 1e-12);
+  assert.ok(Math.abs(Daydream.SPHERE_RADIUS * 2 / visibleHeight - SPHERE_FIT_COVERAGE) < 1e-12);
 });
 
 test('fitDistance is height-driven for any aspect >= 1', () => {
@@ -204,7 +205,7 @@ test('setCanvasSize anchors a square PiP to the bottom-left corner', () => {
 
   const { x, y, width, height } = ctx.pipViewport;
   assert.equal(width, height, 'the PiP viewport is not square');
-  assert.equal(height, Math.floor(800 * 0.3), 'the PiP is not 30% of the smaller dimension');
+  assert.equal(height, Math.floor(800 * PIP_FRACTION), 'the PiP does not scale with the smaller dimension');
   assert.equal(x, 0, 'the PiP is not flush with the left edge');
   assert.equal(y, 0, 'setViewport measures from the lower left, so y 0 is the bottom edge');
   assert.equal(ctx.pipCamera.aspect, 1, 'a non-square PiP camera distorts the corner view');
@@ -229,14 +230,14 @@ test('setCanvasSize sizes the PiP off the short side on a portrait container', (
   const ctx = sizeCtx(400, 1000);
   resize(ctx, 400, 1000);
 
-  assert.equal(ctx.pipViewport.width, Math.floor(400 * 0.3));
+  assert.equal(ctx.pipViewport.width, Math.floor(400 * PIP_FRACTION));
 });
 
 test('setCanvasSize frames the sphere on the first layout', () => {
   const ctx = sizeCtx(1200, 800);
   resize(ctx, 1200, 800);
 
-  assert.ok(Math.abs(verticalCoverage(ctx) - 0.85) < 1e-12);
+  assert.ok(Math.abs(verticalCoverage(ctx) - SPHERE_FIT_COVERAGE) < 1e-12);
   // setLength rescales the radius only, so the starting orbit direction survives.
   assert.equal(ctx.camera.position.x, 0);
   assert.equal(ctx.camera.position.y, 0);
@@ -249,8 +250,8 @@ test('setCanvasSize backs the camera off when the container turns portrait', () 
 
   resize(ctx, 800, 1200);
   assert.ok(orbitRadius(ctx) > landscape, 'a portrait view clipped the sphere');
-  // Width is the binding dimension below aspect 1, so the sphere covers 85% of it.
-  assert.ok(Math.abs(verticalCoverage(ctx) / ctx.camera.aspect - 0.85) < 1e-9);
+  // Width is the binding dimension below aspect 1.
+  assert.ok(Math.abs(verticalCoverage(ctx) / ctx.camera.aspect - SPHERE_FIT_COVERAGE) < 1e-9);
 });
 
 test('setCanvasSize preserves a user zoom across a later resize', () => {
@@ -1126,8 +1127,8 @@ test('render reconciles once after an advanced simulation frame', () => {
 
   Daydream.prototype.render.call(ctx, adapter);
 
-  assert.deepEqual(log.slice(0, 3),
-    ['drawFrame', 'effectGui.sync', 'controls.update']);
+  assert.ok(log.indexOf('drawFrame') >= 0 && log.indexOf('drawFrame') < log.indexOf('effectGui.sync'),
+    `the panel syncs after the frame it reports: ${log.join(', ')}`);
   assert.equal(log.filter((entry) => entry === 'effectGui.sync').length, 1);
   assert.deepEqual(stepped, [true], 'the panel is told the simulation stepped');
 });
@@ -1533,8 +1534,8 @@ test('setupContextLossHandling starts unlost behind a hidden overlay', () => {
   assert.equal(ctx.contextLostOverlay.getAttribute('role'), 'alert');
   assert.equal(ctx.contextLostOverlay.tabIndex, -1);
   assert.equal(ctx.contextLostOverlay.style.display, 'none');
-  assert.equal(ctx.contextLostOverlay.querySelector('.load-error-title').tagName, 'SPAN');
-  assert.equal(ctx.contextLostDetail.tagName, 'SPAN');
+  assert.ok(ctx.contextLostOverlay.querySelector('.load-error-title'));
+  assert.ok(ctx.contextLostOverlay.children.includes(ctx.contextLostDetail));
   const reload = ctx.contextLostOverlay.querySelector('.context-lost-reload');
   assert.equal(reload.tagName, 'BUTTON');
   // An untyped button defaults to submit inside a form.

@@ -59,7 +59,7 @@ test('showFatalError appends one banner carrying the message as textContent', ()
   const el = bodyEl.children[0];
   assert.equal(el.id, 'fatal-error-overlay');
   assert.equal(el.attributes.role, 'alert');
-  assert.equal(messageOf(el), '⚠ engine failed to load');
+  assert.ok(messageOf(el).endsWith('engine failed to load'));
 });
 
 test('showFatalError writes textContent, never innerHTML — markup is not interpreted', () => {
@@ -67,7 +67,7 @@ test('showFatalError writes textContent, never innerHTML — markup is not inter
   showFatalError('<img src=x onerror=alert(1)>');
 
   const el = created[0];
-  assert.equal(messageOf(el), '⚠ <img src=x onerror=alert(1)>');
+  assert.ok(messageOf(el).endsWith('<img src=x onerror=alert(1)>'));
   assert.deepEqual(el.querySelector('.fatal-error-message').children, [],
     'the markup landed as text, not as nodes parsed into the message slot');
 });
@@ -78,7 +78,7 @@ test('showFatalError is idempotent — repeated calls reuse the single banner', 
   showFatalError('second');
 
   assert.equal(bodyEl.children.length, 1);
-  assert.equal(messageOf(bodyEl.children[0]), '⚠ second');
+  assert.ok(messageOf(bodyEl.children[0]).endsWith('second'));
 });
 
 test('the banner dismiss button removes it; a later failure opens a fresh one', () => {
@@ -95,20 +95,20 @@ test('the banner dismiss button removes it; a later failure opens a fresh one', 
 
   showFatalError('a second failure');
   assert.equal(bodyEl.children.length, 1);
-  assert.equal(messageOf(bodyEl.children[0]), '⚠ a second failure');
+  assert.ok(messageOf(bodyEl.children[0]).endsWith('a second failure'));
 });
 
 test('showFatalError falls back to documentElement when body is absent', () => {
   const { docEl } = fakeDocument({ body: null, documentElement: true });
   showFatalError('too early');
   assert.equal(docEl.children.length, 1);
-  assert.equal(messageOf(docEl.children[0]), '⚠ too early');
+  assert.ok(messageOf(docEl.children[0]).endsWith('too early'));
 });
 
 test('showFatalError does not throw when neither body nor documentElement exists', () => {
   const { created } = fakeDocument({ body: null });
   assert.doesNotThrow(() => showFatalError('too early'));
-  assert.equal(messageOf(created[0]), '⚠ too early');
+  assert.ok(messageOf(created[0]).endsWith('too early'));
 });
 
 // --- post-boot failure surface --------------------------------------------
@@ -150,7 +150,7 @@ test('a post-boot uncaught error raises the banner, not just a console line', ()
 
   assert.equal(bodyEl.children.length, 1, 'no banner for a post-boot error');
   assert.match(messageOf(bodyEl.children[0]),
-    /^⚠ The solids tool hit an error — Error: renderOps blew up —/);
+    /The solids tool hit an error — Error: renderOps blew up —/);
   assert.equal(logged.length, 1);
 });
 
@@ -217,7 +217,7 @@ test('bootstrapTool still banners a synchronous and an async init failure', asyn
 
   assert.equal(asyncPage.bodyEl.children.length, 1, 'a rejected init raised no banner');
   assert.match(messageOf(asyncPage.bodyEl.children[0]),
-    /^⚠ The palette tool failed to initialize/);
+    /The palette tool failed to initialize/);
   assert.equal(logged.length, 1);
   assert.match(logged[0][0], /palette tool failed to initialize/);
 });

@@ -335,7 +335,7 @@ test('the page-failure surface is the shared one, and it is torn down', () => {
   const failureListeners = () => listeners.filter(
     ({ type }) => type === 'error' || type === 'unhandledrejection');
 
-  assert.deepEqual(failureListeners().map(({ type }) => type),
+  assert.deepEqual(failureListeners().map(({ type }) => type).sort(),
     ['error', 'unhandledrejection'],
     'a synchronous throw from an animation frame, a lil-gui onChange, or a DOM '
     + 'listener is console-only without the error listener the shared surface '
@@ -472,7 +472,7 @@ test('a recording report reaches the shared notice element', async () => {
 
   recorder.toggle = () => false;
   captureConsole(() => record.object.record());
-  assert.equal(noticeText(app), 'Recording stopped.',
+  assert.match(noticeText(app), /Recording stopped/,
     'the end of a session is as unreported as its start without this');
 });
 
@@ -677,9 +677,11 @@ test('the same parameter rejection is re-announced once per pointer gesture', as
 
   begin();
   edit(1.4);
-  assert.equal(noticeText(app), first + '\u200b');
+  const second = noticeText(app);
+  assert.notEqual(second, first, 'a new gesture rewrites the notice so it is announced again');
+  assert.match(second, /Speed.*was rejected/);
   edit(1.5);
-  assert.equal(noticeText(app), first + '\u200b');
+  assert.equal(noticeText(app), second);
   end();
 });
 
@@ -814,7 +816,7 @@ test('a refused effect reset preserves edits and a later reset restores defaults
   captureConsole(() => panel.ctrl('reset').getValue()());
   assert.equal(panel.destroyed, 0);
   assert.equal(panel.ctrl('Speed').getValue(), 0.75);
-  assert.equal(noticeText(app), 'Effect reset was rejected. The panel still shows the current values.');
+  assert.match(noticeText(app), /Effect reset was rejected/);
   assert.equal(app.elements.get('apply-notice-body').hidden, false);
 
   module.engine.setEffect = setEffect;

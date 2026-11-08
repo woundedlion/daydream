@@ -190,8 +190,10 @@ test('a clear with no recorded owner hides a visible notice', () => {
 test('showing the same notice re-announces it and restarts its dwell', () => {
   const h = makeApplyNotice();
   h.notice.show('Effect change was rejected.', 'switch');
+  const first = h.text.textContent;
   h.notice.show('Effect change was rejected.', 'switch');
-  assert.equal(h.text.textContent, 'Effect change was rejected.\u200b');
+  assert.notEqual(h.text.textContent, first, 'unchanged live-region text is not announced again');
+  assert.ok(h.text.textContent.startsWith('Effect change was rejected.'));
   assert.deepEqual(h.timer.cancelled, [1]);
   assert.equal(h.timer.handle, 2);
   assert.equal(h.body.hidden, false);

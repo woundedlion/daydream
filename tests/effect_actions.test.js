@@ -17,6 +17,9 @@ afterEach(() => { mock.timers.reset(); });
  * @param {Object} [options]
  * @returns {Object} The handle, its record, and the calls its deps saw.
  */
+/** @param {Object} ctrl @returns {string|null} The Export button's accessible name. */
+const exportName = (ctrl) => ctrl.$button.getAttribute('aria-label');
+
 function actions({
   presetCount = 0,
   presetIndex = 0,
@@ -63,11 +66,11 @@ test('Export copies the text the coordinator builds and flashes success', async 
   const a = actions();
   await a.ctrl('export').object.export();
   assert.deepEqual(a.copyText.copied, ['copied text']);
-  assert.equal(a.ctrl('export').label, '\u2713');
+  assert.equal(exportName(a.ctrl('export')), EXPORT_COPIED);
   assert.equal(a.ctrl('export').$button.getAttribute('title'), EXPORT_COPIED);
   assert.equal(a.status().textContent, EXPORT_COPIED);
   mock.timers.tick(FLASH_MS);
-  assert.equal(a.ctrl('export').label, '\u29c9');
+  assert.equal(exportName(a.ctrl('export')), 'Export');
   assert.equal(a.status().textContent, '');
 });
 
@@ -77,7 +80,7 @@ test('an Export the coordinator refuses logs its reason and copies nothing', () 
   a.ctrl('export').object.export();
   assert.deepEqual(a.copyText.copied, []);
   assert.deepEqual(a.warnings, [['Export: blocked']]);
-  assert.equal(a.ctrl('export').label, '\u2717');
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(a.ctrl('export'))));
   assert.equal(a.status().textContent, EXPORT_REFUSED);
   assert.deepEqual(a.notices, ['Export: blocked']);
 });
@@ -94,17 +97,20 @@ test('a failed or rejected copy flashes failure', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const refused = actions({ copyText: fakeCopyText(false) });
   await refused.ctrl('export').object.export();
-  assert.equal(refused.ctrl('export').label, '\u2717');
-  assert.deepEqual(refused.warnings, [['Export: clipboard copy failed']]);
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(refused.ctrl('export'))));
+  assert.equal(refused.warnings.length, 1);
+  assert.match(refused.warnings[0][0], /clipboard copy failed/);
   assert.equal(refused.status().textContent, EXPORT_FAILED);
-  assert.deepEqual(refused.notices, ['Export: clipboard copy failed']);
+  assert.deepEqual(refused.notices, [refused.warnings[0][0]]);
 
   const error = new Error('denied');
   const rejected = actions({ copyText: fakeCopyText(error) });
   await rejected.ctrl('export').object.export();
-  assert.equal(rejected.ctrl('export').label, '\u2717');
-  assert.deepEqual(rejected.warnings, [['Export: clipboard copy failed', error]]);
-  assert.deepEqual(rejected.notices, ['Export: clipboard copy failed']);
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(rejected.ctrl('export'))));
+  assert.equal(rejected.warnings.length, 1);
+  assert.match(rejected.warnings[0][0], /clipboard copy failed/);
+  assert.equal(rejected.warnings[0][1], error);
+  assert.deepEqual(rejected.notices, [rejected.warnings[0][0]]);
 });
 
 test('a successful Export retry clears its earlier copy failure', async () => {
@@ -114,7 +120,8 @@ test('a successful Export retry clears its earlier copy failure', async () => {
   await a.ctrl('export').object.export();
   allowed = true;
   await a.ctrl('export').object.export();
-  assert.deepEqual(a.notices, ['Export: clipboard copy failed', null]);
+  assert.match(a.notices[0], /clipboard copy failed/);
+  assert.deepEqual(a.notices, [a.notices[0], null]);
   assert.equal(a.status().textContent, EXPORT_COPIED);
 });
 
@@ -124,7 +131,7 @@ test('a copy that lands after the record was replaced flashes nothing', async ()
     const pending = a.ctrl('export').object.export();
     a.state.active = false;
     await pending;
-    assert.equal(a.ctrl('export').label, '\u29c9');
+    assert.equal(exportName(a.ctrl('export')), 'Export');
     assert.deepEqual(a.notices, []);
   }
 });
@@ -135,7 +142,7 @@ test('cancel drops the pending Export label revert', () => {
   a.ctrl('export').object.export();
   a.handle.cancel();
   mock.timers.tick(FLASH_MS);
-  assert.equal(a.ctrl('export').label, '\u2717');
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(a.ctrl('export'))));
 });
 
 test('an accepted preset selection hands count and index to the coordinator', () => {

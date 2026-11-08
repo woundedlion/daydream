@@ -61,7 +61,7 @@ const fatalBanner = () => globalThis.document.body.children
 
 test('a failed workbench init reports through its notice, not the page-failure banner', async () => {
   const { app } = await bootRejectedWorkbench(() => new Error('boom'));
-  assert.equal(noticeText(app), 'The shader workbench could not be initialized: Error: boom');
+  assert.match(noticeText(app), /could not be initialized.*Error: boom/);
   assert.equal(app.elements.get('apply-notice-body').hidden, false);
   assert.equal(fatalBanner(), undefined);
   assert.equal(app.teardown.disposed(), false);

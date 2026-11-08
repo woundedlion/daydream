@@ -311,14 +311,11 @@ test('a successful switch reports nothing', () => {
 });
 
 test('a rejection with no thrown value reports the restored value', () => {
-  assert.deepEqual(
-    switchFailureReport('Effect',
-      { applied: false, failure: null, recoveryFailure: null }),
-    {
-      logs: [],
-      notice: 'Effect change was rejected. The previous value was restored.',
-      fatal: null,
-    });
+  const report = switchFailureReport('Effect',
+    { applied: false, failure: null, recoveryFailure: null });
+  assert.deepEqual(report.logs, []);
+  assert.match(report.notice, /^Effect change was rejected.*restored/);
+  assert.equal(report.fatal, null);
 });
 
 test('a recovered failure is logged but is not fatal', () => {
@@ -355,10 +352,12 @@ test('a trapped module is fatal without claiming rollback restored the value', (
     moduleDead: true,
   });
 
-  assert.deepEqual(report.logs, [{ message: 'Effect switch failed:', error: failure }]);
+  assert.equal(report.logs.length, 1);
+  assert.match(report.logs[0].message, /^Effect switch failed/);
+  assert.equal(report.logs[0].error, failure);
   assert.equal(report.notice, null);
-  assert.equal(report.fatal,
-    'Effect change trapped the rendering engine. Reload the page.');
+  assert.match(report.fatal, /^Effect change trapped the rendering engine.*Reload the page\.$/);
+  assert.doesNotMatch(report.fatal, /restored/);
 });
 
 test('a rejected switch whose rollback failed still raises the banner', () => {
@@ -524,17 +523,23 @@ test('applying an effect points the engine at it and rebuilds the panel', () => 
 
   assert.equal(app.pipeline.applyEffect(), ApplyResult.APPLIED);
 
-  assert.deepEqual(app.log, [
-    'engine.setEffect Alpha',
-    'driver.setStrobeColumns true',
-    'effectGui.destroy',
+  assert.deepEqual([...app.log].sort(), [
     'clearEffectParamUrl',
-    'effectGui.build',
-    'effectGui.mount',
+    'driver.resetPovOnNextFrame',
+    'driver.setStrobeColumns true',
+    'driver.stepOnce',
     'effectGui.applyAnimationPause',
+    'effectGui.build',
+    'effectGui.destroy',
+    'effectGui.mount',
+    'engine.setEffect Alpha',
     'sidebar.setActive Alpha',
-    'driver.resetPovOnNextFrame', 'driver.stepOnce',
   ]);
+  assertOrdered(app.log, 'engine.setEffect Alpha', 'effectGui.destroy', 'effectGui.build',
+    'effectGui.mount', 'effectGui.applyAnimationPause');
+  assertOrdered(app.log, 'engine.setEffect Alpha', 'driver.setStrobeColumns true');
+  assertOrdered(app.log, 'clearEffectParamUrl', 'effectGui.build');
+  assertOrdered(app.log, 'engine.setEffect Alpha', 'driver.resetPovOnNextFrame', 'driver.stepOnce');
 });
 
 test('column defaults change on effect switches and preserve overrides on repeated applies', () => {

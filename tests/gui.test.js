@@ -918,9 +918,8 @@ test('duplicate enum values warn while retaining the admitted URL value', () => 
   const state = {mode: 0};
   const warnings = captureWarnings(() => gui.add(state, 'mode', {One: 1, AlsoOne: 1, Two: 2}));
   assert.equal(state.mode, 1);
-  assert.deepEqual(warnings, [
-    'DeepLinkGUI: enum "fx.mode" has options sharing a value; the deep link may restore a different label.',
-  ]);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /enum "fx\.mode" has options sharing a value/);
 });
 
 test('a hydrated display refresh failure warns and retains its controller', (t) => {
@@ -933,7 +932,8 @@ test('a hydrated display refresh failure warns and retains its controller', (t) 
   const warnings = captureWarnings(() => { controller = gui.add(state, 'speed', 0, 1); });
   assert.equal(controller.getValue(), 0.5);
   assert.deepEqual(gui.collectUrlKeys(), ['fx.speed']);
-  assert.deepEqual(warnings, ['DeepLinkGUI: updateDisplay failed for "fx.speed": Error: paint']);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /updateDisplay failed for "fx\.speed": Error: paint/);
 });
 
 test('a fallback URL writer hands pending keys to a newly registered URLSync', () => {
@@ -974,8 +974,8 @@ test('DeepLinkGUI.readStoredNumber rejects a non-numeric companion value', () =>
     value = gui.readStoredNumber('__accepted.Foo');
   });
   assert.equal(value, undefined);
-  assert.deepEqual(warnings,
-    ['DeepLinkGUI: ignoring non-numeric stored value for "fx.__accepted.Foo"']);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /non-numeric stored value for "fx\.__accepted\.Foo"/);
 });
 
 

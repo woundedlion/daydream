@@ -479,7 +479,7 @@ export class Daydream {
     this.mainViewport.width = width;
     this.mainViewport.height = height;
 
-    const pipSize = Math.floor(Math.min(width, height) * 0.3);
+    const pipSize = Math.floor(Math.min(width, height) * PIP_FRACTION);
     this.pipViewport.x = this.pipOnRight ? width - pipSize : 0;
     this.pipViewport.y = 0;
     this.pipViewport.width = pipSize;
@@ -1113,23 +1113,33 @@ export class Daydream {
 export const initialAspect = (canvas) =>
   canvas.width > 0 && canvas.height > 0 ? canvas.width / canvas.height : 1;
 
+/** Fraction of the smaller viewport dimension the square PiP spans. */
+export const PIP_FRACTION = 0.3;
+
+/** Dot sphere segment count at zero pixels. */
+export const MAX_DOT_SEGMENTS = 30;
+
+/** Dot sphere segment floor. */
+export const MIN_DOT_SEGMENTS = 3;
+
+/** Fraction of the smaller view dimension the fitted sphere fills. */
+export const SPHERE_FIT_COVERAGE = 0.85;
+
 /** Per-dot sphere LOD: segment count decays exponentially as pixel count rises
  *  so the triangle budget stays bounded.
  * @param {number} totalPixels - Instance count of the dot mesh (W*H).
- * @returns {number} Sphere width/height segment count, floored at 3.
+ * @returns {number} Sphere width/height segment count, floored at `MIN_DOT_SEGMENTS`.
  */
 export const dotDetailFor = (totalPixels) => {
-  const MAX_DOT_SEGMENTS = 30;
   const LOD_DECAY_PIXELS = 30000;
-  const MIN_DOT_SEGMENTS = 3;
   return Math.max(
     MIN_DOT_SEGMENTS,
     Math.round(MAX_DOT_SEGMENTS * Math.exp(-totalPixels / LOD_DECAY_PIXELS)));
 };
 
 /**
- * Orbit radius at which the sphere fills ~85% of the smaller view dimension,
- * clamped into the orbit-control range.
+ * Orbit radius at which the sphere fills `SPHERE_FIT_COVERAGE` of the smaller
+ * view dimension, clamped into the orbit-control range.
  * @param {number} aspect - Viewport aspect ratio (width / height).
  * @param {number} minDistance - Closest orbit radius the controls allow.
  * @param {number} maxDistance - Farthest orbit radius the controls allow.
@@ -1137,9 +1147,8 @@ export const dotDetailFor = (totalPixels) => {
  */
 export const fitDistance = (aspect, minDistance, maxDistance) => {
   const diameter = Daydream.SPHERE_RADIUS * 2;
-  const targetCoverage = 0.85;
   const fovRad = THREE.MathUtils.degToRad(Daydream.CAMERA_FOV / 2);
-  const distForHeight = diameter / (2 * Math.tan(fovRad) * targetCoverage);
+  const distForHeight = diameter / (2 * Math.tan(fovRad) * SPHERE_FIT_COVERAGE);
   const distForWidth = distForHeight / aspect;
   return THREE.MathUtils.clamp(
     Math.max(distForHeight, distForWidth), minDistance, maxDistance);

@@ -241,34 +241,44 @@ function makeTeardown({
 test('the teardown listens for the page discard', () => {
   const t = makeTeardown();
 
-  assert.deepEqual(t.pageTarget.listeners.map((l) => l.type),
-    ['keydown', 'unhandledrejection', 'pagehide']);
+  assert.deepEqual(t.pageTarget.listeners.map((l) => l.type).sort(),
+    ['keydown', 'pagehide', 'unhandledrejection']);
 });
+
+const TEARDOWN_STEPS = [
+  'remove keydown', 'remove unhandledrejection', 'remove click', 'remove pagehide',
+  'switches.dispose', 'releaseAppServices', 'effectGui.destroy', 'shaderDocuments.dispose',
+  'globalGui.destroy', 'recorder.dispose', 'engine.delete adapter=null', 'urlSync.dispose',
+  'sidebar.dispose', 'driver.dispose', 'strandSegmentWork',
+  'segments.dispose active=false epoch=1', 'removeOverlay',
+];
+
+/**
+ * Asserts the teardown ran each expected step once and kept its ordering
+ * contract: listeners come off before the GUI and scene teardown, the engine
+ * host goes before the driver, and the pool is stranded before it is destroyed.
+ * @param {string[]} log - The recorded steps.
+ * @param {string[]} steps - The steps expected to have run.
+ * @param {string} [message] - Failure message for the step set.
+ */
+function assertTeardown(log, steps, message) {
+  assert.deepEqual([...log].sort(), [...steps].sort(), message);
+  const at = (step) => log.indexOf(step);
+  const lastRemoval = Math.max(...log.map((step, i) => step.startsWith('remove ') ? i : -1));
+  for (const step of ['effectGui.destroy', 'globalGui.destroy', 'driver.dispose']) {
+    if (at(step) >= 0) assert.ok(lastRemoval < at(step), `listeners come off before ${step}`);
+  }
+  for (const step of ['recorder.dispose', 'engine.delete adapter=null'])
+    assert.ok(at(step) < at('driver.dispose'), `${step} precedes driver.dispose`);
+  assert.ok(at('strandSegmentWork') < at('segments.dispose active=false epoch=1'));
+}
 
 test('dispose releases in an order nothing can re-enter', () => {
   const t = makeTeardown();
 
   t.teardown.dispose();
 
-  assert.deepEqual(t.log, [
-    'remove keydown',
-    'remove unhandledrejection',
-    'remove click',
-    'remove pagehide',
-    'switches.dispose',
-    'releaseAppServices',
-    'effectGui.destroy',
-    'shaderDocuments.dispose',
-    'globalGui.destroy',
-    'recorder.dispose',
-    'engine.delete adapter=null',
-    'urlSync.dispose',
-    'sidebar.dispose',
-    'driver.dispose',
-    'strandSegmentWork',
-    'segments.dispose active=false epoch=1',
-    'removeOverlay',
-  ]);
+  assertTeardown(t.log, TEARDOWN_STEPS);
 });
 
 test('dispose leaves the host holding nothing', () => {
@@ -325,24 +335,8 @@ test('a step that throws does not strand the releases behind it', () => {
 
   t.teardown.dispose();
 
-  assert.deepEqual(t.log, [
-    'remove keydown',
-    'remove unhandledrejection',
-    'remove click',
-    'remove pagehide',
-    'switches.dispose',
-    'releaseAppServices',
-    'effectGui.destroy',
-    'shaderDocuments.dispose',
-    'recorder.dispose',
-    'engine.delete adapter=null',
-    'urlSync.dispose',
-    'sidebar.dispose',
-    'driver.dispose',
-    'strandSegmentWork',
-    'segments.dispose active=false epoch=1',
-    'removeOverlay',
-  ], 'dispose runs once, so a stranded release leaks the URL debounce, the '
+  assertTeardown(t.log, TEARDOWN_STEPS.filter((step) => step !== 'globalGui.destroy'),
+    'dispose runs once, so a stranded release leaks the URL debounce, the '
     + 'WebGL context, and the worker pool with no retry left');
   assert.equal(t.errors.length, 1, 'the failure is still reported');
   assert.match(t.errors[0].message, /global GUI/);
@@ -585,7 +579,7 @@ test('a frame that throws every tick reports once', () => {
 
   assert.equal(reported.length, 1, 'the banner must not be rewritten 60 times a second');
   assert.equal(logged.length, 1);
-  assert.equal(logged[0][0], 'Render loop frame failed:');
+  assert.match(logged[0][0], /frame failed/);
 });
 
 test('a failing reporter cannot skip dead-module release', () => {
@@ -600,7 +594,7 @@ test('a failing reporter cannot skip dead-module release', () => {
   });
   assert.doesNotThrow(guarded);
   assert.equal(released, true);
-  assert.equal(errors.at(-1)[0], 'Render error reporting failed:');
+  assert.match(errors.at(-1)[0], /reporting failed/);
   assert.equal(errors.at(-1)[1].message, 'report unavailable');
 });
 

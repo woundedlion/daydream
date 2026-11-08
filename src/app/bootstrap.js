@@ -63,7 +63,8 @@ const MODULE_FETCH_FAILURE = new RegExp([
 // to its glue by content hash.
 const REFRESHED_EXTENSIONS = ['.js', '.mjs', '.wasm', '.css', '.json'];
 
-const REFRESH_CONCURRENCY = 6;
+/** Most re-fetches refreshModuleCache keeps in flight at once. */
+export const REFRESH_CONCURRENCY = 6;
 
 const RESOURCE_TIMING_ENTRIES = 1000;
 

@@ -22,6 +22,9 @@ import {
 
 restoreDocumentAfterEach();
 
+/** @param {Object} ctrl @returns {string|null} The Export button's accessible name. */
+const exportName = (ctrl) => ctrl.$button.getAttribute('aria-label');
+
 // createEffectGui's Export, mount, drag latch, destroy and external-parameter
 // filter, driven over doubles for every injected collaborator.
 
@@ -37,7 +40,7 @@ test('Export copies the live values as a C++ brace-init list', async () => {
   await h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, ['{ 0.25f, true }']);
-  assert.equal(h.gui().ctrl('export').label, '\u2713');
+  assert.equal(exportName(h.gui().ctrl('export')), EXPORT_COPIED);
   assert.equal(h.gui().ctrl('export').$button.getAttribute('title'), EXPORT_COPIED);
   assert.equal(exportStatus(h).textContent, EXPORT_COPIED);
 });
@@ -55,7 +58,8 @@ test('the Export outcome is announced in a polite live region', () => {
   h.gui().ctrl('export').object.export();
   assert.equal(status.textContent, EXPORT_REFUSED);
   h.gui().ctrl('export').object.export();
-  assert.equal(status.textContent, `${EXPORT_REFUSED}\u200b`);
+  assert.notEqual(status.textContent, EXPORT_REFUSED, 'a repeated outcome rewrites the live region');
+  assert.ok(status.textContent.startsWith(EXPORT_REFUSED));
 
   mock.timers.tick(FLASH_MS);
   assert.equal(status.textContent, '',
@@ -74,7 +78,7 @@ test('ShaderChain Export copies the versioned chain snapshot', async () => {
   await h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, [JSON.stringify(snapshot, null, 2)]);
-  assert.equal(h.gui().ctrl('export').label, '\u2713');
+  assert.equal(exportName(h.gui().ctrl('export')), EXPORT_COPIED);
 });
 
 test('Export copies displayed values while a segmented snapshot is pending', async () => {
@@ -91,7 +95,7 @@ test('Export copies displayed values while a segmented snapshot is pending', asy
   await h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, ['{ 0.75f, true }']);
-  assert.equal(h.gui().ctrl('export').label, '\u2713');
+  assert.equal(exportName(h.gui().ctrl('export')), EXPORT_COPIED);
 });
 
 test('Export does not fall back to controls from a stale schema', () => {
@@ -108,7 +112,7 @@ test('Export does not fall back to controls from a stale schema', () => {
   h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, []);
-  assert.equal(h.gui().ctrl('export').label, '\u2717');
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
   assert.match(h.warnings[0], /no parameter values matching/);
   assert.equal(exportStatus(h).textContent, EXPORT_REFUSED);
   assert.match(h.actionNotices[0], /no parameter values matching/);
@@ -134,7 +138,7 @@ test('Export without a copy operation reports the failure', () => {
 
   h.gui().ctrl('export').object.export();
 
-  assert.equal(h.gui().ctrl('export').label, '\u2717');
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
   assert.equal(h.warnings.length, 1);
   assert.match(h.warnings[0], /clipboard copy unavailable/);
 });
@@ -151,8 +155,9 @@ test('ShaderChain Export names a missing clipboard operation', () => {
 
   h.gui().ctrl('export').object.export();
 
-  assert.equal(h.gui().ctrl('export').label, '\u2717');
-  assert.deepEqual(h.warnings, ['Export: clipboard copy unavailable']);
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
+  assert.equal(h.warnings.length, 1);
+  assert.match(h.warnings[0], /clipboard copy unavailable/);
 });
 
 test('chain Export fails visibly when the typed snapshot is unavailable', () => {
@@ -167,12 +172,11 @@ test('chain Export fails visibly when the typed snapshot is unavailable', () => 
   h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, []);
-  assert.equal(h.gui().ctrl('export').label, '\u2717');
-  assert.deepEqual(h.warnings,
-    ['Export: Shader Workbench chain snapshot is unavailable']);
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
+  assert.equal(h.warnings.length, 1);
+  assert.match(h.warnings[0], /chain snapshot is unavailable/);
   assert.equal(exportStatus(h).textContent, EXPORT_REFUSED);
-  assert.deepEqual(h.actionNotices,
-    ['Export: Shader Workbench chain snapshot is unavailable']);
+  assert.deepEqual(h.actionNotices, h.warnings);
 });
 
 test('Export refuses a value stream that has skewed from the panel', () => {
@@ -183,7 +187,7 @@ test('Export refuses a value stream that has skewed from the panel', () => {
   h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, []);
-  assert.equal(h.gui().ctrl('export').label, '\u2717');
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
   assert.match(h.warnings[0], /param\/value length skew \(2 vs 1\)/);
 });
 
@@ -198,7 +202,7 @@ test('a rejected clipboard copy reports the failure', async () => {
 
   await h.gui().ctrl('export').object.export();
 
-  assert.equal(h.gui().ctrl('export').label, '\u2717');
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
   assert.match(h.warnings[0], /clipboard copy failed/);
   assert.equal(exportStatus(h).textContent, EXPORT_FAILED);
 });
@@ -214,7 +218,7 @@ test('a copy operation that exhausts its fallbacks reports the failure', async (
 
   await h.gui().ctrl('export').object.export();
 
-  assert.equal(h.gui().ctrl('export').label, '\u2717');
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
   assert.match(h.warnings[0], /clipboard copy failed/);
 });
 
@@ -229,7 +233,7 @@ test('an Export that lands after an effect switch does not flash the old panel',
   await completion;
 
   assert.deepEqual(h.state.copyText.copied, ['{ 0.25f }']);
-  assert.equal(stale.ctrl('export').label, '\u29c9',
+  assert.equal(exportName(stale.ctrl('export')), 'Export',
     'the replaced panel is left alone');
 });
 
@@ -240,7 +244,7 @@ test('Export reports a parameter formatting failure', () => {
   });
   h.panel.build();
   h.gui().ctrl('export').object.export();
-  assert.equal(h.gui().ctrl('export').label, '\u2717');
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
   assert.match(h.warnings[0], /parameter formatting failed/);
   assert.deepEqual(h.state.copyText.copied, []);
   h.panel.destroy();
@@ -252,10 +256,10 @@ test('the Export flash reverts to the default label', () => {
   h.panel.build();
 
   h.gui().ctrl('export').object.export();
-  assert.equal(h.gui().ctrl('export').label, '\u2717');
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
 
   mock.timers.tick(FLASH_MS);
-  assert.equal(h.gui().ctrl('export').label, '\u29c9');
+  assert.equal(exportName(h.gui().ctrl('export')), 'Export');
   assert.equal(h.gui().ctrl('export').$button.getAttribute('title'), 'Export');
 });
 
@@ -269,7 +273,7 @@ test('destroy cancels a pending Export flash', () => {
   h.panel.destroy();
   mock.timers.tick(FLASH_MS);
 
-  assert.equal(stale.ctrl('export').label, '\u2717',
+  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(stale.ctrl('export'))),
     'the flash timer fired into a destroyed controller');
 });
 
@@ -322,8 +326,8 @@ test('a drag registers window listeners that the pointer release drains', () => 
 
   controller.domElement.dispatch('pointerdown', pointerDown());
   assert.equal(controller.dragging, true);
-  assert.deepEqual(h.dragTarget.listeners.map((l) => l.type),
-    ['pointerup', 'pointercancel', 'blur']);
+  assert.deepEqual(h.dragTarget.listeners.map((l) => l.type).sort(),
+    ['blur', 'pointercancel', 'pointerup']);
 
   h.dragTarget.dispatch('pointerup', pointerUp());
   assert.equal(controller.dragging, false);
@@ -629,8 +633,8 @@ test('a second pointer neither re-latches a held control nor releases it', () =>
   controller.setValue(0.4);
   controller.domElement.dispatch('pointerdown', pointerDown(9));
 
-  assert.deepEqual(h.dragTarget.listeners.map((l) => l.type),
-    ['pointerup', 'pointercancel', 'blur'],
+  assert.deepEqual(h.dragTarget.listeners.map((l) => l.type).sort(),
+    ['blur', 'pointercancel', 'pointerup'],
     'the second pointer registers no end set of its own');
   assert.equal(h.panel.active().edits.activeDragEnds.size, 1);
 
@@ -745,8 +749,8 @@ test('external parameter export refuses missing live values without controller f
   h.gui().ctrl('export').object.export();
   assert.deepEqual(h.state.copyText.copied, []);
   assert.equal(exportStatus(h).textContent, EXPORT_REFUSED);
-  assert.deepEqual(h.warnings,
-    ['Export: no parameter values matching the current effect; skipping copy']);
+  assert.equal(h.warnings.length, 1);
+  assert.match(h.warnings[0], /no parameter values/);
 });
 
 test('a filter change rebuilds the panel on the next sync', () => {

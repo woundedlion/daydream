@@ -124,21 +124,21 @@ test('copy feedback replaces the prior outcome classes on re-entry', async () =>
   const opts = { element: el, revertMs: 1500, ...COPY_FEEDBACK };
 
   assert.equal(await copyWithFeedback('a', opts), false);
-  assert.equal(el.className, 'text-amber-400');
+  assert.equal(el.className, COPY_FEEDBACK.failedClasses.join(' '));
   mock.timers.tick(500);
 
   rejectCopy = false;
   assert.equal(await copyWithFeedback('b', opts), true);
-  assert.equal(el.className, 'text-green-400');
+  assert.equal(el.className, COPY_FEEDBACK.copiedClasses.join(' '));
   mock.timers.tick(500);
 
   rejectCopy = true;
   assert.equal(await copyWithFeedback('c', opts), false);
-  assert.equal(el.className, 'text-amber-400');
+  assert.equal(el.className, COPY_FEEDBACK.failedClasses.join(' '));
   mock.timers.tick(1100);
-  assert.equal(el.className, 'text-amber-400');
+  assert.equal(el.className, COPY_FEEDBACK.failedClasses.join(' '));
   mock.timers.tick(400);
-  assert.equal(el.className, 'text-gray-300');
+  assert.equal(el.className, COPY_FEEDBACK.idleClasses.join(' '));
   assert.equal(el.textContent, 'Copy');
 });
 

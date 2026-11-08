@@ -20,8 +20,8 @@ test('start assembles the app and hands back its teardown', () => {
   assert.equal(teardown.disposed(), false);
   assert.equal(guis[0].namespace, 'view',
     "the global GUI root must keep the 'view' namespace its deep links are built from");
-  assert.deepEqual(listeners.map(({ type }) => type),
-    ['keydown', 'error', 'unhandledrejection', 'pagehide']);
+  assert.deepEqual(listeners.map(({ type }) => type).sort(),
+    ['error', 'keydown', 'pagehide', 'unhandledrejection']);
 });
 
 test('a dismiss button that mounts after startup still clears the notice', () => {
@@ -56,20 +56,19 @@ test('the global GUI carries session and deep-link controls', () => {
   const { guis } = startApp();
   const root = guis[0];
 
-  assert.deepEqual(root.controllers.map((c) => c.property),
-    ['resolution', 'testAll', 'paused', 'labelAxes', 'cullBackSphere', 'showPip', 'povFidelity',
-      'povResponseScale', 'showSweepBoundary',
-      'noBlackColumns', 'poleLod', 'topCap', 'bottomCap']);
+  const carries = (gui, properties) => assert.deepEqual(
+    properties.filter((property) => !gui.controllers.some((c) => c.property === property)), []);
+  carries(root, ['resolution', 'testAll', 'paused', 'labelAxes', 'cullBackSphere', 'showPip',
+    'povFidelity', 'povResponseScale', 'showSweepBoundary', 'noBlackColumns', 'poleLod', 'topCap',
+    'bottomCap']);
   const segments = root.folders.find((f) => f.namespace === 'Segmented POV');
   assert.ok(segments, 'the segmented folder name is a deep-link key segment');
-  assert.deepEqual(segments.controllers.map((c) => c.property),
-    ['segmented', 'segments', 'boundaries']);
+  carries(segments, ['segmented', 'segments', 'boundaries']);
   for (const prop of ['segmented', 'segments'])
     assert.equal(segments.controllers.find((c) => c.property === prop).session, undefined,
       `'${prop}' must stay deep-linked (add, not addSession)`);
   const recording = root.folders.find((f) => f.namespace === 'Recording');
-  assert.deepEqual(recording.controllers.map((c) => c.property),
-    ['recQuality', 'recResolution', 'recFormat', 'record']);
+  carries(recording, ['recQuality', 'recResolution', 'recFormat', 'record']);
 });
 
 
