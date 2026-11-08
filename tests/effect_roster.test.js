@@ -24,15 +24,18 @@ test('unknown resolutions use the high-resolution favorites', (t) => {
   const messages = [];
   t.mock.method(console, 'error', (...args) => messages.push(args));
   assert.deepEqual(favoritesFor('no-such-preset'), favoritesFor('Phantasm (288x144)'));
-  assert.ok(favoritesFor('Holosphere (96x20)').includes('Dynamo'));
   assert.equal(messages.length, 1);
 });
 
-test('GridWorms is offered at both display resolutions', () => {
-  for (const resolution of ['Holosphere (96x20)', 'Phantasm (288x144)']) {
+test('every listed effect is registered and stays active at its resolution', () => {
+  const registered = new Set(EFFECT_IDENTITIES.map(({ display_name }) => display_name));
+  for (const resolution of Object.keys(resolutionPresets)) {
     const favorites = favoritesFor(resolution);
-    assert.ok(favorites.includes('GridWorms'), resolution);
-    assert.equal(resolveActiveEffect(favorites, 'GridWorms'), 'GridWorms');
+    assert.ok(favorites.length > 0, resolution);
+    for (const name of favorites) {
+      assert.ok(registered.has(name), `${resolution}: ${name}`);
+      assert.equal(resolveActiveEffect(favorites, name), name);
+    }
   }
 });
 
@@ -68,17 +71,17 @@ test('every registered simulator effect is offered at some resolution', () => {
   assert.deepEqual(missing, []);
 });
 
-const RESO_EFFECTS = ['ShapeShifter', 'Comets', 'MobiusGrid'];
+const RESO_EFFECTS = ['First', 'Second', 'Third'];
 
 test('resolveActiveEffect keeps an effect the resolution offers', () => {
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'Comets'), 'Comets');
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'ShapeShifter'), 'ShapeShifter');
+  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'Second'), 'Second');
+  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'First'), 'First');
 });
 
 test('resolveActiveEffect falls back to the first effect for an off-list request', () => {
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'NotHere'), 'ShapeShifter');
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'GARBAGE_FROM_URL'), 'ShapeShifter');
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, undefined), 'ShapeShifter');
+  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'NotHere'), 'First');
+  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'GARBAGE_FROM_URL'), 'First');
+  assert.equal(resolveActiveEffect(RESO_EFFECTS, undefined), 'First');
 });
 
 test('a preset reports its own effect list', () => {

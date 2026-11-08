@@ -6,6 +6,7 @@ import { EFFECT_IDENTITIES } from '../generated/engine_contract.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { isDeepStrictEqual } from 'node:util';
 import createHolosphereModule from '../generated/holosphere_wasm.js';
 import { validateRegistryFaces } from '../src/workbench/solids/solid_registry_codegen.js';
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
@@ -41,6 +42,35 @@ const initialPoleLod = engine.getPoleLod();
 
 const resolutionOk = (r) => r === M.ResolutionSetResult.RESIZED
   || r === M.ResolutionSetResult.ALREADY_ACTIVE;
+
+const SIMULATOR_EFFECTS = EFFECT_IDENTITIES.map(({ display_name }) => display_name)
+  .filter((name) => name !== 'ShaderChain');
+
+/** @param {*} d @returns {boolean} Whether a definition is a writable numeric slider. */
+const writableNumeric = (d) => !d.readonly && typeof d.value === 'number' && d.options === undefined;
+
+const ARENAS = ['scratch_arena_a', 'scratch_arena_b', 'persistent_arena'];
+
+// A registered effect that provisions every arena, exposes a writable numeric
+// parameter, renders, and narrows to a clip band, leaving the pixels outside it black.
+const FIXTURE_EFFECT = (() => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  for (const name of SIMULATOR_EFFECTS) {
+    if (engine.setEffect(name) !== M.EffectSetResult.INSTALLED
+        || ARENAS.some((arena) => !(engine.getArenaMetrics()[arena].capacity > 0))
+        || !engine.getParameterDefinitions().some(writableNumeric)
+        || engine.setClip(0, W / 2, 0, H) !== M.ClipSetResult.APPLIED) continue;
+    engine.getPixels().fill(0);
+    engine.drawFrame();
+    const pixels = engine.getPixels();
+    let outside = false;
+    for (let y = 0; y < H && !outside; y++) {
+      outside = pixels.subarray((y * W + W / 2) * 3, (y + 1) * W * 3).some((v) => v !== 0);
+    }
+    if (!outside && pixels.some((v) => v !== 0)) return name;
+  }
+  assert.fail('no registered effect renders inside a clip band with a writable numeric parameter');
+})();
 
 // Structured payload shapes are authored separately from emitted bindings.
 const DTS_PATH = 'generated/engine_types.d.ts';
@@ -121,11 +151,14 @@ test(`${DTS_PATH} declares the object shapes the engine returns`, () => {
   assertDeclaredShape('ArenaUsage', metrics.persistent_arena);
   assertDeclaredShape('StackUsage', metrics.stack);
 
-  assert.equal(engine.setEffect('Comets'), M.EffectSetResult.INSTALLED);
-  const toggle = engine.getParameterDefinitions()
-    .find((/** @type {*} */ d) => typeof d.value === 'boolean');
-  assert.ok(toggle, 'Comets must expose a toggle, or this pin has no '
-    + 'BooleanParameterDefinition to check — repoint it at an effect that does');
+  let toggle = null;
+  for (const name of SIMULATOR_EFFECTS) {
+    assert.equal(engine.setEffect(name), M.EffectSetResult.INSTALLED, name);
+    toggle = engine.getParameterDefinitions()
+      .find((/** @type {*} */ d) => typeof d.value === 'boolean');
+    if (toggle) break;
+  }
+  assert.ok(toggle, 'no effect exposes a toggle, so BooleanParameterDefinition is unchecked');
   assertDeclaredShape('BooleanParameterDefinition', toggle);
 
   assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
@@ -183,9 +216,7 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
     'setResolution must return a ResolutionSetResult value');
   assert.ok(resolutionOk(ok), `the ${W}x${H} preset must be a buildable resolution`);
 
-  // DisplacementField is on HS_EFFECT_LIST, so the factory registers it at every
-  // supported resolution.
-  const effectOk = engine.setEffect('DisplacementField');
+  const effectOk = engine.setEffect(FIXTURE_EFFECT);
   assert.ok(effectOk instanceof M.EffectSetResult,
     'setEffect must return an EffectSetResult value');
   assert.equal(effectOk, M.EffectSetResult.INSTALLED,
@@ -195,7 +226,7 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
   assert.equal(typeof defs.length, 'number',
     'getParameterDefinitions must return an array-like value');
   assert.ok(defs.length > 0,
-    'DisplacementField must expose at least one parameter');
+    `${FIXTURE_EFFECT} must expose at least one parameter`);
   const p = defs[0];
   assert.equal(typeof p.name, 'string', 'param def must carry a string name');
   assert.ok(typeof p.value === 'number' || typeof p.value === 'boolean',
@@ -206,8 +237,6 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
     'setParameter must report APPLIED for a known param name');
 
   engine.setAnimationsPaused(false);
-  // APPLIED, not FULL_FRAME_KEPT: DisplacementField's filter pipeline does not
-  // cross segment bands, so the clip narrows.
   assert.equal(engine.setClip(0, W, 0, H), M.ClipSetResult.APPLIED,
     'setClip must report APPLIED for a full-canvas band');
   engine.drawFrame();
@@ -224,7 +253,7 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
     'getParamValues elements must be numbers');
 
   const m = engine.getArenaMetrics();
-  for (const arena of ['scratch_arena_a', 'scratch_arena_b', 'persistent_arena']) {
+  for (const arena of ARENAS) {
     assert.ok(m[arena], `getArenaMetrics must expose ${arena}`);
     for (const field of ['usage', 'high_water_mark', 'capacity']) {
       assert.equal(typeof m[arena][field], 'number',
@@ -240,7 +269,7 @@ const paramNames = (defs) => Array.from(defs, (d) => d.name);
 
 test('an unknown effect name is rejected and leaves the prior effect renderable', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+  assert.equal(engine.setEffect(FIXTURE_EFFECT), M.EffectSetResult.INSTALLED,
     'setEffect must succeed for a registered effect');
   const before = paramNames(engine.getParameterDefinitions());
 
@@ -272,7 +301,7 @@ test('an unsupported resolution is rejected and keeps the prior one active', () 
 
 test('malformed clip bounds are rejected', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+  assert.equal(engine.setEffect(FIXTURE_EFFECT), M.EffectSetResult.INSTALLED,
     'setEffect must succeed after a resolution change');
   for (const bounds of [
     [-1, W, 0, H], [0, W + 1, 0, H], [0, W, -1, H], [0, W, 0, H + 1],
@@ -293,7 +322,7 @@ test('an effectless engine reports NO_EFFECT, not a bounds rejection', () => {
   assert.ok(other, 'a second supported resolution is needed to tear the effect down');
 
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+  assert.equal(engine.setEffect(FIXTURE_EFFECT), M.EffectSetResult.INSTALLED,
     'setEffect must succeed for a registered effect');
   const [ow, oh] = other;
   assert.equal(engine.setResolution(ow, oh), M.ResolutionSetResult.RESIZED,
@@ -307,7 +336,7 @@ test('an effectless engine reports NO_EFFECT, not a bounds rejection', () => {
 // Only RESIZED obliges the caller to re-apply setEffect/setClip.
 test('a request matching the active resolution reports ALREADY_ACTIVE and keeps the effect', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+  assert.equal(engine.setEffect(FIXTURE_EFFECT), M.EffectSetResult.INSTALLED,
     'setEffect must succeed for a registered effect');
   assert.equal(engine.setResolution(W, H), M.ResolutionSetResult.ALREADY_ACTIVE,
     'a same-size request must report ALREADY_ACTIVE');
@@ -451,14 +480,14 @@ test('live composed groups cover every parameter and both planar-warp slots', ()
 
 test('strobeColumns and effect metadata return the shapes daydream consumes', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+  assert.equal(engine.setEffect(FIXTURE_EFFECT), M.EffectSetResult.INSTALLED,
     'setEffect must succeed for a registered effect');
   assert.equal(typeof engine.strobeColumns(), 'boolean',
     'strobeColumns must return a boolean');
 
   const sizes = engine.getEffectSizes();
   const names = Object.keys(sizes);
-  assert.ok(names.includes('DisplacementField'),
+  assert.deepEqual(SIMULATOR_EFFECTS.filter((name) => !names.includes(name)), [],
     'getEffectSizes must name the effects the factory builds');
   const nonNumeric = names.filter((name) => typeof sizes[name] !== 'number');
   assert.deepEqual(nonNumeric.slice(0, 5), [],
@@ -471,9 +500,9 @@ test('strobeColumns and effect metadata return the shapes daydream consumes', ()
     ([, count]) => !Number.isInteger(count) || count < 0);
   assert.deepEqual(invalidCounts.slice(0, 5), [],
     `${invalidCounts.length} getEffectPresetCounts entries are not non-negative integers`);
-  assert.ok(presetCounts.Comets > 0, 'a choreographed effect must report its presets');
-  assert.ok(presetCounts.KaleidoscopeMelt > 0, 'KaleidoscopeMelt reports authored presets');
-  assert.equal(presetCounts.HopfFibration, 0,
+  assert.ok(Object.values(presetCounts).some((count) => count > 0),
+    'no effect reports authored presets');
+  assert.ok(Object.values(presetCounts).some((count) => count === 0),
     'an effect with no authored presets must report zero, not be absent');
 });
 
@@ -514,7 +543,7 @@ test('getBufferLength reports the active resolution buffer length', () => {
   assert.deepEqual(wrong.slice(0, 5), [],
     `getBufferLength is wrong at ${wrong.length} reported resolutions`);
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+  assert.equal(engine.setEffect(FIXTURE_EFFECT), M.EffectSetResult.INSTALLED,
     'setEffect must succeed after a resolution change');
   assert.equal(engine.getBufferLength(), engine.getPixels().length,
     'getBufferLength must equal the getPixels view length');
@@ -554,12 +583,12 @@ test('a resolution change leaves a held pixel view attached at the wrong length'
 
 test('getParamGeneration changes across setEffect', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+  assert.equal(engine.setEffect(FIXTURE_EFFECT), M.EffectSetResult.INSTALLED,
     'setEffect must succeed for a registered effect');
 
   const generation = engine.getParamGeneration();
   assert.equal(typeof generation, 'number', 'getParamGeneration must return a number');
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+  assert.equal(engine.setEffect(FIXTURE_EFFECT), M.EffectSetResult.INSTALLED,
     'setEffect must succeed on a reload');
   assert.notEqual(engine.getParamGeneration(), generation,
     'getParamGeneration must change across a setEffect, or a stale param snapshot ' +
@@ -590,28 +619,47 @@ test('setPoleLod reads back in range and clamps outside it', () => {
   engine.setPoleLod(0);
 });
 
-test('DisplacementField exposes selectable phase presets and preserves paused tuning', () => {
+test('preset selection pauses, restores authored values and preserves paused tuning', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)));
-  engine.setAnimationsPaused(false);
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.getPresetCount(), 2);
-  assert.deepEqual(engine.getPresetIds(), ['noise', 'balls']);
-  assert.equal(engine.getPresetIndex(), 0);
+  const sliders = () => new Map(engine.getParameterDefinitions()
+    .filter(writableNumeric).map((d) => [d.name, d]));
+  let found = null;
+  for (const name of SIMULATOR_EFFECTS) {
+    if (engine.setEffect(name) !== M.EffectSetResult.INSTALLED) continue;
+    const ids = engine.getPresetIds();
+    if (ids.length < 2) continue;
+    const first = sliders();
+    assert.equal(engine.selectPresetById(ids[1]), true, name);
+    const param = [...sliders().values()].find((d) => first.get(d.name)
+      && first.get(d.name).value !== d.value);
+    if (param) {
+      found = { effect: name, ids, param, authored: first.get(param.name).value };
+      break;
+    }
+  }
+  assert.ok(found, 'no two presets author different values for one writable parameter');
+  const { effect, ids, param, authored } = found;
+  const value = () => sliders().get(param.name).value;
 
-  assert.equal(engine.selectPresetById('balls'), true);
+  engine.setAnimationsPaused(false);
+  assert.equal(engine.setEffect(effect), M.EffectSetResult.INSTALLED);
+  assert.equal(engine.getPresetIndex(), 0);
+  assert.equal(engine.selectPresetById(ids[1]), true);
   assert.equal(engine.getPresetIndex(), 1);
   assert.equal(engine.getAnimationsPaused(), true);
-  assert.equal(engine.setParameter('Ball Amp', 0.6), M.ParamSetResult.APPLIED);
+  const tuned = Math.fround((param.min + param.max) / 2) === Math.fround(param.value)
+    ? param.min : (param.min + param.max) / 2;
+  assert.equal(engine.setParameter(param.name, tuned), M.ParamSetResult.APPLIED);
   for (let frame = 0; frame < 32; ++frame) engine.drawFrame();
   assert.equal(engine.getPresetIndex(), 1);
-  assert.ok(Math.abs(engine.getParameterDefinitions().find(p => p.name === 'Ball Amp').value - 0.6) < 1e-6);
-  assert.ok(engine.getPixels().some(value => value > 0));
+  assert.ok(Math.abs(value() - tuned) < 1e-6);
+  assert.ok(engine.getPixels().some((v) => v > 0));
 
-  assert.equal(engine.nextPreset(), true);
+  assert.equal(engine.previousPreset(), true);
   assert.equal(engine.getPresetIndex(), 0);
   assert.equal(engine.getAnimationsPaused(), true);
-  assert.ok(Math.abs(engine.getParameterDefinitions().find(p => p.name === 'Ball Amp').value - 0.1) < 1e-6);
-  assert.equal(engine.previousPreset(), true);
+  assert.ok(Math.abs(value() - authored) < 1e-6);
+  assert.equal(engine.nextPreset(), true);
   assert.equal(engine.getPresetIndex(), 1);
   assert.equal(engine.selectPresetById('missing'), false);
   assert.equal(engine.getPresetIndex(), 1);
@@ -675,7 +723,7 @@ test('getPresetIds names the presets selectPresetById answers to', () => {
 
 test('getAnimationsPaused reports the pause both of its writers engage', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+  assert.equal(engine.setEffect(FIXTURE_EFFECT), M.EffectSetResult.INSTALLED,
     'setEffect must succeed for a registered effect');
 
   assert.equal(typeof engine.getAnimationsPaused(), 'boolean',
@@ -688,7 +736,7 @@ test('getAnimationsPaused reports the pause both of its writers engage', () => {
     'getAnimationsPaused must report a resume');
 
   engine.setAnimationsPaused(true);
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+  assert.equal(engine.setEffect(FIXTURE_EFFECT), M.EffectSetResult.INSTALLED,
     'setEffect must succeed on a reload');
   assert.equal(engine.getAnimationsPaused(), true,
     'the pause must be retained across a setEffect rebuild');
@@ -812,7 +860,7 @@ test('heap growth detaches a held pixel view and the re-fetch is live and identi
   const engine = new M.HolosphereEngine();
   try {
     assert.ok([M.ResolutionSetResult.RESIZED, M.ResolutionSetResult.ALREADY_ACTIVE].includes(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-    assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+    assert.equal(engine.setEffect(FIXTURE_EFFECT), M.EffectSetResult.INSTALLED,
       'setEffect must succeed for a registered effect');
     engine.setClip(0, W, 0, H);
     engine.drawFrame();
@@ -1120,7 +1168,7 @@ test('the glue honours instantiateWasm, and shared-module instances stay isolate
       const resized = e.setResolution(W, H);
       assert.ok(resized === mod.ResolutionSetResult.RESIZED
         || resized === mod.ResolutionSetResult.ALREADY_ACTIVE);
-      assert.equal(e.setEffect('DisplacementField'), mod.EffectSetResult.INSTALLED);
+      assert.equal(e.setEffect(FIXTURE_EFFECT), mod.EffectSetResult.INSTALLED);
       e.drawFrame();
       return e.getPixels();
     });
@@ -1175,8 +1223,10 @@ test('display caps default to full coverage and validate requests without rebuil
 
 test('display caps preserve tuning, pause, clipping and resolution-independent placement', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)));
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.setParameter('Alpha', 0.65), M.ParamSetResult.APPLIED);
+  assert.equal(engine.setEffect(FIXTURE_EFFECT), M.EffectSetResult.INSTALLED);
+  const tunable = engine.getParameterDefinitions().find(writableNumeric);
+  assert.equal(engine.setParameter(tunable.name, (tunable.min + tunable.max) / 2),
+    M.ParamSetResult.APPLIED);
   engine.setAnimationsPaused(true);
   assert.equal(engine.setClip(0, W / 2, 0, H), M.ClipSetResult.APPLIED);
   const definitions = engine.getParameterDefinitions();
@@ -1196,7 +1246,7 @@ test('display caps preserve tuning, pause, clipping and resolution-independent p
     }
     assert.ok(pixels.some((v) => v !== 0));
     assert.ok(resolutionOk(engine.setResolution(288, 144)));
-    assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED);
+    assert.equal(engine.setEffect(FIXTURE_EFFECT), M.EffectSetResult.INSTALLED);
     assert.ok(Math.abs(engine.getDisplayNorthPhi() - Math.PI * 0.02) < 1e-6);
     assert.ok(Math.abs(engine.getDisplaySouthPhi() - Math.PI * 0.97) < 1e-6);
   } finally {
@@ -1206,19 +1256,32 @@ test('display caps preserve tuning, pause, clipping and resolution-independent p
   }
 });
 
-test('display caps preserve MobiusGrid after topology rebuilds', () => {
+test('display caps preserve every effect\'s parameter values and rendering after rebuilds', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)));
-  assert.equal(engine.setEffect('MobiusGrid'), M.EffectSetResult.INSTALLED);
-  const definitions = engine.getParameterDefinitions();
+  const values = () => Array.from(engine.getParameterDefinitions(),
+    ({ name, value, acceptedValue }) => ({ name, value, acceptedValue }));
+  const rendersWithin = (frames) => {
+    for (let frame = 0; frame < frames; frame++) {
+      engine.getPixels().fill(0);
+      engine.drawFrame();
+      if (engine.getPixels().some((value) => value !== 0)) return true;
+    }
+    return false;
+  };
+  const failures = [];
   try {
-    assert.equal(engine.setDisplayCaps(2, 3), true);
-    assert.deepEqual(engine.getParameterDefinitions(), definitions);
-    engine.getPixels().fill(0);
-    engine.drawFrame();
-    assert.ok(engine.getPixels().some((value) => value !== 0));
+    for (const name of SIMULATOR_EFFECTS) {
+      engine.setDisplayCaps(0, 0);
+      assert.equal(engine.setEffect(name), M.EffectSetResult.INSTALLED, name);
+      const before = values();
+      assert.equal(engine.setDisplayCaps(2, 3), true);
+      if (!isDeepStrictEqual(values(), before)) failures.push(`${name}: parameter values changed`);
+      if (!rendersWithin(2)) failures.push(`${name}: blank frames`);
+    }
   } finally {
     engine.setDisplayCaps(0, 0);
   }
+  assert.deepEqual(failures, []);
 });
 
 test('registry export rejects oversized intermediate primitive endpoints', async () => {

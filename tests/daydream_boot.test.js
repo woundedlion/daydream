@@ -4,6 +4,10 @@
 // Notice owner names are checked against the composition source.
 import { currentChainSnapshot } from './helpers/chain_snapshot.js';
 import { canonicalEffectId, effectDisplayName } from '../src/effects/effect_identity.js';
+import {
+  DEFAULT_EFFECT, favoritesFor, resolutionPresets, SHADER_DOCUMENT_EFFECTS,
+} from '../src/effects/effect_roster.js';
+import { EFFECT_IDENTITIES } from '../generated/engine_contract.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -28,28 +32,31 @@ const startApp = trackedStartApp();
 const PHANTASM = [288, 144, 0.25];
 const HOLOSPHERE = [96, 20, 2];
 
-test('catalog effects are offered at both simulator resolutions', async () => {
+const HIGH_RES = 'Phantasm (288x144)';
+const offeredIds = (resolution) => favoritesFor(resolution).map(canonicalEffectId);
+// An effect the high-res sidebar offers that is not a shader document, with a
+// display name distinct from its canonical id.
+const SIMULATOR_EFFECT = EFFECT_IDENTITIES.find(({ id, display_name }) => id !== display_name
+  && offeredIds(HIGH_RES).includes(id) && !SHADER_DOCUMENT_EFFECTS.includes(id));
+
+test('the sidebar offers each resolution its declared effect list', async () => {
   const app = await bootedApp({
     loadModule: () => Promise.resolve(fakeWasmModule()),
   });
-  const hiRes = offeredEffects(app);
-
-  captureConsole(() => resolutionControl(app).setValue('Holosphere (96x20)'));
-  const loRes = offeredEffects(app);
-
-  for (const effect of ['AshCloud', 'HyperLattice', 'Millefiori']) {
-    assert.ok(hiRes.includes(canonicalEffectId(effect)),
-      `the sidebar must offer ${effect} at the high-res preset`);
-    assert.ok(loRes.includes(canonicalEffectId(effect)),
-      `the sidebar must offer ${effect} at the low-res preset`);
+  const sorted = (ids) => [...ids].sort();
+  assert.deepEqual(sorted(offeredEffects(app)), sorted(offeredIds(HIGH_RES)));
+  for (const resolution of Object.keys(resolutionPresets)) {
+    captureConsole(() => resolutionControl(app).setValue(resolution));
+    assert.deepEqual(sorted(offeredEffects(app)), sorted(offeredIds(resolution)), resolution);
   }
-  assert.equal(hiRes.includes(canonicalEffectId('Dynamo')), false);
-  assert.equal(loRes.includes(canonicalEffectId('Dynamo')), true);
 });
 
-test('Millefiori starts at both resolutions and explicit effects override it', async () => {
-  for (const resolution of ['Phantasm (288x144)', 'Holosphere (96x20)']) {
-    for (const effect of [null, 'Comets']) {
+test('the default effect starts at every resolution and explicit effects override it', async () => {
+  for (const resolution of Object.keys(resolutionPresets)) {
+    const explicit = favoritesFor(resolution).find((name) => name !== DEFAULT_EFFECT
+      && !SHADER_DOCUMENT_EFFECTS.includes(canonicalEffectId(name)));
+    assert.ok(explicit, resolution);
+    for (const effect of [null, explicit]) {
       const module = fakeWasmModule();
       const installed = [];
       module.HolosphereEngine.prototype.setEffect = (name) => {
@@ -57,11 +64,11 @@ test('Millefiori starts at both resolutions and explicit effects override it', a
         return EffectSetResult.INSTALLED;
       };
       const query = new URLSearchParams();
-      if (resolution !== 'Phantasm (288x144)') query.set('resolution', resolution);
+      if (resolution !== HIGH_RES) query.set('resolution', resolution);
       if (effect) query.set('effect', effect);
       const app = await bootedApp({ search: query.size ? `?${query}` : '',
         loadModule: async () => module });
-      assert.equal(installed.at(-1), effect ? 'comets' : 'millefiori');
+      assert.equal(installed.at(-1), canonicalEffectId(effect ?? DEFAULT_EFFECT));
       assert.deepEqual(app.replaced, []);
     }
   }
@@ -863,7 +870,8 @@ test('the recorder watches visibility on the injected document until teardown', 
 });
 
 async function pooledPresetRig(t) {
-  const presetCounts = { IslamicStars: 24, Fishbowl: 1, Comets: 12 };
+  const [many, single, some] = favoritesFor(HIGH_RES);
+  const presetCounts = { [many]: 24, [single]: 1, [some]: 12 };
   const module = fakeWasmModule();
   module.HolosphereEngine.prototype.setEffect = function (name) {
     this.effect = name;
@@ -882,12 +890,12 @@ async function pooledPresetRig(t) {
     const control = app.guis.at(-1).ctrl('presetIndex');
     return control ? Object.keys(control.args[0]).length : 0;
   };
-  return {app, presetCounts, presetChoices};
+  return {app, presetCounts, presetChoices, sequence: [many, single, some, many]};
 }
 
 test('a pooled effect switch sizes the preset row from the incoming effect', async (t) => {
-  const {app, presetCounts, presetChoices} = await pooledPresetRig(t);
-  for (const name of ['IslamicStars', 'Fishbowl', 'Comets', 'IslamicStars']) {
+  const {app, presetCounts, presetChoices, sequence} = await pooledPresetRig(t);
+  for (const name of sequence) {
     app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
       .find((entry) => entry.dataset.effect === canonicalEffectId(name)).onclick();
     assert.equal(presetChoices(), presetCounts[name], name);
@@ -895,8 +903,8 @@ test('a pooled effect switch sizes the preset row from the incoming effect', asy
 });
 
 test('a pooled effect switch offers pause only for a preset bank', async (t) => {
-  const {app, presetCounts} = await pooledPresetRig(t);
-  for (const name of ['IslamicStars', 'Fishbowl', 'Comets', 'IslamicStars']) {
+  const {app, presetCounts, sequence} = await pooledPresetRig(t);
+  for (const name of sequence) {
     app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
       .find((entry) => entry.dataset.effect === canonicalEffectId(name)).onclick();
     assert.equal(Boolean(app.guis.at(-1).ctrl('pause')), presetCounts[name] > 1, name);
@@ -905,16 +913,18 @@ test('a pooled effect switch offers pause only for a preset bank', async (t) => 
 
 test('simulator shares canonical identity, preserves display metadata and reloads its route', async (t) => {
   t.mock.timers.enable({apis: ['setTimeout']});
-  const app = await bootedApp({search: '?effect=Comets&fx.Speed=0.7',
+  const document = offeredIds(HIGH_RES).find((id) => SHADER_DOCUMENT_EFFECTS.includes(id));
+  assert.ok(document);
+  const app = await bootedApp({search: `?effect=${SIMULATOR_EFFECT.display_name}&fx.Speed=0.7`,
     loadModule: async () => fakeWasmModule()});
   const option = app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
-    .find((entry) => entry.dataset.effect === 'alien-brain');
+    .find((entry) => entry.dataset.effect === document);
   assert.ok(option);
-  assert.match(option.getAttribute('aria-label'), /^AlienBrain, /);
+  assert.equal(option.getAttribute('aria-label').startsWith(`${effectDisplayName(document)}, `), true);
   option.onclick();
   t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
   const shared = new URL(app.urlWrites.at(-1), 'https://example.test');
-  assert.equal(shared.searchParams.get('effect'), 'alien-brain');
+  assert.equal(shared.searchParams.get('effect'), document);
   assert.equal(shared.searchParams.get('view'), 'simulator');
   const reload = startApp({search: shared.search});
   assert.deepEqual(reload.replaced, []);
@@ -923,7 +933,8 @@ test('simulator shares canonical identity, preserves display metadata and reload
 
 test('canonical and legacy URL normalization retains parameter keys', async (t) => {
   t.mock.timers.enable({apis: ['setTimeout']});
-  for (const effect of ['Comets', 'comets']) {
+  const { id, display_name } = SIMULATOR_EFFECT;
+  for (const effect of [display_name, id]) {
     const app = await bootedApp({search: `?effect=${effect}&fx.Speed=0.7`,
       loadModule: async () => fakeWasmModule({ definitions: [
         {name: 'Speed', value: 0.2, min: 0, max: 1, animated: false},
@@ -931,12 +942,12 @@ test('canonical and legacy URL normalization retains parameter keys', async (t) 
     getActiveURLSync().setParam('view.poleLod', 1.5);
     t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     const query = new URL(app.urlWrites.at(-1), 'https://example.test').searchParams;
-    assert.equal(query.get('effect'), 'comets');
+    assert.equal(query.get('effect'), id);
     assert.equal(query.get('fx.Speed'), '0.7');
     assert.equal(app.guis.at(-1).namespace, 'fx');
     const active = app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
       .find((entry) => entry.getAttribute('aria-selected') === 'true');
-    assert.equal(active.dataset.effect, 'comets');
+    assert.equal(active.dataset.effect, id);
   }
 });
 
