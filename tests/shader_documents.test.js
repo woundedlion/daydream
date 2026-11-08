@@ -3,8 +3,8 @@ import {
   primaryName, ownedEditors, INDEX, WORKBENCH, ENGINE_CATALOG, SCRATCH, plainName, MODULE,
   fixedEngine, promotedDocument, PROMOTED, PATTERN_CATALOG, shaderDocument, workbenchEngine,
   patternFetch, workbench, onChange, SCRATCH_WRITES, chooseCatalogSource,
-  withoutEmbeddedModulation, KALEIDOSCOPE_HEX_BRIGHT, KALEIDOSCOPE_STAINED_GLASS,
-  HEX_PATTERN_CATALOG, compiledBuildEngine, editorWorkbench, clickPlaneBandEntry, stripChips,
+  withoutEmbeddedModulation, CHAIN_STUDY, KALEIDOSCOPE_STAINED_GLASS,
+  STUDY_PATTERN_CATALOG, compiledBuildEngine, editorWorkbench, clickPlaneBandEntry, stripChips,
   displayedParameter, sampleFrequencySlider, expectStageAbsent, stageEditor, savedValues,
   affineLatticeStudy,
 } from './helpers/shader_document_harness.js';
@@ -35,7 +35,7 @@ import {
   BAKED_MODULATION_SCALE_MAX, MODULATION_OPERATOR, PALETTE_OPERATOR, UNIT_MODULATION_AMOUNT_MAX,
 } from '../src/workbench/shader/chain_presentation.js';
 
-const HEX_CHAIN = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT).descriptor.chain;
+const STUDY_CHAIN = JSON.parse(CHAIN_STUDY).descriptor.chain;
 
 /** @param {string} operator @param {string} param @param {string} option @returns {number} */
 const optionIndex = (operator, param, option) => JSON.parse(ENGINE_CATALOG).operators
@@ -587,7 +587,7 @@ test('an effect the engine rejects leaves the loaded chain editor standing', asy
 
   installs = false;
   assert.equal(
-    await harness.controller.loadSource(KALEIDOSCOPE_HEX_BRIGHT, 'other.shader.json'), false);
+    await harness.controller.loadSource(CHAIN_STUDY, 'other.shader.json'), false);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /rejected effect "ShaderChain"/);
   assert.deepEqual(stripChips(harness).map((chip) => chip.dataset.label), before,
@@ -598,12 +598,12 @@ test('an effect the engine rejects leaves the loaded chain editor standing', asy
 // decodes but is refused falls through to the scratch chain, and the select has
 // to fall through with it.
 test('a refused shader link leaves the source select on the scratch chain', async () => {
-  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const document = JSON.parse(CHAIN_STUDY);
   const hash = await encodeShaderStateHash({
     document, preset: 'no-such-preset', bypassed: [], paused: false,
   });
   const harness = await editorWorkbench(
-    { source: null, hash, patternCatalog: HEX_PATTERN_CATALOG });
+    { source: null, hash, patternCatalog: STUDY_PATTERN_CATALOG });
 
   assert.equal(harness.elements.get('shader-document-select').value, '');
   assert.match(harness.elements.get('shader-document-status').textContent,
@@ -622,7 +622,7 @@ test('a link whose bypass the store refuses leaves the toolbar on the loaded doc
   const presets = harness.elements.get('shader-preset-select').options.map((o) => o.value);
   const programs = harness.engine.chainCalls.length;
 
-  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const document = JSON.parse(CHAIN_STUDY);
   const copy = structuredClone(document.preset_bank.presets[0]);
   copy.preset_id = 'second';
   document.preset_bank.presets.push(copy);
@@ -703,7 +703,7 @@ test('a refused preset restores the preview and dropdown while preserving the re
 });
 
 test('a shader state link restores its document, preset, bypasses, and pause', async () => {
-  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const document = JSON.parse(CHAIN_STUDY);
   const preset = document.preset_bank.presets[1];
   preset.values['sample.pattern-freq'] = 7.25;
   const hash = await encodeShaderStateHash({
@@ -720,13 +720,13 @@ test('a shader state link restores its document, preset, bypasses, and pause', a
   assert.ok(harness.engine.writes.some(
     ([name, value]) => name === 'sample.pattern-freq' && value === 7.25));
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.instance),
-    HEX_CHAIN.map((entry) => entry.label).filter((label) => label !== 'camera'));
+    STUDY_CHAIN.map((entry) => entry.label).filter((label) => label !== 'camera'));
   assert.equal(stripChips(harness).find((chip) => chip.dataset.label === 'camera')
     .querySelector('.chain-chip-bypass').getAttribute('aria-pressed'), 'true');
 });
 
 test('a modulation bypass link is refused without adopting a stuck stage', async () => {
-  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const document = JSON.parse(CHAIN_STUDY);
   const harness = await editorWorkbench();
   const chips = stripChips(harness);
   const programs = harness.engine.chainCalls.length;
@@ -739,7 +739,7 @@ test('a modulation bypass link is refused without adopting a stuck stage', async
 });
 
 test('a disabled modulation link restores a stage that its toggle can enable', async () => {
-  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const document = JSON.parse(CHAIN_STUDY);
   const preset = document.preset_bank.presets[0];
   preset.values['modulation.modulation-enabled'] = 'disabled';
   const hash = await encodeShaderStateHash({document, preset: preset.preset_id,
@@ -761,7 +761,7 @@ test('a disabled modulation link restores a stage that its toggle can enable', a
 test('an oversized document clears the previous shader state hash', async () => {
   const harness = await editorWorkbench({ source: null });
   assert.match(harness.win.location.hash, /^#shader=/);
-  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const document = JSON.parse(CHAIN_STUDY);
   document.preset_bank.presets = Array.from({ length: 140 }, (_, index) => ({
     ...document.preset_bank.presets[0], preset_id: `large-${index}`, description: 'x'.repeat(4000),
   }));
@@ -799,7 +799,7 @@ test('shader edits keep the full state hash current', async () => {
 // The chips carry the inline stage controls, and they render one preset's
 // values.
 test('a deep-linked preset builds the strip from the preset it renders', async () => {
-  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const document = JSON.parse(CHAIN_STUDY);
   document.preset_bank.presets[0].values['sample.pattern-freq'] = 1.5;
   const preset = document.preset_bank.presets[1];
   preset.values['sample.pattern-freq'] = 7.25;
@@ -970,9 +970,9 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   const harness = await editorWorkbench();
   assert.deepEqual(harness.selections, [canonicalEffectId('shader-chain'), canonicalEffectId('shader-chain')]);
   assert.equal(harness.engine.chainCalls.length, 2);
-  assert.equal(harness.engine.chainCalls.at(-1).length, HEX_CHAIN.length);
-  assert.equal(stripChips(harness).length, HEX_CHAIN.length);
-  const digest = compileShaderDocument(KALEIDOSCOPE_HEX_BRIGHT,
+  assert.equal(harness.engine.chainCalls.at(-1).length, STUDY_CHAIN.length);
+  assert.equal(stripChips(harness).length, STUDY_CHAIN.length);
+  const digest = compileShaderDocument(CHAIN_STUDY,
     { catalog: JSON.parse(ENGINE_CATALOG) }).descriptor_digest;
   assert.equal(harness.elements.get('shader-document-digest').dataset.digest, digest,
     'the toolbar carries the whole descriptor digest');
@@ -982,14 +982,14 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   clickPlaneBandEntry(harness, 'warp.wave-shear.v2');
 
   assert.equal(harness.engine.chainCalls.length, 3);
-  assert.equal(harness.engine.chainCalls.at(-1).length, HEX_CHAIN.length + 1);
+  assert.equal(harness.engine.chainCalls.at(-1).length, STUDY_CHAIN.length + 1);
   assert.ok(harness.engine.writes.some(([name]) => name === 'warp.strength'),
     'the re-apply carries the backfilled catalog defaults');
 
   // Save exports the store's edited document, not the load-time compile.
   assert.equal(harness.controller.save(), true);
   const saved = JSON.parse(harness.downloads[0][1]);
-  assert.equal(saved.descriptor.chain.length, HEX_CHAIN.length + 1);
+  assert.equal(saved.descriptor.chain.length, STUDY_CHAIN.length + 1);
   assert.ok(Object.keys(saved.preset_bank.presets[0].values)
     .some((id) => id.startsWith('warp.')));
 });
@@ -1016,7 +1016,7 @@ test('Kaleidoscope Stained Glass loads its effect preset into the interpreter co
 });
 
 test('preset and stage writes preserve the animation state', async () => {
-  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
+  const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
   const presets = harness.elements.get('shader-preset-select');
   presets.value = presets.options.at(-1).value;
   await onChange(presets)();
@@ -1045,7 +1045,7 @@ test('preset and stage writes preserve the animation state', async () => {
 // build and disarms the toggle. A bypass is a program-shape override and a chip
 // control edit of a declared parameter writes a preset value; neither changes the descriptor digest.
 test('the parity toggle disarms on a descriptor edit, not on a bypass', async () => {
-  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
+  const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
   const toggle = harness.elements.get('shader-parity-toggle');
   assert.equal(toggle.disabled, false, 'the loaded digest matches a promoted effect');
   assert.deepEqual(harness.selections, [canonicalEffectId('shader-chain'), canonicalEffectId('shader-chain')],
@@ -1064,7 +1064,7 @@ test('the parity toggle disarms on a descriptor edit, not on a bypass', async ()
 });
 
 test('compiled stage edits reach stages bypassed in the interpreter', async () => {
-  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
+  const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
   stripChips(harness).find((chip) => chip.dataset.label === 'warp2')
     .querySelector('.chain-chip-bypass').dispatch('click');
   harness.elements.get('shader-parity-toggle').dispatch('click');
@@ -1098,7 +1098,7 @@ test('compiled Twist stage edits resolve an arbitrary instance label', async () 
 });
 
 test('an accepted compiled edit clears the previous refusal', async () => {
-  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
+  const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
   harness.elements.get('shader-parity-toggle').dispatch('click');
   const definitions = harness.compiledEngine.getParameterDefinitions();
   const original = [...definitions];
@@ -1116,9 +1116,9 @@ test('an accepted compiled edit clears the previous refusal', async () => {
 });
 
 test('compiled stage rows share one document-definition read and refresh it after a write', async () => {
-  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
+  const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
   const engine = harness.compiledEngine;
-  const {descriptor, preset_bank} = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const {descriptor, preset_bank} = JSON.parse(CHAIN_STUDY);
   const parameterId = 'modulation.pattern-scale';
   const names = engineControlNames(parameterId, descriptor);
   const definitions = engine.getParameterDefinitions();
@@ -1158,14 +1158,14 @@ test('compiled stage rows share one document-definition read and refresh it afte
 });
 
 test('a descriptor edit under the compiled build returns the preview to the interpreter', async () => {
-  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
+  const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
   const status = harness.elements.get('shader-document-status');
   const toggle = harness.elements.get('shader-parity-toggle');
 
   toggle.dispatch('click');
 
-  assert.equal(harness.selections.at(-1), 'KaleidoscopeHexBright');
-  assert.deepEqual(harness.compiledEngine.selected, [JSON.parse(KALEIDOSCOPE_HEX_BRIGHT).preset_bank.presets[0].preset_id]);
+  assert.equal(harness.selections.at(-1), 'ChainStudy');
+  assert.deepEqual(harness.compiledEngine.selected, [JSON.parse(CHAIN_STUDY).preset_bank.presets[0].preset_id]);
   assert.ok(harness.compiledEngine.writes.some(([name]) => name === 'Camera Wander'),
     'the compiled build takes the preset through its own control names');
   assert.match(status.textContent, /compiled build/);
@@ -1175,7 +1175,7 @@ test('a descriptor edit under the compiled build returns the preview to the inte
   assert.equal(harness.selections.at(-1), 'shader-chain');
   assert.equal(toggle.disabled, true);
   assert.equal(toggle.getAttribute('aria-pressed'), 'false');
-  assert.equal(harness.engine.chainCalls.at(-1).length, HEX_CHAIN.length + 1,
+  assert.equal(harness.engine.chainCalls.at(-1).length, STUDY_CHAIN.length + 1,
     'the edited chain is what renders');
   assert.match(status.textContent, /back on the interpreter/);
 });
@@ -1188,7 +1188,7 @@ test('Save writes the canonical v2 serialization', async () => {
   const [filename, source] = harness.downloads.at(-1);
   assert.equal(filename, 'study.shader.json');
   assert.equal(source, exportShaderDocumentJson(compileShaderDocument(
-    KALEIDOSCOPE_HEX_BRIGHT, {catalog: JSON.parse(ENGINE_CATALOG)}).document));
+    CHAIN_STUDY, {catalog: JSON.parse(ENGINE_CATALOG)}).document));
 });
 
 // Save As is a copy, not a rename - the loaded document and the
@@ -1199,19 +1199,19 @@ test('Save As writes a new document id and leaves the loaded one alone', async (
   assert.equal(await harness.controller.saveAs(), true);
   const [copyName, copySource] = harness.downloads.at(-1);
   const copy = JSON.parse(copySource);
-  assert.equal(copy.document_id, 'kaleidoscope-hex-bright-copy1');
-  assert.equal(copyName, 'kaleidoscope-hex-bright-copy1.shader.json');
+  assert.equal(copy.document_id, 'chain-study-copy1');
+  assert.equal(copyName, 'chain-study-copy1.shader.json');
   assert.equal(copySource, exportShaderDocumentJson(copy),
     'a copy is written in the same canonical serialization as Save');
 
   assert.equal(harness.controller.save(), true);
   const [savedName, savedSource] = harness.downloads.at(-1);
   assert.equal(savedName, 'study.shader.json');
-  assert.equal(JSON.parse(savedSource).document_id, 'kaleidoscope-hex-bright');
+  assert.equal(JSON.parse(savedSource).document_id, 'chain-study');
 
   assert.equal(await harness.controller.saveAs(), true);
   assert.equal(JSON.parse(harness.downloads.at(-1)[1]).document_id,
-    'kaleidoscope-hex-bright-copy2', 'each copy takes an id of its own');
+    'chain-study-copy2', 'each copy takes an id of its own');
 });
 
 for (const picker of [false, true]) test(`cancelled Save As preserves the next copy number (picker=${picker})`, async () => {
@@ -1225,7 +1225,7 @@ for (const picker of [false, true]) test(`cancelled Save As preserves the next c
   delete h.win.showSaveFilePicker;
   h.win.prompt = (message, filename) => filename;
   assert.equal(await h.controller.saveAs(), true);
-  assert.equal(JSON.parse(h.downloads.at(-1)[1]).document_id, 'kaleidoscope-hex-bright-copy1');
+  assert.equal(JSON.parse(h.downloads.at(-1)[1]).document_id, 'chain-study-copy1');
 });
 
 test('a Save As copy carries the edits made since the load', async () => {
@@ -1234,7 +1234,7 @@ test('a Save As copy carries the edits made since the load', async () => {
 
   assert.equal(await harness.controller.saveAs(), true);
   const copy = JSON.parse(harness.downloads.at(-1)[1]);
-  assert.equal(copy.descriptor.chain.length, HEX_CHAIN.length + 1);
+  assert.equal(copy.descriptor.chain.length, STUDY_CHAIN.length + 1);
   assert.deepEqual(
     validateShaderDocument(copy, { catalog: JSON.parse(ENGINE_CATALOG) }), []);
 });
@@ -1259,7 +1259,7 @@ test('Save and Save As omit bypassed stages and keep them in the editor', async 
 });
 
 test('Save omits a modulation stage only when every preset disables it', async () => {
-  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const document = JSON.parse(CHAIN_STUDY);
   const [first, second] = document.preset_bank.presets;
   first.values['modulation.modulation-enabled'] = 'disabled';
   const source = exportShaderDocumentJson(document);
@@ -1283,13 +1283,13 @@ for (const [entered, filename] of [
   test(`Save As downloads the filename entered as ${JSON.stringify(entered)}`, async () => {
     const harness = await editorWorkbench();
     harness.win.prompt = (message, suggestedName) => {
-      assert.equal(suggestedName, 'kaleidoscope-hex-bright-copy1.shader.json');
+      assert.equal(suggestedName, 'chain-study-copy1.shader.json');
       return entered;
     };
     assert.equal(await harness.controller.saveAs(), true);
     assert.equal(harness.downloads.at(-1)[0], filename);
     assert.equal(JSON.parse(harness.downloads.at(-1)[1]).document_id,
-      'kaleidoscope-hex-bright-copy1');
+      'chain-study-copy1');
   });
 }
 
@@ -1321,20 +1321,20 @@ test('Save As opens the file picker immediately and writes to its chosen file', 
     });
   };
   const pending = harness.controller.saveAs();
-  assert.equal(options.suggestedName, 'kaleidoscope-hex-bright-copy1.shader.json');
+  assert.equal(options.suggestedName, 'chain-study-copy1.shader.json');
   assert.deepEqual(options.types[0].accept, { 'application/json': ['.json'] });
   assert.equal(await pending, true);
   assert.deepEqual(harness.downloads, []);
   assert.equal(closed, true);
   assert.equal(writes.length, 1);
   assert.equal(writes[0], exportShaderDocumentJson(JSON.parse(writes[0])));
-  assert.equal(JSON.parse(writes[0]).document_id, 'kaleidoscope-hex-bright-copy1');
+  assert.equal(JSON.parse(writes[0]).document_id, 'chain-study-copy1');
   assert.equal(harness.elements.get('shader-document-status').textContent,
     'Saved My shader.json.');
   assert.equal(harness.controller.save(), true);
   assert.equal(harness.downloads.at(-1)[0], 'study.shader.json');
   assert.equal(JSON.parse(harness.downloads.at(-1)[1]).document_id,
-    'kaleidoscope-hex-bright');
+    'chain-study');
 });
 
 test('cancelling the Save As picker leaves the document unsaved without an error', async () => {
@@ -1428,7 +1428,7 @@ test('a bypass reshapes the engine program and skips the bypassed parameters', a
     .querySelector('.chain-chip-bypass').dispatch('click');
 
   const shape = harness.engine.chainCalls.at(-1);
-  assert.equal(shape.length, HEX_CHAIN.length - 1);
+  assert.equal(shape.length, STUDY_CHAIN.length - 1);
   assert.ok(!shape.some((entry) => entry.instance === 'lens'));
   assert.ok(harness.engine.writes.length > writesBefore,
     'the re-apply rewrote the surviving instances');
@@ -1797,7 +1797,7 @@ test('catalog skew refuses initialization before any chain is applied', async ()
 });
 
 test('source and file switches preserve edits when discard is refused', async () => {
-  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
+  const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
   let confirmations = 0;
   harness.win.confirm = () => { confirmations += 1; return false; };
   stageEditor(harness, 'sample')('sample.pattern-freq', 3.5);
@@ -1823,19 +1823,19 @@ test('source and file switches preserve edits when discard is refused', async ()
 });
 
 test('refused replacement restores the previous compiled preset after switching effects', async () => {
-  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
+  const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
   harness.elements.get('shader-parity-toggle').dispatch('click');
   harness.compiledEngine.selected.length = 0;
   assert.equal(await harness.controller.loadSource(
-    JSON.parse(KALEIDOSCOPE_HEX_BRIGHT), 'refused.shader.json', null,
-    { preset: JSON.parse(KALEIDOSCOPE_HEX_BRIGHT).preset_bank.presets[0].preset_id, bypassed: ['missing-stage'], paused: false }), false);
-  assert.equal(harness.selections.at(-1), 'KaleidoscopeHexBright');
-  assert.deepEqual(harness.compiledEngine.selected, [JSON.parse(KALEIDOSCOPE_HEX_BRIGHT).preset_bank.presets[0].preset_id]);
+    JSON.parse(CHAIN_STUDY), 'refused.shader.json', null,
+    { preset: JSON.parse(CHAIN_STUDY).preset_bank.presets[0].preset_id, bypassed: ['missing-stage'], paused: false }), false);
+  assert.equal(harness.selections.at(-1), 'ChainStudy');
+  assert.deepEqual(harness.compiledEngine.selected, [JSON.parse(CHAIN_STUDY).preset_bank.presets[0].preset_id]);
   assert.match(harness.elements.get('shader-document-status').textContent, /missing-stage/);
 });
 
 test('a refused interpreter re-apply keeps the error after parity drops', async () => {
-  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
+  const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
   harness.elements.get('shader-parity-toggle').dispatch('click');
   harness.engine.bindings.setShaderChain = () => ({ code: 'ARENA_OVERFLOW', entryIndex: -1 });
   stageEditor(harness, 'sample')('sample.edge-width', 0.25);
@@ -1845,7 +1845,7 @@ test('a refused interpreter re-apply keeps the error after parity drops', async 
 });
 
 test('a compiled slider declaration keeps its control through release and explains the parity drop', async () => {
-  const harness = await editorWorkbench({patternCatalog: HEX_PATTERN_CATALOG});
+  const harness = await editorWorkbench({patternCatalog: STUDY_PATTERN_CATALOG});
   const mount = harness.elements.get('chain-strip');
   const sliderFor = () => mount.querySelectorAll('.chain-param')
     .find((row) => row.dataset.parameter === 'sample.edge-width').querySelector('.chain-param-control');
@@ -1869,7 +1869,7 @@ test('a compiled slider declaration keeps its control through release and explai
 
 for (const compiled of [false, true]) {
   test(`an omitted parameter edit declares it and updates parity from ${compiled ? 'compiled' : 'interpreter'} preview`, async () => {
-    const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
+    const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
     const toggle = harness.elements.get('shader-parity-toggle');
     const original = savedValues(harness);
     const before = JSON.parse(harness.downloads.at(-1)[1]);
@@ -1893,12 +1893,12 @@ for (const compiled of [false, true]) {
 }
 
 test('restored edits require discard confirmation and save to the catalog filename', async () => {
-  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const document = JSON.parse(CHAIN_STUDY);
   document.preset_bank.presets[0].values['sample.pattern-freq'] = 7.25;
   const hash = await encodeShaderStateHash({
     document, preset: document.preset_bank.presets[0].preset_id, bypassed: [], paused: false,
   });
-  const harness = await editorWorkbench({ source: null, hash, patternCatalog: HEX_PATTERN_CATALOG });
+  const harness = await editorWorkbench({ source: null, hash, patternCatalog: STUDY_PATTERN_CATALOG });
   let confirmations = 0;
   harness.win.confirm = () => { confirmations += 1; return false; };
   const source = harness.elements.get('shader-document-select');
@@ -1908,14 +1908,14 @@ test('restored edits require discard confirmation and save to the catalog filena
   assert.equal(confirmations, 1);
   assert.equal(source.value, before);
   harness.controller.save();
-  assert.equal(harness.downloads.at(-1)[0], 'kaleidoscope_hex_bright.shader.json');
+  assert.equal(harness.downloads.at(-1)[0], 'chain_study.shader.json');
 });
 
 test('imported documents have a named source and can switch directly to scratch', async () => {
   const harness = await editorWorkbench({ source: null });
   const input = harness.elements.get('shader-document-file');
-  input.files = [{ name: 'study.shader.json', size: KALEIDOSCOPE_HEX_BRIGHT.length,
-    text: async () => KALEIDOSCOPE_HEX_BRIGHT }];
+  input.files = [{ name: 'study.shader.json', size: CHAIN_STUDY.length,
+    text: async () => CHAIN_STUDY }];
   await onChange(input)();
   const source = harness.elements.get('shader-document-select');
   assert.equal(source.selectedOptions[0].textContent, 'Imported: study.shader.json');
@@ -1929,7 +1929,7 @@ test('imported documents have a named source and can switch directly to scratch'
 });
 
 test('noncatalog shader links have their own source option', async () => {
-  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const document = JSON.parse(CHAIN_STUDY);
   const hash = await encodeShaderStateHash({ document,
     preset: document.preset_bank.presets[0].preset_id, bypassed: [], paused: false });
   const harness = await editorWorkbench({ source: null, hash });
@@ -2100,12 +2100,12 @@ test('abandoning a refused link reports its release once', async () => {
   assert.equal(harness.controller.preservesOriginalLink(), true);
   assert.equal(releases, 0);
   const picker = harness.elements.get('shader-document-file');
-  picker.files = [{ name: 'study.shader.json', size: KALEIDOSCOPE_HEX_BRIGHT.length,
-    text: async () => KALEIDOSCOPE_HEX_BRIGHT }];
+  picker.files = [{ name: 'study.shader.json', size: CHAIN_STUDY.length,
+    text: async () => CHAIN_STUDY }];
   await onChange(picker)();
   assert.equal(harness.controller.preservesOriginalLink(), false);
   assert.equal(releases, 1);
-  assert.equal(await harness.controller.loadSource(KALEIDOSCOPE_HEX_BRIGHT), true);
+  assert.equal(await harness.controller.loadSource(CHAIN_STUDY), true);
   assert.equal(releases, 1);
 });
 
@@ -2261,7 +2261,7 @@ for (const failure of ['editor', 'runtime']) {
     const previous = savedValues(harness);
     const strip = harness.elements.get('chain-strip').children[0];
     const snapshot = callWorkbenchBinding(harness.engine, 'getSnapshot', []);
-    const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+    const document = JSON.parse(CHAIN_STUDY);
     let session;
     if (failure === 'editor') refuseEditor = true;
     else {
@@ -2291,12 +2291,12 @@ for (const operator of ['sphere.lens.mobius.v2', 'sphere.displace.symmetric.v1',
   test(`opening retired operator ${operator} preserves the current document`, async () => {
     const harness = await editorWorkbench();
     const before = callWorkbenchBinding(harness.engine, 'getSnapshot', [], null);
-    const retired = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+    const retired = JSON.parse(CHAIN_STUDY);
     retired.descriptor.chain[0].operator = operator;
     assert.equal(await harness.controller.loadSource(retired), false);
     assert.equal(harness.elements.get('shader-document-status').dataset.status, 'error');
     assert.deepEqual(callWorkbenchBinding(harness.engine, 'getSnapshot', [], null), before);
-    assert.equal(await harness.controller.loadSource(KALEIDOSCOPE_HEX_BRIGHT), true);
+    assert.equal(await harness.controller.loadSource(CHAIN_STUDY), true);
   });
 }
 

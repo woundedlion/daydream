@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { scratchChainDocument } from '../../src/workbench/shader/chain_document_store.js';
+import { chainStudyDocument, withPreset } from './chain_study.js';
 
 import {applyFixedShaderDocument, createShaderDocumentController} from '../../src/workbench/shader/shader_documents.js';
 import {FakeChainEngine, ParamSetResult, ChainSnapshotRestoreResult} from './fake_engine.js';
@@ -283,9 +284,6 @@ async function chooseCatalogSource({ elements, controller }) {
 
 // ── The pipeline strip over the real store, compiler and engine catalog ────
 
-const CANONICAL_KALEIDOSCOPE_HEX_BRIGHT = readFileSync(
-  new URL('../../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8');
-
 function withoutEmbeddedModulation(source) {
   const document = JSON.parse(source);
   for (const parameter of document.descriptor.parameters) {
@@ -300,7 +298,10 @@ function withoutEmbeddedModulation(source) {
   return exportShaderDocumentJson(document);
 }
 
-const KALEIDOSCOPE_HEX_BRIGHT = withoutEmbeddedModulation(CANONICAL_KALEIDOSCOPE_HEX_BRIGHT);
+// The test-owned document the editor workbench opens: two presets that differ
+// in one sample value.
+const CHAIN_STUDY = exportShaderDocumentJson(withPreset(
+  chainStudyDocument(JSON.parse(ENGINE_CATALOG)), 'study-alt', { 'sample.pattern-freq': 2 }));
 
 const KALEIDOSCOPE_STAINED_GLASS = readFileSync(
   new URL('../../generated/shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8');
@@ -310,9 +311,9 @@ const EMPTY_PATTERN_CATALOG = JSON.stringify({
   source_documents: {}, product_group: { children: [] },
 });
 
-// kaleidoscope_hex_bright as a shipped pattern: loading it digests onto a promoted effect, so
+// The study as a shipped pattern: loading it digests onto a promoted effect, so
 // the toolbar's parity toggle arms.
-const HEX_PATTERN_CATALOG = singlePatternCatalog('KaleidoscopeHexBright', 'kaleidoscope_hex_bright.shader.json', 'Kaleidoscope Hex Bright');
+const STUDY_PATTERN_CATALOG = singlePatternCatalog('ChainStudy', 'chain_study.shader.json', 'Chain Study');
 
 /**
  * The promoted build's engine surface: its own reference presets and the
@@ -320,7 +321,7 @@ const HEX_PATTERN_CATALOG = singlePatternCatalog('KaleidoscopeHexBright', 'kalei
  * double does not model the compiled engine's control set.
  * @returns {Object} The engine.
  */
-function compiledBuildEngine(source = KALEIDOSCOPE_HEX_BRIGHT) {
+function compiledBuildEngine(source = CHAIN_STUDY) {
   const document = JSON.parse(source);
   const fixed = (parameter) => {
     const binding = fixedDerivedBinding(document.descriptor, parameter.id,
@@ -350,7 +351,7 @@ function compiledBuildEngine(source = KALEIDOSCOPE_HEX_BRIGHT) {
 
 /**
  * The document controller over the real compiler, the real chain store, and a
- * FakeChainEngine, with the workbench mounts present and kaleidoscope_hex_bright loaded over
+ * FakeChainEngine, with the workbench mounts present and the chain study loaded over
  * the scratch document the page opens on.
  * @param {{source?: string|null, patternCatalog?: string, hash?: string, search?: string, initialEffect?: string|null,
  *   paused?: boolean, pausedFromEngine?: boolean, selectEffect?: () => boolean,
@@ -362,7 +363,7 @@ function compiledBuildEngine(source = KALEIDOSCOPE_HEX_BRIGHT) {
  * @returns {Promise<Object>} The controller and everything it wrote to.
  */
 async function editorWorkbench({
-  source = KALEIDOSCOPE_HEX_BRIGHT, sourceFiles = {}, patternCatalog = EMPTY_PATTERN_CATALOG, hash = '', search = '?effect=ShaderChain', initialEffect = null, paused = false,
+  source = CHAIN_STUDY, sourceFiles = {}, patternCatalog = EMPTY_PATTERN_CATALOG, hash = '', search = '?effect=ShaderChain', initialEffect = null, paused = false,
   engineCatalog = ENGINE_CATALOG,
   selectEffect = () => true,
   onOriginalLinkReleased = () => {},
@@ -375,7 +376,7 @@ async function editorWorkbench({
   const module = engineCatalog === ENGINE_CATALOG ? MODULE
     : {...MODULE, ShaderChainBindings: {getShaderChainCatalog: () => engineCatalog}};
   prepare(engine);
-  const compiledEngine = compiledBuildEngine(source ?? KALEIDOSCOPE_HEX_BRIGHT);
+  const compiledEngine = compiledBuildEngine(source ?? CHAIN_STUDY);
   let animationsPaused = paused;
   // writeDeepLink builds its link state synchronously, reading the pause seam
   // once, so the count tells a write a timer started from one still pending.
@@ -445,7 +446,7 @@ async function editorWorkbench({
     },
     setParamFilter: (filter) => filters.push(filter),
     fetchText: patternFetch(
-      { 'kaleidoscope_hex_bright.shader.json': KALEIDOSCOPE_HEX_BRIGHT,
+      { 'chain_study.shader.json': CHAIN_STUDY,
         ...sourceFiles }, patternCatalog, engineCatalog),
     importCompiler,
     download: (filename, source) => downloads.push([filename, source]),
@@ -555,8 +556,8 @@ export {
   plainName, MODULE, BAKED, fixedDocument, fixedEngine, PATTERNS, promotedDocument, PROMOTED,
   affinePeriodDocument, PATTERN_CATALOG, shaderDocument, workbenchEngine, workbenchMounts,
   patternFetch, workbench, onChange, SCRATCH_WRITES, chooseCatalogSource,
-  CANONICAL_KALEIDOSCOPE_HEX_BRIGHT, withoutEmbeddedModulation, KALEIDOSCOPE_HEX_BRIGHT,
-  KALEIDOSCOPE_STAINED_GLASS, EMPTY_PATTERN_CATALOG, HEX_PATTERN_CATALOG, compiledBuildEngine,
+  withoutEmbeddedModulation, CHAIN_STUDY,
+  KALEIDOSCOPE_STAINED_GLASS, EMPTY_PATTERN_CATALOG, STUDY_PATTERN_CATALOG, compiledBuildEngine,
   editorWorkbench, clickPlaneBandEntry, stripChips, displayedParameter, sampleFrequencySlider,
   expectStageAbsent, stageEditor, savedValues, affineLatticeStudy, applyFixed,
 };

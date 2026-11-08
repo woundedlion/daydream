@@ -1,7 +1,8 @@
-// Check chain-strip gestures against the real document store and
-// kaleidoscope_hex_bright fixture compiled with the pinned engine catalog.
+// Check chain-strip gestures against the real document store and a test-owned
+// study document compiled with the pinned engine catalog.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { createChainDocumentStore, scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
 import { createChainStrip } from '../src/workbench/shader/chain_strip.js';
@@ -14,8 +15,20 @@ import {
   CATALOG, BASE, runFrame, makeStrip, chips, chipByLabel, bandFor, paletteOf, paletteEntries,
   lastAnnounced, labels, paramsOf, rowsOf, rowFor, controlIn, declarationsFor,
 } from './helpers/chain_strip_harness.js';
+import { STUDY_CHAIN, withPreset } from './helpers/chain_study.js';
+import { compileShaderDocument } from '../generated/shader/shader_workbench.mjs';
 
-const PROJECT = 2;
+const PROJECT = STUDY_CHAIN.findIndex((entry) => entry.label === 'project');
+
+test('the strip opens a shipped pattern with one chip per stage', async () => {
+  const shipped = compileShaderDocument(readFileSync(
+    new URL('../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
+  { catalog: CATALOG });
+  assert.equal(shipped.status, 'VALID');
+  const h = await makeStrip({ source: structuredClone(shipped.document) });
+  assert.deepEqual(chips(h).map((chip) => chip.dataset.label),
+    shipped.document.descriptor.chain.map((entry) => entry.label));
+});
 
 test('a budget-exhausted chain offers no band insertion buttons', async () => {
   const catalog = structuredClone(CATALOG);
@@ -184,7 +197,10 @@ test('a spherical source selector can restore a planar route and undo it', async
 });
 
 test('each card exposes a named reset control without expanding or selecting it', async () => {
-  const h = await makeStrip();
+  const source = structuredClone(BASE.document);
+  const wander = source.descriptor.parameters.find((parameter) => parameter.id === 'camera.wander');
+  source.preset_bank.presets[0].values['camera.wander'] = wander.domain.maximum;
+  const h = await makeStrip({ source });
   for (const chip of chips(h)) {
     const reset = chip.querySelector('.chain-chip-reset');
     assert.ok(reset);
@@ -564,10 +580,12 @@ test('palette dismissal tolerates focusout during DOM removal', async () => {
 // Picking the operator a socket already carries is a no-op, not a re-seat: the
 // instance keeps its label, and with it every tuned value.
 test('selecting the operator the socket carries keeps the instance', async () => {
-  const h = await makeStrip();
+  const source = structuredClone(BASE.document);
+  const fade = source.descriptor.parameters.find((parameter) => parameter.id === 'project.singularity-fade');
+  source.preset_bank.presets[0].values['project.singularity-fade'] = fade.domain.maximum;
+  assert.notEqual(fade.domain.maximum, fade.default);
+  const h = await makeStrip({ source });
   const before = h.store.document();
-  assert.equal(before.preset_bank.presets[0].values['project.singularity-fade'] !== 1, true,
-    'the fixture tunes the socket away from the catalog default');
 
   let select = chipByLabel(h, 'project').querySelector('.chain-chip-replace');
   select.value = 'project.stereographic.v2';
@@ -1148,7 +1166,8 @@ test('parameter rows follow declared order and numeric domains', async () => {
     'authored declarations followed by undeclared catalog controls');
   assert.deepEqual(rowsOf(h, 'sample')
     .map((row) => row.querySelector('.chain-param-name').textContent),
-  ['Angle Speed', 'Coverage Mode', 'Drift', 'Pattern Freq', 'Speed', 'Weight Mode', 'Edge Width'],
+  rowsOf(h, 'sample').map((row) => row.dataset.parameter.slice('sample.'.length).split('-')
+    .map((word) => word[0].toUpperCase() + word.slice(1)).join(' ')),
   'a control is labeled by its field segment alone: the chip names the instance');
 
   // The document's declared domain and the active preset's value, not the
@@ -1564,21 +1583,23 @@ test('a refused rename reports and restores the field', async () => {
 });
 
 test('an enum renders its declared values and edits by option id', async () => {
-  const h = await makeStrip();
+  const source = structuredClone(BASE.document);
+  const options = source.descriptor.parameters
+    .find((parameter) => parameter.id === 'lens.symmetry').domain.values;
+  const [authored, chosen] = options.slice(-2);
+  source.preset_bank.presets[0].values['lens.symmetry'] = authored;
+  const h = await makeStrip({ source });
   chipByLabel(h, 'lens').dispatch('click');
   const select = controlIn(rowFor(h, 'lens', 'lens.symmetry'));
-  const declared = declarationsFor(h, 'lens')
-    .find((parameter) => parameter.id === 'lens.symmetry');
 
   assert.equal(select.tagName, 'SELECT');
-  assert.deepEqual(select.options.map((option) => option.value),
-    declared.domain.values);
-  assert.equal(select.value, 'hexagonal-prism', 'the preset’s value is selected');
+  assert.deepEqual(select.options.map((option) => option.value), options);
+  assert.equal(select.value, authored, 'the preset’s value is selected');
 
-  select.value = 'octahedral';
+  select.value = chosen;
   select.dispatch('change');
 
-  assert.deepEqual(h.edits, [['lens.symmetry', 'octahedral']],
+  assert.deepEqual(h.edits, [['lens.symmetry', chosen]],
     'the document stores the option id, never an index');
 });
 
@@ -1644,7 +1665,10 @@ test('topology-gated controls hide and retain their values when revealed', async
 });
 
 test('the inline controls read the named preset', async () => {
-  const h = await makeStrip({ presetId: 'hex-twin-wave-alt' });
+  const source = withPreset(structuredClone(BASE.document), 'alt',
+    { 'colorize.mapping-frequency': 2 });
+  assert.notEqual(source.preset_bank.presets[0].values['colorize.mapping-frequency'], 2);
+  const h = await makeStrip({ source, presetId: 'alt' });
   chipByLabel(h, 'colorize').dispatch('click');
 
   assert.equal(Number(rowFor(h, 'colorize', 'colorize.mapping-frequency').querySelector('.chain-param-value')
@@ -1899,7 +1923,7 @@ test('syncHistory repaints Undo and Redo without rebuilding the strip', async ()
   const chip = chipByLabel(h, 'camera');
   assert.equal(h.container.querySelector('.chain-undo').disabled, true);
 
-  h.store.setPresetValue('hex-twin-wave', 'camera.wander', 0.5);
+  h.store.setPresetValue(BASE.document.preset_bank.presets[0].preset_id, 'camera.wander', 0.5);
   h.strip.syncHistory();
 
   assert.equal(h.container.querySelector('.chain-undo').disabled, false);
@@ -1910,7 +1934,7 @@ test('history buttons retain focus while enabled and fall back to a chip at exha
   const h = await makeStrip();
   chipByLabel(h, 'camera').dispatch('click');
   for (const value of [0.2, 0.3]) {
-    h.store.setPresetValue('hex-twin-wave', 'camera.wander', value);
+    h.store.setPresetValue(BASE.document.preset_bank.presets[0].preset_id, 'camera.wander', value);
     h.store.endValueRun();
   }
   h.strip.syncHistory();

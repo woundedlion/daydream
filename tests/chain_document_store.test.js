@@ -1,5 +1,5 @@
 // Check transactional chain edits, reconciliation, undo and session bypass
-// against a multi-preset pattern fixture and the pinned engine catalog.
+// against a two-preset study document and the pinned engine catalog.
 import {modulationRecipe} from './helpers/fake_engine.js';
 import { test } from 'node:test';
 import * as compiler from '../generated/shader/shader_workbench.mjs';
@@ -14,23 +14,24 @@ import {
   scratchChainDocument,
 } from '../src/workbench/shader/chain_document_store.js';
 import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../src/workbench/shader/shader_deeplink.js';
+import {
+  STUDY_CHAIN, chainStudyDocument, withPreset, withoutDeclaration,
+} from './helpers/chain_study.js';
 
 const CATALOG = JSON.parse(readFileSync(
   new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
-const BASE = compiler.compileShaderDocument(readFileSync(
-  new URL('../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
-{ catalog: CATALOG });
+const BASE = compiler.compileShaderDocument(withPreset(chainStudyDocument(CATALOG), 'study-alt'),
+  { catalog: CATALOG });
 assert.equal(BASE.status, 'VALID');
+const [FIRST, SECOND] = BASE.document.preset_bank.presets.map((preset) => preset.preset_id);
 const STAINED_GLASS = compiler.compileShaderDocument(readFileSync(
   new URL('../generated/shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8'),
 { catalog: CATALOG });
 assert.equal(STAINED_GLASS.status, 'VALID');
 
-// kaleidoscope_hex_bright chain order: camera, lens, project, warp2, sample,
-// colorize, modulation.
-const PROJECT = 2;
-const WARP = 3;
-const SAMPLE = 4;
+const PROJECT = STUDY_CHAIN.findIndex((entry) => entry.label === 'project');
+const WARP = STUDY_CHAIN.findIndex((entry) => entry.label === 'warp2');
+const SAMPLE = STUDY_CHAIN.findIndex((entry) => entry.label === 'sample');
 
 /**
  * A store over a fresh copy of the fixture document.
@@ -105,6 +106,13 @@ const presetsDifferBy = (document, values) => {
 
 const labels = (store) => store.chain().map((entry) => entry.label);
 
+/** @param {string} operatorId @returns {Array<{id: string, default: *}>} The operator's catalog fields. */
+const catalogFields = (operatorId) => CATALOG.operators.find((operator) => operator.id === operatorId).params;
+
+/** @param {string} operatorId @param {string} field @returns {*} The field's catalog default. */
+const catalogDefault = (operatorId, field) =>
+  catalogFields(operatorId).find((param) => param.id === field).default;
+
 test('preset views reuse the current values until a committed edit replaces them', async () => {
   const store = await makeStore();
   const [{preset_id: id}, {preset_id: other, values: otherValues}] = store.document().preset_bank.presets;
@@ -138,8 +146,8 @@ test('insertion backfills presets, fields and staggered groups atomically', asyn
   assert.deepEqual(labels(store),
     ['camera', 'lens', 'project', 'warp', 'warp2', 'sample', 'colorize', 'modulation']);
   const document = store.document();
-  const ids = ['speed', 'strength', 'frequency', 'field-angle', 'edge-width', 'envelope']
-    .map((field) => `warp.${field}`);
+  const fields = catalogFields('warp.wave-shear.v2');
+  const ids = fields.map((field) => `warp.${field.id}`);
   const declared = new Set(document.descriptor.parameters.map((parameter) => parameter.id));
   for (const id of ids) assert.ok(declared.has(id), `${id} is declared`);
   for (const id of ids)
@@ -147,10 +155,7 @@ test('insertion backfills presets, fields and staggered groups atomically', asyn
   const staggered = document.descriptor.path_policies.find((policy) => policy.id === 'staggered');
   for (const id of ids) assert.ok(staggered.groups.includes(id), `${id} scheduled`);
   for (const preset of document.preset_bank.presets) {
-    assert.equal(preset.values['warp.speed'], 0);
-    assert.equal(preset.values['warp.frequency'], 1);
-    assert.equal(preset.values['warp.edge-width'], 0.1);
-    assert.equal(preset.values['warp.envelope'], 'flat');
+    for (const field of fields) assert.equal(preset.values[`warp.${field.id}`], field.default);
   }
   const frequency = document.descriptor.parameters.find(
     (parameter) => parameter.id === 'warp.frequency');
@@ -163,12 +168,12 @@ test('insertion backfills presets, fields and staggered groups atomically', asyn
 });
 
 test('a second instance of a declared operator carries the whole catalog schema', async () => {
-  const store = await makeStore({ mutate: addStaggered });
+  const store = await makeStore({ mutate: (document) => {
+    withoutDeclaration(document, 'camera.spin-speed');
+    addStaggered(document);
+  } });
   const camera = store.document().descriptor.parameters.find(
     (parameter) => parameter.id === 'camera.wander');
-  assert.equal(store.document().descriptor.parameters.some(
-    (parameter) => parameter.id === 'camera.spin-speed'), false,
-  'the fixture declares a strict subset of the rotate schema');
 
   assert.deepEqual(store.replaceSpan(0, 0, [{ label: 'orbit', operator: 'sphere.rotate.v2' }]),
     { ok: true });
@@ -177,7 +182,7 @@ test('a second instance of a declared operator carries the whole catalog schema'
   const declared = document.descriptor.parameters.filter(
     (parameter) => parameter.id.startsWith('orbit.'));
   assert.deepEqual(declared.map((parameter) => parameter.id),
-    ['orbit.wander', 'orbit.spin-speed']);
+    catalogFields('sphere.rotate.v2').map((field) => `orbit.${field.id}`));
   for (const parameter of declared) {
     assert.ok(document.descriptor.serialization.fields.includes(parameter.id));
     for (const preset of document.preset_bank.presets)
@@ -187,7 +192,8 @@ test('a second instance of a declared operator carries the whole catalog schema'
     (policy) => policy.id === 'staggered');
   assert.ok(staggered.groups.includes('orbit.spin-speed'));
   assert.equal(declared[0].default, camera.default, 'a declared field keeps its value');
-  assert.equal(declared[1].default, 0, 'the widened field takes the catalog default');
+  assert.equal(declared[1].default, catalogDefault('sphere.rotate.v2', 'spin-speed'),
+    'the widened field takes the catalog default');
   assertGreen(store);
 });
 
@@ -391,8 +397,9 @@ test('a crossing cannot be removed, only replaced', async () => {
     ['camera', 'lens', 'project', 'sample', 'colorize', 'modulation']);
   const document = store.document();
   for (const preset of document.preset_bank.presets) {
-    assert.equal(preset.values['sample.complexity'], 0);
-    assert.equal(preset.values['project.singularity-fade'], 1);
+    assert.equal(preset.values['sample.complexity'], catalogDefault('sample.grid.v4', 'complexity'));
+    assert.equal(preset.values['project.singularity-fade'],
+      catalogDefault('project.equirectangular.v2', 'singularity-fade'));
     assert.equal('warp2.rotation' in preset.values, false);
   }
   assertGreen(store);
@@ -451,17 +458,17 @@ test('removing and reinserting one operator preserves its descriptor digest', as
 });
 
 test('reusing a label under a new operator re-seeds it from catalog defaults', async () => {
-  const store = await makeStore();
-  const before = store.document();
-  assert.notEqual(before.preset_bank.presets[0].values['sample.pattern-freq'], 1);
-  assert.equal('sample.edge-width' in before.preset_bank.presets[0].values, false);
+  const store = await makeStore({ mutate: (document) => {
+    withoutDeclaration(document, 'sample.edge-width');
+    for (const preset of document.preset_bank.presets) preset.values['sample.pattern-freq'] = 7;
+  } });
   const result = store.replaceSpan(SAMPLE, 1, [{ label: 'sample', operator: 'sample.grid.v4' }]);
   assert.equal(result.ok, true);
   const document = store.document();
+  assert.notEqual(catalogDefault('sample.grid.v4', 'pattern-freq'), 7);
   for (const preset of document.preset_bank.presets) {
-    assert.equal(preset.values['sample.pattern-freq'], 1);
-    assert.equal(preset.values['sample.edge-width'], 0.1);
-    assert.equal(preset.values['sample.complexity'], 0);
+    for (const field of catalogFields('sample.grid.v4'))
+      assert.equal(preset.values[`sample.${field.id}`], field.default);
   }
   assertGreen(store);
 });
@@ -551,10 +558,10 @@ test('modulation uses its enabled parameter and refuses session bypass', async (
   assert.equal(store.setBypassed('modulation', true).diagnostics[0].code, 'BYPASS_MODULATION');
   assert.deepEqual(store.bypassedLabels(), []);
   assert.ok(store.programShape().some((entry) => entry.instance === 'modulation'));
-  assert.equal(store.setPresetValue('hex-twin-wave', 'modulation.modulation-enabled', 'disabled').ok, true);
-  assert.equal(presetValue(store, 'hex-twin-wave', 'modulation.modulation-enabled'), 'disabled');
-  assert.equal(store.setPresetValue('hex-twin-wave', 'modulation.modulation-enabled', 'enabled').ok, true);
-  assert.equal(presetValue(store, 'hex-twin-wave', 'modulation.modulation-enabled'), 'enabled');
+  assert.equal(store.setPresetValue(FIRST, 'modulation.modulation-enabled', 'disabled').ok, true);
+  assert.equal(presetValue(store, FIRST, 'modulation.modulation-enabled'), 'disabled');
+  assert.equal(store.setPresetValue(FIRST, 'modulation.modulation-enabled', 'enabled').ok, true);
+  assert.equal(presetValue(store, FIRST, 'modulation.modulation-enabled'), 'enabled');
 });
 
 test('bypass is pruned by removal and not restored by undo', async () => {
@@ -583,14 +590,14 @@ const presetValue = (store, presetId, parameterId) => store.document()
 
 test('a preset value write lands in the document and is validated', async () => {
   const store = await makeStore();
-  const untouched = presetValue(store, 'hex-twin-wave-alt', 'sample.pattern-freq');
-  assert.equal(store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 7).ok, true);
-  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 7);
-  assert.equal(presetValue(store, 'hex-twin-wave-alt', 'sample.pattern-freq'), untouched,
+  const untouched = presetValue(store, SECOND, 'sample.pattern-freq');
+  assert.equal(store.setPresetValue(FIRST, 'sample.pattern-freq', 7).ok, true);
+  assert.equal(presetValue(store, FIRST, 'sample.pattern-freq'), 7);
+  assert.equal(presetValue(store, SECOND, 'sample.pattern-freq'), untouched,
     'the write names one preset, never the bank');
-  assert.equal(store.setPresetValue('hex-twin-wave', 'colorize.palette-mapping', 'bell').ok,
+  assert.equal(store.setPresetValue(FIRST, 'colorize.palette-mapping', 'bell').ok,
     true);
-  assert.equal(presetValue(store, 'hex-twin-wave', 'colorize.palette-mapping'), 'bell');
+  assert.equal(presetValue(store, FIRST, 'colorize.palette-mapping'), 'bell');
   assertGreen(store);
 });
 
@@ -598,14 +605,14 @@ test('a write outside the parameter domain leaves the store untouched', async ()
   const store = await makeStore();
   const before = store.document();
 
-  const wide = store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 500);
+  const wide = store.setPresetValue(FIRST, 'sample.pattern-freq', 500);
   assert.equal(wide.ok, false);
   assert.equal(wide.diagnostics[0].code, 'VALUE_OUT_OF_RANGE');
-  const option = store.setPresetValue('hex-twin-wave', 'colorize.palette-mapping', 'plaid');
+  const option = store.setPresetValue(FIRST, 'colorize.palette-mapping', 'plaid');
   assert.equal(option.diagnostics[0].code, 'INVALID_ENUM_VALUE');
   assert.equal(store.setPresetValue('dawn', 'sample.pattern-freq', 2).diagnostics[0].code,
     'UNKNOWN_PRESET');
-  assert.equal(store.setPresetValue('hex-twin-wave', 'sample.nope', 2).diagnostics[0].code,
+  assert.equal(store.setPresetValue(FIRST, 'sample.nope', 2).diagnostics[0].code,
     'UNKNOWN_PARAMETER');
   assert.deepEqual(store.document(), before);
   assert.equal(store.canUndo(), false);
@@ -615,32 +622,32 @@ test('a write outside the parameter domain leaves the store untouched', async ()
 // restores the value the control held before the drag started.
 test('consecutive writes to one control coalesce into one undo step', async () => {
   const store = await makeStore();
-  const opening = presetValue(store, 'hex-twin-wave', 'sample.pattern-freq');
+  const opening = presetValue(store, FIRST, 'sample.pattern-freq');
   for (const value of [2, 3, 4, 5]) {
-    assert.equal(store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', value).ok, true);
+    assert.equal(store.setPresetValue(FIRST, 'sample.pattern-freq', value).ok, true);
   }
-  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 5);
+  assert.equal(presetValue(store, FIRST, 'sample.pattern-freq'), 5);
 
   assert.equal(store.undo(), true);
-  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), opening);
+  assert.equal(presetValue(store, FIRST, 'sample.pattern-freq'), opening);
   assert.equal(store.canUndo(), false);
   assert.equal(store.redo(), true);
-  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 5);
+  assert.equal(presetValue(store, FIRST, 'sample.pattern-freq'), 5);
 });
 
 test('ending a value run gives the next drag its own undo entry', async () => {
   const store = await makeStore();
-  const opening = presetValue(store, 'hex-twin-wave', 'sample.pattern-freq');
-  store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 2);
-  store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 3);
+  const opening = presetValue(store, FIRST, 'sample.pattern-freq');
+  store.setPresetValue(FIRST, 'sample.pattern-freq', 2);
+  store.setPresetValue(FIRST, 'sample.pattern-freq', 3);
   store.endValueRun();
-  store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 4);
-  store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 5);
+  store.setPresetValue(FIRST, 'sample.pattern-freq', 4);
+  store.setPresetValue(FIRST, 'sample.pattern-freq', 5);
 
   assert.equal(store.undo(), true);
-  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 3);
+  assert.equal(presetValue(store, FIRST, 'sample.pattern-freq'), 3);
   assert.equal(store.undo(), true);
-  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), opening);
+  assert.equal(presetValue(store, FIRST, 'sample.pattern-freq'), opening);
 });
 
 test('the history keeps UNDO_DEPTH entries and drops the oldest past it', async () => {
@@ -652,47 +659,47 @@ test('the history keeps UNDO_DEPTH entries and drops the oldest past it', async 
   for (let step = 0; step < UNDO_DEPTH + overflow; step += 1) {
     const parameter = step % 2 === 0 ? 'sample.pattern-freq' : 'camera.wander';
     const value = step % 2 === 0 ? 2 + (step % 5) : (step % 10) / 10;
-    if (!store.setPresetValue('hex-twin-wave', parameter, value).ok) refused.push(step);
-    walked.push(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'));
+    if (!store.setPresetValue(FIRST, parameter, value).ok) refused.push(step);
+    walked.push(presetValue(store, FIRST, 'sample.pattern-freq'));
   }
   assert.deepEqual(refused, [], 'every write must commit for the depth to be read');
 
   let undone = 0;
   while (store.undo()) undone += 1;
   assert.equal(undone, UNDO_DEPTH, 'the history must stop at its depth');
-  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'),
+  assert.equal(presetValue(store, FIRST, 'sample.pattern-freq'),
     walked[overflow - 1],
     'the dropped entries are the oldest, so the opening document is unreachable');
 
   let redone = 0;
   while (store.redo()) redone += 1;
   assert.equal(redone, UNDO_DEPTH, 'every kept entry must reapply');
-  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'),
+  assert.equal(presetValue(store, FIRST, 'sample.pattern-freq'),
     walked.at(-1));
 });
 
 test('another control, a structural edit, an undo or a redo ends the run', async () => {
   const store = await makeStore();
-  assert.equal(store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 2).ok, true);
-  assert.equal(store.setPresetValue('hex-twin-wave', 'camera.wander', 0.5).ok, true);
-  assert.equal(store.setPresetValue('hex-twin-wave-alt', 'camera.wander', 0.25).ok, true);
+  assert.equal(store.setPresetValue(FIRST, 'sample.pattern-freq', 2).ok, true);
+  assert.equal(store.setPresetValue(FIRST, 'camera.wander', 0.5).ok, true);
+  assert.equal(store.setPresetValue(SECOND, 'camera.wander', 0.25).ok, true);
   assert.equal(store.undo(), true);
   assert.equal(store.undo(), true);
   assert.equal(store.undo(), true);
   assert.equal(store.canUndo(), false);
 
-  assert.equal(store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 3).ok, true);
+  assert.equal(store.setPresetValue(FIRST, 'sample.pattern-freq', 3).ok, true);
   assert.equal(store.replaceSpan(WARP, 0, [{ operator: 'warp.wave-shear.v2' }]).ok, true);
-  assert.equal(store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 4).ok, true);
+  assert.equal(store.setPresetValue(FIRST, 'sample.pattern-freq', 4).ok, true);
   assert.equal(store.undo(), true);
-  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 3);
+  assert.equal(presetValue(store, FIRST, 'sample.pattern-freq'), 3);
   assert.equal(labels(store).includes('warp'), true,
     'the structural edit opened its own entry and survives the value undo');
 
   assert.equal(store.redo(), true);
-  assert.equal(store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 6).ok, true);
+  assert.equal(store.setPresetValue(FIRST, 'sample.pattern-freq', 6).ok, true);
   assert.equal(store.undo(), true);
-  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 4,
+  assert.equal(presetValue(store, FIRST, 'sample.pattern-freq'), 4,
     'a redo ends the run, so the write after it opens a new entry');
 });
 
@@ -1018,19 +1025,17 @@ test('the scratch document compiles clean against the catalog', async () => {
     { catalog: CATALOG });
   assert.equal(compiled.status, 'VALID');
   assert.deepEqual(compiled.diagnostics, []);
-  assert.deepEqual(compiled.document.descriptor.chain, [
-    { label: 'rotate', operator: 'sphere.rotate.v2' },
-    { label: 'project', operator: 'project.equirectangular.v2' },
-    { label: 'sample', operator: 'sample.spiral.v3' },
-    { label: 'colorize', operator: 'colorize.generated-palette.v4' },
-  ]);
+  assert.deepEqual(compiled.document.descriptor.chain, [...DEFAULT_SCRATCH_CHAIN]);
   assert.equal(compiled.document.preset_bank.presets.length, 1);
   const values = compiled.document.preset_bank.presets[0].values;
   assert.equal(values['sample.coordinate-system'], 'equirectangular');
-  assert.equal(values['sample.center-azimuth'], 0);
-  assert.equal(values['sample.center-polar'], 0);
-  assert.equal(values['colorize.palette-chroma'], 0.62,
-    'the one preset carries the catalog defaults');
+  for (const { label, operator } of DEFAULT_SCRATCH_CHAIN) {
+    for (const field of catalogFields(operator)) {
+      if (`${label}.${field.id}` === 'sample.coordinate-system') continue;
+      assert.equal(values[`${label}.${field.id}`], field.default,
+        'the one preset carries the catalog defaults');
+    }
+  }
   assert.deepEqual(Object.keys(values).sort(),
     compiled.document.descriptor.parameters.map((parameter) => parameter.id).sort());
   const units = new Map(compiled.document.descriptor.parameters.map(
@@ -1049,12 +1054,12 @@ test('the store adopts the scratch document and edits it', async () => {
   const store = await createChainDocumentStore({
     document: scratchChainDocument(CATALOG), catalog: CATALOG,
   });
-  assert.deepEqual(labels(store), ['rotate', 'project', 'sample', 'colorize']);
+  const scratch = DEFAULT_SCRATCH_CHAIN.map((entry) => entry.label);
+  assert.deepEqual(labels(store), scratch);
 
   assert.equal(store.replaceSpan(1, 0, [{ operator: 'sphere.lens.mobius.v3' }]).ok, true);
   assertGreen(store);
-  assert.deepEqual(labels(store),
-    ['rotate', 'lens', 'project', 'sample', 'colorize']);
+  assert.deepEqual(labels(store), [scratch[0], 'lens', ...scratch.slice(1)]);
 });
 
 test('the scratch builder refuses an operator the catalog lacks', () => {
@@ -1215,14 +1220,19 @@ test('editing an undeclared field backfills presets and policies atomically with
 
 
 test('new kaleidoscope instances retain the loaded authored symmetry default', async () => {
-  const store = await makeStore();
+  const authored = catalogFields('sphere.lens.kaleidoscope.v2')
+    .find((field) => field.id === 'symmetry').values.at(-1);
+  assert.notEqual(authored, catalogDefault('sphere.lens.kaleidoscope.v2', 'symmetry'));
+  const store = await makeStore({ mutate: (document) => {
+    document.descriptor.parameters.find((p) => p.id === 'lens.symmetry').default = authored;
+  } });
   assert.deepEqual(store.replaceSpan(1, 0,
     [{ label: 'mirror2', operator: 'sphere.lens.kaleidoscope.v2' }]), { ok: true });
   const doc = store.document();
   assert.equal(doc.descriptor.parameters.find((p) => p.id === 'mirror2.symmetry').default,
-    'hexagonal-prism');
+    authored);
   for (const preset of doc.preset_bank.presets)
-    assert.equal(preset.values['mirror2.symmetry'], 'hexagonal-prism');
+    assert.equal(preset.values['mirror2.symmetry'], authored);
 });
 
 

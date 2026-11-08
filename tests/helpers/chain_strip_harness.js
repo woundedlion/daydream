@@ -4,13 +4,12 @@ import {readFileSync} from 'node:fs';
 import {createChainDocumentStore} from '../../src/workbench/shader/chain_document_store.js';
 import {createChainStrip} from '../../src/workbench/shader/chain_strip.js';
 import {compileShaderDocument} from '../../generated/shader/shader_workbench.mjs';
+import {chainStudyDocument} from './chain_study.js';
 import {documentEvents, fakeElement, installAnimationFrames, installDocument, restoreDocumentAfterEach} from './fake_dom.js';
 
 const CATALOG = JSON.parse(readFileSync(
   new URL('../../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
-const BASE = compileShaderDocument(readFileSync(
-  new URL('../../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
-{ catalog: CATALOG });
+const BASE = compileShaderDocument(chainStudyDocument(CATALOG), { catalog: CATALOG });
 assert.equal(BASE.status, 'VALID');
 
 let frames = null;
