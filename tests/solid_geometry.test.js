@@ -7,6 +7,9 @@ import {
   uniqueEdges,
   geodesicSegments,
   geodesicTriangleVertices,
+  GEODESIC_SEGMENT_ARC,
+  GEODESIC_TRIANGLE_BUDGET,
+  GEODESIC_MAX_SEGMENTS,
 } from '../src/workbench/solids/solid_geometry.js';
 
 /** Verifies the Newell normal of a triangle off every coordinate plane is its edge cross product. */
@@ -108,25 +111,30 @@ test('uniqueEdges collapses the two half-edges of a 2-gon', () => {
   assert.deepEqual(uniqueEdges([[0, 1]], 2), [[0, 1]]);
 });
 
-/** Verifies the geodesic level rounds the arc up to whole ~3-degree segments when the budget is slack. */
-test('geodesicSegments targets three degrees of arc per segment', () => {
-  const seg = Math.PI / 60;
+/** Verifies the geodesic level rounds the arc up to whole segments when the budget is slack. */
+test('geodesicSegments rounds the arc up to whole target segments', () => {
+  const seg = GEODESIC_SEGMENT_ARC;
   assert.equal(geodesicSegments(3.2 * seg, 4), 4);
   assert.equal(geodesicSegments(4.5 * seg, 4), 5);
 });
 
-/** Verifies the total-triangle budget caps the level on dense meshes. */
+/** Verifies the total-triangle budget caps the level on dense meshes at the largest level that fits. */
 test('geodesicSegments caps dense meshes on the triangle budget', () => {
-  // sqrt(400000 / 40000) = 3.16 -> 3, below the arc target for a 90-degree face.
-  assert.equal(geodesicSegments(Math.PI / 2, 40000), 3);
-  // 400000 triangles leave no subdivision headroom at all.
-  assert.equal(geodesicSegments(Math.PI / 2, 400000), 1);
+  let previous = Infinity;
+  for (const triCount of [GEODESIC_TRIANGLE_BUDGET / 9, GEODESIC_TRIANGLE_BUDGET / 5, GEODESIC_TRIANGLE_BUDGET]) {
+    const level = geodesicSegments(Math.PI / 2, triCount);
+    assert.ok(level >= 1 && level <= previous, 'denser meshes never subdivide more');
+    assert.ok(level * level * triCount <= GEODESIC_TRIANGLE_BUDGET, 'the level fits the budget');
+    assert.ok((level + 1) ** 2 * triCount > GEODESIC_TRIANGLE_BUDGET, 'the next level would not fit');
+    previous = level;
+  }
+  assert.equal(geodesicSegments(Math.PI / 2, GEODESIC_TRIANGLE_BUDGET), 1, 'a full budget leaves no headroom');
 });
 
-/** Verifies the level stays within [1, 24] for degenerate and huge arcs. */
-test('geodesicSegments clamps to the [1, 24] range', () => {
+/** Verifies the level stays within [1, GEODESIC_MAX_SEGMENTS] for degenerate and huge arcs. */
+test('geodesicSegments clamps to its level range', () => {
   assert.equal(geodesicSegments(0, 1), 1);
-  assert.equal(geodesicSegments(Math.PI, 1), 24);
+  assert.equal(geodesicSegments(Math.PI, 1), GEODESIC_MAX_SEGMENTS);
 });
 
 /** Corners of a spherical octant, the fan triangle the tessellation tests subdivide. */

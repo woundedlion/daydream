@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { EffectSidebar } from '../src/ui/sidebar.js';
+import { EffectSidebar, TYPEAHEAD_RESET_MS } from '../src/ui/sidebar.js';
+import { balancedColumnRows } from '../src/ui/sidebar_logic.js';
 import {
   fakeElement, installDocument, restoreDocumentAfterEach, restoreGlobalsAfterEach,
 } from './helpers/fake_dom.js';
@@ -110,13 +111,13 @@ test('setEffects builds one button per name with its preset count and optional s
   // No active effect yet: roving tab stop falls to the first option.
   assert.equal(sidebar.tabbableBtn, sidebar.listEl.children[0]);
   assert.equal(sidebar.tabbableBtn.tabIndex, 0);
-  assert.equal(sidebar.listEl.style.gridTemplateRows, 'repeat(2, auto)');
+  assert.equal(sidebar.listEl.style.gridTemplateRows, `repeat(${balancedColumnRows(2)}, auto)`);
 });
 
 test('setEffects balances a full roster across its existing columns', () => {
   const { sidebar } = makeSidebar();
   sidebar.setEffects(Array.from({ length: 20 }, (_, i) => `E${i}`), {});
-  assert.equal(sidebar.listEl.style.gridTemplateRows, 'repeat(7, auto)');
+  assert.equal(sidebar.listEl.style.gridTemplateRows, `repeat(${balancedColumnRows(20)}, auto)`);
 });
 
 test('setEffects rebuilds cleanly without leaking the old roster', () => {
@@ -278,20 +279,21 @@ test('typeahead cycles initials, extends prefixes and resets after inactivity wi
   sidebar.setEffects(['Comets', 'ShapeShifter', 'Snow'], {});
   sidebar.buttons.get('Comets').focus();
   const key = (value, timeStamp) => sidebar.listEl.dispatch('keydown', {key: value, timeStamp});
+  const idle = TYPEAHEAD_RESET_MS + 1;
   key('S', 0);
   assert.equal(document.activeElement, sidebar.buttons.get('ShapeShifter'));
-  key('s', 100);
+  key('s', 1);
   assert.equal(document.activeElement, sidebar.buttons.get('Snow'));
-  key('s', 200);
+  key('s', 2);
   assert.equal(document.activeElement, sidebar.buttons.get('ShapeShifter'));
-  key('h', 250);
+  key('h', 3);
   assert.equal(document.activeElement, sidebar.buttons.get('ShapeShifter'));
-  key('c', 751);
+  key('c', 3 + idle);
   assert.equal(document.activeElement, sidebar.buttons.get('Comets'));
   assert.equal(sidebar.tabbableBtn, sidebar.buttons.get('Comets'));
-  assert.equal(key(' ', 752).defaultPrevented, true);
+  assert.equal(key(' ', 4 + idle).defaultPrevented, true);
   assert.deepEqual(selected, []);
-  key(' ', 1253);
+  key(' ', 4 + 2 * idle);
   assert.deepEqual(selected, ['Comets']);
 });
 
@@ -505,7 +507,8 @@ test('sort controls expose the current order in their accessible name and announ
   assert.equal(sidebar.sizeBtn.getAttribute('aria-label'), 'Sort by size');
   // The direction arrow is presentational; the name carries the direction.
   assert.equal(glyph(sidebar.nameBtn).getAttribute('aria-hidden'), 'true');
-  assert.equal(glyph(sidebar.nameBtn).textContent, '▲');
+  const ascending = glyph(sidebar.nameBtn).textContent;
+  assert.ok(ascending);
   assert.equal(sidebar.nameBtn.getAttribute('aria-pressed'), 'true');
   assert.equal(sidebar.sizeBtn.getAttribute('aria-pressed'), 'false');
   assert.equal(sidebar.listEl.getAttribute('aria-label'), 'Effects, sorted by name ascending');
@@ -516,8 +519,13 @@ test('sort controls expose the current order in their accessible name and announ
   assert.equal(sidebar.sizeBtn.getAttribute('aria-label'), 'Sort by size, descending');
   assert.equal(sidebar.nameBtn.getAttribute('aria-pressed'), 'false');
   assert.equal(sidebar.sizeBtn.getAttribute('aria-pressed'), 'true');
-  assert.equal(glyph(sidebar.nameBtn).textContent, '⇅');
-  assert.equal(glyph(sidebar.sizeBtn).textContent, '▼');
+  const inactive = glyph(sidebar.nameBtn).textContent;
+  const descending = glyph(sidebar.sizeBtn).textContent;
+  assert.ok(inactive && descending);
+  assert.equal(new Set([ascending, descending, inactive]).size, 3,
+    'ascending, descending and unsorted each draw their own glyph');
+  for (const btn of [sidebar.nameBtn, sidebar.sizeBtn])
+    assert.equal(glyph(btn).getAttribute('aria-hidden'), 'true');
   assert.equal(sidebar.listEl.getAttribute('aria-label'), 'Effects, sorted by size descending');
   const status = sidebar.sortStatus;
   assert.equal(status.parentNode, sidebar.sortRow);

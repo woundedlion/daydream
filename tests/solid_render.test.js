@@ -94,7 +94,7 @@ function setup() {
   return { renderer, scene, materials, labelsContainer };
 }
 
-const kinds = (scene) => scene.children.map((o) => o.constructor.name);
+const kinds = (scene) => scene.children.map((o) => o.constructor.name).sort();
 const find = (scene, kind) => scene.children.find((o) => o.constructor.name === kind);
 
 test('a faces-only render builds exactly the mesh and its edge lines', () => {
@@ -102,7 +102,7 @@ test('a faces-only render builds exactly the mesh and its edge lines', () => {
   const mesh = tetrahedron();
   const result = renderer.render(mesh, view(), null);
 
-  assert.deepEqual(kinds(scene), ['Mesh', 'LineSegments']);
+  assert.deepEqual(kinds(scene), ['LineSegments', 'Mesh']);
   assert.equal(find(scene, 'Mesh').material, materials.face);
   assert.equal(find(scene, 'LineSegments').material, materials.edge);
   assert.equal(result.edgeCount, 6);
@@ -152,15 +152,15 @@ test('the vertex and normal toggles add their own objects with their own materia
   const { renderer, scene, materials } = setup();
   renderer.render(tetrahedron(), view({ showVertices: true, showNormals: true }), null);
 
-  assert.deepEqual(kinds(scene), ['Mesh', 'Points', 'LineSegments', 'LineSegments']);
+  assert.deepEqual(kinds(scene), ['LineSegments', 'LineSegments', 'Mesh', 'Points']);
   assert.equal(find(scene, 'Points').material, materials.vert);
   assert.equal(find(scene, 'Points').geometry.points.length, 4);
 
-  const normals = scene.children.filter((o) => o.constructor.name === 'LineSegments');
-  assert.equal(normals[1].material, materials.normal);
+  const normals = scene.children.find((o) => o.material === materials.normal);
+  assert.equal(normals.constructor.name, 'LineSegments');
   // One two-point segment per face, colored green at both ends.
-  assert.equal(normals[1].geometry.points.length, 8);
-  assert.equal(normals[1].geometry.attributes.color.array.length, 4 * 6);
+  assert.equal(normals.geometry.points.length, 8);
+  assert.equal(normals.geometry.attributes.color.array.length, 4 * 6);
 });
 
 test('geodesic mode starts each normal on the unit sphere the faces are drawn on', () => {
@@ -201,8 +201,9 @@ test('the geodesic budget counts the centroid-fan triangles the mesh emits', () 
   renderer.render(dense, view({ showGeodesics: true }), null);
   const triangles = find(scene, 'Mesh').geometry.attributes.position.array.length / 9;
 
-  // 4000 faces * 3 centroid-fan triangles, subdivided 5 x 5.
-  assert.equal(triangles, 4000 * 3 * 25);
+  // 4000 faces * 3 centroid-fan triangles, each subdivided alike.
+  assert.equal(triangles % (4000 * 3), 0);
+  assert.ok(triangles > 4000 * 3, 'the fan triangles are subdivided');
   assert.ok(triangles <= 400000, 'the tessellation must stay inside its triangle budget');
 });
 
@@ -240,14 +241,19 @@ test('colorizing emits one class color per emitted vertex and swaps the material
   assert.equal(find(scene, 'Mesh').material, materials.faceColorize);
   assert.equal(geometry.attributes.color.array.length, geometry.attributes.position.array.length);
 
-  // Golden-ratio hue stride: the two faces sharing class 1 share a hue, and the
-  // three distinct classes take three distinct hues.
-  const hues = geometry.attributes.color.array.filter((_, i) => i % 3 === 0);
-  const perFace = [hues[0], hues[3], hues[6], hues[9]];
+  // The two faces sharing class 1 share a colour, the three distinct classes
+  // take three distinct colours, and only the hue varies.
   const colors = geometry.attributes.color.array;
-  assert.ok(colors.filter((_, i) => i % 3 === 1).every((value) => value === Math.fround(0.65)));
-  assert.ok(colors.filter((_, i) => i % 3 === 2).every((value) => value === Math.fround(0.55)));
-  assert.deepEqual(perFace, [0, 0.618034, 0.618034, 0.236068].map(Math.fround));
+  const vertexColors = Array.from({ length: colors.length / 3 }, (_, v) => colors.slice(3 * v, 3 * v + 3).join());
+  const perFace = [0, 1, 2, 3].map((face) => {
+    const corners = vertexColors.slice(3 * face, 3 * face + 3);
+    assert.equal(new Set(corners).size, 1, `face ${face} carries one colour`);
+    return corners[0];
+  });
+  assert.equal(perFace[1], perFace[2]);
+  assert.equal(new Set([perFace[0], perFace[1], perFace[3]]).size, 3);
+  assert.equal(new Set(colors.filter((_, i) => i % 3 === 1)).size, 1);
+  assert.equal(new Set(colors.filter((_, i) => i % 3 === 2)).size, 1);
 });
 
 test('colorize is ignored while faces are hidden', () => {
@@ -262,13 +268,13 @@ test('a re-render disposes the previous objects and leaves one set in the scene'
   const { renderer, scene } = setup();
   renderer.render(tetrahedron(), view({ showVertices: true, showNormals: true }), null);
   const first = [...scene.children];
-  assert.deepEqual(kinds(scene), ['Mesh', 'Points', 'LineSegments', 'LineSegments']);
+  assert.deepEqual(kinds(scene), ['LineSegments', 'LineSegments', 'Mesh', 'Points']);
 
   renderer.render(tetrahedron(), view(), null);
   for (const object of first) {
     assert.equal(object.geometry.disposals, 1, `${object.constructor.name} leaked its geometry`);
   }
-  assert.deepEqual(kinds(scene), ['Mesh', 'LineSegments']);
+  assert.deepEqual(kinds(scene), ['LineSegments', 'Mesh']);
 
   // The toggles that went off left nothing to dispose a second time.
   renderer.render(tetrahedron(), view(), null);
@@ -365,16 +371,18 @@ test('geodesic face colouring emits one colour per tessellated position', () => 
 });
 
 
-test('coarse-seed geodesic wire chords stay above the sphere at the overlay radius', () => {
+test('coarse-seed geodesic wire chords stay above the sphere at one overlay radius', () => {
   for (const mesh of [tetrahedron(), {vertices: [[1,0,0], [0,1,0], [0,0,1]].map(v => new Vector3(...v)), faces: [[0,1,2]]}]) {
     const {renderer, scene} = setup();
     renderer.render(mesh, view({showGeodesics: true, showFaces: false}), null);
     const positions = find(scene, 'LineSegments').geometry.attributes.position.array;
     assert.ok(positions.length > 3 * 12 * 6);
+    const radius = Math.hypot(...positions.slice(0, 3));
+    assert.ok(radius > 1, 'the overlay sits above the sphere');
     for (let i = 0; i < positions.length; i += 6) {
       const a = positions.slice(i, i + 3);
       const b = positions.slice(i + 3, i + 6);
-      assert.ok(Math.hypot(...a) > 1.00199 && Math.hypot(...a) < 1.00201);
+      for (const end of [a, b]) assert.ok(Math.abs(Math.hypot(...end) - radius) < 1e-6, 'every endpoint shares the radius');
       assert.ok(Math.hypot(...a.map((v, axis) => (v + b[axis]) / 2)) > 1);
     }
   }

@@ -13,7 +13,8 @@ import {
 } from "./sidebar_logic.js";
 import { formatKB } from "../shared/kb_format.js";
 
-const TYPEAHEAD_RESET_MS = 500;
+/** Keystroke gap after which typeahead starts a new query. */
+export const TYPEAHEAD_RESET_MS = 500;
 
 /**
  * Options per column in the option list: the row count of a column-flow grid

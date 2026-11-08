@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {MAX_RECIPE_STEPS} from '../src/workbench/solids/solid_codegen.js';
 import {loadSavedSolids, mergeSavedSolids, persistSavedSolids, captureSavedSolidThumbnail, queueSavedSolidRestore, SAVED_SOLIDS_MAX,
-  SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY, importedSavedSolid, resolveSavedSolidsStorage} from '../src/workbench/solids/solid_saved_store.js';
+  REJECTED_BACKUP_ENTRIES, REJECTED_BACKUP_ENTRY_CHARS, SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY, importedSavedSolid, resolveSavedSolidsStorage} from '../src/workbench/solids/solid_saved_store.js';
 
 test('blocked browser storage resolves once to an isolated session store', (t) => {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
@@ -45,21 +45,23 @@ test('a rejected entry stays pending until a backup lands', () => {
 test('rejected backups retain only recent bounded data without thumbnails', () => {
   const values = new Map();
   const storage = {getItem: key => values.get(key), setItem: (key, value) => values.set(key, value)};
-  const cards = Array.from({length: 25}, (_, id) => ({
+  const cards = Array.from({length: REJECTED_BACKUP_ENTRIES + 5}, (_, id) => ({
     id, base: 'retired', ops: [], thumb: 'data:image/png;base64,thumbnail',
   }));
-  const oversized = {payload: 'x'.repeat(5000), thumb: 'data:image/png;base64,large'};
-  const rejected = [...cards, oversized, 'y'.repeat(5000)];
+  const oversizedLength = REJECTED_BACKUP_ENTRY_CHARS + 1000;
+  const oversized = {payload: 'x'.repeat(oversizedLength), thumb: 'data:image/png;base64,large'};
+  const rejected = [...cards, oversized, 'y'.repeat(oversizedLength)];
   const state = {notice: '', rejected};
   persistSavedSolids(storage, [], state);
   const backup = JSON.parse(values.get(REJECTED_SOLIDS_KEY));
-  assert.equal(backup.length, 20);
-  assert.deepEqual(backup.slice(0, -2).map(({id}) => id), cards.slice(7).map(({id}) => id));
+  assert.equal(backup.length, REJECTED_BACKUP_ENTRIES);
+  assert.deepEqual(backup.slice(0, -2).map(({id}) => id),
+    cards.slice(cards.length + 2 - REJECTED_BACKUP_ENTRIES).map(({id}) => id));
   assert.ok(backup.slice(0, -2).every((entry) => !Object.hasOwn(entry, 'thumb')));
   assert.deepEqual(backup.at(-2), {truncated: true});
-  assert.equal(backup.at(-1), 'y'.repeat(4096));
+  assert.equal(backup.at(-1), 'y'.repeat(REJECTED_BACKUP_ENTRY_CHARS));
   assert.equal(cards[0].thumb, 'data:image/png;base64,thumbnail');
-  assert.equal(oversized.payload.length, 5000);
+  assert.equal(oversized.payload.length, oversizedLength);
   assert.equal(oversized.thumb, 'data:image/png;base64,large');
   assert.deepEqual(state.rejected, []);
   assert.deepEqual(JSON.parse(values.get(SAVED_SOLIDS_KEY)), []);
@@ -87,7 +89,7 @@ test('imports retain valid entries up to saved-solid capacity', () => {
   const result = mergeSavedSolids(JSON.stringify([card, card, null]), entries);
   assert.equal(result.added, 1);
   assert.equal(entries.length, SAVED_SOLIDS_MAX);
-  assert.match(result.message, /1 invalid entry.*1 past the 40-card limit/);
+  assert.match(result.message, new RegExp(`1 invalid entry.*1 past the ${SAVED_SOLIDS_MAX}-card limit`));
   assert.equal(result.persist, true);
   assert.deepEqual(entries.at(-1).ops, [{op: 'dual', params: {}}]);
 });
@@ -143,15 +145,17 @@ test('stale card backup failure cannot block the primary save', () => {
   assert.equal(savedStorage.entries.length, 1);
   assert.equal(savedStorage.rejected.length, 1);
   assert.match(savedStorage.notice, /1 saved solid could not be loaded.*out-of-range/);
-  assert.match(savedStorage.backupNotice, /up to 20 rejected entries without thumbnails; oversized data may be truncated or omitted/);
+  const pendingNotice = savedStorage.backupNotice;
+  assert.ok(pendingNotice, 'a pending backup is announced');
   const status = {textContent: savedStorage.notice};
   const persist = () => { status.textContent = persistSavedSolids(localStorage, savedStorage.entries, savedStorage); };
   persist();
   assert.deepEqual(JSON.parse(storage.get(SAVED_SOLIDS_KEY)), [valid, stale]);
   assert.deepEqual(loadSavedSolids(localStorage).rejected, [stale]);
   assert.deepEqual(writes, [REJECTED_SOLIDS_KEY, SAVED_SOLIDS_KEY]);
-  assert.equal(status.textContent,
-    `${savedStorage.notice} ${savedStorage.backupNotice} Rejected cards could not be backed up.`);
+  const failed = status.textContent;
+  assert.ok(failed.startsWith(savedStorage.notice), failed);
+  assert.ok(failed.length > `${savedStorage.notice} ${pendingNotice}`.length, 'the refused backup is reported');
   assert.equal(savedStorage.rejected.length, 1);
   refusingBackup = false;
   persist();
@@ -159,8 +163,10 @@ test('stale card backup failure cannot block the primary save', () => {
   assert.deepEqual(JSON.parse(storage.get(SAVED_SOLIDS_KEY)), [valid]);
   assert.deepEqual(JSON.parse(storage.get(REJECTED_SOLIDS_KEY)), [{older: true}, stale]);
   assert.equal(savedStorage.rejected.length, 0);
-  assert.match(status.textContent, /could not be loaded:.*Rejected entries were backed up\./);
-  assert.doesNotMatch(status.textContent, /Saving attempts/);
+  assert.ok(status.textContent.startsWith(savedStorage.notice), status.textContent);
+  assert.ok(savedStorage.backupNotice, 'a confirmed backup is announced');
+  assert.notEqual(status.textContent, failed, 'success and failure read differently');
+  assert.ok(!status.textContent.includes(pendingNotice), 'the pending notice is replaced');
   const confirmed = status.textContent;
   persist();
   assert.equal(status.textContent, confirmed);

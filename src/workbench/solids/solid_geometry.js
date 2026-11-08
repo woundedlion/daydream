@@ -131,19 +131,26 @@ export function uniqueEdges(faces, vertexCount) {
   return edges;
 }
 
+/** Target arc per geodesic segment, in radians. */
+export const GEODESIC_SEGMENT_ARC = Math.PI / 60;
+/** Most triangles the geodesic tessellation emits across the whole mesh. */
+export const GEODESIC_TRIANGLE_BUDGET = 400000;
+/** Highest geodesic subdivision level. */
+export const GEODESIC_MAX_SEGMENTS = 24;
+
 /**
  * Chooses the barycentric subdivision level for the geodesic (sphere-curved)
- * face tessellation: ~3° of arc per segment on the largest face, capped by a
- * total-triangle budget so dense meshes don't explode, and clamped to [1, 24].
+ * face tessellation: GEODESIC_SEGMENT_ARC per segment on the largest face, capped
+ * by GEODESIC_TRIANGLE_BUDGET total triangles, and clamped to [1, GEODESIC_MAX_SEGMENTS].
  * @param {number} maxArc - Largest edge arc in radians over all fan triangles.
  * @param {number} triCount - Total fan triangles the mesh would emit unsubdivided.
  * @returns {number} Segments per triangle side, uniform across the whole mesh.
  * @details The level must be uniform across the mesh or shared edges crack.
  */
 export function geodesicSegments(maxArc, triCount) {
-  const nArc = Math.ceil(maxArc / (Math.PI / 60));
-  const nBudget = Math.floor(Math.sqrt(400000 / Math.max(1, triCount)));
-  return Math.max(1, Math.min(24, nArc, nBudget));
+  const nArc = Math.ceil(maxArc / GEODESIC_SEGMENT_ARC);
+  const nBudget = Math.floor(Math.sqrt(GEODESIC_TRIANGLE_BUDGET / Math.max(1, triCount)));
+  return Math.max(1, Math.min(GEODESIC_MAX_SEGMENTS, nArc, nBudget));
 }
 
 /**

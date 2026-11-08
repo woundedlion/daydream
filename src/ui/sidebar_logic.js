@@ -92,12 +92,15 @@ export function typeaheadIndex(labels, query, from) {
 }
 
 
+/** Largest scroll distance from either end that still counts as at that end. */
+export const SCROLL_ARROW_DEADZONE_PX = 4;
+
 /**
  * Decide which horizontal scroll arrows should be visible. When the content
  * fits (no overflow) neither arrow shows; otherwise the left arrow shows once
  * scrolled past a deadzone from the start, and the right arrow shows until within
- * the deadzone of the end. The deadzone is 4px but never more than half the
- * scroll range, so a small overflow (0 < maxScroll ≤ 8) still surfaces an arrow;
+ * the deadzone of the end. The deadzone is SCROLL_ARROW_DEADZONE_PX but never more
+ * than half the scroll range, so a small overflow still surfaces an arrow;
  * it is clamped at zero so a sub-pixel overflow (maxScroll < 1) does not invert
  * it and show the left arrow while pinned to the start.
  * @param {number} scrollLeft - Current horizontal scroll offset.
@@ -108,7 +111,7 @@ export function typeaheadIndex(labels, query, from) {
 export function scrollArrowState(scrollLeft, scrollWidth, clientWidth) {
   const maxScroll = scrollWidth - clientWidth;
   if (maxScroll <= 0) return { left: false, right: false };
-  const deadzone = Math.max(0, Math.min(4, (maxScroll - 1) / 2));
+  const deadzone = Math.max(0, Math.min(SCROLL_ARROW_DEADZONE_PX, (maxScroll - 1) / 2));
   return {
     left: scrollLeft > deadzone,
     right: scrollLeft < maxScroll - deadzone,

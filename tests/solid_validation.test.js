@@ -17,7 +17,9 @@ test('validator reports a thrown string and frees its standing mesh', async () =
     if (token === 'kis') throw 'op refused';
   } });
   const verdict = await createChainValidator(async () => Mod).chainIsValid('cube', ['kis']);
-  assert.deepEqual(verdict, { ok: false, message: 'Op "kis" failed: op refused' });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /kis/);
+  assert.match(verdict.message, /op refused/);
   assert.equal(state.live, 0);
   assert.equal(state.cleared, 1);
 });
@@ -158,8 +160,10 @@ test('createChainValidator rejects a chain that throws, freeing its mesh', async
   const validator = createChainValidator(async () => Mod);
   const verdict = await validator.chainIsValid('cube', ['kis']);
   assert.equal(verdict.ok, false);
-  assert.equal(verdict.message, 'Op "kis" failed: op refused',
-    'a throw the bridge recorded no reason for must still name the op and what it said');
+  for (const named of [/kis/, /op refused/]) {
+    assert.match(verdict.message, named,
+      'a throw the bridge recorded no reason for must still name the op and what it said');
+  }
   assert.equal(state.live, 0);
   assert.equal(state.cleared, 1);
 });

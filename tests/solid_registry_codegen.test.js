@@ -3,7 +3,7 @@ import { D2R_F32, MAX_RECIPE_STEPS, KNOWN_OPS, PARAMETERIZED_OPS, SIMPLE_SEEDS, 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { upperSnake, opStepCpp, generateRegistryCpp, validateRegistryFaces, MAX_BUILD_STEPS } from '../src/workbench/solids/solid_registry_codegen.js';
+import { upperSnake, opStepCpp, generateRegistryCpp, validateRegistryFaces, MAX_BUILD_STEPS, MAX_BUILD_FACES, LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
 
 test('upperSnake splits camelCase runs and uppercases the rest', () => {
   assert.equal(upperSnake('truncatedIcosahedron_hk58_chamfer63'),
@@ -413,7 +413,7 @@ test('generateRegistryCpp counts a flattened base chain against the ceiling', ()
 
   const overCeiling = { seed: 'icosahedron', ops: [...baseOps, chainStep('kis')] };
   assert.throws(() => generateRegistryCpp(item, overCeiling),
-    /lowers to 9 primitive steps; IslamicStars supports at most 8/);
+    new RegExp(`lowers to ${MAX_BUILD_STEPS + 1} primitive steps; IslamicStars supports at most ${MAX_BUILD_STEPS}`));
 });
 
 test('registry limits count composite operations after lowering', () => {
@@ -422,18 +422,25 @@ test('registry limits count composite operations after lowering', () => {
   });
   assert.deepEqual([...code.matchAll(/\{Op::([A-Z]+)\}/g)].map((match) => match[1]),
     ['META', 'META', 'DUAL', 'DUAL']);
-  assert.throws(() => generateRegistryCpp({
-    base: 'cube', ops: ['meta', 'meta', 'meta'],
-  }), /lowers to 9 primitive steps/);
-  assert.throws(() => generateRegistryCpp({
-    base: 'cube', ops: ['gyro', 'needle', 'zip', { op: 'bevel', params: { t: 0.3 } }, 'dual'],
-  }), /lowers to 9 primitive steps/);
+  const lowered = (ops) => ops.reduce((count, op) =>
+    count + (LOWERING[typeof op === 'string' ? op : op.op]?.(op).length ?? 1), 0);
+  const pastCeiling = (cycle) => {
+    const ops = [];
+    while (lowered(ops) <= MAX_BUILD_STEPS) ops.push(cycle[ops.length % cycle.length]);
+    assert.ok(ops.length <= MAX_BUILD_STEPS, 'the authored op count alone fits the ceiling');
+    return ops;
+  };
+  for (const cycle of [['meta'], ['gyro', 'needle', 'zip', { op: 'bevel', params: { t: 0.3 } }]]) {
+    const ops = pastCeiling(cycle);
+    assert.throws(() => generateRegistryCpp({ base: 'cube', ops }),
+      new RegExp(`lowers to ${lowered(ops)} primitive steps`));
+  }
 });
 
 test('registry exports refuse meshes beyond the effect face budget', () => {
-  const item = { base: 'truncatedIcosidodecahedron', ops: ['kis', 'kis', 'kis'], fCount: 2160 };
-  assert.throws(() => generateRegistryCpp(item), /2160 faces.*1152/);
-  assert.doesNotThrow(() => generateRegistryCpp({ ...item, fCount: 1152 }));
+  const item = { base: 'truncatedIcosidodecahedron', ops: ['kis', 'kis', 'kis'], fCount: MAX_BUILD_FACES + 1 };
+  assert.throws(() => generateRegistryCpp(item), new RegExp(`${MAX_BUILD_FACES + 1} faces.*${MAX_BUILD_FACES}`));
+  assert.doesNotThrow(() => generateRegistryCpp({ ...item, fCount: MAX_BUILD_FACES }));
 });
 
 test('registry arguments wrap after the function when that saves a line', () => {

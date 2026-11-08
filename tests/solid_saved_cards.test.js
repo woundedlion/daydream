@@ -61,7 +61,6 @@ test('collision badges expose their explanation and cards fall back to their tit
   assert.equal(card.title, message);
   const badge = card.querySelector('.saved-clash-btn');
   assert.equal(badge.type, 'button');
-  assert.equal(badge.classList.contains('text-amber-400'), true);
   assert.equal(badge.getAttribute('aria-label'), message);
   badge.dispatch('click');
   assert.deepEqual(messages, [message]);

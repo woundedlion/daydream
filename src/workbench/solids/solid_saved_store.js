@@ -7,6 +7,10 @@ import { savedChainShapeError, savedSolidExportError, formatSolidName } from './
 
 /** Maximum number of thumbnail-bearing solids retained by the page. */
 export const SAVED_SOLIDS_MAX = 40;
+/** Most recent rejected entries the rejected-card backup keeps. */
+export const REJECTED_BACKUP_ENTRIES = 20;
+/** Longest serialized rejected entry the backup keeps; longer ones are truncated or replaced. */
+export const REJECTED_BACKUP_ENTRY_CHARS = 4096;
 
 /**
  * Captures a saved-solid thumbnail only while the list has capacity.
@@ -84,7 +88,8 @@ export function loadSavedSolids(storage) {
     notice: rejected.length
       ? `${rejected.length} saved solid${rejected.length === 1 ? '' : 's'} could not be loaded: ${reason}.` : '',
     backupNotice: rejected.length
-      ? 'Saving attempts a backup of up to 20 rejected entries without thumbnails; oversized data may be truncated or omitted.' : '',
+      ? `Saving attempts a backup of up to ${REJECTED_BACKUP_ENTRIES} rejected entries without thumbnails; `
+        + 'oversized data may be truncated or omitted.' : '',
   };
 }
 
@@ -108,16 +113,16 @@ export function persistSavedSolids(storage, savedSolids, savedStorage) {
           previous = [];
         }
         const backup = [...(Array.isArray(previous) ? previous : []), ...savedStorage.rejected]
-          .slice(-20).map((entry) => {
-            if (!entry || typeof entry !== 'object') return String(entry).slice(0, 4096);
+          .slice(-REJECTED_BACKUP_ENTRIES).map((entry) => {
+            if (!entry || typeof entry !== 'object') return String(entry).slice(0, REJECTED_BACKUP_ENTRY_CHARS);
             const data = { ...entry };
             delete data.thumb;
-            return JSON.stringify(data).length <= 4096 ? data : { truncated: true };
+            return JSON.stringify(data).length <= REJECTED_BACKUP_ENTRY_CHARS ? data : { truncated: true };
           });
         storage.setItem(REJECTED_SOLIDS_KEY, JSON.stringify(backup));
         savedStorage.rejected.length = 0;
         backupNotice = savedStorage.backupNotice = 'Rejected entries were backed up. '
-          + 'The backup keeps up to 20 entries without thumbnails; oversized data may have been truncated or omitted.';
+          + `The backup keeps up to ${REJECTED_BACKUP_ENTRIES} entries without thumbnails; oversized data may have been truncated or omitted.`;
       } catch (error) {
         console.warn('Could not back up rejected solids:', error);
         backupNotice = [backupNotice, 'Rejected cards could not be backed up.'].filter(Boolean).join(' ');

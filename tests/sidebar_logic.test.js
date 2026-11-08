@@ -6,6 +6,7 @@ import {
   navTargetIndex,
   typeaheadIndex,
   scrollArrowState,
+  SCROLL_ARROW_DEADZONE_PX,
 } from '../src/ui/sidebar_logic.js';
 
 test('typeahead searches case-insensitive prefixes in display order with wrapping', () => {
@@ -54,11 +55,16 @@ test('sortItems does not mutate its input', () => {
 });
 
 test('balancedColumnRows keeps the column count and fills columns evenly', () => {
-  assert.equal(balancedColumnRows(20), 7);
-  assert.equal(balancedColumnRows(17), 6);
-  assert.equal(balancedColumnRows(16), 8);
-  assert.equal(balancedColumnRows(8), 8);
-  assert.equal(balancedColumnRows(0), 1);
+  const cap = 8;
+  for (const count of [1, 7, 8, 9, 16, 17, 20, 33]) {
+    const rows = balancedColumnRows(count, cap);
+    const columns = Math.ceil(count / cap);
+    assert.ok(rows <= cap, `${count} items stay within the row cap`);
+    assert.ok(rows * columns >= count, `${count} items fit ${columns} columns`);
+    assert.ok((rows - 1) * columns < count, `${count} items fill every column`);
+  }
+  assert.equal(balancedColumnRows(cap, cap), cap);
+  assert.equal(balancedColumnRows(0, cap), 1);
 });
 
 test('balancedColumnRows treats a non-positive row cap as one row per column', () => {
@@ -135,11 +141,14 @@ test('scrollArrowState shows both arrows mid-scroll and only left near the end',
   assert.deepEqual(scrollArrowState(200, 300, 100), { left: true, right: false });
 });
 
-test('scrollArrowState caps the deadzone at 4px on a large overflow', () => {
-  assert.deepEqual(scrollArrowState(4, 300, 100), { left: false, right: true });
-  assert.deepEqual(scrollArrowState(5, 300, 100), { left: true, right: true });
-  assert.deepEqual(scrollArrowState(195, 300, 100), { left: true, right: true });
-  assert.deepEqual(scrollArrowState(196, 300, 100), { left: true, right: false });
+test('scrollArrowState caps the deadzone on a large overflow', () => {
+  const zone = SCROLL_ARROW_DEADZONE_PX;
+  const maxScroll = 200;
+  assert.ok(zone > 0 && zone < maxScroll / 2);
+  assert.deepEqual(scrollArrowState(zone, 300, 100), { left: false, right: true });
+  assert.deepEqual(scrollArrowState(zone + 1, 300, 100), { left: true, right: true });
+  assert.deepEqual(scrollArrowState(maxScroll - zone - 1, 300, 100), { left: true, right: true });
+  assert.deepEqual(scrollArrowState(maxScroll - zone, 300, 100), { left: true, right: false });
 });
 
 test('scrollArrowState surfaces an arrow for a sub-deadzone overflow', () => {

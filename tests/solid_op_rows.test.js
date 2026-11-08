@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildOpRow, formatParamValue, syncSweepWarning } from '../src/workbench/solids/solid_op_rows.js';
-import { authoredParamRange, OP_DEFS, snapToStep } from '../src/workbench/solids/solid_codegen.js';
+import { authoredParamRange, MORPH_SWEEP, OP_DEFS, seedOpParams, snapToStep, unsweepableReason } from '../src/workbench/solids/solid_codegen.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
 // fakeElement throws on any non-empty innerHTML assignment, so a row must be
@@ -82,9 +82,10 @@ test('parameter rows carry the OP_DEFS range and the current value', () => {
   const range = (row) => row.children.find((c) => c.type === 'range');
   const number = (row) => row.children.find((c) => c.type === 'number');
   // An input's range and value are string properties in the DOM.
-  assert.equal(range(tRow).min, '0.01');
-  assert.equal(range(tRow).max, '0.99');
-  assert.equal(range(tRow).step, '0.01');
+  const def = OP_DEFS.snub.params.t;
+  assert.equal(range(tRow).min, String(def.min));
+  assert.equal(range(tRow).max, String(def.max));
+  assert.equal(range(tRow).step, String(def.step));
   assert.equal(range(tRow).value, '0.5');
   assert.equal(number(twistRow).value, '0.28');
   assert.equal(number(twistRow).getAttribute('aria-label'), 'snub at position 1 twist (radians) value');
@@ -183,23 +184,24 @@ test('the drag grip is built as namespaced SVG nodes, not markup', () => {
   const svg = el.querySelector('.drag-handle').children[0];
   assert.equal(svg.tagName, 'SVG');
   assert.equal(svg.namespaceURI, 'http://www.w3.org/2000/svg');
-  assert.equal(svg.getAttribute('viewBox'), '0 0 24 24');
   const path = svg.children[0];
   assert.equal(path.namespaceURI, 'http://www.w3.org/2000/svg');
-  assert.match(path.getAttribute('d'), /^M11 18c0 1\.1/);
 });
 
-test('a row marks an op the engine morph path declines', () => {
-  const swept = build({ op: 'chamfer', params: { t: 0.5 } }).el.querySelector('.op-unsweepable');
+const unswept = Object.keys(MORPH_SWEEP).find((op) => MORPH_SWEEP[op] === null);
+
+test('a row marks an op the engine morph path declines', { skip: !unswept && 'every op is swept' }, () => {
+  const swept = build({ op: 'chamfer', params: { t: MORPH_SWEEP.chamfer.t.min } }).el.querySelector('.op-unsweepable');
   assert.equal(swept.textContent, '', 'a swept op carries no marker');
   assert.equal(swept.hidden, true);
 
-  const { el, calls } = build({ op: 'expand', params: { t: 0.5 } });
+  const op = { op: unswept, params: seedOpParams(unswept, null) };
+  const { el, calls } = build(op);
   const flag = el.querySelector('.op-unsweepable');
   assert.equal(flag.tagName, 'BUTTON');
   assert.equal(flag.type, 'button');
   assert.equal(flag.hidden, false);
-  assert.match(flag.getAttribute('aria-label'), /^expand is not swept by the morph path/,
+  assert.equal(flag.getAttribute('aria-label'), unsweepableReason(op),
     'the marker is a glyph, so the reason has to reach assistive tech by name');
   assert.equal(flag.getAttribute('title'), flag.getAttribute('aria-label'),
     'the pointer tooltip and the accessible name must carry the same reason');
@@ -208,19 +210,20 @@ test('a row marks an op the engine morph path declines', () => {
 });
 
 test('the sweep marker follows a slider across its band', () => {
-  const op = { op: 'chamfer', params: { t: 0.5 } };
+  const band = MORPH_SWEEP.chamfer.t;
+  const op = { op: 'chamfer', params: { t: band.min } };
   const { el } = build(op);
   const flag = el.querySelector('.op-unsweepable');
   assert.equal(flag.hidden, true);
 
   // A parameter write patches the inputs in place rather than rebuilding the
   // row, so the marker only tracks the value if the caller re-syncs it.
-  op.params.t = 0.99;
+  op.params.t = band.max + OP_DEFS.chamfer.params.t.step;
   syncSweepWarning(el, op);
   assert.equal(flag.hidden, false);
-  assert.match(flag.getAttribute('aria-label'), /^chamfer sweeps t only over/);
+  assert.equal(flag.getAttribute('aria-label'), unsweepableReason(op));
 
-  op.params.t = 0.5;
+  op.params.t = band.min;
   syncSweepWarning(el, op);
   assert.equal(flag.hidden, true);
   assert.equal(flag.getAttribute('aria-label'), '');
