@@ -20,7 +20,7 @@ import {resolutionPresets} from '../src/effects/effect_roster.js';
 
 
 
-import { deactivatedParameterIds } from '../src/workbench/shader/chain_presentation.js';
+import { deactivatedParameterIds, modulationValueLimits } from '../src/workbench/shader/chain_presentation.js';
 import { declarationFromCatalogField } from '../generated/shader/shader_workbench.mjs';
 
 const sink = () => {};
@@ -304,6 +304,44 @@ test('modulation writes and batches match the engine admission and atomicity', (
     assert.equal(target.getAnimationsPaused(), true);
   }
   assert.deepEqual(fake.getParameterDefinitions(), engine.getParameterDefinitions());
+});
+
+test('modulation value limits are the bounds the engine admits', () => {
+  engine.setEffect('ShaderChain');
+  assert.equal(chainCall(engine, 'setShaderChain', [...DEFAULT_CHAIN,
+    {instance: 'modulation', operator: 'color.modulate.v1'}]).code, 'APPLIED');
+  const definition = (field) => engine.getParameterDefinitions()
+    .find((d) => d.name === `modulation.${field}`);
+  const value = (field) => {
+    const d = definition(field);
+    return d.options ? d.options[d.value] : d.value;
+  };
+  const select = (field, option) => assert.equal(engine.setParameter(`modulation.${field}`,
+    definition(field).options.indexOf(option)), M.ParamSetResult.APPLIED, `${field}=${option}`);
+  const admits = (field, candidate) => {
+    const before = chainCall(engine, 'getSnapshot');
+    const result = engine.setParameter(`modulation.${field}`, candidate);
+    if (result === M.ParamSetResult.APPLIED) assert.equal(chainCall(engine, 'restoreSnapshot', before),
+      M.ChainSnapshotRestoreResult.APPLIED);
+    return result === M.ParamSetResult.APPLIED;
+  };
+  const probe = (field) => {
+    const limits = modulationValueLimits(field, value);
+    assert.ok(limits, field);
+    const { min, max } = definition(field);
+    if (Number.isFinite(limits.min)) {
+      assert.equal(admits(field, limits.min), true, `${field} at its lower limit`);
+      if (limits.min > min) assert.equal(admits(field, limits.min - 0.01), false, `${field} below its limit`);
+    }
+    assert.equal(admits(field, limits.max), true, `${field} at its upper limit`);
+    assert.ok(limits.max < max, `${field} limit lies inside its declared range`);
+    assert.equal(admits(field, limits.max + 0.01), false, `${field} above its limit`);
+  };
+  select('modulation-evaluation', 'baked-cube');
+  probe('pattern-scale');
+  select('modulation-mechanic', definition('modulation-mechanic').options
+    .find((option) => option !== 'hue-rotation'));
+  probe('modulation-amount');
 });
 
 test('chain refusal statuses match the fake engine payload contracts', () => {

@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { isDeepStrictEqual } from 'node:util';
 import createHolosphereModule from '../generated/holosphere_wasm.js';
-import { validateRegistryFaces } from '../src/workbench/solids/solid_registry_codegen.js';
+import { LOWERING, validateRegistryFaces } from '../src/workbench/solids/solid_registry_codegen.js';
+import { MAX_DISPLAY_CAP_PERCENT } from '../src/renderer/display_caps.js';
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 
 import { createChainValidator } from '../src/workbench/solids/solid_validation.js';
@@ -1213,11 +1214,17 @@ test('display caps default to full coverage and validate requests without rebuil
   assert.ok(Math.abs(initialDisplayAngles[1] - Math.PI) < 1e-6);
   assert.equal(engine.setDisplayCaps(0, 0), true);
   const generation = engine.getParamGeneration();
-  for (const caps of [[0, 0], [-1, 0], [0, 25.1], [NaN, 0], [0, Infinity]]) {
+  const over = MAX_DISPLAY_CAP_PERCENT + 0.1;
+  for (const caps of [[0, 0], [-1, 0], [over, 0], [0, over], [NaN, 0], [0, Infinity]]) {
     assert.equal(engine.setDisplayCaps(...caps), caps[0] === 0 && caps[1] === 0);
     assert.equal(engine.getParamGeneration(), generation);
     assert.equal(engine.getDisplayNorthPhi(), 0);
     assert.ok(Math.abs(engine.getDisplaySouthPhi() - Math.PI) < 1e-6);
+  }
+  try {
+    assert.equal(engine.setDisplayCaps(MAX_DISPLAY_CAP_PERCENT, MAX_DISPLAY_CAP_PERCENT), true);
+  } finally {
+    engine.setDisplayCaps(0, 0);
   }
 });
 
@@ -1282,6 +1289,32 @@ test('display caps preserve every effect\'s parameter values and rendering after
     engine.setDisplayCaps(0, 0);
   }
   assert.deepEqual(failures, []);
+});
+
+test('each composite operator builds the mesh its registry lowering builds', () => {
+  /** @param {*} mesh @returns {Array<number[]>} Vertices and face arrays, for comparison. */
+  const geometry = (mesh) => {
+    const faces = mesh.getFaces();
+    return [Array.from(mesh.getVertices()), Array.from(faces.indices), Array.from(faces.counts)];
+  };
+  for (const name of Object.keys(LOWERING)) {
+    for (const t of [0.25, 0.5]) {
+      const op = { op: name, params: { t } };
+      const live = [M.MeshOps.fromSolidName('cube'), M.MeshOps.fromSolidName('cube')];
+      try {
+        live.push(applyOp(live[0], op));
+        const composite = live.at(-1);
+        let lowered = live[1];
+        for (const step of LOWERING[name](op)) {
+          lowered = applyOp(lowered, step);
+          live.push(lowered);
+        }
+        assert.deepEqual(geometry(composite), geometry(lowered), `${name}(${t})`);
+      } finally {
+        for (const mesh of live) mesh.delete();
+      }
+    }
+  }
 });
 
 test('registry export rejects oversized intermediate primitive endpoints', async () => {

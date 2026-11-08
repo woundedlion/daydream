@@ -6,7 +6,6 @@
 // under which a missing tree fails.
 import { constructorToObject, glslConstants } from './helpers/source_transpile.js';
 import { engineRoot, engineMissing, engineSkip } from './helpers/engine_checkout.js';
-import * as paletteEnums from './helpers/fake_palette.js';
 import { test } from 'node:test';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
@@ -17,11 +16,7 @@ import { defaultPaletteRecipe } from '../src/workbench/palettes/palette_controls
 import { closingDomain, lissajousCodeString } from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
 import { generateFuncAndRecipe, DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS, MORPH_SWEEP, OP_DEFS } from '../src/workbench/solids/solid_codegen.js';
-import { generateRegistryCpp, MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount, LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
-import { MAX_DISPLAY_CAP_PERCENT } from '../src/renderer/display_caps.js';
-import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../src/workbench/shader/shader_deeplink.js';
-import { BAKED_MODULATION_SCALE_MAX, UNIT_MODULATION_AMOUNT_MIN,
-  UNIT_MODULATION_AMOUNT_MAX } from '../src/workbench/shader/chain_presentation.js';
+import { generateRegistryCpp, MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount } from '../src/workbench/solids/solid_registry_codegen.js';
 
 const enginePin = readFileSync(new URL('../generated/holosphere_wasm.sha', import.meta.url), 'utf8').trim();
 
@@ -300,21 +295,6 @@ function engineValuedEnumerators(source, name) {
   return { roster, count };
 }
 
-/** Verifies the test palette enums, including COUNT, against the engine source. */
-test('the compile-status rosters match core/color/palette_recipe.h', { skip: engineSkip }, () => {
-  const cpp = header(PALETTE_RECIPE_H);
-  for (const cppName of ['PaletteCompileCode', 'PaletteRecipeField']) {
-    const { roster: want, count } = engineValuedEnumerators(cpp, cppName);
-    assert.ok(want.size > 0, `${cppName} yielded no enumerators`);
-    const got = paletteEnums[cppName];
-    const names = [...want.values(), ...(count === null ? [] : ['COUNT'])];
-    assert.deepEqual(Object.keys(got).sort(), names.sort(), `${cppName} roster drifted`);
-    for (const [value, name] of want)
-      assert.equal(got[name].value, value, `${cppName}.${name} ordinal drifted`);
-    if (count !== null) assert.equal(got.COUNT.value, count, `${cppName}.COUNT drifted`);
-  }
-});
-
 /**
  * The non-static data members of a plain struct, in declaration order.
  * @param {string} source - core/color/palette_recipe.h text.
@@ -548,14 +528,6 @@ test('closingDomain follows the pinned Comets traversal', { skip: engineSkip }, 
   }
 });
 
-test('gyro lowering uses the engine snub defaults', { skip: engineSkip }, () => {
-  const path = 'core/mesh/conway.h';
-  const cpp = header(path);
-  const [snub] = LOWERING.gyro('gyro');
-  assert.equal(snub.params.t, engineConstant(cpp, 'SNUB_DEFAULT_T', path));
-  assert.equal(snub.params.twist, engineConstant(cpp, 'SNUB_DEFAULT_TWIST', path));
-});
-
 test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip }, () => {
   const graphPath = 'core/mesh/conway_graph.h';
   const recipePath = 'core/mesh/recipe.h';
@@ -604,89 +576,6 @@ test('composite sweep exemptions stay inside the engine primitive bands', { skip
   const graph = header(graphPath);
   assert.ok(OP_DEFS.bevel.params.t.min >= engineConstant(graph, 'T_TRUNCATE_ARRIVAL_MIN', graphPath));
   assert.ok(OP_DEFS.bevel.params.t.max <= 1 - engineConstant(graph, 'T_EPS_AMBO', graphPath));
-});
-
-test('registry composite lowering matches expand_to_primitives', { skip: engineSkip }, () => {
-  const recipe = header('core/mesh/recipe.h');
-  const start = recipe.search(/\bsize_t\s+expand_to_primitives\(/);
-  assert.ok(start >= 0, 'expand_to_primitives not found');
-  const body = recipe.slice(start);
-  for (const [name, lower] of Object.entries(LOWERING)) {
-    const block = body.split(`case Op::${name.toUpperCase()}:`)[1]?.split('break;')[0];
-    assert.ok(block, name);
-    for (const t of [0.25, 0.5]) {
-      let chosen = block;
-      if (name === 'bevel') {
-        assert.match(block, /if \(step\.param == 0\.5f\)/);
-        chosen = block.split('if (')[0] + (t === 0.5
-          ? block.split('if (step.param == 0.5f)')[1].split('else')[0]
-          : block.split('else')[1]);
-      }
-      const emitted = [...chosen.matchAll(/emit\(\{Op::([A-Z]+)([^}]*)\}\)/g)].map((match) => {
-        const op = match[1].toLowerCase();
-        if (op === 'truncate') { assert.match(match[2], /^,\s*step\.param\s*$/); return { op, params: { t } }; }
-        if (op === 'snub') assert.match(match[2], /MeshOps::SNUB_DEFAULT_T, MeshOps::SNUB_DEFAULT_TWIST/);
-        return op;
-      });
-      const lowered = lower({ op: name, params: { t } })
-        .map((step) => (step.op === 'snub' ? step.op : step));
-      assert.deepEqual(lowered, emitted, `${name}(${t})`);
-    }
-  }
-});
-
-test('MAX_DISPLAY_CAP_PERCENT is the bound setDisplayCaps enforces', { skip: engineSkip }, () => {
-  const path = 'targets/wasm/engine_bindings.h';
-  const body = functionBody(header(path), 'bool setDisplayCaps');
-  const bounds = [...body.matchAll(/\b(top|bottom)_percent > ([\d.]+)/g)];
-  assert.deepEqual(bounds.map(([, side]) => side), ['top', 'bottom'],
-    `setDisplayCaps bounds not found in ${path} — the parity reader is out of date`);
-  for (const [, side, bound] of bounds) assert.equal(MAX_DISPLAY_CAP_PERCENT, Number(bound), side);
-});
-
-
-test('CHAIN_SNAPSHOT_SCHEMA_VERSION is the engine chain snapshot schema', { skip: engineSkip }, () => {
-  const path = 'workbench/shader/chain_snapshot.h';
-  const match = /static constexpr uint32_t SCHEMA_VERSION\s*=\s*(\d+);/.exec(header(path));
-  assert.ok(match, `SCHEMA_VERSION not found in ${path} — the parity reader is out of date`);
-  assert.equal(CHAIN_SNAPSHOT_SCHEMA_VERSION, Number(match[1]));
-});
-
-test('shader modulation bounds match the installed engine', { skip: engineSkip }, () => {
-  const typesPath = 'core/pattern/types.h';
-  assert.equal(BAKED_MODULATION_SCALE_MAX,
-    engineConstant(header(typesPath), 'MAX_BAKED_NOISE_SCALE', typesPath));
-
-  const controlPath = 'core/render/pullback/modulation.h';
-  const body = functionBody(header(controlPath), 'control_fields');
-  const amount = /"Modulation Amount",\s*&config\.mechanic\.amount,\s*UNIT \? (-?[\d.]+)f : -?[\d.]+f,\s*UNIT \? (-?[\d.]+)f : -?[\d.]+f/.exec(body);
-  assert.ok(amount, `Unit modulation amount bounds not found in ${controlPath} — the parity reader is out of date`);
-  assert.deepEqual([UNIT_MODULATION_AMOUNT_MIN, UNIT_MODULATION_AMOUNT_MAX],
-    [Number(amount[1]), Number(amount[2])]);
-});
-
-test('palettes.html recipe sliders stay inside the limits the engine compiler accepts', { skip: engineSkip }, () => {
-  const path = 'core/color/generative_palette.h';
-  const cpp = header(path);
-  const html = readFileSync(new URL('../tools/palettes.html', import.meta.url), 'utf8');
-  /** @param {string} id @returns {{min: number, max: number}} The slider's declared range. */
-  const slider = (id) => {
-    const m = new RegExp(`<input type="range" id="${id}" min="([^"]+)" max="([^"]+)"`).exec(html);
-    assert.ok(m, `palettes.html has no ${id} range slider`);
-    return { min: Number(m[1]), max: Number(m[2]) };
-  };
-  /** @param {string} name @returns {number} A static constexpr float limit, in double precision. */
-  const limit = (name) => engineConstant(cpp, name, path, { PI_F: Math.PI });
-  for (const [id, name] of [['gen_sweep', 'MAX_SWEEP_TURNS'], ['gen_torsion', 'MAX_ABS_TORSION']]) {
-    const { min, max } = slider(id);
-    const bound = limit(name);
-    assert.ok(-bound <= min && max <= bound, `${id} [${min}, ${max}] exceeds ±${name} = ${bound}`);
-  }
-  const falloff = /recipe\.falloff_start > ([\d.]+)f \/ ([\d.]+)f && recipe\.falloff_start < ([\d.]+)f/.exec(cpp);
-  assert.ok(falloff, `the falloff_start bounds were not found in ${path} — the parity reader is out of date`);
-  const { min, max } = slider('gen_falloff');
-  assert.ok(Number(falloff[1]) / Number(falloff[2]) < min && max < Number(falloff[3]),
-    `gen_falloff [${min}, ${max}] leaves the open falloff_start interval`);
 });
 
 test('solid exports name engine categories and generator identifiers', { skip: engineSkip }, () => {

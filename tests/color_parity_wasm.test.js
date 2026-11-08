@@ -8,6 +8,7 @@ import {oklchLinearRgb, maxSrgbGamutChroma} from '../src/workbench/palettes/pale
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import createHolosphereModule from '../generated/holosphere_wasm.js';
 import * as C from '../src/shared/color.js';
 import { PaletteRecipeModel } from '../src/workbench/palettes/palette_recipe_model.js';
@@ -368,6 +369,34 @@ test('every effect-owned GenerativePalette recipe the engine exports compiles an
       assert.equal(typeof preset.randomHue, 'boolean', preset.name);
       assert.equal(preset.recipe.schemaVersion, 4, preset.name);
       assert.equal(ops.inspectV4(preset.recipe).status.code, M.PaletteCompileCode.OK, preset.name);
+    }
+  } finally {
+    ops.delete();
+  }
+});
+
+test('palettes.html recipe sliders compile at both ends of their ranges', () => {
+  const html = readFileSync(new URL('../tools/palettes.html', import.meta.url), 'utf8');
+  /** @param {string} id @returns {number[]} The slider's declared min and max. */
+  const range = (id) => {
+    const m = new RegExp(`<input type="range" id="${id}" min="([^"]+)" max="([^"]+)"`).exec(html);
+    assert.ok(m, `palettes.html has no ${id} range slider`);
+    return [Number(m[1]), Number(m[2])];
+  };
+  const ops = new M.PaletteOps();
+  try {
+    for (const [id, set] of [
+      ['gen_sweep', (recipe, v) => { recipe.hue.mode = PaletteV4.hueMode.SWEEP; recipe.hue.sweepTurns = v; }],
+      ['gen_torsion', (recipe, v) => { recipe.hueTorsion = v; }],
+      ['gen_falloff', (recipe, v) => { recipe.domain = PaletteV4.domain.FALLOFF; recipe.falloffStart = v; }],
+    ]) {
+      for (const v of range(id)) {
+        const recipe = defaultPaletteRecipe();
+        set(recipe, v);
+        const { status } = ops.inspectV4(recipe);
+        assert.equal(status.code, M.PaletteCompileCode.OK, `${id} = ${v}`);
+        assert.equal(status.clampedFields, 0, `${id} = ${v}`);
+      }
     }
   } finally {
     ops.delete();

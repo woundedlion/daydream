@@ -8,6 +8,7 @@ import {documentFromChainSnapshot, scratchChainDocument} from '../src/workbench/
 import {applyChainDocument} from '../src/workbench/shader/chain_apply.js';
 import {applyFixedShaderDocument} from '../src/workbench/shader/shader_documents.js';
 import {currentChainSnapshot} from './helpers/chain_snapshot.js';
+import {CHAIN_SNAPSHOT_SCHEMA_VERSION} from '../src/workbench/shader/shader_deeplink.js';
 
 const catalog = JSON.parse(readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
 
@@ -19,6 +20,7 @@ after(() => engine.delete());
 
 test('the shared current snapshot fixture restores on the compiled engine', () => {
   engine.setEffect('ShaderChain');
+  assert.equal(capture().schemaVersion, CHAIN_SNAPSHOT_SCHEMA_VERSION);
   assert.equal(restore(currentChainSnapshot()), module.ChainSnapshotRestoreResult.APPLIED);
 });
 
