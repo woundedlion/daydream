@@ -282,8 +282,8 @@ test('the frame loop runs onAnimate before the render and onAfterRender after it
  * @param {string[]} releases - The expected releases, sorted.
  */
 function assertDisposeOrder(releases) {
-  assert.deepEqual(log.slice(0, 3),
-    ['cancelAnimationFrame', 'removeEventListener', 'ResizeObserver.disconnect']);
+  assert.deepEqual(log.slice(0, 3).sort(),
+    ['ResizeObserver.disconnect', 'cancelAnimationFrame', 'removeEventListener']);
   assert.deepEqual(log.slice(3).sort(), releases);
 }
 

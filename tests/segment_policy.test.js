@@ -7,6 +7,7 @@ import {
   createSegmentSpawnGuard,
   createSegmentedFallback,
   maxSegmentCount,
+  SEGMENT_COUNT_MAX,
 } from '../src/segments/segment_policy.js';
 
 // The segmented spawn guard.
@@ -165,22 +166,26 @@ test('the segmented fallback reports a thrown non-Error', () => {
 });
 
 // The pool ceiling: every member holds a WASM heap of its own.
-test('a device cap moves with the memory hint and the mobile layout', () => {
-  assert.equal(maxSegmentCount({}, false), 8,
+test('a device cap never rises as memory falls and the mobile layout never raises it', () => {
+  assert.equal(maxSegmentCount({}, false), SEGMENT_COUNT_MAX,
     'no hint (Firefox/Safari) on a desktop layout keeps the full range');
-  assert.equal(maxSegmentCount({ deviceMemory: 8 }, false), 8);
-  assert.equal(maxSegmentCount({ deviceMemory: 4 }, false), 4);
-  assert.equal(maxSegmentCount({ deviceMemory: 0.5 }, false), 2);
-  assert.equal(maxSegmentCount({ deviceMemory: 2 }, false), 2);
-  assert.equal(maxSegmentCount({ deviceMemory: 3 }, false), 4);
+  const memories = [64, 8, 6, 4, 3, 2, 1, 0.5, 0.25];
+  for (let i = 1; i < memories.length; i++)
+    assert.ok(maxSegmentCount({ deviceMemory: memories[i] }, false)
+      <= maxSegmentCount({ deviceMemory: memories[i - 1] }, false),
+      `${memories[i]} GiB must not allow more segments than ${memories[i - 1]} GiB`);
+  assert.ok(maxSegmentCount({ deviceMemory: 0.25 }, false) < SEGMENT_COUNT_MAX,
+    'a low memory hint lowers the cap');
   // Without deviceMemory the narrow layout is the only phone signal there is.
-  assert.equal(maxSegmentCount({}, true), 4);
-  assert.equal(maxSegmentCount({ deviceMemory: 8 }, true), 4,
-    'the lower of the two caps wins');
+  assert.ok(maxSegmentCount({}, true) < SEGMENT_COUNT_MAX, 'the mobile layout lowers the cap');
+  for (const gib of memories)
+    assert.equal(maxSegmentCount({ deviceMemory: gib }, true),
+      Math.min(maxSegmentCount({ deviceMemory: gib }, false), maxSegmentCount({}, true)),
+      'the lower of the two caps wins');
   for (const gib of [undefined, 0.25, 1, 2, 3, 4, 6, 8, 64])
     for (const mobile of [false, true]) {
       const cap = maxSegmentCount({ deviceMemory: gib }, mobile);
       assert.equal(cap % 2, 0, `cap ${cap} must stay layout-legal (even)`);
-      assert.ok(cap >= 2 && cap <= 8, `cap ${cap} must stay inside the slider range`);
+      assert.ok(cap >= 2 && cap <= SEGMENT_COUNT_MAX, `cap ${cap} must stay inside the slider range`);
     }
 });

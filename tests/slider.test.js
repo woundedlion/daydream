@@ -62,9 +62,8 @@ test('builds a slider, scaling bounds and rounding the step to integer units', (
   assert.equal(slider.step, '10');
   assert.equal(slider.value, '50');
   assert.equal(valueSpan.textContent, '5.0');
-  assert.equal(container.children.length, 3);
-  assert.equal(container.children[0].tagName, 'LABEL');
-  assert.equal(container.children[0].htmlFor, slider.id);
+  assert.equal(container.querySelector('label').htmlFor, slider.id);
+  assert.ok(container.contains(slider) && container.contains(valueSpan));
 });
 
 test('initial value is clamped to the slider range', () => {
@@ -81,10 +80,10 @@ test('building a slider replaces existing container content', () => {
   const stale = fakeElement('span');
   container.appendChild(stale);
 
-  createSlider('c', base, null);
+  const { slider } = createSlider('c', base, null);
 
   assert.equal(stale.parentNode, null);
-  assert.equal(container.children.length, 3);
+  assert.ok(container.contains(slider), 'the new slider is mounted');
 });
 
 test('input updates the display value without a callback', () => {

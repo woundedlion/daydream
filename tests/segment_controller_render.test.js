@@ -412,7 +412,7 @@ test('composite() marks the layout seams, not only the reported segments', () =>
 });
 
 test('composite() self-heals a broken display-buffer alias instead of throwing', () => {
-  expectSegmentDiagnostics([["error", "SegmentCompositor.composite: display-buffer alias diverged from getMemoryView() \u2014 re-pointing the display aliases at the composite target"]]);
+  expectSegmentDiagnostics([["error", /^SegmentCompositor\.composite: display-buffer alias diverged\b/]]);
   setDisplayGrid(4, 2);
 
   const c = makeController();
@@ -430,7 +430,7 @@ test('composite() self-heals a broken display-buffer alias instead of throwing',
 });
 
 test('composite() heals a diverged mesh alias even while driver.pixels is aligned', () => {
-  expectSegmentDiagnostics([["error", "SegmentCompositor.composite: display-buffer alias diverged from getMemoryView() \u2014 re-pointing the display aliases at the composite target"]]);
+  expectSegmentDiagnostics([["error", /^SegmentCompositor\.composite: display-buffer alias diverged\b/]]);
   setDisplayGrid(4, 2);
   // Split the alias pair: the GPU-side attribute reads a stale buffer while
   // driver.pixels still matches the composite target.

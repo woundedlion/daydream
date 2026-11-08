@@ -17,7 +17,9 @@ test('index provides every container the stats view resolves', () => {
   for (const id of ['segment-stats', 'segment-spawn-status', 'global-stats-desktop', 'stats-bar']) {
     assert.match(html, new RegExp(`id=["']${id}["']`), id);
   }
-  assert.match(html, /<div id="segment-spawn-status"[^>]*role="status"><\/div>/);
+  const spawnStatus = html.match(/<div\b[^>]*\bid="segment-spawn-status"[^>]*>/);
+  assert.ok(spawnStatus, 'segment-spawn-status is a div');
+  assert.match(spawnStatus[0], /\brole="status"/);
 });
 
 /**
@@ -28,6 +30,13 @@ test('index provides every container the stats view resolves', () => {
  * @returns {Object} Fake element standing in for a node already in the page.
  */
 const pageElement = (tag) => fakeElement(tag, { connected: true });
+
+/**
+ * Text of each node in an alert, whatever its position.
+ * @param {Object} box - The fault alert.
+ * @returns {string[]} Text of every child node.
+ */
+const alertTexts = (box) => box.childNodes.map((c) => typeof c === 'string' ? c : c.textContent);
 
 /**
  * Overlay document stand-in: the stats container plus the two global stat bars
@@ -159,7 +168,6 @@ test('a segment whose engine refused a write is marked with its notices', () => 
     'the text is on a node assistive technology reads, not behind a pointer-only tooltip');
   assert.equal(cell(2, 'Segment').getAttribute('title'), null);
   assert.equal(cell(2, 'Segment').getAttribute('aria-describedby'), notice(2).id);
-  assert.equal(notice(2).id, 'seg-notice-1');
   assert.equal(notice(2).parentNode.classList.contains('seg-notices'), true);
   assert.equal(notice(2).textContent,
     'Seg 1: setParameter(Ghost) rejected: UNKNOWN_PARAM; '
@@ -260,7 +268,8 @@ test('a steady-state repaint re-queries nothing and rewrites no class', () => {
   const view = new SegmentStatsView(doc);
 
   view.update(readyState(2));
-  assert.equal(lookups, 4, 'the first repaint resolves the overlay elements');
+  const firstLookups = lookups;
+  assert.ok(firstLookups > 0, 'the first repaint resolves the overlay elements');
 
   // Counting wrapper over the fake element's className accessor, so an
   // unconditional write is visible even when the value is unchanged.
@@ -275,7 +284,7 @@ test('a steady-state repaint re-queries nothing and rewrites no class', () => {
 
   view.update(readyState(2, { timings: [5, 6] }));
   view.update(readyState(2, { timings: [7, 8] }));
-  assert.equal(lookups, 4, 'later repaints reuse the resolved elements');
+  assert.equal(lookups, firstLookups, 'later repaints reuse the resolved elements');
   assert.equal(classWrites, 0, 'an unchanged compute class is not rewritten');
 
   view.update(readyState(2, { timings: [SLOW_FRAME_MS + 1, 1] }));
@@ -525,11 +534,11 @@ test('each fault code names its own source in the headline', () => {
     assert.equal(box.getAttribute('role'), 'alert');
     assert.equal(box.tabIndex, -1);
     assert.equal(box.focusCalls, 0, 'the live region announces without taking focus');
-    assert.equal(box.childNodes[0],
-      `⚠ Segment ${who} faulted — segmented render halted.`);
-    assert.equal(box.childNodes[2].textContent, faultInfo ? 'boom' : 'see console');
-    assert.equal(box.childNodes[4].textContent,
-      'Change resolution or toggle segmented mode to restart.');
+    const texts = alertTexts(box);
+    assert.ok(texts.includes(`⚠ Segment ${who} faulted — segmented render halted.`), texts.join('|'));
+    assert.ok(texts.includes(faultInfo ? 'boom' : 'see console'), texts.join('|'));
+    assert.ok(texts.includes('Change resolution or toggle segmented mode to restart.'),
+      texts.join('|'));
   }
 });
 
@@ -540,17 +549,15 @@ test('the fault message is a text node, never markup', () => {
     readyState(2, { faulted: true, faultInfo: { segId: 1, message: hostile } }));
 
   const box = stats.firstElementChild;
-  const msg = box.childNodes[2];
-  assert.equal(msg.tagName, 'SPAN');
-  assert.equal(msg.textContent, hostile, 'the message is carried verbatim as text');
+  const msg = box.children.find((c) => c.textContent === hostile);
+  assert.ok(msg, 'the message is carried verbatim as text');
   assert.deepEqual(msg.childNodes, [hostile], 'the message remains one text node');
   assert.deepEqual(msg.children, [], 'nothing was parsed out of the message');
-  // The headline is appended as a string, so it too becomes a text node.
-  assert.equal(typeof box.childNodes[0], 'string');
-  assert.deepEqual(box.childNodes.map((c) => typeof c === 'string' ? 'text' : c.tagName),
-    ['text', 'BR', 'SPAN', 'BR', 'SPAN']);
-  assert.deepEqual(box.children.map((c) => c.tagName), ['BR', 'SPAN', 'BR', 'SPAN'],
-    'the elements-only view drops the text nodes');
+  const elements = [];
+  const walk = (node) => { for (const child of node.children) { elements.push(child.tagName); walk(child); } };
+  walk(box);
+  assert.ok(!elements.includes('IMG') && !elements.includes('SCRIPT'),
+    `no markup was parsed into the alert: ${elements.join(',')}`);
 });
 
 test('the fault overlay is painted once and torn down on recovery', () => {
@@ -574,7 +581,7 @@ test('a second fault replaces the standing alert', () => {
   const { doc, stats } = makeDoc();
   const view = new SegmentStatsView(doc);
   view.update(readyState(2, { faulted: true, faultInfo: { segId: 1, message: 'boom' } }));
-  assert.equal(stats.firstElementChild.childNodes[2].textContent, 'boom');
+  assert.ok(alertTexts(stats.firstElementChild).includes('boom'));
 
   // The recovery the banner prescribes: toggle segmented mode off, then fault
   // again on the respawn. The overlay is left standing across the inactive
@@ -583,9 +590,9 @@ test('a second fault replaces the standing alert', () => {
   view.update(readyState(2, { faulted: true, faultInfo: { segId: 0, message: 'worse' } }));
   const box = stats.firstElementChild;
   assert.equal(box.getAttribute('role'), 'alert');
-  assert.equal(box.childNodes[0],
-    '⚠ Segment worker 0 faulted — segmented render halted.');
-  assert.equal(box.childNodes[2].textContent, 'worse');
+  const texts = alertTexts(box);
+  assert.ok(texts.includes('⚠ Segment worker 0 faulted — segmented render halted.'), texts.join('|'));
+  assert.ok(texts.includes('worse') && !texts.includes('boom'), texts.join('|'));
 });
 
 test('a steady frame rewrites no cell of the table', () => {

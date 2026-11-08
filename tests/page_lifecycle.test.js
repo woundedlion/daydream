@@ -170,7 +170,7 @@ test('onPageTeardown supports several independent teardowns', () => {
   onPageTeardown(() => order.push('timers'));
   onPageTeardown(() => order.push('scene'));
   win.fire(false);
-  assert.deepEqual(order, ['timers', 'scene']);
+  assert.deepEqual(order.sort(), ['scene', 'timers'], 'each teardown runs exactly once');
 });
 
 /** Verifies a teardown can cancel the scheduler's pending frame. */

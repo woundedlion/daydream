@@ -52,7 +52,10 @@ const PASSTHROUGH_CONSOLE_MESSAGES = {
 export const capturedConsole = [];
 let expectedDiagnostics = [];
 
-/** @param {Array<[string, string]>} diagnostics - Expected warnings/errors for this test. */
+/**
+ * @param {Array<[string, string | RegExp]>} diagnostics - Expected warnings/errors for this
+ *   test, in order; a string matches the whole message, a RegExp its identifying tokens.
+ */
 export function expectSegmentDiagnostics(diagnostics) {
   expectedDiagnostics = diagnostics;
 }
@@ -97,7 +100,14 @@ export function installSegmentControllerHarness() {
       .filter(({method, args}) => method !== 'log' && !(PASSTHROUGH_CONSOLE_MESSAGES[method] ?? [])
         .some((pattern) => pattern.test(String(args[0]))))
       .map(({method, args}) => [method, String(args[0])]);
-    assert.deepEqual(diagnostics, expectedDiagnostics, 'per-test segment diagnostics');
+    const matches = diagnostics.length === expectedDiagnostics.length
+      && diagnostics.every(([method, message], i) => {
+        const [expectedMethod, expected] = expectedDiagnostics[i];
+        return method === expectedMethod
+          && (expected instanceof RegExp ? expected.test(message) : message === expected);
+      });
+    if (!matches)
+      assert.deepEqual(diagnostics, expectedDiagnostics, 'per-test segment diagnostics');
   });
   const restore = stashGlobals('Worker', 'document');
   after(() => {

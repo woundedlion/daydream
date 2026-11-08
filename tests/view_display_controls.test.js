@@ -67,13 +67,19 @@ test('a fidelity edit repaints the paused main preview unless the pool owns it',
   const fidelity = gui.controllers.find((control) => control.property === 'povFidelity');
 
   fidelity.setValue(true);
+  const first = writes.splice(0);
   segments.ownsDisplay = true;
   fidelity.setValue(false);
+  const second = writes.splice(0);
 
-  assert.deepEqual(writes, [
-    ['engine-temporal', true], ['temporal', true], ['draw'],
-    ['engine-temporal', false], ['temporal', false],
-  ]);
+  const has = (log, entry) => log.some((write) => JSON.stringify(write) === JSON.stringify(entry));
+  assert.ok(has(first, ['engine-temporal', true]) && has(first, ['temporal', true]),
+    'both sinks receive the first edit');
+  assert.equal(first.filter(([operation]) => operation === 'draw').length, 1);
+  assert.equal(first.at(-1)[0], 'draw', 'the repaint follows the writes');
+  assert.ok(has(second, ['engine-temporal', false]) && has(second, ['temporal', false]),
+    'both sinks receive the second edit');
+  assert.ok(!has(second, ['draw']), 'the pool owns the display, so the main preview is not drawn');
 });
 
 test('column defaults preserve a hydrated choice until a live edit takes precedence', () => {

@@ -4,6 +4,11 @@ import {fakeGui} from './helpers/fake_gui.js';
 import {pageWarmer} from '../src/segments/module_warmer.js';
 import {installConsoleCapture} from './helpers/fake_console.js';
 import {createSegmentedPovControls, createSegmentPoolSpawner} from '../src/ui/segmented_pov_controls.js';
+import {maxSegmentCount, SEGMENT_COUNT_MAX} from '../src/segments/segment_policy.js';
+
+const NAV = { hardwareConcurrency: 8 };
+const DESKTOP_CAP = maxSegmentCount(NAV, false);
+const MOBILE_CAP = maxSegmentCount(NAV, true);
 
 test('a segmented-POV failure is announced and returns the toggle', async (t) => {
   const gui = fakeGui('view');
@@ -20,7 +25,7 @@ test('a segmented-POV failure is announced and returns the toggle', async (t) =>
   createSegmentedPovControls({
     gui,
     segments,
-    nav: { hardwareConcurrency: 8 },
+    nav: NAV,
     win: {},
     showNotice: (message) => notices.push(message),
   });
@@ -52,7 +57,7 @@ test('segmented controls reconcile a mobile spawn and resize without a second po
   const layout = { matches: false };
   const win = { matchMedia: () => layout };
   const segments = {
-    active: false, count: 8, showBoundaries: false,
+    active: false, count: SEGMENT_COUNT_MAX, showBoundaries: false,
     destroyed: 0,
     create(count) { this.count = count; created.push(count); },
     destroy() { this.destroyed += 1; },
@@ -60,7 +65,7 @@ test('segmented controls reconcile a mobile spawn and resize without a second po
   let finishWarm;
   t.mock.method(pageWarmer, 'warm', () => new Promise(resolve => { finishWarm = resolve; }));
   const notices = [];
-  createSegmentedPovControls({ gui, segments, nav: { hardwareConcurrency: 8 }, win,
+  createSegmentedPovControls({ gui, segments, nav: NAV, win,
     showNotice: message => notices.push(message) });
   const controls = gui.folders[0].controllers;
   const enabled = controls.find(control => control.property === 'segmented');
@@ -70,13 +75,13 @@ test('segmented controls reconcile a mobile spawn and resize without a second po
   layout.matches = true;
   finishWarm();
   await start;
-  assert.deepEqual(created, [4]);
-  assert.equal(count.object.segments, 4);
+  assert.deepEqual(created, [MOBILE_CAP]);
+  assert.equal(count.object.segments, MOBILE_CAP);
   assert.equal(segments.active, true);
   t.mock.method(pageWarmer, 'warm', async () => {});
   count.object.segments = 2;
   await count.changed(2);
-  assert.deepEqual(created, [4, 2]);
+  assert.deepEqual(created, [MOBILE_CAP, 2]);
   assert.equal(count.object.segments, 2);
   enabled.object.segmented = false;
   await enabled.changed(false);
@@ -87,12 +92,12 @@ test('segmented controls reconcile a mobile spawn and resize without a second po
 
 test('the spawn bounds the pool by the ceiling the device carries now', () => {
   const created = [];
-  let requested = 8;
+  let requested = SEGMENT_COUNT_MAX;
   let mobile = false;
   const spawn = createSegmentPoolSpawner(
     { create: (count) => created.push(count) },
     () => requested,
-    { hardwareConcurrency: 8 },
+    NAV,
     () => mobile);
 
   spawn();
@@ -100,7 +105,7 @@ test('the spawn bounds the pool by the ceiling the device carries now', () => {
   mobile = true;
   spawn();
 
-  assert.deepEqual(created, [8, 4],
+  assert.deepEqual(created, [Math.min(SEGMENT_COUNT_MAX, DESKTOP_CAP), Math.min(6, MOBILE_CAP)],
     'a rotation into the mobile layout must lower the next pool spawn');
 });
 
@@ -114,10 +119,10 @@ function layoutControlRig(t) {
     removeEventListener(type, handler) { removed = handler; },
   };
   const created = [];
-  const segments = { active: false, count: 8, showBoundaries: false,
+  const segments = { active: false, count: SEGMENT_COUNT_MAX, showBoundaries: false,
     create(count) { this.count = count; created.push(count); }, destroy() {} };
   t.mock.method(pageWarmer, 'warm', async () => {});
-  const spawn = createSegmentedPovControls({ gui, segments, nav: { hardwareConcurrency: 8 },
+  const spawn = createSegmentedPovControls({ gui, segments, nav: NAV,
     win: { matchMedia: () => query }, showNotice() {} });
   const controls = gui.folders[0].controllers;
   const count = controls.find(control => control.property === 'segments');
@@ -126,19 +131,19 @@ function layoutControlRig(t) {
 
 test('segmented slider and pool follow viewport layout changes', async (t) => {
   const {count, query, segments, spawn, created, changed} = layoutControlRig(t);
-  assert.equal(count.args[1], 8);
+  assert.equal(count.args[1], DESKTOP_CAP);
   assert.equal(count.label, 'Segments (6 = sim only)');
   query.matches = true;
   changed();
-  assert.equal(count.args[1], 4);
-  assert.equal(count.label, 'Segments (max 4 here)');
-  assert.equal(count.object.segments, 4);
+  assert.equal(count.args[1], MOBILE_CAP);
+  assert.equal(count.label, `Segments (max ${MOBILE_CAP} here)`);
+  assert.equal(count.object.segments, MOBILE_CAP);
   segments.active = true;
   await spawn.respawn();
-  assert.deepEqual(created, [4]);
+  assert.deepEqual(created, [MOBILE_CAP]);
   query.matches = false;
   changed();
-  assert.equal(count.args[1], 8);
+  assert.equal(count.args[1], DESKTOP_CAP);
   assert.equal(count.label, 'Segments (6 = sim only)');
   spawn.dispose();
 });
@@ -157,7 +162,7 @@ test('segment resize failure destroys the pool and clears Enabled while boundari
     destroy() { this.destroyed += 1; }, updateStats() {},
   };
   t.mock.method(pageWarmer, 'warm', async () => {});
-  const guard = createSegmentedPovControls({ gui, segments, nav: { hardwareConcurrency: 8 },
+  const guard = createSegmentedPovControls({ gui, segments, nav: NAV,
     win: {}, showNotice: (message) => notices.push(message) });
   t.after(() => guard.dispose());
   const controls = gui.folders[0].controllers;

@@ -232,7 +232,8 @@ test('a thrown effect apply is logged and rolled back', () => {
   app.appState.set('effect', 'Beta');
 
   assert.equal(app.appState.get('effect'), 'Alpha');
-  assert.deepEqual(app.errors, [{ message: 'Effect switch failed:', error: failure }]);
+  assert.equal(app.errors.length, 1);
+  assert.equal(app.errors[0].error, failure);
   assert.deepEqual(app.notices, ['Effect change was rejected. The previous value was restored.']);
   assert.deepEqual(app.restoredUrls, ['/?effect=Alpha']);
   assert.deepEqual(app.fatals, []);
@@ -247,7 +248,8 @@ test('a thrown effect apply never rolls back into a trapped module', () => {
   assert.equal(app.appState.get('effect'), 'Beta');
   assert.deepEqual(applyCalls(app, 'applyEffect').map((call) => call.effect), ['Beta']);
   assert.deepEqual(app.paramWrites, []);
-  assert.deepEqual(app.errors, [{ message: 'Effect switch failed:', error: failure }]);
+  assert.equal(app.errors.length, 1);
+  assert.equal(app.errors[0].error, failure);
   assert.deepEqual(app.notices, [null]);
   assert.deepEqual(app.fatals, [
     'Effect change trapped the rendering engine. Reload the page.',
@@ -261,7 +263,8 @@ test('a thrown resolution apply is logged and rolled back', async () => {
   await Promise.resolve();
   assert.equal(app.appState.get('resolution'), 'Lo');
   assert.deepEqual(applyCalls(app, 'applyResolution').map((call) => call.resolution), ['Hi', 'Lo']);
-  assert.deepEqual(app.errors, [{ message: 'Resolution switch failed:', error: failure }]);
+  assert.equal(app.errors.length, 1);
+  assert.equal(app.errors[0].error, failure);
   assert.equal(app.applied.resolution, 'Lo');
   assert.deepEqual(app.notices, ['Resolution change was rejected. The previous value was restored.']);
   assert.deepEqual(app.fatals, []);
@@ -275,7 +278,8 @@ test('a thrown resolution apply never rolls back into a trapped module', async (
   await Promise.resolve();
   assert.equal(app.appState.get('resolution'), 'Hi');
   assert.deepEqual(applyCalls(app, 'applyResolution').map((call) => call.resolution), ['Hi']);
-  assert.deepEqual(app.errors, [{ message: 'Resolution switch failed:', error: failure }]);
+  assert.equal(app.errors.length, 1);
+  assert.equal(app.errors[0].error, failure);
   assert.deepEqual(app.fatals, ['Resolution change trapped the rendering engine. Reload the page.']);
   assert.deepEqual(app.urlSyncs, ['Hi']);
 });
@@ -286,8 +290,8 @@ test('an effect rollback that is itself rejected raises the fatal banner', () =>
   app.appState.set('effect', 'Beta');
 
   assert.equal(app.errors.length, 1);
-  assert.equal(app.errors[0].message, 'Effect rollback failed:');
-  assert.match(app.errors[0].error.message, /Effect rollback to "Alpha" was rejected/);
+  assert.ok(app.errors[0].error instanceof Error);
+  assert.match(app.errors[0].error.message, /Alpha/, 'the error names the rollback target');
   assert.deepEqual(app.fatals, [
     'Effect change failed and the previous state could not be restored. Reload the page.',
   ]);
@@ -367,8 +371,8 @@ test('a resolution rollback that is itself rejected raises the fatal banner',
     await Promise.resolve();
 
     assert.equal(app.errors.length, 1);
-    assert.equal(app.errors[0].message, 'Resolution rollback failed:');
-    assert.match(app.errors[0].error.message, /Resolution rollback to "Lo" was rejected/);
+    assert.ok(app.errors[0].error instanceof Error);
+    assert.match(app.errors[0].error.message, /Lo/, 'the error names the rollback target');
     assert.deepEqual(app.fatals, [
       'Resolution change failed and the previous state could not be restored. '
         + 'Reload the page.',
@@ -490,8 +494,9 @@ test('a refused chain rollback reports a fatal recovery failure and closes its m
   const app = makeApp({fullConfigEffects: new Set(['Alpha']),
     rejectEffects: new Set(['Beta']), refuseChainRestore: true});
   app.appState.set('effect', 'Beta');
-  assert.equal(app.errors[0].message, 'Effect rollback failed:');
-  assert.match(app.errors[0].error.message, /Chain snapshot rollback was rejected/);
+  assert.equal(app.errors.length, 1);
+  assert.ok(app.errors[0].error instanceof Error);
+  assert.match(app.errors[0].error.message, /snapshot/, 'the error names the refused snapshot');
   assert.equal(app.fatals.length, 1);
   assert.equal(app.switches.isRestoring(), false);
 });

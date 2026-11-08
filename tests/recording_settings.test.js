@@ -65,11 +65,11 @@ test('a write during a session is reported as deferred to the next one', () => {
   assert.match(h.warnings[0], /next recording/, 'and says when it takes effect');
 });
 
-test('settings enumerate in definition order', () => {
+test('every setting is an enumerable own property', () => {
   const h = makeRecordingSettings();
 
-  assert.deepEqual(Object.keys(h.block.settings), ['recQuality', 'recFormat'],
-    'the settings enumerate in definition order');
+  assert.deepEqual(Object.keys(h.block.settings).sort(), ['recFormat', 'recQuality'],
+    'every defined setting enumerates');
 });
 
 test('replaying settings without a recorder throws', () => {

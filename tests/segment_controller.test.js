@@ -971,7 +971,7 @@ test('an in-flight frame cannot revert a selected preset', async () => {
 });
 
 test('a pool fault notifies the host once after workers stop', () => {
-  expectSegmentDiagnostics([["warn", "[Segmented] additional worker fault (seg 1): another failure \u2014 first fault already latched, UI shows that one"]]);
+  expectSegmentDiagnostics([["warn", /^\[Segmented\] additional worker fault \(seg 1\): another failure\b/]]);
   const faults = [];
   const controller = makeController({ onFault: (message) => {
     assert.equal(controller.faulted, true);

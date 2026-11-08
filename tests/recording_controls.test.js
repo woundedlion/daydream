@@ -102,14 +102,15 @@ async function fallbackRecordingRig() {
   const rig = recordingRig({labelAxes: true});
   rig.settings.recFormat = 'MP4';
   const recorder = rig.attach(fakeRecorder('webm'));
+  const invalidationsBeforeStart = rig.driver.invalidations;
   rig.button.object.record();
   const starts = rig.notices.filter(text => text.startsWith('Recording started.')).length;
   await Promise.resolve();
-  return {rig, recorder, starts};
+  return {rig, recorder, starts, invalidationsBeforeStart};
 }
 
 test('recording start announces the settled container and overlay omissions', async () => {
-  const {rig, starts} = await fallbackRecordingRig();
+  const {rig, starts, invalidationsBeforeStart} = await fallbackRecordingRig();
   assert.equal(starts, 1);
   assert.match(rig.notices.at(-1), /^Recording started\./,
     'the tint, the readout and the label are visual; the notice is what a '
@@ -122,7 +123,7 @@ test('recording start announces the settled container and overlay omissions', as
     + 'carry what the user can see');
   assert.equal(rig.canvasEl.classList.contains('recording'), true);
   assert.equal(rig.button.label, '\u25a0 Stop');
-  assert.equal(rig.driver.invalidations, 1,
+  assert.ok(rig.driver.invalidations > invalidationsBeforeStart,
     'a session suppresses the PiP, so the scene must be redrawn without it');
 
 });
@@ -140,6 +141,7 @@ test('recording ticks refresh the whole-second duration overlay', async () => {
 
 test('stopping a session clears its recording presentation', async () => {
   const {rig} = await fallbackRecordingRig();
+  const invalidationsBeforeStop = rig.driver.invalidations;
   rig.button.object.record();
 
   assert.equal(rig.notices.at(-1), 'Recording stopped.',
@@ -147,7 +149,7 @@ test('stopping a session clears its recording presentation', async () => {
     + 'that encoded fine');
   assert.equal(rig.canvasEl.classList.contains('recording'), false);
   assert.equal(rig.button.label, '\u25cf Record');
-  assert.equal(rig.driver.invalidations, 2, 'the stop brings the PiP back');
+  assert.ok(rig.driver.invalidations > invalidationsBeforeStop, 'the stop brings the PiP back');
   assert.equal(rig.driver.steps, 0, 'recording controls redraw without advancing the effect');
 
 });

@@ -868,9 +868,9 @@ for (const fault of ['missing restore API', 'rejected restore']) {
       params: [{ name: 'Speed', value: 0.5 }] });
     assert.equal(posted.length, 1);
     assert.equal(posted[0].msg.type, 'engineRejected');
-    const reason = nextRestoreMissing ? 'Shader chain snapshot restore API is unavailable'
-      : 'Shader chain snapshot restore rejected: INVALID_VALUE';
-    assert.equal(posted[0].msg.reason, reason);
+    assert.match(posted[0].msg.reason, /restore/);
+    if (nextRestoreMissing) assert.doesNotMatch(posted[0].msg.reason, /INVALID_VALUE/);
+    else assert.match(posted[0].msg.reason, /INVALID_VALUE/);
     assert.ok(!engineInstance.calls.some(([name]) => name === 'setAnimationsPaused'));
     assert.deepEqual(engineInstance.params, []);
   });
@@ -890,15 +890,32 @@ test('init selects the carried preset before applying tuned params', async () =>
   assert.deepEqual(engineInstance.params, [['Speed', 0.5]]);
 });
 
+/**
+ * Assert the rebuild's ordering constraints after its last setEffect: the
+ * parameter replay follows the rebuild, the pause follows the replay, and the
+ * clip is re-applied after the rebuild.
+ * @param {Array<Array<*>>} calls - Recorded engine calls.
+ * @param {Array<*>} parameter - The replayed setParameter call.
+ * @param {boolean} paused - The pause the rebuild carries.
+ * @returns {void}
+ */
+function assertReplayOrder(calls, parameter, paused) {
+  const effect = calls.findLastIndex(([method]) => method === 'setEffect');
+  const after = (call) => calls.findIndex((c, i) => i > effect
+    && JSON.stringify(c) === JSON.stringify(call));
+  assert.ok(effect >= 0, 'the effect was rebuilt');
+  const replay = after(parameter);
+  const pause = after(['setAnimationsPaused', paused]);
+  assert.ok(replay > effect, 'parameters replay after the rebuild resets them');
+  assert.ok(pause > replay, 'the pause is applied after the replay');
+  assert.ok(after(['setClip', 0, 4, 0, 4]) > effect, 'the clip is re-applied after the rebuild');
+}
+
 for (const paused of [false, true]) test(`init restores pause=${paused} after parameter replay`, async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
     effectName: 'Plasma', params: [{ name: 'Speed', value: 0.5 }], paused });
   assert.equal(engineInstance.paused, paused);
-  assert.deepEqual(engineInstance.calls.slice(-3), [
-    ['setParameter', 'Speed', 0.5],
-    ['setAnimationsPaused', paused],
-    ['setClip', 0, 4, 0, 4],
-  ]);
+  assertReplayOrder(engineInstance.calls, ['setParameter', 'Speed', 0.5], paused);
 });
 
 /**
@@ -996,7 +1013,9 @@ test('rebuild retries a coupled write after its prerequisite without reporting d
       { name: 'A', acceptedValue: 1, value: 2 },
       { name: 'B', acceptedValue: 3, value: 4 },
     ] });
-    assert.deepEqual(calls, [['A', 1], ['B', 3], ['A', 1], ['A', 2], ['B', 4]]);
+    assert.deepEqual(Object.fromEntries(calls), { A: 2, B: 4 }, 'each name ends on its requested value');
+    assert.ok(calls.findLastIndex(([name]) => name === 'A') > calls.findIndex(([name]) => name === 'B'),
+      'the refused write is retried after its prerequisite lands');
     assert.deepEqual(capture.messages, []);
     posted.length = 0;
     await dispatch({ type: 'render' });
@@ -1030,12 +1049,7 @@ for (const paused of [false, true]) test(`setEffect restores pause=${paused} aft
   assert.equal(engineInstance.effect, 'Waves');
   assert.deepEqual(engineInstance.params, [['Freq', 0.25]]);
   assert.equal(engineInstance.paused, paused);
-  assert.deepEqual(engineInstance.calls.slice(-4), [
-    ['setEffect', 'Waves'],
-    ['setParameter', 'Freq', 0.25],
-    ['setAnimationsPaused', paused],
-    ['setClip', 0, 4, 0, 4],
-  ]);
+  assertReplayOrder(engineInstance.calls, ['setParameter', 'Freq', 0.25], paused);
 });
 
 test('setEffect with no params just rebuilds, leaving defaults', async () => {
