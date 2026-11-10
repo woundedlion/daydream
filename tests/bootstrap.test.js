@@ -610,7 +610,6 @@ test('index identifies new-window tool links and associates stats headers', () =
   for (const header of headers) assert.match(header, /\bscope="col"/);
 });
 
-
 test('WASM compile and link failures offer the stale-cache remedy', () => {
   for (const ErrorType of [WebAssembly.LinkError, WebAssembly.CompileError]) {
     const { doc, overlay } = fakeDocument();
@@ -618,7 +617,6 @@ test('WASM compile and link failures offer the stale-cache remedy', () => {
     assert.equal(childWithClass(overlay, 'load-error-remedy').textContent, STALE_MODULE_REMEDY);
   }
 });
-
 
 test('boot failure advice tolerates an absent WebAssembly global', () => {
   const wasm = globalThis.WebAssembly;

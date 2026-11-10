@@ -1,9 +1,8 @@
-import {installRecordingWindow} from './helpers/fake_dom.js';
 import { fakeTimers } from './helpers/fake_timers.js';
 import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
-import { installWindow, restoreWindowAfterEach } from './helpers/fake_dom.js';
+import { installRecordingWindow, installWindow, restoreWindowAfterEach } from './helpers/fake_dom.js';
 import {
   AppState,
   URLSync,
@@ -196,20 +195,14 @@ test('URL-write retries outlast the rate-limit window', () => {
   assert.ok(URL_FLUSH_DEBOUNCE_MS < URL_FLUSH_RETRY_MS);
 });
 
-// --- URLSync (needs a minimal window stub) ---
-
-
-
-
-
 test('writeUrl assembles pathname, query and hash', () => {
-  const {calls: calls} = installRecordingWindow({search: '', pathname: '/sim', hash: '#frag'});
+  const {calls} = installRecordingWindow({search: '', pathname: '/sim', hash: '#frag'});
   writeUrl(new URLSearchParams('effect=ShapeShifter&speed=2'));
   assert.deepEqual(calls, ['/sim?effect=ShapeShifter&speed=2#frag']);
 });
 
 test('writeUrl drops the query separator when no params survive', () => {
-  const {calls: calls} = installRecordingWindow({search: '?effect=ShapeShifter', pathname: '/sim', hash: '#frag'});
+  const {calls} = installRecordingWindow({search: '?effect=ShapeShifter', pathname: '/sim', hash: '#frag'});
   writeUrl(new URLSearchParams());
   assert.deepEqual(calls, ['/sim#frag']);
 });
@@ -258,7 +251,7 @@ test('URLSync arms and cancels its debounce on the window it was handed', () => 
 });
 
 test('URLSync.reset leaves a bare path when nothing survives', () => {
-  const {calls: calls} = installRecordingWindow({search: '?effect=ShapeShifter&speed=2', pathname: '/sim', hash: '#frag'});
+  const {calls} = installRecordingWindow({search: '?effect=ShapeShifter&speed=2', pathname: '/sim', hash: '#frag'});
   const sync = new URLSync(new AppState({ effect: 'ShapeShifter' }), []);
 
   sync.reset();
@@ -433,7 +426,7 @@ test('URLSync reads initial tracked keys from the URL into state', () => {
 test('URLSync defers a tracked identity rewrite until resume', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=ShaderChain', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=ShaderChain', pathname: '/sim'});
     const state = new AppState({ effect: 'ShaderChain' });
     const sync = new URLSync(state, ['effect']);
     sync.suspend();
@@ -455,7 +448,7 @@ test('URLSync defers a tracked identity rewrite until resume', () => {
 test('URLSync counts nested suspensions and writes on the outermost resume', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=ShaderChain', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=ShaderChain', pathname: '/sim'});
     const state = new AppState({ effect: 'ShaderChain' });
     const sync = new URLSync(state, ['effect']);
     sync.suspend();
@@ -481,7 +474,7 @@ test('URLSync counts nested suspensions and writes on the outermost resume', () 
 test('URLSync ignores a resume with no suspension outstanding', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=ShaderChain', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=ShaderChain', pathname: '/sim'});
     const state = new AppState({ effect: 'ShaderChain' });
     const sync = new URLSync(state, ['effect']);
 
@@ -507,7 +500,7 @@ test('URLSync ignores a resume with no suspension outstanding', () => {
 test('URLSync suspend disarms the flush the constructor already armed', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=bogus', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=bogus', pathname: '/sim'});
     const state = new AppState({ effect: 'ShaderChain' });
     // Rejected by the validator, so the constructor arms a canonicalizing flush.
     const sync = new URLSync(state, ['effect'], { effect: (v) => v === 'Shader' });
@@ -693,7 +686,7 @@ test('URLSync registers itself as the active URL writer', () => {
 test('URLSync construction disposes the previous writer', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=ShapeShifter', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=ShapeShifter', pathname: '/sim'});
     const s = new AppState({ effect: 'ShapeShifter' });
     const first = new URLSync(s, ['effect']);
     const second = new URLSync(s, ['effect']);
@@ -721,7 +714,7 @@ test('disposing a superseded URLSync leaves the current writer active', () => {
 test('URLSync.dispose stops a later setParam from re-arming the flush', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=ShapeShifter', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=ShapeShifter', pathname: '/sim'});
     const s = new AppState({ effect: 'ShapeShifter' });
     const sync = new URLSync(s, ['effect']);
 
@@ -737,7 +730,7 @@ test('URLSync.dispose stops a later setParam from re-arming the flush', () => {
 });
 
 test('URLSync.flush writes tracked state and ad-hoc params to the URL', () => {
-  const {calls: calls} = installRecordingWindow({search: '', pathname: '/sim'});
+  const {calls} = installRecordingWindow({search: '', pathname: '/sim'});
   const s = new AppState({ effect: 'ShapeShifter' });
   const sync = new URLSync(s, ['effect']);
 
@@ -752,7 +745,7 @@ test('URLSync.flush writes tracked state and ad-hoc params to the URL', () => {
 });
 
 test('URLSync.flush preserves an existing location.hash', () => {
-  const {calls: calls} = installRecordingWindow({search: '', pathname: '/sim', hash: '#frag'});
+  const {calls} = installRecordingWindow({search: '', pathname: '/sim', hash: '#frag'});
   const s = new AppState({ effect: 'ShapeShifter' });
   const sync = new URLSync(s, ['effect']);
 
@@ -764,7 +757,7 @@ test('URLSync.flush preserves an existing location.hash', () => {
 });
 
 test('URLSync.setParam cannot override a tracked key with a stale value', () => {
-  const {calls: calls} = installRecordingWindow({search: '', pathname: '/sim'});
+  const {calls} = installRecordingWindow({search: '', pathname: '/sim'});
   const s = new AppState({ resolution: 'low' });
   const sync = new URLSync(s, ['resolution']);
 
@@ -786,7 +779,7 @@ test('URLSync.setParam cannot override a tracked key with a stale value', () => 
  * advertises, since nothing schedules a correction after the flush.
  */
 test('a re-asserted tracked value does not survive a later switch in the same window', () => {
-  const {calls: calls} = installRecordingWindow({search: '?resolution=low', pathname: '/sim'});
+  const {calls} = installRecordingWindow({search: '?resolution=low', pathname: '/sim'});
   const s = new AppState({ resolution: 'low' });
   const sync = new URLSync(s, ['resolution']);
 
@@ -803,7 +796,7 @@ test('a re-asserted tracked value does not survive a later switch in the same wi
 });
 
 test('URLSync.reset re-asserts tracked state over an ad-hoc write of the same key', () => {
-  const {calls: calls} = installRecordingWindow({search: '?speed=2', pathname: '/sim'});
+  const {calls} = installRecordingWindow({search: '?speed=2', pathname: '/sim'});
   const s = new AppState({ resolution: 'high' });
   const sync = new URLSync(s, ['resolution']);
 
@@ -817,7 +810,7 @@ test('URLSync.reset re-asserts tracked state over an ad-hoc write of the same ke
 });
 
 test('URLSync.reset carries an excluded ad-hoc write over the value it replaces', () => {
-  const {calls: calls} = installRecordingWindow({search: '?speed=2&junk=1', pathname: '/sim'});
+  const {calls} = installRecordingWindow({search: '?speed=2&junk=1', pathname: '/sim'});
   const s = new AppState({ resolution: 'high' });
   const sync = new URLSync(s, ['resolution']);
 
@@ -883,7 +876,7 @@ test('URLSync.overlayPending applies the writes buffered for the next flush', ()
 });
 
 test('URLSync.setParam(k, null) drops the key from the URL on flush', () => {
-  const {calls: calls} = installRecordingWindow({search: '?keep=1', pathname: '/sim'});
+  const {calls} = installRecordingWindow({search: '?keep=1', pathname: '/sim'});
   const s = new AppState({});
   const sync = new URLSync(s, []);
 
@@ -900,7 +893,7 @@ test('URLSync.setParam(k, null) drops the key from the URL on flush', () => {
 });
 
 test('URLSync.setParam(k, NaN) drops the key from the URL on flush', () => {
-  const {calls: calls} = installRecordingWindow({search: '?keep=1', pathname: '/sim'});
+  const {calls} = installRecordingWindow({search: '?keep=1', pathname: '/sim'});
   const s = new AppState({});
   const sync = new URLSync(s, []);
 
@@ -917,7 +910,7 @@ test('URLSync.setParam(k, NaN) drops the key from the URL on flush', () => {
 });
 
 test('URLSync.setParam keeps a small non-zero value instead of collapsing it to 0', () => {
-  const {calls: calls} = installRecordingWindow({search: '?keep=1', pathname: '/sim'});
+  const {calls} = installRecordingWindow({search: '?keep=1', pathname: '/sim'});
   const s = new AppState({});
   const sync = new URLSync(s, []);
 
@@ -955,7 +948,7 @@ test('roundUrlNumber is a fixed point under re-serialization', () => {
 });
 
 test('URLSync serializes an exact zero rather than dropping it', () => {
-  const {calls: calls} = installRecordingWindow({search: '', pathname: '/sim'});
+  const {calls} = installRecordingWindow({search: '', pathname: '/sim'});
   const s = new AppState({ speed: 0 });
   const sync = new URLSync(s, ['speed']);
 
@@ -965,7 +958,7 @@ test('URLSync serializes an exact zero rather than dropping it', () => {
 });
 
 test('URLSync.flush drops a tracked key cleared to null', () => {
-  const {calls: calls} = installRecordingWindow({search: '?effect=ShapeShifter&keep=1', pathname: '/sim'});
+  const {calls} = installRecordingWindow({search: '?effect=ShapeShifter&keep=1', pathname: '/sim'});
   const s = new AppState({ effect: 'ShapeShifter' });
   const sync = new URLSync(s, ['effect']);
 
@@ -978,7 +971,7 @@ test('URLSync.flush drops a tracked key cleared to null', () => {
 });
 
 test('URLSync.reset preserves the excluded keys and clears the rest', () => {
-  const {calls: calls} = installRecordingWindow({search: '?effect=ShapeShifter&speed=2&junk=x', pathname: '/sim'});
+  const {calls} = installRecordingWindow({search: '?effect=ShapeShifter&speed=2&junk=x', pathname: '/sim'});
   const s = new AppState({ effect: 'ShapeShifter' });
   const sync = new URLSync(s, ['effect']);
 
@@ -995,7 +988,7 @@ test('URLSync.reset preserves the excluded keys and clears the rest', () => {
 test('URLSync auto-flushes a tracked-key change once after the debounce', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=ShapeShifter', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=ShapeShifter', pathname: '/sim'});
     const s = new AppState({ effect: 'ShapeShifter' });
     new URLSync(s, ['effect']);
 
@@ -1015,7 +1008,7 @@ test('URLSync auto-flushes a tracked-key change once after the debounce', () => 
 test('URLSync writes nothing for a change to an untracked key', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=ShapeShifter', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=ShapeShifter', pathname: '/sim'});
     const s = new AppState({ effect: 'ShapeShifter', paused: false });
     new URLSync(s, ['effect']);
 
@@ -1030,7 +1023,7 @@ test('URLSync writes nothing for a change to an untracked key', () => {
 test('URLSync restarts the debounce on a tracked change inside the window', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=ShapeShifter', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=ShapeShifter', pathname: '/sim'});
     const s = new AppState({ effect: 'ShapeShifter' });
     new URLSync(s, ['effect']);
 
@@ -1050,7 +1043,7 @@ test('URLSync restarts the debounce on a tracked change inside the window', () =
 test('URLSync corrects a URL advertising a rejected value, and converges', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=Bogus&keep=1', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=Bogus&keep=1', pathname: '/sim'});
     const s = new AppState({ effect: 'ShapeShifter' });
     new URLSync(s, ['effect'], { effect: (v) => v === 'ShapeShifter' });
 
@@ -1075,7 +1068,7 @@ test('URLSync corrects a URL advertising a rejected value, and converges', () =>
 test('URLSync rewrites a URL value it accepted in a non-canonical form', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?flag=on&count=%208%20', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?flag=on&count=%208%20', pathname: '/sim'});
     const s = new AppState({ flag: false, count: 0 });
     new URLSync(s, ['flag', 'count']);
 
@@ -1092,7 +1085,7 @@ test('URLSync rewrites a URL value it accepted in a non-canonical form', () => {
 test('URLSync writes nothing when the URL already matches state', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=ShapeShifter&count=8&untracked=x', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=ShapeShifter&count=8&untracked=x', pathname: '/sim'});
     const s = new AppState({ effect: 'ShapeShifter', count: 0 });
     new URLSync(s, ['effect', 'count']);
 
@@ -1106,7 +1099,7 @@ test('URLSync writes nothing when the URL already matches state', () => {
 test('URLSync discards a failed transaction before restoring full-config hydration', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=Shader&fx.__chainSnapshot=snapshot', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=Shader&fx.__chainSnapshot=snapshot', pathname: '/sim'});
     const state = new AppState({ effect: 'Shader' });
     const sync = new URLSync(state, ['effect']);
     sync.suspend();
@@ -1143,7 +1136,7 @@ test('URLSync discard disarms an active retry and restores its full retry budget
 test('URLSync.reset collapses into the pending debounced flush', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=ShapeShifter&speed=2', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=ShapeShifter&speed=2', pathname: '/sim'});
     const s = new AppState({ effect: 'ShapeShifter' });
     const sync = new URLSync(s, ['effect']);
 
@@ -1168,7 +1161,7 @@ test('URLSync.reset collapses into the pending debounced flush', () => {
 test('a burst of resets costs a single URL write', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const {calls: calls} = installRecordingWindow({search: '?effect=ShapeShifter&fx.speed=2', pathname: '/sim'});
+    const {calls} = installRecordingWindow({search: '?effect=ShapeShifter&fx.speed=2', pathname: '/sim'});
     const s = new AppState({ effect: 'ShapeShifter' });
     const sync = new URLSync(s, ['effect']);
 

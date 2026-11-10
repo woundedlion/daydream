@@ -1,7 +1,7 @@
-import {hitTestHueKeyMarker} from '../src/workbench/palettes/palette_wheel.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { hitTestHueKeyMarker } from '../src/workbench/palettes/palette_wheel.js';
 
 import {
   paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,

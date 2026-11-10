@@ -1018,7 +1018,6 @@ test('a malformed span or sequence is refused without side effects', async () =>
   assertGreen(store);
 });
 
-
 // The workbench opens on this document, so it must be valid by construction.
 test('the scratch document compiles clean against the catalog', async () => {
   const compiled = compiler.compileShaderDocument(scratchChainDocument(CATALOG),
@@ -1173,7 +1172,6 @@ test('radian periodicity is independent of a catalog field bound', () => {
   assert.deepEqual(compiler.validateShaderDocument(document, { catalog }), []);
 });
 
-
 test('catalog fallback declarations preserve authored domains and leave load untouched', async () => {
   const store = await makeStore();
   const before = store.document();
@@ -1218,7 +1216,6 @@ test('editing an undeclared field backfills presets and policies atomically with
   assert.deepEqual(store.document(), after);
 });
 
-
 test('new kaleidoscope instances retain the loaded authored symmetry default', async () => {
   const authored = catalogFields('sphere.lens.kaleidoscope.v2')
     .find((field) => field.id === 'symmetry').values.at(-1);
@@ -1235,7 +1232,6 @@ test('new kaleidoscope instances retain the loaded authored symmetry default', a
     assert.equal(preset.values['mirror2.symmetry'], authored);
 });
 
-
 test('relabel rewrites an authored interpolation group', async () => {
   const store = await makeStore({ mutate: (doc) => {
     const parameter = doc.descriptor.parameters.find((p) => p.id === 'warp2.rotation');
@@ -1245,7 +1241,6 @@ test('relabel rewrites an authored interpolation group', async () => {
   assert.equal(store.document().descriptor.parameters.find((p) => p.id === 'warp.rotation')
     .interpolation.group, 'warp.mix');
 });
-
 
 test('new instances remap authored interpolation groups to their own labels', async () => {
   const store = await makeStore({ mutate: (doc) => {
@@ -1320,7 +1315,7 @@ test('a chain snapshot import refuses unknown parameters and unsupported shapes'
   /unknown chain snapshot parameter: missing\.parameter/);
   for (const snapshot of [null, { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION + 1, chain: SNAPSHOT_CHAIN, modulation: [], parameters: [] },
     { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: null, parameters: [], modulation: [] },
-    { schemaVersion: 2, chain: SNAPSHOT_CHAIN, parameters: [], modulation: [] },
+    { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION - 1, chain: SNAPSHOT_CHAIN, parameters: [], modulation: [] },
     { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: SNAPSHOT_CHAIN, parameters: [] },
     { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: SNAPSHOT_CHAIN, modulation: [], parameters: null }])
     assert.throws(() => documentFromChainSnapshot(snapshot, CATALOG), /unsupported chain snapshot/);

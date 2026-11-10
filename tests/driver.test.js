@@ -13,6 +13,7 @@ import { MOBILE_BREAKPOINT_PX } from '../src/shared/layout.js';
 import { repointDisplayAliases } from '../src/engine/display_aliases.js';
 import { captureConsole } from './helpers/fake_console.js';
 import { fakeElement } from './helpers/fake_dom.js';
+import { daydreamFields } from './helpers/fake_app.js';
 import { fakeColorAttribute, fakeMatrixAttribute } from './helpers/fake_three.js';
 
 // ---------------------------------------------------------------------------
@@ -2428,16 +2429,6 @@ test('the driver hands its own document to every collaborator that defaults to t
   }
 });
 
-/** Fields the Daydream class assigns, read from its class body.
- * @returns {Set<string>} Field names.
- */
-function driverFields() {
-  const body = DRIVER_SOURCE
-    .split(/^export class Daydream \{$/m)[1]?.split(/^\}$/m)[0];
-  assert.ok(body, 'the Daydream class body no longer parses');
-  return new Set([...body.matchAll(/this\.([A-Za-z_]\w*) =[^=]/g)].map((m) => m[1]));
-}
-
 // Keys a context carries that are not driver state: the sinks a test reads its
 // assertions out of.
 const CONTEXT_SINKS = new Set(['sized', 'handlers', 'classes', 'acquired']);
@@ -2448,7 +2439,7 @@ const CONTEXT_SINKS = new Set(['sized', 'handlers', 'classes', 'acquired']);
  * @returns {Array<string>} Unpinned key names, sorted.
  */
 function unpinnedContextFields(ctx) {
-  const fields = driverFields();
+  const fields = daydreamFields();
   return Object.keys(ctx)
     .filter((key) => !fields.has(key)
       && !CONTEXT_SINKS.has(key)

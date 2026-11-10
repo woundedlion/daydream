@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { GUI } from '../src/ui/gui.js';
 import { Daydream } from '../src/renderer/driver.js';
 import { AppState, URLSync } from '../src/app/state.js';
-import { fakeDriver } from './helpers/fake_app.js';
+import { daydreamFields, fakeDriver } from './helpers/fake_app.js';
 import { fakeGui, fakePanelGui } from './helpers/fake_gui.js';
 
 for (const factory of [fakeGui, fakePanelGui]) {
@@ -50,8 +50,7 @@ test('stored companion writes match DeepLinkGUI pending and flushed URLs', () =>
 
 
 test('fake driver matches the real driver method and data surface', () => {
-  const fields = new Set([...Daydream.toString().matchAll(/\bthis\.([A-Za-z_$][\w$]*)\s*=(?!=)/g)]
-    .map((match) => match[1]));
+  const fields = daydreamFields();
   for (const [name, value] of Object.entries(fakeDriver())) {
     if (typeof value === 'function') {
       assert.equal(typeof Daydream.prototype[name], 'function', name);

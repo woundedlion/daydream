@@ -10,6 +10,12 @@ import { start } from '../../src/app/daydream.js';
 
 import {fakeGui} from './fake_gui.js';
 
+/** @returns {Set<string>} Fields assigned by the Daydream driver. */
+export function daydreamFields() {
+  return new Set([...Daydream.toString().matchAll(/\bthis\.([A-Za-z_$][\w$]*)\s*=(?!=)/g)]
+    .map((match) => match[1]));
+}
+
 /**
  * The Daydream driver as the root uses one.
  * @returns {Object} The driver double.

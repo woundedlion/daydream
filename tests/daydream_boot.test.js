@@ -24,7 +24,6 @@ import { FPS } from '../src/renderer/frame_constants.js';
 
 import { fakeWasmModule, noticeText, trackedStartApp, segmentCountControl } from './helpers/fake_app.js';
 
-
 restoreDocumentAfterEach();
 const startApp = trackedStartApp();
 
@@ -243,18 +242,6 @@ async function bootedApp(options) {
   }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
 test('a failed engine load disposes the app through the retained teardown', async () => {
   const app = await bootedApp({ loadModule: () => Promise.reject(new Error('no wasm')) });
 
@@ -353,7 +340,6 @@ test('the page-failure surface is the shared one, and it is torn down', () => {
     'a listener that outlives the page discard reports into a dead app');
 });
 
-
 test('a parameter write does not clear a rejected switch', async () => {
   const module = fakeWasmModule({
     definitions: [{ name: 'Speed', value: 1, min: 0, max: 2 }],
@@ -398,8 +384,6 @@ test('resolution rollback restores an unpaused animated parameter snapshot', asy
   assert.equal(restored.find((control) => control.property === 'pause').getValue(), false);
   assert.equal(module.engine.getAnimationsPaused(), false);
 });
-
-
 
 test('the segmented controls have their own notice owner', async (t) => {
   const source = readFileSync(new URL('../src/app/daydream.js', import.meta.url), 'utf8');
@@ -638,7 +622,6 @@ test('a trapped resolution query stops the startup instead of booting on', async
     + 'nothing can render into');
 });
 
-
 test('a refused parameter write reports its reason and a later accepted edit clears it', async () => {
   const module = fakeWasmModule({
     definitions: [{ name: 'Speed', value: 1, min: 0, max: 2 }],
@@ -775,7 +758,6 @@ test('a rejected live cap edit leaves the displayed geometry unchanged', async (
   assert.equal(app.driver.DISPLAY_NORTH_PHI, 0);
   assert.equal(app.driver.DISPLAY_SOUTH_PHI, Math.PI);
 });
-
 
 test('a workbench missing document controls preserves its URL across rendered and failed frames', async (t) => {
   t.mock.timers.enable({apis: ['setTimeout']});
@@ -952,8 +934,6 @@ test('canonical and legacy URL normalization retains parameter keys', async (t) 
     assert.equal(active.dataset.effect, id);
   }
 });
-
-
 
 test('fidelity selects engine sampling before first draw and refreshes paused toggles once', async () => {
   for (const povFidelity of [false, true]) {

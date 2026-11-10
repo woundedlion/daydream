@@ -1,9 +1,9 @@
-import {wiring} from './helpers/effect_gui_harness.js';
 // Pins the behaviour of the lil-gui build package.json pins, driving the real
 // module over tests/helpers/fake_dom.js.
 //
 // add() picks a controller off `typeof object[prop]` and returns undefined,
 // after logging, for anything it has no controller for.
+import { wiring } from './helpers/effect_gui_harness.js';
 import { createEffectPanelView } from '../src/ui/effect_panel_view.js';
 import { enumChoices } from '../src/effects/param_sync.js';
 import { GUI as DeepLinkGUI } from '../src/ui/gui.js';

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMeshRenderer, meshStatsLine, meshCanvasLabel, MAX_INDEX_LABELS } from '../src/workbench/solids/solid_render.js';
+import { GEODESIC_TRIANGLE_BUDGET } from '../src/workbench/solids/solid_geometry.js';
 import { fakeElement } from './helpers/fake_dom.js';
 import {
   BufferGeometry,
@@ -204,7 +205,7 @@ test('the geodesic budget counts the centroid-fan triangles the mesh emits', () 
   // 4000 faces * 3 centroid-fan triangles, each subdivided alike.
   assert.equal(triangles % (4000 * 3), 0);
   assert.ok(triangles > 4000 * 3, 'the fan triangles are subdivided');
-  assert.ok(triangles <= 400000, 'the tessellation must stay inside its triangle budget');
+  assert.ok(triangles <= GEODESIC_TRIANGLE_BUDGET, 'the tessellation must stay inside its triangle budget');
 });
 
 test('flat shading is switched with the geodesic toggle, and only when it changes', () => {

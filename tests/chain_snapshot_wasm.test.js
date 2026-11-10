@@ -181,7 +181,7 @@ test('snapshot restore requires the current version and preserves the running ch
   installModulatedChain();
   const current = capture();
   assert.equal(restore(current), module.ChainSnapshotRestoreResult.APPLIED);
-  for (const schemaVersion of [3, 4, current.schemaVersion + 1]) {
+  for (const schemaVersion of [current.schemaVersion - 1, current.schemaVersion + 1]) {
     assert.equal(restore({...current, schemaVersion}), module.ChainSnapshotRestoreResult.UNSUPPORTED_VERSION);
     assert.deepEqual(capture(), current);
   }

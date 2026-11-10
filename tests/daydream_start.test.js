@@ -71,7 +71,6 @@ test('the global GUI carries session and deep-link controls', () => {
   carries(recording, ['recQuality', 'recResolution', 'recFormat', 'record']);
 });
 
-
 test('the column toggle follows the loaded effect default and accepts manual changes', async () => {
   const app = startApp({ loadModule: async () => fakeWasmModule() });
   const control = app.guis[0].controllers.find((c) => c.property === 'noBlackColumns');
@@ -102,8 +101,6 @@ test('explicit column-layout choices survive the initial effect default', async 
   }
 });
 
-
-
 test('legacy presentation query parameters are removed from shared URLs', () => {
   const {urlWrites} = startApp({search: '?view.povPresentation=raw&view.povExposureMs=187'});
   getActiveURLSync().flush();
@@ -111,8 +108,6 @@ test('legacy presentation query parameters are removed from shared URLs', () => 
   assert.equal(params.has('view.povPresentation'), false);
   assert.equal(params.has('view.povExposureMs'), false);
 });
-
-
 
 test('a workbench-only effect deep link is handed to the workbench page', () => {
   for (const effect of ['ShaderChain', 'alien-brain']) {
@@ -191,7 +186,6 @@ test('a failed engine load reports and disarms the Test All ticker', async (t) =
     'the failure must reach the overlay, not only the console');
 });
 
-
 test('retired shader identities are absent from simulator routing', () => {
   for (const effect of ['Shader', 'ShaderBall', 'ShaderWorkbench']) {
     const app = startApp({search: `?effect=${effect}`});
@@ -216,7 +210,6 @@ test('authoring page accepts legacy and canonical document aliases', () => {
     assert.ok(app.guis.length > 0);
   }
 });
-
 
 test('Pause Presets is absent for one preset and no animated parameter', async () => {
   const module = fakeWasmModule();

@@ -465,8 +465,6 @@ test('both handlers tolerate a teardown reader that returns null', () => {
   assert.deepEqual(failed.log, ['reportFailure fetch blocked']);
 });
 
-
-
 test('a load that beats the deadline resolves and cancels the timer', async () => {
   const timers = fakeTimers();
 
@@ -975,7 +973,6 @@ test('refreshPixelView heals both detached display aliases without advancing the
   assert.strictEqual(a.driver.dotMesh.instanceColor.array, a.view);
 });
 
-
 test('focused links and their children retain Space and arrow keys', () => {
   const h = makeKeydownHandler();
   const link = fakeElement('a');
@@ -1003,7 +1000,6 @@ test('an anchor without href does not own the key', () => {
   assert.deepEqual(h.keys, [' ']);
 });
 
-
 test('render adapters tolerate a missing pixel view', () => {
   const h = makeAdapter();
   h.driver.pixels = h.view;
@@ -1017,7 +1013,6 @@ test('render adapters tolerate a missing pixel view', () => {
   assert.equal(h.driver.dotMesh.instanceColor.version, 0);
   assert.deepEqual(h.errors, []);
 });
-
 
 test('failure reporting cannot prevent teardown', () => {
   let disposed = false;

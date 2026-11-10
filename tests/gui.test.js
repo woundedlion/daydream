@@ -1,4 +1,3 @@
-import {installRecordingWindow} from './helpers/fake_dom.js';
 // gui.js's DeepLinkGUI and URL writers, against a stubbed lil-gui.
 import { fakeTimers } from './helpers/fake_timers.js';
 import { test, mock, afterEach } from 'node:test';
@@ -16,7 +15,7 @@ import {
   snapshotEffectControlState,
   restoreEffectControlState,
 } from '../src/effects/effect_sequencing.js';
-import { fakeElement, installWindow, restoreWindowAfterEach } from './helpers/fake_dom.js';
+import { fakeElement, installRecordingWindow, installWindow, restoreWindowAfterEach } from './helpers/fake_dom.js';
 import { captureConsole } from './helpers/fake_console.js';
 
 // Roots created by a test; destroy() cancels the 200ms URL-write debounce so no

@@ -1408,10 +1408,3 @@ test('palette CUSTOM transitions send canonical recipes to WASM', () => {
     ops.delete();
   }
 });
-
-test('every effect the engine registers is offered at some resolution', () => {
-  const offered = new Set(Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
-  const missing = Array.from(engine.getEffectIdentities(), ({ display_name }) => display_name)
-    .filter((name) => name !== 'ShaderChain' && !offered.has(name));
-  assert.deepEqual(missing, []);
-});

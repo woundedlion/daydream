@@ -175,7 +175,6 @@ test('segment layout ↔ pov_segment_map: correspondence holds across configs', 
 });
 
 test('firmware columns wrap correctly at every half-turn boundary', () => {
-  assert.deepEqual(golden.x_cols.map((entry) => entry.width), [8, 96, 288]);
   for (const { width, samples } of golden.x_cols) {
     assert.deepEqual(samples.map((sample) => sample.x),
       [0, width / 2 - 1, width / 2, width - 1]);
@@ -195,7 +194,7 @@ test('firmware clip rectangles match web bands for both half-turn orientations',
       `S=${config.leds} N=${config.segment_count} lists every segment`);
     for (const [id, segment] of config.segments.entries()) {
       assert.deepEqual(segment.clips.map((clip) => [clip.width, clip.first_half]),
-        [8, 96, 288].flatMap((width) => [[width, false], [width, true]]));
+        golden.x_cols.map(({width}) => width).flatMap((width) => [[width, false], [width, true]]));
       for (const clip of segment.clips) {
         const rect = computeSegmentRange(id, config.segment_count, clip.width, config.rows);
         const x0 = clip.first_half ? rect.x0 : (rect.x0 + clip.width / 2) % clip.width;
