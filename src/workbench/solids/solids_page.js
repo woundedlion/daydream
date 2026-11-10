@@ -25,7 +25,7 @@ import {
 import { SAVED_SOLIDS_KEY, SAVED_SOLIDS_MAX, captureSavedSolidThumbnail, queueSavedSolidRestore,
   loadSavedSolids, persistSavedSolids as persistSavedStore, mergeSavedSolids, resolveSavedSolidsStorage }
   from './solid_saved_store.js';
-import { fanTriangulateFace, uniqueEdges } from './solid_geometry.js';
+import { uniqueEdges } from './solid_geometry.js';
 import { buildBaseMesh, buildChainMesh } from './solid_build.js';
 import { registryDisplayName, generateRegistryCpp, validateRegistryFaces } from './solid_registry_codegen.js';
 import { buildOpRow, formatParamValue, syncSweepWarning } from './solid_op_rows.js';
@@ -294,38 +294,28 @@ async function generateThumbnails(signal) {
     shininess: 30
   });
   const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
+  const thumbRenderer = createMeshRenderer({
+    THREE,
+    scene: offScene,
+    materials: { face: mat, faceColorize: mat, edge: lineMat },
+  });
+  const THUMB_VIEW = {
+    showFaces: true,
+    showGeodesics: false,
+    colorizeFaces: false,
+    showVertices: false,
+    showNormals: false,
+    showIndices: false,
+  };
 
   try {
     for (const key of thumbKeys) {
       await new Promise(resolve => setTimeout(resolve));
       if (signal.aborted || !meshOpsWasm) break;
 
-      offScene.clear();
-      offScene.add(light);
-      offScene.add(ambient);
-
       const meshData = buildBaseMesh(key, `Thumbnail for "${key}"`, buildContext(showThumbnailError));
       if (!meshData) continue;
-
-      const vertices = [];
-      const emitTri = (a, b, c) => {
-        vertices.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
-      };
-      meshData.faces.forEach(f => fanTriangulateFace(meshData.vertices, f, emitTri));
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-      geo.computeVertexNormals();
-
-      const mesh = new THREE.Mesh(geo, mat);
-      offScene.add(mesh);
-
-      const linePoints = [];
-      for (const [ai, bi] of uniqueEdges(meshData.faces, meshData.vertices.length)) {
-        linePoints.push(meshData.vertices[ai], meshData.vertices[bi]);
-      }
-      const lineGeo = new THREE.BufferGeometry().setFromPoints(linePoints);
-      const lines = new THREE.LineSegments(lineGeo, lineMat);
-      offScene.add(lines);
+      thumbRenderer.render(meshData, THUMB_VIEW, null);
 
       offRenderer.render(offScene, offCamera);
 
@@ -363,10 +353,9 @@ async function generateThumbnails(signal) {
         highlightBaseSolid();
       }
 
-      geo.dispose();
-      lineGeo.dispose();
     }
   } finally {
+    thumbRenderer.disposeGeometry();
     mat.dispose();
     lineMat.dispose();
     offRenderer.dispose();
