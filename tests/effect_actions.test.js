@@ -12,14 +12,14 @@ import {
 
 afterEach(() => { mock.timers.reset(); });
 
+/** @param {Object} ctrl @returns {string|null} The Export button's accessible name. */
+const exportName = (ctrl) => ctrl.$button.getAttribute('aria-label');
+
 /**
  * The action row over a fake GUI and fake deps.
  * @param {Object} [options]
  * @returns {Object} The handle, its record, and the calls its deps saw.
  */
-/** @param {Object} ctrl @returns {string|null} The Export button's accessible name. */
-const exportName = (ctrl) => ctrl.$button.getAttribute('aria-label');
-
 function actions({
   presetCount = 0,
   presetIndex = 0,

@@ -36,6 +36,7 @@ function makeEffectRecord(name, speed, paused, writes = []) {
  *   the engine module.
  * @param {Set<string>} [options.fullConfigEffects] - Effects the panel persists
  *   and restores whole through the full-config snapshot API.
+ * @param {boolean} [options.refuseChainRestore] - restoreChainSnapshot() refuses the snapshot.
  */
 function makeApp({
   rejectEffects = new Set(),

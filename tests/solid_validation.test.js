@@ -459,7 +459,6 @@ test('createOpGate re-sweeps when a param crosses the ambo lowering', async () =
 });
 
 
-/** Verifies a pass the chain outran reports nothing rather than gating on stale probes. */
 test('a gate task yield preserves validator ordering and frees a cancelled standing mesh', async (t) => {
   let posted = 0;
   let closed = 0;
@@ -506,6 +505,7 @@ test('a gate task yield preserves validator ordering and frees a cancelled stand
   assert.equal(closed, posted * 2);
 });
 
+/** A pass the chain outran reports nothing. */
 test('createOpGate discards a pass the chain changed under', async () => {
   const { Mod } = fakeModule();
   const gate = createOpGate(createChainValidator(async () => Mod));

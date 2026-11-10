@@ -1,6 +1,4 @@
-// Real-engine contract pin for the WASM surface: loads the shipped module and
-// exercises the methods and return shapes FakeEngine models, plus MeshOps and
-// PaletteOps.
+// ShaderChain WASM binding contract against FakeChainEngine.
 
 import {chainSnapshot} from './helpers/effect_gui_harness.js';
 import { test } from 'node:test';
@@ -27,6 +25,7 @@ const sink = () => {};
 const M = await createHolosphereModule({print: sink, printErr: sink});
 const {w: W, h: H} = resolutionPresets['Holosphere (96x20)'];
 const engine = new M.HolosphereEngine();
+// Both non-rejections leave the requested size active; only RESIZED tears the effect down.
 const resolutionOk = r => r === M.ResolutionSetResult.RESIZED || r === M.ResolutionSetResult.ALREADY_ACTIVE;
 const chainCall = (target, method, payload) => callWorkbenchBinding(target, method, [payload]);
 
@@ -194,8 +193,6 @@ test('adapter decode rejects nested authoring and deletion from getters', async 
 });
 
 
-// Both non-rejections leave the requested size active; only RESIZED tears the
-// effect down.
 const DEFAULT_CHAIN = [
   { instance: 'camera', operator: 'sphere.rotate.v2' },
   { instance: 'project', operator: 'project.stereographic.v2' },

@@ -357,7 +357,7 @@ function compiledBuildEngine(source = CHAIN_STUDY) {
  *   paused?: boolean, pausedFromEngine?: boolean, selectEffect?: () => boolean,
  *   onOriginalLinkReleased?: () => void, prepare?: (engine: FakeChainEngine) => void,
  *   sourceFiles?: Record<string, string>, engineCatalog?: string,
- *   importCompiler?: () => Promise<typeof import("../generated/shader/shader_workbench.mjs")>}} [seams] - source null
+ *   importCompiler?: () => Promise<typeof import("../../generated/shader/shader_workbench.mjs")>}} [seams] - source null
  *   leaves the scratch document loaded; pausedFromEngine reads the pause seam off the chain engine; prepare
  *   alters the engine before the controller starts.
  * @returns {Promise<Object>} The controller and everything it wrote to.

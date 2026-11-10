@@ -104,8 +104,6 @@ and action handlers; the page owns registry collision detection and list order.
 
 ## Validation
 
-## Validation
-
 After `npm ci` and an engine install, run `npm run lint`, `npm run typecheck`, and
 `npm test`. Test suites live in `tests/`, reusable support code in
 `tests/helpers/`, and fixture inputs in `tests/fixtures/`.

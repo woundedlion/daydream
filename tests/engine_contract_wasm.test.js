@@ -184,8 +184,6 @@ test('getShaderChainCatalog matches the installed generated/shader/engine_catalo
     + 'newline — re-pin the catalog from the installed module');
 });
 
-// The default ShaderChain program, spelled as the payload setShaderChain
-// takes.
 test('getSupportedResolutions reports buildable [w, h] rows', () => {
   const rows = M.HolosphereEngine.getSupportedResolutions();
   assert.ok(Array.isArray(rows), 'getSupportedResolutions must return an array');
