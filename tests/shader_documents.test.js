@@ -1,6 +1,6 @@
-import {singlePatternCatalog, paramRow} from './helpers/shader_document_harness.js';
 import {
-  primaryName, ownedEditors, INDEX, WORKBENCH, ENGINE_CATALOG, SCRATCH, plainName, MODULE,
+  singlePatternCatalog, paramRow, primaryName, ownedEditors, INDEX, WORKBENCH, ENGINE_CATALOG,
+  SCRATCH, plainName, MODULE,
   fixedEngine, promotedDocument, PROMOTED, PATTERN_CATALOG, shaderDocument, workbenchEngine,
   patternFetch, workbench, onChange, SCRATCH_WRITES, chooseCatalogSource,
   withoutEmbeddedModulation, CHAIN_STUDY, KALEIDOSCOPE_STAINED_GLASS,

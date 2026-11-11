@@ -1005,18 +1005,18 @@ export function createShaderDocumentController({
 
   /** @param {NonNullable<Awaited<ReturnType<typeof decodeShaderStateHash>>>} linked */
   const loadLinkedSource = async (linked) => {
-      const effectId = linked.document.effect_id;
-      const entry = [...sourceCatalog.values()].find(
-        (candidate) => candidate.compiled.document.effect_id === effectId);
-      const scratch = effectId === 'scratch';
-      const filename = entry?.filename ?? (scratch ? SCRATCH_FILENAME : 'linked.shader.json');
-      if (await loadSource(linked.document, filename, null, linked)) {
-        (/** @type {ActiveDocument} */ (active)).savedDocument = entry ? JSON.stringify(entry.compiled.document)
-          : scratch ? JSON.stringify(compiler.compileShaderDocument(
-            scratchChainDocument(operatorCatalog), { catalog: operatorCatalog }).document) : null;
-        selectLoadedSource(scratch ? '' : entry?.effectId ?? null, filename, scratch ? '' : 'Linked');
-        return true;
-      }
+    const effectId = linked.document.effect_id;
+    const entry = [...sourceCatalog.values()].find(
+      (candidate) => candidate.compiled.document.effect_id === effectId);
+    const scratch = effectId === 'scratch';
+    const filename = entry?.filename ?? (scratch ? SCRATCH_FILENAME : 'linked.shader.json');
+    if (await loadSource(linked.document, filename, null, linked)) {
+      (/** @type {ActiveDocument} */ (active)).savedDocument = entry ? JSON.stringify(entry.compiled.document)
+        : scratch ? JSON.stringify(compiler.compileShaderDocument(
+          scratchChainDocument(operatorCatalog), { catalog: operatorCatalog }).document) : null;
+      selectLoadedSource(scratch ? '' : entry?.effectId ?? null, filename, scratch ? '' : 'Linked');
+      return true;
+    }
     return false;
   };
 

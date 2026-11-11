@@ -1,8 +1,8 @@
-import {createHash} from 'node:crypto';
 // The published set combines site_manifest.txt with verified engine assets:
 // every source entry is tracked and present, and every asset the served pages
 // reach is covered by an entry.
 import { test } from 'node:test';
+import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
