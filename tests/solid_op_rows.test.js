@@ -124,7 +124,7 @@ test('the angle parameter is the one that carries a degree suffix', () => {
 });
 
 test('a number box preserves authored values outside the parameter grid', () => {
-  for (const t of [0.08726646, 0.87266463]) {
+  for (const t of [0.08726646, 0.87266463, 0.8766]) {
     const { el } = build({ op: 'truncate', params: { t } });
     const [row] = el.querySelectorAll('.op-param');
     assert.equal(row.children.find((c) => c.type === 'number').value, String(t));

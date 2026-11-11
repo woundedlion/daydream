@@ -94,7 +94,7 @@ export function formatParamValue(value, def) {
  * @returns {{row: HTMLElement, range: HTMLInputElement, number: HTMLInputElement}} The row and its two inputs.
  */
 function buildParamRow(doc, key, def, value, controlId, opName, index) {
-  def = authoredParamRange(def, value);
+  const rangeDef = authoredParamRange(def, value);
   const row = doc.createElement('div');
   row.className = 'op-param flex items-center text-[0.6rem] space-x-1';
   row.dataset.key = key;
@@ -111,18 +111,18 @@ function buildParamRow(doc, key, def, value, controlId, opName, index) {
   range.id = `${controlId}-range`;
   range.setAttribute('aria-label', accessibleName);
   range.className = 'flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer min-w-0';
-  range.min = String(def.min);
-  range.max = String(def.max);
-  range.step = String(def.step);
+  range.min = String(rangeDef.min);
+  range.max = String(rangeDef.max);
+  range.step = String(rangeDef.step);
   range.value = String(value);
 
   const number = doc.createElement('input');
   number.type = 'number';
   number.setAttribute('aria-label', `${accessibleName} value`);
   number.className = 'w-12 bg-transparent text-right font-mono text-slate-300 focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
-  number.min = String(def.min);
-  number.max = String(def.max);
-  number.step = String(def.step);
+  number.min = String(rangeDef.min);
+  number.max = String(rangeDef.max);
+  number.step = String(rangeDef.step);
   number.value = formatParamValue(value, def);
 
   const unit = doc.createElement('span');
