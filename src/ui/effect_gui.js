@@ -282,26 +282,60 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    */
   function sync(advanced = true) {
     if (!activeEffect || !activeEffect.controllerByName) return;
-    const hasPresets = activeEffect.actions.hasPresets();
+    const { presetAdvanced, presetSynced } = followPreset(activeEffect);
+    if (schemaStale(activeEffect) && !rebuildSchema()) return;
+    if (!presetSynced) return;
+    showLiveState(activeEffect, advanced, presetAdvanced);
+  }
+
+  /**
+   * Mirror the engine's live preset into the panel.
+   * @param {EffectRecord} fx - The active effect record.
+   * @returns {{presetAdvanced: boolean, presetSynced: boolean}} Whether the
+   *   live preset moved off the displayed one, and whether the panel now
+   *   mirrors it.
+   */
+  function followPreset(fx) {
+    const hasPresets = fx.actions.hasPresets();
     const presetIndex = hasPresets ? getPresetIndex() : null;
     const presetAdvanced = hasPresets
-      && activeEffect.actions.displayedPresetIndex() !== presetIndex;
+      && fx.actions.displayedPresetIndex() !== presetIndex;
     const presetSynced = !hasPresets || synchronizePreset(/** @type {number} */ (presetIndex));
+    return { presetAdvanced, presetSynced };
+  }
+
+  /**
+   * Whether the panel's schema must be rebuilt: the parameter generation
+   * moved, the engine's warnings changed, or the parameter filter toggled. A
+   * warnings change also clears the rebuild-failure latch.
+   * @param {EffectRecord} fx - The active effect record.
+   * @returns {boolean} True when the schema is stale.
+   */
+  function schemaStale(fx) {
     const filterStale =
-      (paramFilter() !== null) !== (activeEffect.paramsExternal === true);
-    const warningsStale = paramWarningsStale(activeEffect);
+      (paramFilter() !== null) !== (fx.paramsExternal === true);
+    const warningsStale = paramWarningsStale(fx);
     if (warningsStale) rebuildFailureGeneration = undefined;
-    if (paramGenerationStale(activeEffect.paramGeneration, paramGeneration())
-        || warningsStale || filterStale) {
-      if (!rebuildSchema()) return;
+    return paramGenerationStale(fx.paramGeneration, paramGeneration())
+      || warningsStale || filterStale;
+  }
+
+  /**
+   * Push the engine's pause state, preset position, parameter values and
+   * fold advisories into the panel.
+   * @param {EffectRecord} fx - The active effect record.
+   * @param {boolean} advanced - Whether the simulation stepped this frame.
+   * @param {boolean} presetAdvanced - Whether the live preset moved off the
+   *   displayed one.
+   * @returns {void}
+   */
+  function showLiveState(fx, advanced, presetAdvanced) {
+    fx.pause.show(engineAnimationsPaused());
+    if (fx.actions.hasPresets()) {
+      fx.actions.showPreset(getPresetCount(), getPresetIndex());
     }
-    if (!presetSynced) return;
-    activeEffect.pause.show(engineAnimationsPaused());
-    if (activeEffect.actions.hasPresets()) {
-      activeEffect.actions.showPreset(getPresetCount(), getPresetIndex());
-    }
-    valueSync.syncValues(activeEffect, { advanced, presetAdvanced });
-    syncAdvisories(activeEffect);
+    valueSync.syncValues(fx, { advanced, presetAdvanced });
+    syncAdvisories(fx);
   }
 
   /**
