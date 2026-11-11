@@ -823,14 +823,18 @@ export class Daydream {
    * hides black pixels and back-face-culls the far hemisphere), and picks a
    * sphere tessellation that drops as pixel count rises to cap geometry cost.
    */
+  releaseDotMesh() {
+    if (!this.dotMesh) return;
+    this.scene.remove(this.dotMesh);
+    this.dotMesh.geometry?.dispose();
+    // instanceColor.array may alias WASM memory.
+    if (this.dotMesh.instanceColor) this.dotMesh.instanceColor.array = null;
+    this.dotMesh.dispose();
+    this.dotMesh = null;
+  }
+
   setupDots() {
-    if (this.dotMesh) {
-      this.scene.remove(this.dotMesh);
-      this.dotMesh.geometry.dispose();
-      // instanceColor.array may alias WASM memory.
-      if (this.dotMesh.instanceColor) this.dotMesh.instanceColor.array = null;
-      this.dotMesh.dispose();
-    }
+    this.releaseDotMesh();
 
     if (!this.dotMaterial) {
       this.dotMaterial = new THREE.MeshBasicMaterial({
@@ -1070,14 +1074,7 @@ export class Daydream {
       this.canvas.classList.remove("keyboard-focus");
     }
 
-    if (this.dotMesh) {
-      this.scene.remove(this.dotMesh);
-      this.dotMesh.geometry?.dispose();
-      // Detach the possibly WASM-aliased instanceColor buffer before dispose().
-      if (this.dotMesh.instanceColor) this.dotMesh.instanceColor.array = null;
-      this.dotMesh.dispose();
-      this.dotMesh = null;
-    }
+    this.releaseDotMesh();
     this.pixels = null;
     this.povSweep = null;
     // Injected sink; not disposed here.
