@@ -3,8 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  *
  * The File System Access save picker. lib.dom declares the handle and stream
- * types it hands back but not the entry point. recorder.js feature-detects it
- * and streams a recording straight to the chosen file.
+ * types it hands back but not the entry point.
  */
 
 interface SaveFilePickerOptions {

@@ -298,8 +298,9 @@ and brightnesses, with held-out effects to detect tuning to one example.
 
 ## Effect identities
 
-The installed `generated/engine_contract.mjs` exports canonical effect IDs,
-display labels and legacy aliases from the compiled engine. Curated resolution
+The installed `generated/engine_contract.mjs` exports each effect's canonical ID
+and display label from the compiled engine. `canonicalEffectId` accepts either,
+so display-name (legacy) links resolve to the canonical ID. Curated resolution
 lists retain their display names and order; the app resolves those names to
 canonical IDs for engine selection and URL state. Registered effects that no
 curated list names are appended to every resolution's list. Sidebar labels, size and
