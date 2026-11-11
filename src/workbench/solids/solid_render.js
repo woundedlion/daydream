@@ -52,15 +52,28 @@ export const MAX_INDEX_LABELS = 1000;
  */
 
 /**
+ * @param {SolidMeshData} meshData - Mesh to count.
+ * @param {number} [edgeCount] - Edge count when the renderer has already built the edge list.
+ * @returns {{vertices: number, edges: number, faces: number, indices: number}}
+ */
+export function meshCounts(meshData, edgeCount = uniqueEdges(meshData.faces, meshData.vertices.length).length) {
+  return {
+    vertices: meshData.vertices.length,
+    edges: edgeCount,
+    faces: meshData.faces.length,
+    indices: meshData.faces.reduce((sum, face) => sum + face.length, 0),
+  };
+}
+
+/**
  * The stats line under the viewport: vertex, edge, face and index counts.
  * @param {SolidMeshData} meshData - The rendered mesh.
  * @param {number} edgeCount - Unique undirected edges, as counted by the render.
  * @returns {string} The formatted line.
  */
 export function meshStatsLine(meshData, edgeCount) {
-  const indexCount = meshData.faces.reduce((sum, f) => sum + f.length, 0);
-  return `${meshData.vertices.length}V / ${edgeCount}E / `
-    + `${meshData.faces.length}F / ${indexCount}I`;
+  const {vertices, edges, faces, indices} = meshCounts(meshData, edgeCount);
+  return `${vertices}V / ${edges}E / ${faces}F / ${indices}I`;
 }
 
 /**
@@ -73,8 +86,9 @@ export function meshStatsLine(meshData, edgeCount) {
  */
 export function meshCanvasLabel(title, ops, meshData, edgeCount) {
   const chain = ops.length > 0 ? `${title} after ${ops.join(', ')}` : title;
-  return `Real-time 3D preview of ${chain}: ${meshData.vertices.length} vertices, `
-    + `${edgeCount} edges, ${meshData.faces.length} faces. `
+  const {vertices, edges, faces} = meshCounts(meshData, edgeCount);
+  return `Real-time 3D preview of ${chain}: ${vertices} vertices, `
+    + `${edges} edges, ${faces} faces. `
     + 'Use arrow keys to pan and Shift plus arrow keys to orbit.';
 }
 

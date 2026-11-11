@@ -25,11 +25,10 @@ import {
 import { SAVED_SOLIDS_KEY, SAVED_SOLIDS_MAX, captureSavedSolidThumbnail, queueSavedSolidRestore,
   loadSavedSolids, persistSavedSolids as persistSavedStore, mergeSavedSolids, resolveSavedSolidsStorage }
   from './solid_saved_store.js';
-import { uniqueEdges } from './solid_geometry.js';
 import { buildBaseMesh, buildChainMesh } from './solid_build.js';
 import { registryDisplayName, generateRegistryCpp, validateRegistryFaces } from './solid_registry_codegen.js';
 import { buildOpRow, formatParamValue, syncSweepWarning } from './solid_op_rows.js';
-import { createMeshRenderer, meshStatsLine, meshCanvasLabel, MAX_INDEX_LABELS }
+import { createMeshRenderer, meshStatsLine, meshCanvasLabel, meshCounts, MAX_INDEX_LABELS }
   from './solid_render.js';
 import {
   createFrameScheduler, onPageTeardown, watchMediaMatch,
@@ -564,11 +563,7 @@ function saveSolid() {
 
   const title = formatSolidName(state.base);
 
-  const vCount = currentMesh.vertices.length;
-  const fCount = currentMesh.faces.length;
-  const eCount = uniqueEdges(currentMesh.faces, vCount).length;
-  let iCount = 0;
-  currentMesh.faces.forEach(f => iCount += f.length);
+  const {vertices: vCount, edges: eCount, faces: fCount, indices: iCount} = meshCounts(currentMesh);
 
   const opsSummary = state.ops.map(o => {
     if (o.op === 'truncate') return `Tr(${o.params.t})`;
