@@ -217,6 +217,7 @@ function patternFetch(files, patternCatalog = PATTERN_CATALOG, engineCatalog = E
  * Builds the workbench document controller over the shader.html control set.
  * @param {{files?: Object, engine?: *, patternCatalog?: string, selectEffect?: (effect: string) => boolean,
  *   initialEffect?: string|null, useDefaultFetch?: boolean,
+ *   getAnimationsPaused?: () => boolean,
  *   wrapImportCompiler?: (importer: Function) => Function}} [seams]
  * @returns {Object} The controller and everything it wrote to.
  */
