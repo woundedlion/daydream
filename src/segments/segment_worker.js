@@ -142,6 +142,12 @@ export function installSegmentWorker() {
       `segment_worker: segment ${segId} setParameter(${name}) rejected: ${outcome}`);
   }
 
+  /** @param {string} name */
+  function clearParamRejection(name) {
+    divergenceWarnings.delete(`param:${name}`);
+    if (paramRejectedKey.startsWith(`${name}:`)) paramRejectedKey = '';
+  }
+
   /**
    * Push one parameter, reporting a refusal.
    * @param {string} name - Parameter to write.
@@ -154,8 +160,7 @@ export function installSegmentWorker() {
     if (result !== wasmModule.ParamSetResult.APPLIED) {
       reportParamRejected(name, result);
     } else {
-      divergenceWarnings.delete(`param:${name}`);
-      if (paramRejectedKey.startsWith(`${name}:`)) paramRejectedKey = '';
+      clearParamRejection(name);
     }
   }
 
@@ -177,8 +182,7 @@ export function installSegmentWorker() {
       const rejected = new Set(refusals.map(({name}) => name));
       for (const {name} of writes) {
         if (rejected.has(name)) continue;
-        divergenceWarnings.delete(`param:${name}`);
-        if (paramRejectedKey.startsWith(`${name}:`)) paramRejectedKey = '';
+        clearParamRejection(name);
       }
       for (const { name, result } of refusals) {
         reportParamRejected(name, result);
