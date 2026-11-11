@@ -54,7 +54,7 @@ jobs:
           });
           appendFileSync(process.env.GITHUB_ENV, `CHROME_PATH=${browser.executablePath}\n`);
           NODE
-      - name: Smoke the published CDN import map
+      - name: Smoke every page through the published CDN import map
         env:
           HS_CDN_SMOKE: '1'
         run: timeout -k 10s 240s node scripts/browser-smoke.mjs
@@ -67,7 +67,7 @@ jobs:
         run: |
           status=0
           deadline=$(( $(date +%s) + PROBE_BUDGET_S ))
-          for script in scripts/browser-smoke.mjs scripts/*-probe.mjs
+          for script in scripts/*-probe.mjs
           do
             echo "::group::$script"
             left=$(( deadline - $(date +%s) ))
