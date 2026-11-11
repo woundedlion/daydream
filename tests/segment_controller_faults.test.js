@@ -27,6 +27,15 @@ import {
 
 installSegmentControllerHarness();
 
+/**
+ * Latch a worker throw on segment 0 of the live pool.
+ * @param {SegmentController} controller - Controller owning the worker pool.
+ * @returns {void}
+ */
+function faultSegZero(controller) {
+  controller.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
+}
+
 // ---------------------------------------------------------------------------
 // Fault latch (deadlock break)
 // ---------------------------------------------------------------------------
@@ -679,7 +688,7 @@ test('destroy() clears the fault latch so a fresh pool can recover', () => {
   expectSegmentDiagnostics([["error", "[Segmented] Worker seg 0 error: x"]]);
   const c = makeController();
   c.create(2);
-  c.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
+  faultSegZero(c);
   assert.equal(c.faulted, true);
   c.destroy();
   assert.equal(c.faulted, false);
@@ -694,7 +703,7 @@ test('a faulted setResolution leaves the rebuild to the apply pipeline', () => {
   c.active = true;
   c.create(2);
   const beforeCount = FakeWorker.instances.length;
-  c.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
+  faultSegZero(c);
   assert.equal(c.faulted, true);
 
   c.setResolution(8, 8);
@@ -713,7 +722,7 @@ test('setEffect on a faulted active pool rebuilds it and clears the fault', () =
   c.active = true;
   c.create(2);
   const beforeCount = FakeWorker.instances.length;
-  c.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
+  faultSegZero(c);
   assert.equal(c.faulted, true);
 
   c.setEffect('NewEffect');
@@ -721,15 +730,6 @@ test('setEffect on a faulted active pool rebuilds it and clears the fault', () =
   assert.equal(c.workers.length, 2, 'a fresh pool of workers was built');
   assert.equal(FakeWorker.instances.length, beforeCount + 2, 'new workers were spawned');
 });
-
-/**
- * Latch a worker throw on segment 0 of the live pool.
- * @param {SegmentController} controller - Controller owning the worker pool.
- * @returns {void}
- */
-function faultSegZero(controller) {
-  controller.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
-}
 
 // A fault that reproduces on every rebuild must not respawn the pool on every
 // effect switch.
@@ -820,7 +820,7 @@ for (const [label, act] of [
     c.create(2);
     const beforeCount = FakeWorker.instances.length;
     const worker = c.workers[0];
-    worker.onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
+    faultSegZero(c);
     assert.equal(c.faulted, true);
     const postedBefore = worker.posted.length;
 
@@ -841,7 +841,7 @@ test('a pause toggled on a faulted pool is carried into the rebuilt one', () => 
   const c = makeController();
   c.active = true;
   c.create(2);
-  c.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
+  faultSegZero(c);
 
   c.setAnimationsPaused(true);
   c.setResolution(8, 8);

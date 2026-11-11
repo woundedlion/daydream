@@ -598,10 +598,13 @@ test('getParamGeneration changes across setEffect', () => {
 test('setPoleLod reads back in range and clamps outside it', () => {
   assert.equal(typeof engine.setPoleLod, 'function',
     'setPoleLod must stay callable (pole_lod.js binds the Pole LOD slider to it)');
-  assert.ok(Number.isInteger(initialPoleLod) && initialPoleLod >= 0 && initialPoleLod <= 8,
+  assert.ok(initialPoleLod >= 0 && initialPoleLod <= 8,
     'a fresh engine starts inside the pole LOD range');
-  // The slider uses [0, 2] inside the engine range [0, 8].
   for (let v = 0; v <= 8; v++) {
+    engine.setPoleLod(v);
+    assert.equal(engine.getPoleLod(), v, `setPoleLod(${v}) must read back`);
+  }
+  for (const v of [0.25, 1.5, 7.75]) {
     engine.setPoleLod(v);
     assert.equal(engine.getPoleLod(), v, `setPoleLod(${v}) must read back`);
   }

@@ -10,9 +10,7 @@ test('upperSnake splits camelCase runs and uppercases the rest', () => {
     'TRUNCATED_ICOSAHEDRON_HK58_CHAMFER63');
   assert.equal(upperSnake('cube'), 'CUBE');
   assert.equal(upperSnake('snubDodecahedron'), 'SNUB_DODECAHEDRON');
-  // A digit before the capital is a boundary too, so the hk62 suffix does not
-  // glue onto the next segment.
-  assert.equal(upperSnake('dodecahedron_hk62_ambo'), 'DODECAHEDRON_HK62_AMBO');
+  assert.equal(upperSnake('icosahedronHk62Ambo'), 'ICOSAHEDRON_HK62_AMBO');
 });
 
 test('opStepCpp emits the engine-unit OpStep initializer per op shape', () => {

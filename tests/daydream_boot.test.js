@@ -27,11 +27,13 @@ import { fakeWasmModule, noticeText, trackedStartApp, segmentCountControl } from
 restoreDocumentAfterEach();
 const startApp = trackedStartApp();
 
-// The two simulator presets, as the driver is told to size itself to them.
-const PHANTASM = [288, 144, 0.25];
-const HOLOSPHERE = [96, 20, 2];
-
 const HIGH_RES = 'Phantasm (288x144)';
+const presetTuple = (label) => {
+  const {w, h, dotSize} = resolutionPresets[label];
+  return [w, h, dotSize];
+};
+const PHANTASM = presetTuple(HIGH_RES);
+const HOLOSPHERE = presetTuple('Holosphere (96x20)');
 const offeredIds = (resolution) => favoritesFor(resolution).map(canonicalEffectId);
 // An effect the high-res sidebar offers that is not a shader document, with a
 // display name distinct from its canonical id.
