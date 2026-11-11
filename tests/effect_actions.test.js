@@ -80,7 +80,7 @@ test('an Export the coordinator refuses logs its reason and copies nothing', () 
   a.ctrl('export').object.export();
   assert.deepEqual(a.copyText.copied, []);
   assert.deepEqual(a.warnings, [['Export: blocked']]);
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(a.ctrl('export'))));
+  assert.equal(exportName(a.ctrl('export')), EXPORT_REFUSED);
   assert.equal(a.status().textContent, EXPORT_REFUSED);
   assert.deepEqual(a.notices, ['Export: blocked']);
 });
@@ -97,7 +97,7 @@ test('a failed or rejected copy flashes failure', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const refused = actions({ copyText: fakeCopyText(false) });
   await refused.ctrl('export').object.export();
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(refused.ctrl('export'))));
+  assert.equal(exportName(refused.ctrl('export')), EXPORT_FAILED);
   assert.equal(refused.warnings.length, 1);
   assert.match(refused.warnings[0][0], /clipboard copy failed/);
   assert.equal(refused.status().textContent, EXPORT_FAILED);
@@ -106,7 +106,7 @@ test('a failed or rejected copy flashes failure', async () => {
   const error = new Error('denied');
   const rejected = actions({ copyText: fakeCopyText(error) });
   await rejected.ctrl('export').object.export();
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(rejected.ctrl('export'))));
+  assert.equal(exportName(rejected.ctrl('export')), EXPORT_FAILED);
   assert.equal(rejected.warnings.length, 1);
   assert.match(rejected.warnings[0][0], /clipboard copy failed/);
   assert.equal(rejected.warnings[0][1], error);
@@ -142,7 +142,7 @@ test('cancel drops the pending Export label revert', () => {
   a.ctrl('export').object.export();
   a.handle.cancel();
   mock.timers.tick(FLASH_MS);
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(a.ctrl('export'))));
+  assert.equal(exportName(a.ctrl('export')), EXPORT_REFUSED);
 });
 
 test('an accepted preset selection hands count and index to the coordinator', () => {

@@ -89,6 +89,7 @@ const ABSENT_CONFIG = join(tmpdir(), 'daydream-absent-gitconfig', 'absent');
 export const isolatedGitEnv = (base = process.env) => {
   const env = { ...base };
   for (const name of LOCAL_GIT_ENV) delete env[name];
+  delete env.GIT_TEMPLATE_DIR;
   return {
     ...env,
     GIT_CONFIG_GLOBAL: ABSENT_CONFIG,

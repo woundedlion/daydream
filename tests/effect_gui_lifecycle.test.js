@@ -112,7 +112,7 @@ test('Export does not fall back to controls from a stale schema', () => {
   h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, []);
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
+  assert.equal(exportName(h.gui().ctrl('export')), EXPORT_REFUSED);
   assert.match(h.warnings[0], /no parameter values matching/);
   assert.equal(exportStatus(h).textContent, EXPORT_REFUSED);
   assert.match(h.actionNotices[0], /no parameter values matching/);
@@ -138,7 +138,7 @@ test('Export without a copy operation reports the failure', () => {
 
   h.gui().ctrl('export').object.export();
 
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
+  assert.equal(exportName(h.gui().ctrl('export')), EXPORT_REFUSED);
   assert.equal(h.warnings.length, 1);
   assert.match(h.warnings[0], /clipboard copy unavailable/);
 });
@@ -155,7 +155,7 @@ test('ShaderChain Export names a missing clipboard operation', () => {
 
   h.gui().ctrl('export').object.export();
 
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
+  assert.equal(exportName(h.gui().ctrl('export')), EXPORT_REFUSED);
   assert.equal(h.warnings.length, 1);
   assert.match(h.warnings[0], /clipboard copy unavailable/);
 });
@@ -172,7 +172,7 @@ test('chain Export fails visibly when the typed snapshot is unavailable', () => 
   h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, []);
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
+  assert.equal(exportName(h.gui().ctrl('export')), EXPORT_REFUSED);
   assert.equal(h.warnings.length, 1);
   assert.match(h.warnings[0], /chain snapshot is unavailable/);
   assert.equal(exportStatus(h).textContent, EXPORT_REFUSED);
@@ -187,7 +187,7 @@ test('Export refuses a value stream that has skewed from the panel', () => {
   h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, []);
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
+  assert.equal(exportName(h.gui().ctrl('export')), EXPORT_REFUSED);
   assert.match(h.warnings[0], /param\/value length skew \(2 vs 1\)/);
 });
 
@@ -202,7 +202,7 @@ test('a rejected clipboard copy reports the failure', async () => {
 
   await h.gui().ctrl('export').object.export();
 
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
+  assert.equal(exportName(h.gui().ctrl('export')), EXPORT_FAILED);
   assert.match(h.warnings[0], /clipboard copy failed/);
   assert.equal(exportStatus(h).textContent, EXPORT_FAILED);
 });
@@ -218,7 +218,7 @@ test('a copy operation that exhausts its fallbacks reports the failure', async (
 
   await h.gui().ctrl('export').object.export();
 
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
+  assert.equal(exportName(h.gui().ctrl('export')), EXPORT_FAILED);
   assert.match(h.warnings[0], /clipboard copy failed/);
 });
 
@@ -244,7 +244,7 @@ test('Export reports a parameter formatting failure', () => {
   });
   h.panel.build();
   h.gui().ctrl('export').object.export();
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
+  assert.equal(exportName(h.gui().ctrl('export')), EXPORT_REFUSED);
   assert.match(h.warnings[0], /parameter formatting failed/);
   assert.deepEqual(h.state.copyText.copied, []);
   h.panel.destroy();
@@ -256,7 +256,7 @@ test('the Export flash reverts to the default label', () => {
   h.panel.build();
 
   h.gui().ctrl('export').object.export();
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(h.gui().ctrl('export'))));
+  assert.equal(exportName(h.gui().ctrl('export')), EXPORT_REFUSED);
 
   mock.timers.tick(FLASH_MS);
   assert.equal(exportName(h.gui().ctrl('export')), 'Export');
@@ -273,7 +273,7 @@ test('destroy cancels a pending Export flash', () => {
   h.panel.destroy();
   mock.timers.tick(FLASH_MS);
 
-  assert.ok([EXPORT_FAILED, EXPORT_REFUSED].includes(exportName(stale.ctrl('export'))),
+  assert.equal(exportName(stale.ctrl('export')), EXPORT_REFUSED,
     'the flash timer fired into a destroyed controller');
 });
 

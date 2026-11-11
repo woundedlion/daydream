@@ -6,7 +6,7 @@ import {installConsoleCapture} from './helpers/fake_console.js';
 import {createSegmentedPovControls, createSegmentPoolSpawner} from '../src/ui/segmented_pov_controls.js';
 import {maxSegmentCount, SEGMENT_COUNT_MAX} from '../src/segments/segment_policy.js';
 
-const NAV = { hardwareConcurrency: 8 };
+const NAV = {};
 const DESKTOP_CAP = maxSegmentCount(NAV, false);
 const MOBILE_CAP = maxSegmentCount(NAV, true);
 
@@ -107,9 +107,21 @@ test('the spawn bounds the pool by the ceiling the device carries now', () => {
 
   assert.deepEqual(created, [Math.min(SEGMENT_COUNT_MAX, DESKTOP_CAP), Math.min(6, MOBILE_CAP)],
     'a rotation into the mobile layout must lower the next pool spawn');
+
+  const lowMemory = {deviceMemory: 2};
+  const memoryCap = maxSegmentCount(lowMemory, false);
+  const memoryCreated = [];
+  const memorySpawn = createSegmentPoolSpawner(
+    {create: (count) => memoryCreated.push(count)},
+    () => SEGMENT_COUNT_MAX,
+    lowMemory,
+    () => false);
+  memorySpawn();
+  assert.ok(memoryCap < SEGMENT_COUNT_MAX);
+  assert.deepEqual(memoryCreated, [memoryCap]);
 });
 
-function layoutControlRig(t) {
+function layoutControlRig(t, nav = NAV) {
   const gui = fakeGui('view');
   let changed;
   let removed;
@@ -122,12 +134,19 @@ function layoutControlRig(t) {
   const segments = { active: false, count: SEGMENT_COUNT_MAX, showBoundaries: false,
     create(count) { this.count = count; created.push(count); }, destroy() {} };
   t.mock.method(pageWarmer, 'warm', async () => {});
-  const spawn = createSegmentedPovControls({ gui, segments, nav: NAV,
+  const spawn = createSegmentedPovControls({ gui, segments, nav,
     win: { matchMedia: () => query }, showNotice() {} });
   const controls = gui.folders[0].controllers;
   const count = controls.find(control => control.property === 'segments');
   return {count, query, segments, spawn, created, changed: () => changed(), get listener() { return changed; }, get removed() { return removed; }};
 }
+
+test('segmented slider follows the device memory ceiling', (t) => {
+  const nav = {deviceMemory: 2};
+  const rig = layoutControlRig(t, nav);
+  assert.deepEqual(rig.count.args[0], [maxSegmentCount(nav, false)]);
+  rig.spawn.dispose();
+});
 
 test('segmented slider and pool follow viewport layout changes', async (t) => {
   const {count, query, segments, spawn, created, changed} = layoutControlRig(t);

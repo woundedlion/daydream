@@ -2308,14 +2308,16 @@ test('loaded twist and glitch stages expose omitted controls and persist slider 
     { label: 'sample', operator: 'sample.grid.v4' },
     { label: 'color', operator: 'colorize.generated-palette.v4' },
   ]);
-  const twist = CATALOG.operators.find((operator) => operator.id === 'sphere.lens.twist.v2');
-  const angle = twist.params.find((field) => field.id === 'twist-angle');
   const controls = [
-    ['twist', angle.id, angle.default, 4.5],
-    ['twist', 'speed', 0.02, 0.035],
-    ['glitch', 'polar-multiplier', 2, 4],
-    ['glitch', 'azimuth-multiplier', 3, -2],
-  ];
+    ['twist', 'sphere.lens.twist.v2', 'twist-angle', 4.5],
+    ['twist', 'sphere.lens.twist.v2', 'speed', 0.035],
+    ['glitch', 'sphere.lens.glitch.v2', 'polar-multiplier', 4],
+    ['glitch', 'sphere.lens.glitch.v2', 'azimuth-multiplier', -2],
+  ].map(([label, operator, field, value]) => [
+    label, field,
+    CATALOG.operators.find((entry) => entry.id === operator).params.find((param) => param.id === field).default,
+    value,
+  ]);
   const omitted = controls.map(([label, field]) => `${label}.${field}`);
   source.descriptor.parameters = source.descriptor.parameters.filter(
     (parameter) => !omitted.includes(parameter.id));
@@ -2326,6 +2328,7 @@ test('loaded twist and glitch stages expose omitted controls and persist slider 
   const h = await makeStrip({ source, writeThrough: true });
   assert.deepEqual(h.store.document(), source);
   for (const [label, field, initial, value] of controls) {
+    assert.notEqual(value, initial);
     chipByLabel(h, label).dispatch('click');
     const id = `${label}.${field}`;
     const slider = controlIn(rowFor(h, label, id));

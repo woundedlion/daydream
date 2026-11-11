@@ -1,11 +1,10 @@
-import {oklchLinearRgb, HUE_KEY_GRAB_RADIUS, HUE_KEY_NAMES, canvasPoint, createHueKeyWheelPainter, hueKeyDegrees, hueKeyHandoff, hueKeyLabelBoxes, hueKeyMarkerPoints, hueKeyNudgeTurns, paintHueWheelRaster, wheelTurnAt, maxSrgbGamutChroma, RASTER_RADIUS, LIGHTNESS_STEPS} from '../src/workbench/palettes/palette_wheel.js';
 // The palette tool's hue-key wheel, run end to end against a recording context
 // double: the gamut raster, the marker and label geometry laid over it, and the
 // pointer and keyboard arithmetic a key is moved by.
+import {oklchLinearRgb, HUE_KEY_GRAB_RADIUS, HUE_KEY_NAMES, canvasPoint, createHueKeyWheelPainter, hueKeyDegrees, hueKeyHandoff, hueKeyLabelBoxes, hueKeyMarkerPoints, hueKeyNudgeTurns, paintHueWheelRaster, wheelTurnAt, maxSrgbGamutChroma, RASTER_RADIUS, LIGHTNESS_STEPS, hitTestHueKeyMarker} from '../src/workbench/palettes/palette_wheel.js';
 import { fakeContext, withPixelRatio } from './helpers/fake_canvas.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hitTestHueKeyMarker } from '../src/workbench/palettes/palette_wheel.js';
 import { linearToSrgbFloat } from '../src/shared/color.js';
 
 /**
@@ -106,6 +105,14 @@ test('a marker is grabbable within the wheel grab radius and not beyond it', () 
     points[1].y, points, HUE_KEY_GRAB_RADIUS), 1);
   assert.equal(hitTestHueKeyMarker(points[1].x + HUE_KEY_GRAB_RADIUS + 1,
     points[1].y, points, HUE_KEY_GRAB_RADIUS), null);
+});
+
+test('hue key hit testing ignores blank wheel space', () => {
+  const points = [{ x: 20, y: 20 }, { x: 80, y: 20 }, { x: 50, y: 80 }];
+
+  assert.equal(hitTestHueKeyMarker(22, 21, points, 12), 0);
+  assert.equal(hitTestHueKeyMarker(68, 20, points, 12), 1);
+  assert.equal(hitTestHueKeyMarker(50, 50, points, 12), null);
 });
 
 test('key hues are reported in whole degrees, wrapped past the seam', () => {

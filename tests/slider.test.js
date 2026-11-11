@@ -22,7 +22,7 @@ const base = { id: 's', label: 'L', min: 0, max: 10, step: 1, value: 5 };
 
 test('throws when the container element is absent', () => {
   installDocument({ getElementById: () => null });
-  assert.throws(() => createSlider('missing', { ...base, min: 10, max: 0 }, null),
+  assert.throws(() => createSlider('missing', base, null),
                 /container #missing not found/);
 });
 

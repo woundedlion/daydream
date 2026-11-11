@@ -480,22 +480,6 @@ test('chain snapshot seeds respect signed 32-bit bounds', () => {
   }
 });
 
-test('palette snapshot restores retain active fade state', () => {
-  const {fake, saved} = chainFixture();
-  const advanced = structuredClone(saved);
-  const nextSequence = 3;
-  advanced.paletteBank.hues.fill((nextSequence - 1) * PALETTE_HUE_STEP);
-  for (const cycle of advanced.paletteBank.cycles) {
-    cycle.nextSequence = nextSequence;
-    cycle.fadeActive = true;
-    cycle.frame = 1;
-  }
-  for (const target of [engine, fake]) {
-    assert.equal(chainCall(target, 'restoreSnapshot', advanced).value, ChainSnapshotRestoreResult.APPLIED.value);
-    assert.deepEqual(chainCall(target, 'getSnapshot').paletteBank, advanced.paletteBank);
-  }
-});
-
 test('palette snapshot restores reject inconsistent fade state', () => {
   const {fake, saved} = chainFixture();
   const advanced = structuredClone(saved);

@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { hitTestHueKeyMarker } from '../src/workbench/palettes/palette_wheel.js';
 
 import {
   paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
@@ -175,16 +174,6 @@ test('custom hue offsets stay signed and continuous across the wrap seam', () =>
   assert.ok(Math.abs(equivalentTurnNear(0.02, 0.98) - 1.02) < 1e-12);
   assert.ok(Math.abs(equivalentTurnNear(0.98, 0.02) + 0.02) < 1e-12);
 });
-
-test('hue key hit testing ignores blank wheel space', () => {
-  const points = [{ x: 20, y: 20 }, { x: 80, y: 20 }, { x: 50, y: 80 }];
-
-  assert.equal(hitTestHueKeyMarker(22, 21, points, 12), 0);
-  assert.equal(hitTestHueKeyMarker(68, 20, points, 12), 1);
-  assert.equal(hitTestHueKeyMarker(50, 50, points, 12), null);
-});
-
-
 
 test('custom hue state derives three sensible keys from authored harmonies', () => {
   const recipe = defaultPaletteRecipe();

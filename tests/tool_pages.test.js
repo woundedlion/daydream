@@ -259,8 +259,8 @@ test('every served page carries a CSP permitting no Tailwind CDN origin or blank
     // WebAssembly.instantiate needs, does not match.
     assert.doesNotMatch(csp, /'unsafe-eval'/,
       `${page} CSP grants blanket 'unsafe-eval'; instantiating WASM needs only 'wasm-unsafe-eval'`);
-    assert.match(csp, /default-src 'self'/);
-    assert.match(csp, /object-src 'none'/);
+    assert.deepEqual(directive(csp, 'default-src'), ["'self'"], page);
+    assert.deepEqual(directive(csp, 'object-src'), ["'none'"], page);
   }
 });
 

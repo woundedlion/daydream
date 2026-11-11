@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync, spawnSync} from 'node:child_process';
+import {existsSync} from 'node:fs';
 import {join} from 'node:path';
 import {isolatedGitEnv, scratchDir, writeFileAt} from './helpers/fixture_repo.js';
 
@@ -27,3 +28,13 @@ for (const location of ['home', 'xdg']) {
     assert.equal(attributes(env), 'probe.txt: marker: unspecified');
   });
 }
+
+test('fixture git ignores the operator template directory', (t) => {
+  const root = scratchDir(t, 'daydream-git-template-');
+  const fixture = join(root, 'fixture');
+  const template = join(root, 'template');
+  writeFileAt(template, 'hooks/pre-commit', '#!/bin/sh\nexit 1\n');
+  const env = isolatedGitEnv({...process.env, GIT_TEMPLATE_DIR: template});
+  execFileSync('git', ['-C', root, 'init', '-q', fixture], {env});
+  assert.equal(existsSync(join(fixture, '.git', 'hooks', 'pre-commit')), false);
+});
