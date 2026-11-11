@@ -871,7 +871,7 @@ for (const [name, fence] of [
     c.active = true;
     c.tick();
     driver.paused = true;
-      fence(c);
+    fence(c);
     assert.notEqual(c.frameState.inflightGen, c.frameState.renderGen);
     await deliverGeneration(c);
     assert.equal(c.frameState.renderInFlight, true);

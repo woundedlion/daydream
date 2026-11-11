@@ -1,5 +1,5 @@
-import {SegmentStatsView} from '../src/ui/segment_stats_view.js';
 // SegmentController compositor and the tick() render-loop state machine.
+import {SegmentStatsView} from '../src/ui/segment_stats_view.js';
 import { installFakeTimers } from './helpers/fake_timers.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
