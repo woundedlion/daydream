@@ -81,13 +81,14 @@ export function snapshotEffectControlState(effect,
   if (!effect?.controllerByName) return null;
   /** @type {Array<[string, any]>} */
   const paramValues = [];
-  if (!usesChainSnapshot()) {
+  const chain = usesChainSnapshot();
+  if (!chain) {
     for (const name of effect.writableParamNames || []) {
       const controller = effect.controllerByName.get(name);
       if (controller) paramValues.push([name, controller.getValue()]);
     }
   }
-  const chainSnapshot = usesChainSnapshot() ? getChainSnapshot() : null;
+  const chainSnapshot = chain ? getChainSnapshot() : null;
   return {
     ...(chainSnapshot ? { chainSnapshot } : {}),
     paramValues,
