@@ -12,11 +12,12 @@
  * getLastResult(), which the next call overwrites.
  */
 
-import { applyOp, chainOpName, meshOpFailure, requireMeshResult } from './solid_codegen.js';
+import { applyOp, meshOpFailure, requireMeshResult } from './solid_validation.js';
+import { chainOpName } from './solid_op_params.js';
 
-/** @typedef {import('./solid_codegen.js').ChainOp} ChainOp */
-/** @typedef {import('./solid_codegen.js').MeshWrapper} MeshWrapper */
-/** @typedef {import('./solid_codegen.js').WasmModule} WasmModule */
+/** @typedef {import('./solid_op_params.js').ChainOp} ChainOp */
+/** @typedef {import('./solid_validation.js').MeshWrapper} MeshWrapper */
+/** @typedef {import('./solid_validation.js').WasmModule} WasmModule */
 
 /** @typedef {import('./solid_render.js').Vertex} Vertex */
 /** @typedef {import('./solid_render.js').SolidMeshData} SolidMeshData */

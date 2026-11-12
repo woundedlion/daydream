@@ -108,6 +108,7 @@
     "src/shared/module_load_guard.js",
     "src/workbench/solids/solid_build.js",
     "src/workbench/solids/solid_codegen.js",
+    "src/workbench/solids/solid_op_params.js",
     "src/workbench/solids/solid_saved_store.js",
     "src/workbench/solids/solid_saved_cards.js",
     "src/workbench/solids/solid_validation.js",

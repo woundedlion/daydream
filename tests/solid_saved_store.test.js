@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {MAX_RECIPE_STEPS} from '../src/workbench/solids/solid_codegen.js';
+import { MAX_RECIPE_STEPS } from '../src/workbench/solids/solid_validation.js';
 import {loadSavedSolids, mergeSavedSolids, persistSavedSolids, captureSavedSolidThumbnail, queueSavedSolidRestore, SAVED_SOLIDS_MAX,
   REJECTED_BACKUP_ENTRIES, REJECTED_BACKUP_ENTRY_CHARS, SAVED_SOLIDS_KEY, REJECTED_SOLIDS_KEY, importedSavedSolid, resolveSavedSolidsStorage} from '../src/workbench/solids/solid_saved_store.js';
 

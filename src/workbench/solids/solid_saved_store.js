@@ -3,7 +3,8 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-import { savedChainShapeError, savedSolidExportError, formatSolidName } from './solid_codegen.js';
+import { savedChainShapeError, savedSolidExportError } from './solid_validation.js';
+import { formatSolidName } from './solid_codegen.js';
 
 /** Maximum number of thumbnail-bearing solids retained by the page. */
 export const SAVED_SOLIDS_MAX = 40;

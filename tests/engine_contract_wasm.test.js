@@ -13,10 +13,8 @@ import { MAX_DISPLAY_CAP_PERCENT } from '../src/renderer/display_caps.js';
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 
 import { createChainValidator } from '../src/workbench/solids/solid_validation.js';
-import {
-  KNOWN_OPS, OP_DEFS, CATALAN_BASES, SIMPLE_SEEDS,
-  DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure,
-} from '../src/workbench/solids/solid_codegen.js';
+import { KNOWN_OPS, OP_DEFS, CATALAN_BASES, SIMPLE_SEEDS, DEFINED_SEED_CONSTANTS } from '../src/workbench/solids/solid_op_params.js';
+import { applyOp, meshOpFailure } from '../src/workbench/solids/solid_validation.js';
 
 import { isViewLive, refreshPixelView } from '../src/renderer/pixel_view.js';
 import { DEFAULT_EFFECT, resolutionPresets } from '../src/effects/effect_roster.js';

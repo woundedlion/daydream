@@ -10,22 +10,13 @@
  */
 
 import {
-  applyOp, chainOpName,
-  meshOpFailure,
-  CATALAN_BASES,
-  D2R_F32,
-  DEFINED_SEED_CONSTANTS,
-  OP_DEFS,
-  KNOWN_OPS,
-  MAX_RECIPE_STEPS,
-  SIMPLE_SEEDS,
-  exactHankinDegrees,
-  generateFuncAndRecipe,
-  opParams,
-  requireParams,
-  snakeIdentifier,
-  unsweepableReason,
-} from './solid_codegen.js';
+  applyOp, meshOpFailure, MAX_RECIPE_STEPS, requireParams, unsweepableReason,
+} from './solid_validation.js';
+import {
+  chainOpName, CATALAN_BASES, D2R_F32, DEFINED_SEED_CONSTANTS, OP_DEFS, KNOWN_OPS,
+  SIMPLE_SEEDS, exactHankinDegrees, opParams,
+} from './solid_op_params.js';
+import { generateFuncAndRecipe, snakeIdentifier } from './solid_codegen.js';
 import { engineHalted } from '../../shared/engine_halt.js';
 import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns, formatFloatCpp } from '../../shared/cpp_format.js';
 
@@ -34,7 +25,7 @@ export const MAX_BUILD_STEPS = 8;
 /** Maximum face count of replay endpoints and morph intermediates. */
 export const MAX_BUILD_FACES = 1152;
 /** Composite operations expanded into engine primitives.
- * @type {Record<string, (op: import('./solid_codegen.js').ChainOp) => import('./solid_codegen.js').ChainOp[]>} */
+ * @type {Record<string, (op: import('./solid_op_params.js').ChainOp) => import('./solid_op_params.js').ChainOp[]>} */
 export const LOWERING = {
   meta: () => ['ambo', 'dual', 'kis'],
   needle: () => ['dual', 'kis'],
@@ -70,7 +61,7 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
       } })),
       ...item.ops,
     ];
-    /** @type {import('./solid_codegen.js').MeshWrapper|null} */
+    /** @type {import('./solid_validation.js').MeshWrapper|null} */
     let mesh = null;
     let halted = false;
     try {
@@ -147,7 +138,7 @@ export function upperSnake(name) {
 /**
  * One solids.h OpStep initializer. HANKIN carries radians (emitted as
  * `deg * D2R`), SNUB a (t, twist) pair, RELAX a live iteration count.
- * @param {import('./solid_codegen.js').ChainOp} o - The op, as a bare name or an {op, params} object.
+ * @param {import('./solid_op_params.js').ChainOp} o - The op, as a bare name or an {op, params} object.
  * @returns {string} The OpStep initializer.
  * @throws {Error} When the op is unknown or a parameterized op arrives without params.
  */

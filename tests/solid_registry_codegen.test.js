@@ -1,5 +1,6 @@
 import {fixture} from './helpers/fixture.js';
-import { D2R_F32, MAX_RECIPE_STEPS, KNOWN_OPS, PARAMETERIZED_OPS, SIMPLE_SEEDS, DEFINED_SEED_CONSTANTS, seedOpParams } from '../src/workbench/solids/solid_codegen.js';
+import { D2R_F32, KNOWN_OPS, PARAMETERIZED_OPS, SIMPLE_SEEDS, DEFINED_SEED_CONSTANTS, seedOpParams } from '../src/workbench/solids/solid_op_params.js';
+import { MAX_RECIPE_STEPS } from '../src/workbench/solids/solid_validation.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 

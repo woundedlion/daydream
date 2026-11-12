@@ -7,21 +7,15 @@
 import * as THREE from 'three';
 import {dropSlotIndex, dropTargetIndex, reorderPreviewShift, movedOps} from './solid_op_order.js';
 import { buildSavedCard } from './solid_saved_cards.js';
-import { createCommitQueue, createChainValidator, createOpGate } from './solid_validation.js';
+import {
+  createCommitQueue, createChainValidator, createOpGate, MAX_RECIPE_STEPS, savedChainShapeError,
+} from './solid_validation.js';
 import { initScene, copyWithFeedback, showFatalError, bootstrapTool, formatKB } from '../shared.js';
 import { standDownIfHalted } from '../../shared/engine_halt.js';
 import {
-  OP_DEFS, MAX_RECIPE_STEPS,
-  savedChainShapeError,
-  CATALAN_BASES,
-  formatSolidName,
-  generateFuncAndRecipe,
-  generateRecipeCpp,
-  authoredParamRange, snapToStep,
-  seedOpParams,
-  opsFromRecipe,
-  opTopologyKey,
-} from './solid_codegen.js';
+  OP_DEFS, CATALAN_BASES, authoredParamRange, snapToStep, seedOpParams, opsFromRecipe, opTopologyKey,
+} from './solid_op_params.js';
+import { formatSolidName, generateFuncAndRecipe, generateRecipeCpp } from './solid_codegen.js';
 import { SAVED_SOLIDS_KEY, SAVED_SOLIDS_MAX, captureSavedSolidThumbnail, queueSavedSolidRestore,
   loadSavedSolids, persistSavedSolids as persistSavedStore, mergeSavedSolids, resolveSavedSolidsStorage }
   from './solid_saved_store.js';

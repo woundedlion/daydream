@@ -8,9 +8,10 @@
  * values come from localStorage, so rows are built node-by-node, never via innerHTML.
  */
 
-import { authoredParamRange, offStepGrid, unsweepableReason } from './solid_codegen.js';
+import { authoredParamRange, offStepGrid } from './solid_op_params.js';
+import { unsweepableReason } from './solid_validation.js';
 
-/** @typedef {import('./solid_codegen.js').OpParamDef} OpParamDef */
+/** @typedef {import('./solid_op_params.js').OpParamDef} OpParamDef */
 
 /**
  * @typedef {{op: string, params: Object<string, number>}} ChainOpRow

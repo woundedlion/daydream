@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildOpRow, formatParamValue, syncSweepWarning } from '../src/workbench/solids/solid_op_rows.js';
-import { authoredParamRange, OP_DEFS, seedOpParams, snapToStep, unsweepableReason } from '../src/workbench/solids/solid_codegen.js';
+import { authoredParamRange, OP_DEFS, seedOpParams, snapToStep } from '../src/workbench/solids/solid_op_params.js';
+import { unsweepableReason } from '../src/workbench/solids/solid_validation.js';
 import { MORPH_SWEEP } from '../generated/engine_contract.mjs';
 import { fakeElement } from './helpers/fake_dom.js';
 

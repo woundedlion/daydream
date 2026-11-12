@@ -1,5 +1,5 @@
 import { enumeration } from './fake_enums.js';
-import { KNOWN_OPS } from '../../src/workbench/solids/solid_codegen.js';
+import { KNOWN_OPS } from '../../src/workbench/solids/solid_op_params.js';
 
 // One triangle: the smallest readback that exercises both arrays.
 const VERTICES = () => Float32Array.from([0, 0, 0, 1, 0, 0, 0, 1, 0]);

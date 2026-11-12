@@ -3,13 +3,294 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-import { engineHalted } from '../../shared/engine_halt.js';
-import { applyOp, chainOpName, meshOpFailure, opTopologyKey, seedOpParams } from './solid_codegen.js';
+/** Solid operation validation and dispatch. */
 
-/** @typedef {import('./solid_codegen.js').WasmModule} WasmModule */
-/** @typedef {import('./solid_codegen.js').ChainOp} ChainOp */
-/** @typedef {import('./solid_codegen.js').MeshWrapper} MeshWrapper */
-/** @typedef {import('./solid_codegen.js').SolidMesh} SolidMesh */
+import { CPP_IDENTIFIER } from '../../shared/cpp_format.js';
+import { engineHalted } from '../../shared/engine_halt.js';
+import { MORPH_SWEEP, NUMERIC_ENUMS } from '../../../generated/engine_contract.mjs';
+import {
+  D2R_F32, KNOWN_OPS, OP_DEFS, PARAMETERIZED_OPS, chainOpName, offStepGrid,
+  opParams, opTopologyKey, seedOpParams,
+} from './solid_op_params.js';
+
+/** @typedef {import('./solid_op_params.js').ChainOp} ChainOp */
+/** @typedef {import('./solid_op_params.js').SolidMesh} SolidMesh */
+/** @typedef {import('./solid_op_params.js').OpParamDef} OpParamDef */
+
+/**
+ * A live WASM MeshOps mesh wrapper.
+ * @typedef {import('../../../generated/holosphere_wasm.js').MeshHandle} MeshWrapper
+ */
+
+/**
+ * A spawned WASM module instance, reached by binding name.
+ * @typedef {import('../../../generated/holosphere_wasm.js').HolosphereModule} WasmModule
+ */
+
+/**
+ * Why the engine's morph path would decline a chain step, which makes the entry
+ * generate whole instead of op by op, per the engine contract's MORPH_SWEEP.
+ * @param {ChainOp} o - The op as the chain holds it.
+ * @returns {?string} A sentence naming the reason, or null when the step sweeps.
+ */
+export function unsweepableReason(o) {
+  const opName = chainOpName(o);
+  if (MORPH_SWEEP.unswept.includes(opName)) {
+    return `${opName} is not swept by the morph path: a shape using it is generated whole `
+      + 'rather than built on screen.';
+  }
+  if (!Object.hasOwn(MORPH_SWEEP.bands, opName)) return null;
+  for (const [key, { min, max, excluded }] of Object.entries(MORPH_SWEEP.bands[opName])) {
+    const value = typeof o === 'string' ? NaN : Number(o?.params?.[key]);
+    if (!Number.isFinite(value)) continue;
+    const engineValue = Math.fround(value);
+    if (excluded && engineValue > Math.fround(excluded.lower)
+        && engineValue <= Math.fround(excluded.upper)) {
+      return `${opName} cannot sweep ${key} at ${engineValue}: the shape is `
+        + 'generated whole rather than built on screen.';
+    }
+    if (engineValue >= Math.fround(min) && engineValue <= Math.fround(max)) continue;
+    return `${opName} sweeps ${key} only over ${min} to ${max}: at ${value} the `
+      + 'shape is generated whole rather than built on screen.';
+  }
+  return null;
+}
+
+/**
+ * Longest step table a Recipe can describe: its count field is a uint8_t.
+ */
+export const MAX_RECIPE_STEPS = 255;
+
+/**
+ * Rejects an op whose params object is missing on either dispatch path.
+ * @param {string} where - Caller name used in the error message.
+ * @param {string} opName - The op being dispatched.
+ * @param {ChainOp} o - The op as supplied.
+ * @returns {void}
+ * @throws {Error} When a parameterized op arrives without a params object.
+ */
+export function requireParams(where, opName, o) {
+  if (PARAMETERIZED_OPS.has(opName) && (typeof o === 'string' || !o.params)) {
+    throw new Error(`${where}: op "${opName}" requires a params object`);
+  }
+}
+
+/**
+ * The first declared param of an op that carries a finite value outside its
+ * OP_DEFS band. Non-finite values are left to the caller's own finiteness check.
+ * @param {string} opName - An op name OP_DEFS declares.
+ * @param {Object<string, number>} params - The op's params.
+ * @returns {?{key: string, def: OpParamDef, value: number}} The offending param,
+ *   or null when every declared param is in band.
+ */
+export function outOfRangeParam(opName, params) {
+  for (const [key, def] of Object.entries(OP_DEFS[opName].params)) {
+    const value = params[key];
+    if (Number.isFinite(value) && (value < def.min || value > def.max)) {
+      return { key, def, value };
+    }
+  }
+  return null;
+}
+
+/**
+ * Checks whether a saved card has an exportable recipe.
+ * @param {string} base - Seed solid.
+ * @param {ChainOp[]} ops - Authored operations.
+ * @returns {?string} Refusal reason, or null for an exportable shape.
+ */
+export function savedSolidExportError(base, ops) {
+  return savedChainShapeError(base, ops)
+    ?? (ops.length === 0 ? 'its op chain is empty; a saved solid needs at least one op' : null);
+}
+
+/**
+ * Shape-checks a persisted base+chain against the op table, without the engine.
+ * @param {*} base - The persisted seed-solid name.
+ * @param {*} ops - The persisted op chain.
+ * @returns {?string} A message naming the first defect, or null when the pair is restorable.
+ * @details Refuses unknown ops, missing, non-numeric, out-of-range or off-grid
+ * params, chains past MAX_RECIPE_STEPS, and bare-string ops. An off-grid value
+ * would split the generated funcName from its recipe: the name suffix rounds
+ * where the emitted call does not.
+ */
+export function savedChainShapeError(base, ops) {
+  if (typeof base !== 'string' || !base) return 'it names no base solid';
+  if (!Array.isArray(ops)) return 'its op chain is not a list';
+  if (ops.length > MAX_RECIPE_STEPS) {
+    return `its op chain holds ${ops.length} ops; a chain carries at most ${MAX_RECIPE_STEPS}`;
+  }
+  for (let i = 0; i < ops.length; i++) {
+    const o = ops[i];
+    const at = `op ${i + 1}`;
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return `${at} is not an op entry`;
+    if (!KNOWN_OPS.has(o.op)) return `${at} names an unknown operator "${o.op}"`;
+    const banded = outOfRangeParam(o.op, o.params ?? {});
+    if (banded) return `${at} ("${o.op}") carries out-of-range "${banded.key}"`;
+    for (const [key, def] of Object.entries(OP_DEFS[o.op].params)) {
+      const value = o.params?.[key];
+      if (!Number.isFinite(value)) {
+        return `${at} ("${o.op}") carries no numeric "${key}"`;
+      }
+      if (offStepGrid(value, def)) {
+        return `${at} ("${o.op}") carries off-grid "${key}"`;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Applies one op of the {op, params} encoding to a WASM mesh wrapper, returning
+ * the resulting mesh.
+ * @param {MeshWrapper} mesh - A live WASM MeshOps mesh wrapper.
+ * @param {ChainOp} o - The op to apply, as a bare op name or an {op, params} object.
+ * @returns {MeshWrapper} The new mesh wrapper.
+ * @throws {Error} When the op name is not a known operator, when the module binds no method for it, or when the op soft-rejects.
+ * @details A soft reject (null from the bridge) throws before the caller swaps
+ * its live wrapper. The KNOWN_OPS gate keeps op names off the wrapper's
+ * lifetime methods (delete, clone).
+ */
+export function applyOp(mesh, o) {
+  const opName = chainOpName(o);
+  if (!KNOWN_OPS.has(opName)) {
+    throw new Error(`applyOp: unknown op "${opName}" — not a Conway/SolidBuilder operator`);
+  }
+  requireParams('applyOp', opName, o);
+  const next = dispatchOp(mesh, o, opName);
+  if (!next) {
+    throw new Error(`applyOp: op "${opName}" was rejected by the WASM MeshOps module`);
+  }
+  return next;
+}
+
+/**
+ * Calls the bound method for one op.
+ * @param {MeshWrapper} mesh - A live WASM MeshOps mesh wrapper.
+ * @param {ChainOp} o - The op to apply.
+ * @param {string} opName - The op's name.
+ * @returns {?MeshWrapper} The new mesh wrapper, or null when the module soft-rejects the op.
+ * @throws {Error} When the module binds no method for the op name.
+ */
+function dispatchOp(mesh, o, opName) {
+  const params = opParams(o);
+  if (opName === 'truncate') return mesh.truncate(params.t);
+  if (opName === 'chamfer') return mesh.chamfer(params.t);
+  if (opName === 'expand') return mesh.expand(params.t);
+  if (opName === 'bevel') return mesh.bevel(params.t);
+  if (opName === 'snub') return mesh.snub(params.t, params.twist);
+  if (opName === 'hankin') return mesh.hankin(Math.fround(params.angle * D2R_F32));
+  if (opName === 'relax') return mesh.relax(params.iter);
+  const operation = Reflect.get(mesh, opName);
+  if (typeof operation === 'function') return operation.call(mesh);
+  throw new Error(`unknown op "${opName}" — not bound by the WASM MeshOps module`);
+}
+
+/**
+ * The set of MeshOpResult keys the WASM bridge binds.
+ */
+export const MESH_OP_RESULT_NAMES = Object.keys(NUMERIC_ENUMS.MeshOpResult);
+
+// Reason-specific tail of the message a null MeshOps result earns.
+/** @type {Object<string, string>} */
+const MESH_FAILURE_REMEDY = {
+  UNKNOWN_NAME: 'the engine registers no solid by that name',
+  CONNECTIVITY_OVERFLOW: 'the result passes the engine 16-bit element ceiling — remove an op',
+  FACE_DEGREE_OVERFLOW: 'the result needs a face with more sides than the engine allows — remove an op',
+  ARENA_EXHAUSTED: 'the chain needs more tooling memory than the engine reserves — remove an op',
+  NON_FINITE_ARG: 'an op argument was not a finite number',
+  ANGLE_OUT_OF_DOMAIN: 'an angle argument sat outside its op domain',
+  STALE_WRAPPER: 'a tooling-memory flush reclaimed this mesh — rebuild it from the base solid',
+  ARENA_UNAVAILABLE: 'the engine could not reserve its tooling memory, so no mesh op can run — reload the page',
+};
+
+/**
+ * Reads back why a mesh-producing MeshOps call returned null.
+ * @param {WasmModule} Mod - The WASM module instance that produced the null.
+ * @param {string} what - What the caller was building, used in the message.
+ * @returns {{reason: string, message: string, flush: boolean, fatal: boolean}} The MeshOpResult key, a message to show, whether clearToolingMemory() is the remedy that reason calls for, and whether arena-backed mesh operations are unavailable for the instance's lifetime.
+ * @details Embind enum values are singletons matched by identity. A module that
+ * binds neither the enum nor getLastResult reports reason 'UNKNOWN'.
+ */
+export function meshOpFailure(Mod, what) {
+  const codes = Mod?.MeshOpResult;
+  const recorded = Mod?.MeshOps?.getLastResult?.();
+  let reason = 'UNKNOWN';
+  if (codes && recorded !== undefined) {
+    reason = Object.entries(codes).find(([name, value]) => MESH_OP_RESULT_NAMES.includes(name) && value === recorded)?.[0] ?? 'UNKNOWN';
+  }
+  return {
+    reason,
+    message: `${what} failed: ${MESH_FAILURE_REMEDY[reason] ?? 'the engine rejected it'}`,
+    flush: reason === 'ARENA_EXHAUSTED',
+    fatal: reason === 'ARENA_UNAVAILABLE',
+  };
+}
+
+/**
+ * Passes a mesh-producing MeshOps result through, or reports and remedies the
+ * failure a null stands for.
+ * @template T
+ * @param {T|null} result - What the bridge returned.
+ * @param {string} what - What the caller was building, used in the message.
+ * @param {Object} ctx - The live wiring, read per call because an engine halt nulls it.
+ * @param {WasmModule} ctx.Mod - The WASM module instance that produced the result.
+ * @param {{clearToolingMemory: () => void}} ctx.meshOps - Its MeshOps binding.
+ * @param {(message: string) => void} ctx.onError - Surfaces the failure message to the user.
+ * @param {(message: string) => void} [ctx.onFatal] - Stands the tool down for a failure nothing can recover from.
+ * @returns {T|null} The result, or null when it was a failure.
+ * @details Flushes the tooling arenas only for ARENA_EXHAUSTED. ARENA_UNAVAILABLE
+ * is unrecoverable and goes to onFatal.
+ */
+export function requireMeshResult(result, what, { Mod, meshOps, onError, onFatal }) {
+  if (result) return result;
+  const failure = meshOpFailure(Mod, what);
+  if (failure.flush) meshOps.clearToolingMemory();
+  if (failure.fatal && onFatal) onFatal(failure.message);
+  else onError(failure.message);
+  return null;
+}
+
+// Op params become C++ literals, so reject anything that would emit NaN/Inf or a
+// malformed token.
+/**
+ * @param {string} opName - The op the param belongs to.
+ * @param {string} param - The param's name.
+ * @param {number} val - The value to check.
+ * @returns {void}
+ * @throws {Error} When the value is not finite.
+ */
+export function requireFinite(opName, param, val) {
+  if (!Number.isFinite(val)) {
+    throw new Error(`generateFuncAndRecipe: ${opName} param "${param}" must be a finite number, got ${val}`);
+  }
+}
+
+/**
+ * @param {string} opName - The op the param belongs to.
+ * @param {string} param - The param's name.
+ * @param {number} val - The value to check.
+ * @returns {void}
+ * @throws {Error} When the value is not a positive integer.
+ */
+export function requireCount(opName, param, val) {
+  if (!Number.isInteger(val) || val < 1) {
+    throw new Error(`generateFuncAndRecipe: ${opName} param "${param}" must be a positive integer, got ${val}`);
+  }
+}
+
+// The seed call must name its namespace: IslamicStarPatterns has no using-directive.
+/**
+ * @param {string} where - Caller name used in the error message.
+ * @param {string} ns - The namespace to check.
+ * @returns {void}
+ * @throws {Error} When the namespace is not a valid C++ identifier.
+ */
+export function requireNamespace(where, ns) {
+  if (typeof ns !== 'string' || !CPP_IDENTIFIER.test(ns)) {
+    throw new Error(`${where}: base namespace "${ns}" is not a valid C++ identifier`);
+  }
+}
 
 /**
  * A createChainValidator handle.

@@ -4,7 +4,9 @@ import { mergeSavedSolids, persistSavedSolids } from '../src/workbench/solids/so
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
-import { MAX_RECIPE_STEPS, authoredParamRange, generateFuncAndRecipe, opTopologyKey, OP_DEFS, savedChainShapeError, seedOpParams, snapToStep } from '../src/workbench/solids/solid_codegen.js';
+import { MAX_RECIPE_STEPS, savedChainShapeError } from '../src/workbench/solids/solid_validation.js';
+import { authoredParamRange, opTopologyKey, OP_DEFS, seedOpParams, snapToStep } from '../src/workbench/solids/solid_op_params.js';
+import { generateFuncAndRecipe } from '../src/workbench/solids/solid_codegen.js';
 import { registryDisplayName } from '../src/workbench/solids/solid_registry_codegen.js';
 import { meshCounts } from '../src/workbench/solids/solid_render.js';
 import { createPointerDrag } from '../src/shared/pointer_drag.js';

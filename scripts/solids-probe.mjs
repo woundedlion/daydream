@@ -196,7 +196,7 @@ export async function probeNumericInputs(tab) {
   const { failures, check } = checks();
   const values = await tab.evaluate(async () => {
     const { buildOpRow } = await import('../src/workbench/solids/solid_op_rows.js');
-    const { OP_DEFS } = await import('../src/workbench/solids/solid_codegen.js');
+    const { OP_DEFS } = await import('../src/workbench/solids/solid_op_params.js');
     return ['truncate', 'chamfer'].map((op) => {
       const row = buildOpRow({ op, params: { t: '0.3" autofocus onfocus="alert(1)' } }, 0, {
         opDef: OP_DEFS[op],

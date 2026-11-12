@@ -15,7 +15,8 @@ import { generativePaletteCpp } from '../src/workbench/palettes/palette_math.js'
 import { defaultPaletteRecipe } from '../src/workbench/palettes/palette_controls.js';
 import { closingDomain, lissajousCodeString } from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
-import { generateFuncAndRecipe, DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../src/workbench/solids/solid_codegen.js';
+import { generateFuncAndRecipe } from '../src/workbench/solids/solid_codegen.js';
+import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../src/workbench/solids/solid_op_params.js';
 import { generateRegistryCpp, MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount } from '../src/workbench/solids/solid_registry_codegen.js';
 
 const enginePin = readFileSync(new URL('../generated/holosphere_wasm.sha', import.meta.url), 'utf8').trim();
