@@ -180,7 +180,7 @@ export function createChainValidator(createModule) {
  * classified on the sacrificial validator; a pass whose base and chain topology
  * repeat the last complete one is skipped.
  * @param {ChainValidator} validator - A createChainValidator handle.
- * @param {number} [retries=3] - Incomplete passes tolerated before probing stops.
+ * @param {number} [retries=3] - Consecutive incomplete passes after which probing stops.
  * @returns {{refresh: (base: string, ops: ChainOp[], candidates: string[], mesh?: ?SolidMesh) => Promise<?OpGateVerdict>}} The gate.
  */
 export function createOpGate(validator, retries = 3) {

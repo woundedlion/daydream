@@ -817,12 +817,7 @@ export class Daydream {
     this.renderer.render(this.scene, this.pipCamera);
   }
 
-  /**
-   * (Re)build the InstancedMesh of dots, one instance per pixel (W*H). Disposes
-   * any previous mesh, lazily builds the dot material (whose injected shader
-   * hides black pixels and back-face-culls the far hemisphere), and picks a
-   * sphere tessellation that drops as pixel count rises to cap geometry cost.
-   */
+  /** Dispose the dot mesh after detaching its WASM-aliased instanceColor array. */
   releaseDotMesh() {
     if (!this.dotMesh) return;
     this.scene.remove(this.dotMesh);
@@ -833,6 +828,12 @@ export class Daydream {
     this.dotMesh = null;
   }
 
+  /**
+   * (Re)build the InstancedMesh of dots, one instance per pixel (W*H). Disposes
+   * any previous mesh, lazily builds the dot material (whose injected shader
+   * hides black pixels and back-face-culls the far hemisphere), and picks a
+   * sphere tessellation that drops as pixel count rises to cap geometry cost.
+   */
   setupDots() {
     this.releaseDotMesh();
 

@@ -17,8 +17,9 @@ Holosphere owns that file and mirrors it into this checkout.
 - `src/types/` declares browser APIs missing from the standard type library.
 
 `index.html` and `tools/*.html` are the public entry points. Their URLs remain
-stable independently of the source-module layout. `styles/` holds simulator CSS
-and Tailwind input; the tool stylesheets sit beside their HTML pages.
+stable independently of the source-module layout. `styles/` holds the simulator stylesheet (also loaded by the shader page),
+the self-hosted font faces shared by tool pages, and the Tailwind input.
+Page-specific tool stylesheets sit beside their HTML pages.
 
 Holosphere installs engine assets into `generated/`. Embind emits method and enum
 declarations; authored object schemas and loader extensions live in the engine

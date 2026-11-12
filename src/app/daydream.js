@@ -358,7 +358,7 @@ export function start({
       host.engine = new module.HolosphereEngine();
       loaded.engine.setTemporalSampling(daydream.povFidelity);
 
-      // Push the Pole LOD value set while host.engine was null.
+      // Push the Pole LOD and display caps set while host.engine was null.
       if (!viewDisplay.replay()) throw new Error('Engine rejected display cap settings.');
 
       if (!syncResolutionOptions(module)) return;

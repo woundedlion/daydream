@@ -11,8 +11,6 @@ distribute them are granted.
 Holosphere source exceptions represented in the distributed WASM (all paths
 below refer to the Holosphere repository, not this repository):
 
-- `core/engine/effects_legacy.h` — retired effect sources, All Rights Reserved
-  on the same terms as `effects/`.
 - `core/math/projections.h` — derived from PROJ; MIT, Copyright Frank
   Warmerdam, Gerald I. Evenden, Kristian Evers, Toby C Wilkinson and the PROJ
   contributors.
