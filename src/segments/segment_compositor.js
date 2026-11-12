@@ -180,8 +180,8 @@ export class SegmentCompositor {
       try {
         bands[s] = computeSegmentRange(s, n, w, h);
       } catch (error) {
-        this.onFault(s,
-          `SegmentCompositor.composite: no segment-${s} band exists for a ` +
+        this.onFault(FAULT_RENDER,
+          `SegmentCompositor.composite: no band layout exists for an ` +
           `${n}-segment ${w}x${h} display buffer — ${errorDetail(error)}`);
         return null;
       }

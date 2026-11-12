@@ -7,6 +7,7 @@ import { fakeElement, fakeDocumentById } from './helpers/fake_dom.js';
 import { fakeColorAttribute } from './helpers/fake_three.js';
 import { repointDisplayAliases } from '../src/engine/display_aliases.js';
 import { SegmentController } from '../src/segments/segment_controller.js';
+import { FAULT_RENDER } from '../src/segments/worker_protocol.js';
 import {
   installSegmentControllerHarness,
   expectSegmentDiagnostics,
@@ -195,7 +196,8 @@ test('composite() faults when the layout admits no band for a segment', () => {
   const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'an underivable layout blits nothing');
   assert.equal(c.faulted, true, 'a throwing layout derivation latches a fault instead of escaping');
-  assert.match(c.faultInfo.message, /no segment-0 band exists/);
+  assert.equal(c.faultInfo.segId, FAULT_RENDER);
+  assert.match(c.faultInfo.message, /no band layout exists for an 8-segment 2x2 display buffer/);
   assert.ok(driver.pixels.every((v) => v === 0), 'nothing is blitted when no band can be derived');
 });
 
