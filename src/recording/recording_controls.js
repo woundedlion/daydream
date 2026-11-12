@@ -71,10 +71,8 @@ export function createRecordingControls({
   /** @type {number|null} */
   let durationSecond = null;
 
-  // Whether the UI is currently showing a session. A failure hook runs after the
-  // recorder has already cleaned up, so its own state cannot tell a failed start
-  // from a stopped session; this can.
   let recordingShown = false;
+  let startPending = false;
   let stopRequested = false;
 
   let startNotice = '';
@@ -99,6 +97,7 @@ export function createRecordingControls({
       recordCtrl.name('\u25a0 Stop');
       recordCtrl.$button?.setAttribute('aria-label', 'Stop recording');
     } else {
+      startPending = false;
       canvasEl?.classList.remove('recording');
       durationEl.style.display = 'none';
       recordCtrl.name('\u25cf Record');
@@ -108,6 +107,7 @@ export function createRecordingControls({
   };
 
   const announceStarted = () => {
+    startPending = false;
     const axisWarning = driver.labelAxes
       ? ' Axis labels are page overlays, not canvas pixels; the recording will not carry them.'
       : '';
@@ -138,6 +138,7 @@ export function createRecordingControls({
       saveFallbackNotice = '';
     }
     const isRecording = recorder.toggle(getEffect());
+    startPending = isRecording && recorder.starting;
     // A start that never began a session has already reported why through onError;
     // there was no session to stop, and the same owner tag would overwrite it.
     if (!wasRecording && !isRecording) return;
@@ -185,7 +186,7 @@ export function createRecordingControls({
       recorder.onError = (err) => {
         sessionError = true;
         const detail = recorderReason(err);
-        showNotice(recordingShown || stopRequested
+        showNotice((recordingShown && !startPending) || stopRequested
           ? `Recording stopped: ${detail}`
           : `Recording failed to start: ${detail}`);
         showRecording(false);

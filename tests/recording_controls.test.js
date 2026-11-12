@@ -237,6 +237,17 @@ test('an encoder fault after Stop is reported as a stopped recording', () => {
   assert.equal(rig.notices.at(-1), 'Recording stopped: the final chunk exceeded the limit');
 });
 
+test('a Save dialog start failure is reported before recording begins', () => {
+  const rig = recordingRig();
+  const recorder = rig.attach(fakeRecorder(null, true));
+  rig.button.object.record();
+  recorder.starting = false;
+  recorder.onError(new Error('encoder could not start'));
+  assert.equal(rig.notices.at(-1), 'Recording failed to start: encoder could not start');
+  assert.equal(rig.canvasEl.classList.contains('recording'), false);
+  assert.equal(rig.button.label, '\u25cf Record');
+});
+
 test('empty recording notices explain the missing file and preserve prior errors', () => {
   const rig = recordingRig();
   const recorder = rig.attach(fakeRecorder());
