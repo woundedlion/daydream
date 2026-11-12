@@ -6,6 +6,7 @@
 
 (() => {
   window.addEventListener('error', (event) => {
+    if (document.readyState === 'complete') return;
     if (!(event.error instanceof SyntaxError)
         && !(event.target instanceof HTMLScriptElement && event.target.type === 'module')) return;
     let overlay = document.getElementById('loading-overlay');

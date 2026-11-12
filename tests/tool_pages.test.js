@@ -919,6 +919,10 @@ for (const { page } of SERVED_PAGES) {
     assert.ok(stacked.length > 0);
     assert.ok(zIndex >= Math.max(...stacked), 'the failure banner overlays every page layer');
     assert.match(current.textContent, /Unable to load the application/);
+    current = null;
+    document.readyState = 'complete';
+    fail({error: new SyntaxError('failure after boot')});
+    assert.equal(current, null);
   });
 }
 
