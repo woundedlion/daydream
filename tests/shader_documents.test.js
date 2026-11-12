@@ -2295,6 +2295,8 @@ for (const operator of ['sphere.lens.mobius.v2', 'sphere.displace.symmetric.v1',
     retired.descriptor.chain[0].operator = operator;
     assert.equal(await harness.controller.loadSource(retired), false);
     assert.equal(harness.elements.get('shader-document-status').dataset.status, 'error');
+    assert.match(harness.elements.get('shader-document-status').textContent,
+      new RegExp(`UNKNOWN_OPERATOR .*"${operator.replaceAll('.', '\\.')}"`));
     assert.deepEqual(callWorkbenchBinding(harness.engine, 'getSnapshot', [], null), before);
     assert.equal(await harness.controller.loadSource(CHAIN_STUDY), true);
   });

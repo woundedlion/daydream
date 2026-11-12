@@ -27,7 +27,11 @@ import {
   requireMeshResult,
   unsweepableReason,
 } from '../src/workbench/solids/solid_codegen.js';
-import { MORPH_SWEEP } from '../generated/engine_contract.mjs';
+import { CLASS_METHODS, MORPH_SWEEP } from '../generated/engine_contract.mjs';
+
+test('every solid operation is bound by the engine MeshOps class', () => {
+  for (const op of KNOWN_OPS) assert.ok(CLASS_METHODS.MeshOps.includes(op), op);
+});
 
 /**
  * Builds an op whose params object records every key a code path reads, in read

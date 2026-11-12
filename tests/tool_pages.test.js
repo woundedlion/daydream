@@ -666,8 +666,8 @@ function color(css, selector, property) {
       `${selector} ${property} resolves to ${value}, a var() this reader loops on`);
     value = value.replace(/var\(\s*(--[\w-]+)\s*(?:,\s*([^()]+))?\)/g,
       (_, token, fallback) => {
-        const local = ruleBody(css, selector).match(
-          new RegExp(`(?:^|;)\\s*${token}\\s*:\\s*([^;]+)`));
+        const local = [...ruleBody(css, selector).matchAll(
+          new RegExp(`(?:^|;)\\s*${token}\\s*:\\s*([^;]+)`, 'g'))].at(-1);
         if (local) return local[1].trim();
         const root = rules(css).filter(([name]) => name === ':root')
           .some(([, body]) => body.includes(`${token}:`));
@@ -683,9 +683,13 @@ function color(css, selector, property) {
  * @param {string} selector - Rule to read.
  * @returns {string} The value, as a colour literal.
  */
-const fill = (css, selector) => color(css, selector,
-  /(?:^|;)\s*background-color\s*:/.test(ruleBody(css, selector))
-    ? 'background-color' : 'background');
+const fill = (css, selector) => {
+  const declarations = [...ruleBody(css, selector)
+    .matchAll(/(?:^|;)\s*(background-color|background)\s*:/g)];
+  const property = declarations.at(-1)?.[1];
+  assert.ok(property, `${selector} declares no background`);
+  return color(css, selector, property);
+};
 
 /**
  * A colour literal's channels.
@@ -776,6 +780,10 @@ test('CSS readers ignore comments and honor later declarations', () => {
   const css = '/* .comment-only {} */ .real { color: #111111; } .real { color: #222222; }';
   assert.deepEqual([...definedClasses(css)], ['real']);
   assert.equal(color(css, '.real', 'color'), '#222222');
+  assert.equal(fill('.x { background-color: #111111 } .x { background: #222222 }', '.x'), '#222222');
+  assert.equal(fill('.x { background: #111111 } .x { background-color: #222222 }', '.x'), '#222222');
+  assert.equal(color('.x { --ink: #111111; color: var(--ink) } .x { --ink: #222222 }',
+    '.x', 'color'), '#222222');
   assert.deepEqual(channels('rgb(20 20 20 / 0.95)'), [20, 20, 20, 0.95]);
   assert.deepEqual(channels('#48f'), [68, 136, 255, 1]);
   assert.deepEqual(channels('color-mix(in srgb, #0f172a 92%, transparent)'), [15, 23, 42, 0.92]);

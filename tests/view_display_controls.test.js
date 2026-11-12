@@ -101,6 +101,7 @@ test('POV fidelity defaults off and toggling it requests a repaint', () => {
   const { gui, driver } = fixture();
   const control = gui.controllers.find((c) => c.property === 'povFidelity');
   assert.equal(control.getValue(), false);
+  driver.invalidated = false;
   control.setValue(true);
   assert.equal(driver.povFidelity, true);
   assert.equal(driver.invalidated, true);
@@ -155,6 +156,7 @@ test('the sweep boundary defaults off and persists as a view control', () => {
   assert.equal(control.getValue(), false);
   assert.equal(control.session, undefined);
   assert.ok(gui.collectUrlKeys().includes('view.showSweepBoundary'));
+  driver.invalidated = false;
   control.setValue(true);
   assert.equal(driver.showSweepBoundary, true);
   assert.equal(driver.invalidated, true);
