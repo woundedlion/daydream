@@ -209,6 +209,32 @@ export class VideoRecorder {
   }
 
   /**
+   * Releases an aborted capture and reports its failure.
+   * @param {MediaStream|undefined} stream - Capture stream, if acquired.
+   * @param {string} message - Failure description.
+   * @param {*} [cause] - Underlying error.
+   * @returns {void}
+   */
+  abandonStart(stream, message, cause) {
+    stream?.getTracks().forEach(t => t.stop());
+    this.cleanup();
+    this.reportFailure(message, cause);
+  }
+
+  /**
+   * Releases the capture canvas and its drawing context.
+   * @returns {void}
+   */
+  releaseOffscreen() {
+    if (this.offscreen) {
+      this.offscreen.width = 0;
+      this.offscreen.height = 0;
+      this.offscreen = null;
+      this.offCtx = null;
+    }
+  }
+
+  /**
    * Begins a recording session. No-op if already recording; unsupported
    * browsers and setup failures are reported through onError.
    * @param {string} effectName - Base name used for the downloaded file.
@@ -222,20 +248,12 @@ export class VideoRecorder {
       return;
     }
 
-    // Each session pins its capture size at start. Drop an offscreen left by a
-    // prior session whose async onstop cleanup has not run yet.
-    if (this.offscreen) {
-      this.offscreen.width = 0;
-      this.offscreen.height = 0;
-      this.offscreen = null;
-      this.offCtx = null;
-    }
+    this.releaseOffscreen();
 
     const captureSource = this.ensureOffscreen();
 
     if (!captureSource || !this.offCtx) {
-      this.cleanup();
-      this.reportFailure('failed to acquire a 2D drawing context for the capture canvas; recording aborted.');
+      this.abandonStart(undefined, 'failed to acquire a 2D drawing context for the capture canvas; recording aborted.');
       return;
     }
 
@@ -256,17 +274,13 @@ export class VideoRecorder {
         track = stream.getVideoTracks()[0];
       }
     } catch (err) {
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      this.cleanup();
-      this.reportFailure('captureStream failed; recording aborted.', err);
+      this.abandonStart(stream, 'captureStream failed; recording aborted.', err);
       return;
     }
 
     // No video track means captureFrame would silently no-op the whole session.
     if (!track) {
-      stream.getTracks().forEach(t => t.stop());
-      this.cleanup();
-      this.reportFailure('capture stream produced no video track; recording aborted.');
+      this.abandonStart(stream, 'capture stream produced no video track; recording aborted.');
       return;
     }
 
@@ -279,9 +293,7 @@ export class VideoRecorder {
     try {
       mimeType = selectMimeType(this.format);
     } catch (err) {
-      stream.getTracks().forEach(t => t.stop());
-      this.cleanup();
-      this.reportFailure('MediaRecorder format probing failed.', err);
+      this.abandonStart(stream, 'MediaRecorder format probing failed.', err);
       return;
     }
 
@@ -299,11 +311,7 @@ export class VideoRecorder {
     try {
       recorder = new MediaRecorder(stream, options);
     } catch (err) {
-      // Construction can throw on unsupported options; stop the live capture
-      // tracks so the stream doesn't leak.
-      stream.getTracks().forEach(t => t.stop());
-      this.cleanup();
-      this.reportFailure('MediaRecorder construction failed.', err);
+      this.abandonStart(stream, 'MediaRecorder construction failed.', err);
       return;
     }
     const notifyFallback = !mimeType && this.format !== 'auto';
@@ -825,12 +833,7 @@ export class VideoRecorder {
       this.stream = null;
     }
     this.track = null;
-    if (this.offscreen) {
-      this.offscreen.width = 0;
-      this.offscreen.height = 0;
-      this.offscreen = null;
-      this.offCtx = null;
-    }
+    this.releaseOffscreen();
   }
 
   /**

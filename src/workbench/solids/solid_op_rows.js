@@ -8,7 +8,7 @@
  * values come from localStorage, so rows are built node-by-node, never via innerHTML.
  */
 
-import { authoredParamRange, snapToStep, unsweepableReason } from './solid_codegen.js';
+import { authoredParamRange, offStepGrid, unsweepableReason } from './solid_codegen.js';
 
 /** @typedef {import('./solid_codegen.js').OpParamDef} OpParamDef */
 
@@ -77,7 +77,7 @@ function buildButton(doc, className, text, ariaLabel) {
  */
 export function formatParamValue(value, def) {
   const number = Number(value);
-  if (def && Math.abs(number - snapToStep(number, def)) > def.step * 1e-6)
+  if (def && offStepGrid(number, def))
     return String(number);
   return number.toFixed(Number.isInteger(def?.step) ? 0 : 2);
 }

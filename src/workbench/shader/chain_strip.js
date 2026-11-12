@@ -399,9 +399,7 @@ export function createChainStrip({
       report(result);
       return;
     }
-    announce('');
-    render({ focusLabel: label, focusControl });
-    onApply();
+    commit(label, focusControl);
   };
 
   /** @param {string|null} [focusAction] */

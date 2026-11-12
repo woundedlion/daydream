@@ -441,24 +441,17 @@ export function installSegmentWorker() {
         /** @type {SegArenaMetrics | null} */
         let arenaMetrics;
         try {
-          arenaMetrics = engine.getArenaMetrics();
-          // Project the engine metrics onto the SegArenaMetrics wire fields.
+          const metrics = engine.getArenaMetrics();
+          /** @param {SegArenaMetrics['scratch_arena_a']} arena */
+          const toWire = (arena) => ({
+            usage: arena.usage,
+            high_water_mark: arena.high_water_mark,
+            capacity: arena.capacity,
+          });
           arenaMetrics = {
-            scratch_arena_a: {
-              usage: arenaMetrics.scratch_arena_a.usage,
-              high_water_mark: arenaMetrics.scratch_arena_a.high_water_mark,
-              capacity: arenaMetrics.scratch_arena_a.capacity,
-            },
-            scratch_arena_b: {
-              usage: arenaMetrics.scratch_arena_b.usage,
-              high_water_mark: arenaMetrics.scratch_arena_b.high_water_mark,
-              capacity: arenaMetrics.scratch_arena_b.capacity,
-            },
-            persistent_arena: {
-              usage: arenaMetrics.persistent_arena.usage,
-              high_water_mark: arenaMetrics.persistent_arena.high_water_mark,
-              capacity: arenaMetrics.persistent_arena.capacity,
-            },
+            scratch_arena_a: toWire(metrics.scratch_arena_a),
+            scratch_arena_b: toWire(metrics.scratch_arena_b),
+            persistent_arena: toWire(metrics.persistent_arena),
           };
         } catch (e) {
           if (engineHalted(e, wasmModule)) throw e;

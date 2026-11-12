@@ -421,6 +421,15 @@ export function createShaderDocumentController({
     showStatus(`${title} · ${preset}${side}`);
   };
 
+  /** @param {boolean|null} paused - Pause state to restore. */
+  const restoreAnimationsPaused = (paused) => {
+    if (paused !== null) {
+      setAnimationsPaused(paused);
+      syncEffectGui();
+    }
+    showAnimationState();
+  };
+
   /** @param {string} presetId */
   const applyPreset = (presetId) => {
     try {
@@ -445,11 +454,7 @@ export function createShaderDocumentController({
           programShape: store ? store.programShape() : null,
           presetId, syncEffectGui, invalidate,
         });
-      if (paused !== null) {
-        setAnimationsPaused(paused);
-        syncEffectGui();
-      }
-      showAnimationState();
+      restoreAnimationsPaused(paused);
       if (active.compiledSide) {
         syncEffectGui();
         invalidate();
@@ -605,11 +610,7 @@ export function createShaderDocumentController({
             refusal = typeof write === 'string' ? write : performEngineWrites(engine, module, [write]);
           }
         }
-        if (paused !== null) {
-          setAnimationsPaused(paused);
-          syncEffectGui();
-        }
-        showAnimationState();
+        restoreAnimationsPaused(paused);
         invalidate();
         return refusal ? { ok: false, diagnostics: [{
           severity: 'error', phase: 'apply', code: 'ENGINE_REFUSAL',

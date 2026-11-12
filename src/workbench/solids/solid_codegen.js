@@ -211,7 +211,7 @@ export function savedChainShapeError(base, ops) {
       if (!Number.isFinite(value)) {
         return `${at} ("${o.op}") carries no numeric "${key}"`;
       }
-      if (Math.abs(value - snapToStep(value, def)) > Math.abs(def.step) * 1e-6) {
+      if (offStepGrid(value, def)) {
         return `${at} ("${o.op}") carries off-grid "${key}"`;
       }
     }
@@ -668,6 +668,16 @@ export function snapToStep(value, def) {
     return (fraction.split('.')[1]?.length ?? 0) - Number(exponent);
   }));
   return Math.min(def.max, Math.max(def.min, Number(snapped.toFixed(Math.min(100, decimals)))));
+}
+
+/**
+ * Tests whether a value lies off the parameter's step grid or outside its range.
+ * @param {number} value - Authored value.
+ * @param {{min: number, max: number, step: number}} def - Parameter range.
+ * @returns {boolean} Whether snapping moves the value beyond the step tolerance.
+ */
+export function offStepGrid(value, def) {
+  return Math.abs(value - snapToStep(value, def)) > Math.abs(def.step) * 1e-6;
 }
 
 /**
