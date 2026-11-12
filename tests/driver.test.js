@@ -341,6 +341,7 @@ function fakeMesh(log) {
  */
 function setupCtx(mesh, log) {
   return {
+    releaseDotMesh: Daydream.prototype.releaseDotMesh,
     W: 8,
     H: 4,
     DOT_SIZE: 3,
@@ -380,6 +381,7 @@ function disposeCtx(mesh, log) {
   canvas.addEventListener('blur', handlers.onCanvasBlur);
   return {
     resizeObserver: { disconnect: () => log.push('observer.disconnect') },
+    releaseDotMesh: Daydream.prototype.releaseDotMesh,
     clock: { dispose: () => log.push('timer.dispose') },
     canvas,
     ...handlers,

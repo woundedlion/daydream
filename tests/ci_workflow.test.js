@@ -33,6 +33,15 @@ function jobBlock(source, name) {
   return source.slice(start.index, next < 0 ? undefined : offset + next);
 }
 
+/** @param {string} workflowName @param {string} stepName @returns {string} A step's shell script. */
+function stepScript(workflowName, stepName) {
+  const step = workflowText(workflowName).split(`      - name: ${stepName}\n`)[1];
+  assert.ok(step, `step "${stepName}" not found in ${workflowName}`);
+  const body = step.split('      - name:')[0].split('        run: |\n')[1];
+  assert.ok(body, `step "${stepName}" has no shell script`);
+  return body.replace(/^ {10}/gm, '');
+}
+
 const workflow = workflowText('ci.yml');
 
 // The prepare script is the only thing that points git at .githooks, and a
@@ -149,9 +158,7 @@ test('ci-green runs after failed dependencies', () => {
 });
 
 test('engine selection snapshots current master and preserves an explicit pair', (t) => {
-  const gate = workflowText('engine-bundle.yml');
-  const block = gate.split('      - name: Resolve engine pin\n')[1].split('      - name:')[0];
-  const body = block.split('        run: |\n')[1].replace(/^ {10}/gm, '');
+  const body = stepScript('engine-bundle.yml', 'Resolve engine pin');
   const current = 'a'.repeat(40);
   const selected = 'b'.repeat(40);
   const shell = findBash();
@@ -212,10 +219,8 @@ const retryAttempts = (body, name) => body.split(`${name}() {`)[1]
 test('engine bundle polling retries transient queries and artifact calls', (t) => {
   const shell = findBash();
   if (!shell) { t.skip('Bash is unavailable'); return; }
-  const gate = workflowText('engine-bundle.yml');
-  const block = gate.split('      - name: Download the verified engine bundle\n')[1].split('      - name:')[0];
   const root = scratchDir(t, 'engine-retries-');
-  const body = block.split('        run: |\n')[1].replace(/^ {10}/gm, '')
+  const body = stepScript('engine-bundle.yml', 'Download the verified engine bundle')
     .replaceAll('/tmp/engine-bundle.zip', '"$FIXTURE_ROOT/bundle.zip"');
   const stubs = `
     sleep() { :; }
@@ -276,10 +281,8 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
 test('the engine bundle poll recovers after exhausting metadata or ZIP retries', (t) => {
   const shell = findBash();
   if (!shell) { t.skip('Bash is unavailable'); return; }
-  const gate = workflowText('engine-bundle.yml');
-  const block = gate.split('      - name: Download the verified engine bundle\n')[1].split('      - name:')[0];
   const root = scratchDir(t, 'engine-poll-');
-  const body = block.split('        run: |\n')[1].replace(/^ {10}/gm, '')
+  const body = stepScript('engine-bundle.yml', 'Download the verified engine bundle')
     .replaceAll('/tmp/engine-bundle.zip', '"$FIXTURE_ROOT/bundle.zip"');
   const stubs = `
     sleep() { :; }

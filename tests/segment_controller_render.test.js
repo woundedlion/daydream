@@ -24,6 +24,23 @@ import {
 
 installSegmentControllerHarness();
 
+test('a live resolution change drops the published frame before replay', async () => {
+  setDisplayGrid(4, 2);
+  const c = readyController(2);
+  c.active = true;
+  await publishGeneration(c, gridHalves(111));
+  c.tick();
+  assert.equal(c.hasPublishedFrame(), true);
+  assert.ok(driver.pixels.includes(111));
+  c.setResolution(8, 4);
+  driver.dotMesh.instanceColor = fakeColorAttribute(null);
+  setDisplayGrid(8, 4);
+  c.tick();
+  assert.equal(c.faulted, false);
+  assert.equal(c.hasPublishedFrame(), false);
+  assert.ok(!driver.pixels.includes(111));
+});
+
 // ---------------------------------------------------------------------------
 // Compositor
 // ---------------------------------------------------------------------------

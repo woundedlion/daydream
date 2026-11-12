@@ -464,13 +464,19 @@ function islamicStarsDetail(source) {
   return block[1];
 }
 
-test('MAX_BUILD_STEPS matches the pinned shared build budget', { skip: engineSkip }, () => {
-  const source = header(ISLAMIC_STARS_H);
-  assert.match(source, /static constexpr size_t MAX_BUILD_STEPS\s*=\s*IslamicStarsDetail::MAX_BUILD_OPS;/);
-  const match = /inline constexpr size_t MAX_BUILD_OPS\s*=\s*(\d+);/.exec(islamicStarsDetail(source));
-  assert.ok(match, 'IslamicStarsDetail::MAX_BUILD_OPS not found');
-  assert.equal(MAX_BUILD_STEPS, Number(match[1]));
-});
+for (const [name, engineName, value] of [
+  ['MAX_BUILD_STEPS', 'MAX_BUILD_OPS', MAX_BUILD_STEPS],
+  ['MAX_BUILD_FACES', 'MAX_BUILD_FACES', MAX_BUILD_FACES],
+]) {
+  test(`${name} matches the pinned shared build budget`, { skip: engineSkip }, () => {
+    const source = header(ISLAMIC_STARS_H);
+    assert.match(source, new RegExp(`static constexpr size_t ${name}\\s*=\\s*IslamicStarsDetail::${engineName};`));
+    const match = new RegExp(`inline constexpr size_t ${engineName}\\s*=\\s*(\\d+);`)
+      .exec(islamicStarsDetail(source));
+    assert.ok(match, `IslamicStarsDetail::${engineName} not found`);
+    assert.equal(value, Number(match[1]));
+  });
+}
 
 test('every operator primitive count matches the installed engine lowering', { skip: engineSkip }, () => {
   const body = functionBody(header('core/mesh/recipe.h'), 'lowered_step_count');
@@ -505,14 +511,6 @@ test('engine struct reader ignores semicolons inside member comments', () => {
   assert.deepEqual(engineStructFields(source, 'Controls'), [
     { type: 'float', field: 'value' }, { type: 'float', field: 'other' },
   ]);
-});
-
-test('MAX_BUILD_FACES matches the pinned shared build budget', { skip: engineSkip }, () => {
-  const source = header(ISLAMIC_STARS_H);
-  assert.match(source, /static constexpr size_t MAX_BUILD_FACES\s*=\s*IslamicStarsDetail::MAX_BUILD_FACES;/);
-  const match = /inline constexpr size_t MAX_BUILD_FACES\s*=\s*(\d+);/.exec(islamicStarsDetail(source));
-  assert.ok(match, 'IslamicStarsDetail::MAX_BUILD_FACES not found');
-  assert.equal(MAX_BUILD_FACES, Number(match[1]));
 });
 
 test('closingDomain follows the pinned Comets traversal', { skip: engineSkip }, () => {

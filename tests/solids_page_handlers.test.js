@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
 import { MAX_RECIPE_STEPS, authoredParamRange, generateFuncAndRecipe, opTopologyKey, OP_DEFS, savedChainShapeError, seedOpParams, snapToStep } from '../src/workbench/solids/solid_codegen.js';
 import { registryDisplayName } from '../src/workbench/solids/solid_registry_codegen.js';
+import { meshCounts } from '../src/workbench/solids/solid_render.js';
 import { createPointerDrag } from '../src/shared/pointer_drag.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
@@ -1002,7 +1003,7 @@ function saveSolidRig() {
     restoreSolid() {}, deleteSolid() {}, copyCode() {},
     registrySolidNames: new Set(['truncatedIcosahedron_hk58_chamfer63']),
     captureSavedSolidThumbnail: () => ({ dataURL: '' }), captureSavedThumbnail() {},
-    uniqueEdges: () => [], structuredClone, formatSolidName: String,
+    meshCounts, structuredClone, formatSolidName: String,
     showGateMsg: (message) => messages.push(message), persistSavedSolids() {},
     document: { getElementById: () => list, createElement: fakeElement },
   };
