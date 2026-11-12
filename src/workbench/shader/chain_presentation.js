@@ -165,6 +165,12 @@ export const nudgeStep = (declaration) => {
 /** @param {string} id @returns {string} The `<label>.<field>` id's field segment. */
 export const fieldOf = (id) => id.slice(id.indexOf('.') + 1);
 
+/** @param {string} id @returns {string} The `<label>.<field>` id's label, or empty for a dotless id. */
+export const labelOf = (id) => {
+  const dot = id.indexOf('.');
+  return dot > 0 ? id.slice(0, dot) : '';
+};
+
 /**
  * The parameter ids deactivated by the catalog's topology-field gates.
  * Gated controls are hidden; their values remain in the document.
@@ -182,7 +188,7 @@ export function deactivatedParameterIds(parameters, values, chain, catalog) {
   for (const parameter of parameters) {
     if (!parameter.id.includes('.')) continue;
     const field = fieldOf(parameter.id);
-    const label = parameter.id.slice(0, parameter.id.indexOf('.'));
+    const label = labelOf(parameter.id);
     const operator = operatorByLabel.get(label);
     const gate = operator?.params.find((candidate) => candidate.id === field)?.gated_by;
     if (!gate) continue;

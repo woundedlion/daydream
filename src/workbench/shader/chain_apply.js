@@ -6,6 +6,7 @@
 
 import { callWorkbenchBinding } from '../../engine/workbench_bindings.js';
 import { enumConstantName, optionValue } from '../../effects/param_sync.js';
+import { labelOf } from './chain_presentation.js';
 
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[], optionValues?: number[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string, diagnostics?: import('./chain_document_store.js').Diagnostic[], status?: string}} CompiledDocument */
@@ -30,6 +31,25 @@ export function resolveParameterWrite(definitions, name, value) {
   if (definition.optionValues && !definition.optionValues.includes(stored))
     return `"${name}" has no option value ${stored}`;
   return {name, stored};
+}
+
+/**
+ * Resolves and atomically admits a batch of chain parameter values.
+ * @param {*} engine - Active engine.
+ * @param {*} module - Engine module and admission codes.
+ * @param {ParameterDefinition[]} definitions - Active parameter definitions.
+ * @param {Array<[string, *]>} entries - Parameter ids and authored values.
+ * @returns {{refusal: string|null, code: number|null}} Resolution refusal, admission failure, or success.
+ */
+export function writeChainParameters(engine, module, definitions, entries) {
+  const writes = [];
+  for (const [id, value] of entries) {
+    const write = resolveParameterWrite(definitions, id, value);
+    if (typeof write === 'string') return {refusal: write, code: null};
+    writes.push({name: write.name, value: write.stored});
+  }
+  const code = callWorkbenchBinding(engine, 'setShaderChainParameters', [writes], module.ParamSetResult.NO_EFFECT);
+  return {refusal: null, code: code === module.ParamSetResult.APPLIED ? null : code};
 }
 
 /**
@@ -86,19 +106,14 @@ export function applyChainDocument({
   };
   const definitions = /** @type {ParameterDefinition[]} */ (
     engine.getParameterDefinitions());
-  /** @type {Array<{name: string, value: number}>} */
-  const writes = [];
-  for (const [parameterId, value] of Object.entries(preset.values ?? {})) {
-    const dot = parameterId.indexOf('.');
-    if (dot > 0 && bypassed.has(parameterId.slice(0, dot))) continue;
-    const write = resolveParameterWrite(definitions, parameterId, value);
-    if (typeof write === 'string') return refuse(write);
-    writes.push({name: write.name, value: write.stored});
-  }
-
-  const written = callWorkbenchBinding(engine, 'setShaderChainParameters', [writes], module.ParamSetResult.NO_EFFECT);
-  if (written !== module.ParamSetResult.APPLIED)
-    return refuse(`the engine refused the preset: ${enumConstantName(module.ParamSetResult, written)}`);
+  const entries = Object.entries(preset.values ?? {}).filter(([id]) => {
+    const label = labelOf(id);
+    return !label || !bypassed.has(label);
+  });
+  const written = writeChainParameters(engine, module, definitions, entries);
+  if (written.refusal !== null) return refuse(written.refusal);
+  if (written.code !== null)
+    return refuse(`the engine refused the preset: ${enumConstantName(module.ParamSetResult, written.code)}`);
 
   syncEffectGui();
   invalidate();

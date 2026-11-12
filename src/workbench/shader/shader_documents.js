@@ -8,10 +8,10 @@ import { engineHalted } from '../../shared/engine_halt.js';
 import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot, shaderChainCatalog } from '../../engine/workbench_bindings.js';
 import { enumConstantName, replayParameterWrites } from '../../effects/param_sync.js';
 import {
-  fieldOf as fieldSegment, MODULATION_OPERATOR, modulationValueLimits,
+  fieldOf as fieldSegment, labelOf, MODULATION_OPERATOR, modulationValueLimits,
 } from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
-import { applyChainDocument, resolveParameterWrite } from './chain_apply.js';
+import { applyChainDocument, resolveParameterWrite, writeChainParameters } from './chain_apply.js';
 import {
   createChainDocumentStore, documentFromChainSnapshot, scratchChainDocument,
 } from './chain_document_store.js';
@@ -80,7 +80,7 @@ function compiledControlFor(parameterId, definitions, baked, descriptor, catalog
 function liveDerivedControl(id, control, definitions, binding) {
   if (control.name === null) return false;
   if (binding.unregistered) return true;
-  const label = id.slice(0, id.indexOf('.'));
+  const label = labelOf(id);
   const resource = control.name.slice(0, control.name.lastIndexOf('.'));
   return control.name === fieldSegment(id) || control.name.endsWith('.' + fieldSegment(id))
     || definitions.some((definition) => !definition.readonly
@@ -486,7 +486,7 @@ export function createShaderDocumentController({
    * @returns {{name: string|null, refusal: string|null}} The control or refusal.
    */
   const engineControlName = (parameterId, definitions) => {
-    const label = parameterId.slice(0, parameterId.indexOf('.'));
+    const label = labelOf(parameterId);
     if (active?.compiledSide !== true) {
       return { name: chainUi?.store.bypassedLabels().includes(label) ? null : parameterId,
         refusal: null };
@@ -548,7 +548,7 @@ export function createShaderDocumentController({
       if (presetValues === null) return false;
       const descriptor = { chain: store.chainView() };
       const values = { [parameterId]: value };
-      const label = parameterId.slice(0, parameterId.indexOf('.'));
+      const label = labelOf(parameterId);
       const field = fieldSegment(parameterId);
       const modulated = descriptor.chain.some((/** @type {*} */ entry) =>
         entry.label === label && entry.operator === MODULATION_OPERATOR);
@@ -585,18 +585,10 @@ export function createShaderDocumentController({
         let refusal = control.refusal;
         if (compiledSide || (refusal === null && control.name !== null)) {
           if (coupled && !compiledSide) {
-            const writes = [];
-            for (const [id, next] of Object.entries(values)) {
-              const write = resolveParameterWrite(definitions, id, next);
-              if (typeof write === 'string') { refusal = write; break; }
-              writes.push({ name: write.name, value: write.stored });
-            }
-            if (refusal === null) {
-              const written = callWorkbenchBinding(engine, 'setShaderChainParameters', [writes],
-                module.ParamSetResult.NO_EFFECT);
-              if (written !== module.ParamSetResult.APPLIED)
-                refusal = `"${parameterId}" was refused: ${enumConstantName(module.ParamSetResult, written)}`;
-            }
+            const written = writeChainParameters(engine, module, definitions, Object.entries(values));
+            refusal = written.refusal;
+            if (written.code !== null)
+              refusal = `"${parameterId}" was refused: ${enumConstantName(module.ParamSetResult, written.code)}`;
           } else if (compiledSide) {
             cachedDocumentDefinitions = null;
             const resolved = resolveFixedWrites(values, definitions,

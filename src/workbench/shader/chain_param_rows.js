@@ -8,7 +8,7 @@ import { titleCase } from '../../shared/labels.js';
 import { createFrameScheduler } from '../../shared/page_lifecycle.js';
 import {
   deactivatedParameterIds, formatNumericValue, nudgeStep,
-  numericSliderPosition, numericSliderValue, fieldOf,
+  numericSliderPosition, numericSliderValue, fieldOf, labelOf,
   COLOR_PARAMETER_GROUPS, MODULATION_PARAMETER_GROUPS, COLOR_PARAMETER_NAMES,
   POTENTIAL_OPERATOR, POTENTIAL_PARAMETER_GROUPS,
   colorParameterHidden, modulationParameterHidden, modulationValueLimits,
@@ -104,7 +104,7 @@ export function createChainParamRows({
       control.disabled = !parameterLive(id);
     }
     for (const [id, row] of rows) {
-      const label = id.slice(0, id.indexOf('.'));
+      const label = labelOf(id);
       const operator = chain.find((entry) => entry.label === label)?.operator;
       const color = operator === PALETTE_OPERATOR;
       const modulation = operator === MODULATION_OPERATOR;

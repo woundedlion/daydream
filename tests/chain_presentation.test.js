@@ -1,7 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import { createChainPresentation, formatNumericValue, colorParameterHidden, deactivatedParameterIds, PALETTE_OPERATOR } from '../src/workbench/shader/chain_presentation.js';
+import { createChainPresentation, formatNumericValue, colorParameterHidden, deactivatedParameterIds, labelOf, PALETTE_OPERATOR } from '../src/workbench/shader/chain_presentation.js';
+
+test('parameter labels end at the first dot and dotless ids have no label', () => {
+  assert.equal(labelOf('warp.center.x'), 'warp');
+  assert.equal(labelOf('speed'), '');
+  assert.equal(labelOf(''), '');
+  assert.equal(labelOf('.speed'), '');
+});
 
 test('numeric readouts retain the shortest binary32 spelling across scales', () => {
   for (const [value, text] of [

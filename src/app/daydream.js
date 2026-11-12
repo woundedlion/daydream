@@ -94,6 +94,15 @@ export function shaderWorkbenchUrl(location, effect = 'ShaderChain') {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+/** @param {string|null} requested @param {string|null} view @returns {string|null} Effect redirected to its workbench. */
+function workbenchRedirectEffect(requested, view) {
+  if (requested === null) return null;
+  const canonical = canonicalEffectId(requested);
+  if (canonical === canonicalEffectId('ShaderChain')) return canonical;
+  if (requested !== canonical || view === 'simulator') return null;
+  return SHADER_DOCUMENT_EFFECTS.includes(canonical) ? canonical : null;
+}
+
 /** @typedef {ReturnType<typeof createAppTeardown> & {ready: Promise<unknown>}} AppHandle */
 
 /**
@@ -122,11 +131,7 @@ export function start({
   const shaderWorkbench = doc.documentElement?.dataset.daydreamMode === 'shader-workbench';
   const routeParams = new URLSearchParams(win.location?.search ?? '');
   const requestedEffect = routeParams.get('effect');
-  const canonicalRequest = canonicalEffectId(requestedEffect ?? '');
-  const workbenchEffect = canonicalRequest === canonicalEffectId('ShaderChain')
-    ? canonicalRequest : requestedEffect === canonicalRequest
-      && routeParams.get('view') !== 'simulator'
-      && SHADER_DOCUMENT_EFFECTS.includes(canonicalRequest) ? canonicalRequest : null;
+  const workbenchEffect = workbenchRedirectEffect(requestedEffect, routeParams.get('view'));
   if (!shaderWorkbench && workbenchEffect) {
     win.location.replace(shaderWorkbenchUrl(win.location, workbenchEffect));
     let redirectDisposed = false;
