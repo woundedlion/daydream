@@ -509,7 +509,6 @@ const CONTRAST_SURFACES = {
     '.saved-item .title': '.saved-item',
     '.saved-item .details': '.saved-item',
     '.saved-item .saved-stats, .saved-item .saved-row-label': '.saved-item',
-    '#arenaStats': ['#arenaStats', 'body'],
     '.action-btn': '.action-btn',
     '.action-btn:hover': '.action-btn:hover',
     '.del-btn:hover': '.del-btn:hover',
@@ -583,6 +582,7 @@ const CONTRAST_EXEMPT = {
     '#footer::-webkit-scrollbar-thumb:hover': 'scrollbar graphics contain no text',
     '.drag-handle': 'an SVG grip, not text; SC 1.4.3 is a text criterion',
     '#meshStats': 'translucent readout over the live canvas',
+    '#arenaStats': 'translucent readout measured separately over a white canvas',
   },
   'mobius.css': {
     '.complex-plane-control:has([aria-orientation="horizontal"]:focus-visible) .axis-h, .complex-plane-control:has([aria-orientation="vertical"]:focus-visible) .axis-v':
@@ -764,6 +764,12 @@ test('segment status text retains AA contrast over a white canvas', () => {
     const ratio = contrast(css, selector, ['.segment-stats', '.white-canvas']);
     assert.ok(ratio >= AA_CONTRAST, `${selector} contrast is ${ratio.toFixed(2)}:1`);
   }
+});
+
+test('solids arena stats retain AA contrast over a white canvas', () => {
+  const css = `${read('tools', 'solids.css')} .white-canvas { background: #fff; }`;
+  const ratio = contrast(css, '#arenaStats', ['#arenaStats', '.white-canvas']);
+  assert.ok(ratio >= AA_CONTRAST, `arena stats contrast is ${ratio.toFixed(2)}:1`);
 });
 
 test('CSS readers ignore comments and honor later declarations', () => {
