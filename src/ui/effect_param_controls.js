@@ -15,7 +15,7 @@ import { float32Decimal } from '../shared/cpp_format.js';
 export { stageGrouping } from "../effects/shader_stages.js";
 
 /** Engine toggles omit the range fields.
- * @typedef {{name: string, group?: {name: string, title: string, order: number}, value: number|boolean, min?: number, max?: number, animated?: boolean, readonly?: boolean, warning?: string, options?: string[], optionValues?: number[], step?: number, acceptedValue?: number|boolean, requestedValue?: number|boolean}} ParameterDefinition */
+ * @typedef {{name: string, group?: {name: string, title: string, order: number}, value: number|boolean, min?: number, max?: number, animated?: boolean, readonly?: boolean, warning?: string, options?: string[], optionValues?: number[], step?: number, acceptedValue?: number|boolean, requestedValue?: number|boolean, preset?: boolean, exportOptions?: string[]}} ParameterDefinition */
 /** @typedef {import("./effect_panel_view.js").PanelController & Record<string, any>} GuiController */
 /** @typedef {import("./effect_panel_view.js").PanelFolder & Record<string, any>} Gui */
 

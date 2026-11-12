@@ -338,7 +338,7 @@ export function createSwitchCoordinator({
  *   param URL entries.
  * @param {{active: boolean, setEffect: (effect: string) => void,
  *   setResolution: (w: number, h: number) => void}} deps.segments - The SegmentController.
- * @param {{setStrobeColumns: (strobe: boolean) => void, invalidate: () => void, stepOnce: () => void,
+ * @param {{setStrobeColumns: (strobe: boolean) => void, stepOnce: () => void,
  *   resetPovOnNextFrame: () => void,
  *   updateResolution: (w: number, h: number, dotSize: number) => void}} deps.driver -
  *   The Daydream driver.

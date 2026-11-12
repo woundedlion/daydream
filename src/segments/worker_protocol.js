@@ -126,8 +126,8 @@ export const FAULT_RENDER = -2;
  *   sharedModule?: boolean }} EngineRejectedMsg */
 
 /** Worker module body started executing — its static imports (incl. the WASM
- * glue) all resolved; sent before the WASM instantiate. Carries no segId, and
- * the protocol version.
+ * glue) all resolved; sent before the WASM instantiate. Carries the protocol
+ * version but no segId.
  * @typedef {{ type: 'booted', version: number }} BootedMsg */
 
 /**

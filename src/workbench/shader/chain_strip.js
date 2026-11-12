@@ -90,8 +90,9 @@ const SOURCE_GROUP_NAMES = { sphere: 'Spherical sources', plane: 'Planar sources
  * @param {OperatorCatalog} options.catalog - The operator catalog.
  * @param {(message: string) => void} options.announce - Writes the shared live
  *   status region; refusals report through it, and a committed edit clears it.
- * @param {() => void} options.onApply - Runs after every committed structural
- *   edit, undo/redo and bypass toggle.
+ * @param {() => void} options.onApply - Runs after every committed chain edit
+ *   (structural replacement, rename, parameter reset), undo/redo and session
+ *   bypass toggle.
  * @param {() => string|null} [options.presetId] - The preset the inline stage
  *   controls read and write; null falls back to the document's first.
  * @param {(parameterId: string, value: *) => boolean|void} [options.onEditParameter] -
