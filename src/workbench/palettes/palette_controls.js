@@ -919,6 +919,7 @@ export function paletteEnumName(group, value) {
  * @throws {RangeError} When a field holds an ordinal PaletteV4 has no member for.
  */
 export function paletteControlsFromRecipe(recipe) {
+  paletteEnumName('chromaBasis', recipe.chroma.basis);
   const hueState = customHueKeyState(recipe);
   return {
     window: { ...recipe.input },

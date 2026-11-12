@@ -103,6 +103,16 @@ test('a recipe with an unknown ordinal is refused and the model kept', () => {
   assert.deepEqual(model.snapshot(), defaultPaletteRecipe());
 });
 
+test('a recipe with an unknown chroma basis is refused and the model kept', () => {
+  const model = new PaletteRecipeModel();
+  model.setWindow(0.2, 0.5);
+  const before = model.snapshot();
+  const recipe = defaultPaletteRecipe();
+  recipe.chroma.basis = 42;
+  assert.throws(() => model.loadRecipe(recipe), /Unknown chromaBasis value: 42/);
+  assert.deepEqual(model.snapshot(), before);
+});
+
 test('choices and amounts write their readings and reject the wrong kind', () => {
   const model = new PaletteRecipeModel();
   model.setChoice('harmony', 'TRIADIC');
