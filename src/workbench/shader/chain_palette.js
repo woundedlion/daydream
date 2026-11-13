@@ -11,7 +11,7 @@ const PALETTE_GAP = 4;
 
 /**
  * @param {{doc: *, el: (tag: string, classes: string) => *,
- *   store: import('./chain_strip.js').ChainStore,
+ *   store: import('./chain_document_store.js').ChainStore,
  *   presentation: ReturnType<typeof import('./chain_presentation.js').createChainPresentation>,
  *   commit: (label: string|null) => boolean,
  *   report: (result: *) => boolean, announce: (message: string) => void,

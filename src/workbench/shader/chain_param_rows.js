@@ -24,7 +24,7 @@ export const BAKED_PARAMETER_REASON = 'This parameter is baked into the compiled
 /**
  * Owns inline parameter rows and their pending edits across strip renders.
  * @param {{el: (tag: string, classes: string) => *, container: *,
- *   store: import('./chain_strip.js').ChainStore,
+ *   store: import('./chain_document_store.js').ChainStore,
  *   catalog: import('./chain_presentation.js').OperatorCatalog,
  *   opOf: (entry: ChainEntry) => import('./chain_document_store.js').CatalogOperator,
  *   chipByLabel: (label: string) => *,

@@ -317,7 +317,7 @@ export function createShaderDocumentController({
   let operatorCatalog = null;
   /** @type {Set<string>} The catalog's topology fields, once it has loaded. */
   let bakedFields = new Set();
-  /** @type {{store: *, strip: *}|null} */
+  /** @type {{store: import('./chain_document_store.js').ChainStore, strip: *}|null} */
   let chainUi = null;
   let rebuildAfterParameterCommit = false;
   /** @type {number} Save As copies this session, which their ids count off. */
@@ -653,9 +653,9 @@ export function createShaderDocumentController({
    * @param {HTMLElement} container - Detached mount for the candidate editor.
    */
   const buildChainUi = async (document, container) => {
-    const store = /** @type {*} */ (await createChainDocumentStore({
+    const store = await createChainDocumentStore({
       document, catalog: operatorCatalog, importCompiler,
-    }));
+    });
     const strip = /** @type {*} */ (createChainStrip({
       doc,
       container,

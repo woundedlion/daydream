@@ -33,30 +33,7 @@ import { createPointerDrag } from '../../shared/pointer_drag.js';
 /** @typedef {import('./chain_presentation.js').BandLayout} BandLayout */
 
 /** @typedef {import('./chain_document_store.js').EditResult} EditResult */
-/**
- * The document-store surface the strip drives. Legality queries throw RangeError
- * for invalid indices; mutation methods return EditResult refusals.
- * @typedef {{
- *   chain: () => ChainEntry[],
- *   selectedLabel: () => string|null,
- *   declares: (id: string) => boolean,
- *   setSelectedLabel: (label: string|null) => boolean,
- *   bypassedLabels: () => string[],
- *   setBypassed: (label: string, on: boolean) => EditResult,
- *   legalInsertions: (index: number) => LegalityEntry[],
- *   legalSequences: (start: number, deleteCount: number,
- *     maxLength: number) => SequenceEntry[],
- *   parameterDeclarations: () => ParameterDeclaration[],
- *   document: () => *,
- *   replaceSpan: (start: number, deleteCount: number,
- *     sequence: Array<{label?: string, operator: string}>) => EditResult,
- *   relabel: (oldLabel: string, newLabel: string) => EditResult,
- *   endValueRun: () => void,
- *   setPresetValues: (presetId: string, values: Object<string, *>) => EditResult,
- *   undo: () => boolean, redo: () => boolean,
- *   canUndo: () => boolean, canRedo: () => boolean,
- * }} ChainStore
- */
+/** @typedef {import('./chain_document_store.js').ChainStore} ChainStore */
 const BYPASS_UNAVAILABLE = 'Bypass applies to the interpreter only: '
   + 'the compiled build renders the whole chain.';
 

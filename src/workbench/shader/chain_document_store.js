@@ -9,6 +9,8 @@ import { LABEL_PATTERN, declarationFromCatalogField as parameterFromField }
 import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from './shader_deeplink.js';
 import { MODULATION_OPERATOR, PALETTE_OPERATOR } from './chain_presentation.js';
 
+/** @typedef {Awaited<ReturnType<typeof createChainDocumentStore>>} ChainStore */
+
 /** @typedef {{field: string, values: string[]}} CatalogGate */
 /** @typedef {{id: string, name: string|null, min: number, max: number, default: *, curve?: string, topology?: false, gated_by?: CatalogGate}} CatalogNumericField */
 /** @typedef {{id: string, topology: true, values: string[], default: *, gated_by?: CatalogGate}} CatalogTopologyField */
@@ -139,7 +141,6 @@ export function scratchChainDocument(catalog, chain = DEFAULT_SCRATCH_CHAIN) {
  * @param {*} options.document - A compiled (post-expansion, valid) v2 document.
  * @param {*} options.catalog - The operator catalog the document validates against.
  * @param {() => Promise<*>} [options.importCompiler] - Loads the document compiler.
- * @returns {Promise<Object>} The store.
  */
 export async function createChainDocumentStore({
   document,
