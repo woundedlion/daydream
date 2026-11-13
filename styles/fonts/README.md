@@ -1,6 +1,6 @@
 # Tool fonts
 
-`../fonts.css` declares each Inter subset as a 400–700 weight range over its
+`../fonts.css` declares each Inter subset as a 400-700 weight range over its
 shared variable font file. The JetBrains Mono 400 faces, Unicode ranges, and
 `font-display: swap` come from the Google Fonts CSS response:
 
