@@ -2379,7 +2379,7 @@ test('the Palette selector supports every family with family-specific controls',
   const type = chipByLabel(h, 'colorize').querySelector('.chain-palette-type');
   assert.equal(rowFor(h, 'colorize', 'colorize.palette-type'), undefined);
   assert.deepEqual(type.children.map((option) => option.value),
-    ['cycling-generated', 'generated', 'procedural', 'gradient', 'mutating']);
+    h.store.parameterDeclarations().find((p) => p.id === 'colorize.palette-type').domain.values);
   const visible = (field) => !rowFor(h, 'colorize', `colorize.${field}`).hidden;
   for (const [family, shown, hidden] of [
     ['generated', 'palette-harmony', 'palette-name'],

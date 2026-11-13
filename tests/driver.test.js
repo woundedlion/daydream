@@ -1306,6 +1306,9 @@ test('render shows axes and labels before the inset view', () => {
   ctx.labelPool.activeCount = 1;
   Daydream.prototype.render.call(ctx, null);
   for (const axis of [ctx.xAxis, ctx.yAxis, ctx.zAxis]) assert.equal(axis.visible, true);
+  for (const step of ['refreshLabels', 'labelRenderer.render', 'renderPip']) {
+    assert.ok(log.includes(step), `missing render step: ${step}`);
+  }
   assert.ok(log.indexOf('refreshLabels') < log.indexOf('labelRenderer.render'));
   assert.ok(log.indexOf('labelRenderer.render') < log.indexOf('renderPip'));
 });
@@ -1400,6 +1403,9 @@ test('render drives the real main pass inside the scissor test', () => {
   ]);
   const pip = log.indexOf('renderPip');
   assert.ok(pip > on && pip < off, 'the PiP renders outside the scissor test');
+  for (const step of ['updateCullUniforms', 'render:scene,camera']) {
+    assert.ok(log.includes(step), `missing render step: ${step}`);
+  }
   assert.ok(log.indexOf('updateCullUniforms') < log.indexOf('render:scene,camera'),
     'the main pass renders before the cull uniforms are updated');
 });

@@ -77,7 +77,9 @@ export const hookUnderTest = (name) => {
 
 // Isolated config and XDG paths exclude operator settings, default ignore and
 // attributes files, and hooks.
-const ABSENT_CONFIG = join(tmpdir(), 'daydream-absent-gitconfig', 'absent');
+const CONFIG_ROOT = mkdtempSync(join(tmpdir(), 'daydream-git-isolation-'));
+const ABSENT_CONFIG = join(CONFIG_ROOT, 'absent');
+process.on('exit', () => rmSync(CONFIG_ROOT, {recursive: true, force: true}));
 
 /**
  * Returns an environment that cannot redirect fixture commands into the

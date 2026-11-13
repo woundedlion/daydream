@@ -400,7 +400,7 @@ test('generateRegistryCpp emits a step table at the engine build ceiling', () =>
 test('generateRegistryCpp reports the primitive budget for oversized chains', () => {
   assert.throws(() => generateRegistryCpp(
     { base: 'cube', ops: longOps(MAX_RECIPE_STEPS + 1) }),
-  /lowers to 256 primitive steps; IslamicStars supports at most 8/);
+  new RegExp(`lowers to ${MAX_RECIPE_STEPS + 1} primitive steps; IslamicStars supports at most ${MAX_BUILD_STEPS}`));
 });
 
 test('generateRegistryCpp counts a flattened base chain against the ceiling', () => {

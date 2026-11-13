@@ -892,64 +892,67 @@ test('Mobius preset descriptions retain AA contrast when active', () => {
 
 
 for (const { page } of SERVED_PAGES) {
-  test(`${page} reports module resource and syntax failures through the shared classic guard`, async (t) => {
-    t.after(stashGlobals('window', 'document', 'HTMLScriptElement'));
+  test(`${page} loads the shared classic guard before its module`, () => {
     const source = read(...page.split('/'));
     const guard = source.match(/<script src="((?:\.\.\/)?src\/shared\/module_load_guard\.js)"><\/script>/);
     assert.ok(guard);
     assert.ok(guard.index < source.indexOf('<script type="module"'));
     assert.doesNotMatch(source, /showLoadFailure|handleModuleSyntaxError/);
-    class Script {
-      constructor(type) { this.type = type; }
-    }
-    let current = fakeElement('div');
-    const listeners = [];
-    globalThis.HTMLScriptElement = Script;
-    globalThis.document = {
-      getElementById: () => current, createElement: fakeElement,
-      body: {appendChild: (element) => { current = element; }},
-    };
-    globalThis.window = {addEventListener: (type, listener, capture) => listeners.push({type, listener, capture})};
-    await import(`../src/shared/module_load_guard.js?${encodeURIComponent(page)}`);
-    assert.equal(listeners.length, 1);
-    assert.equal(listeners[0].type, 'error');
-    assert.equal(listeners[0].capture, true, 'resource error events do not bubble');
-    const fail = listeners[0].listener;
-    for (const event of [{error: new Error('ordinary')}, {target: new Script('')}, {target: {tagName: 'LINK'}}])
-      fail(event);
-    assert.equal(current.dataset.moduleLoadFailure, undefined);
-    fail({target: new Script('module')});
-    assert.equal(current.dataset.moduleLoadFailure, 'true');
-    assert.equal(current.getAttribute('role'), 'alert');
-    assert.match(current.textContent, /Unable to load the application.*Hard-reload/);
-    current.textContent = 'existing failure';
-    fail({error: new SyntaxError('bad module')});
-    assert.equal(current.textContent, 'existing failure');
-    current = fakeElement('div');
-    current.classList.add('error');
-    current.textContent = 'application boot failure';
-    fail({error: new SyntaxError('late failure')});
-    assert.equal(current.textContent, 'application boot failure');
-    current = fakeElement('div');
-    fail({error: new SyntaxError('bad module')});
-    assert.equal(current.getAttribute('role'), 'alert');
-    current = null;
-    assert.doesNotThrow(() => fail({target: new Script('module')}));
-    assert.equal(current.id, 'loading-overlay');
-    assert.equal(current.getAttribute('role'), 'alert');
-    assert.match(current.style.cssText, /position:fixed/);
-    const zIndex = Number(current.style.cssText.match(/z-index:\s*(-?\d+)/)?.[1]);
-    const stacked = SERVED_PAGES.flatMap(({ sheets }) => sheets)
-      .flatMap((sheet) => [...read(...sheet).matchAll(/z-index:\s*(-?\d+)/g)].map(([, z]) => Number(z)));
-    assert.ok(stacked.length > 0);
-    assert.ok(zIndex >= Math.max(...stacked), 'the failure banner overlays every page layer');
-    assert.match(current.textContent, /Unable to load the application/);
-    current = null;
-    document.readyState = 'complete';
-    fail({error: new SyntaxError('failure after boot')});
-    assert.equal(current, null);
   });
 }
+
+test('the shared module load guard reports resource and syntax failures', async (t) => {
+  t.after(stashGlobals('window', 'document', 'HTMLScriptElement'));
+  class Script {
+    constructor(type) { this.type = type; }
+  }
+  let current = fakeElement('div');
+  const listeners = [];
+  globalThis.HTMLScriptElement = Script;
+  globalThis.document = {
+    getElementById: () => current, createElement: fakeElement,
+    body: {appendChild: (element) => { current = element; }},
+  };
+  globalThis.window = {addEventListener: (type, listener, capture) => listeners.push({type, listener, capture})};
+  await import('../src/shared/module_load_guard.js?resource-and-syntax-failures');
+  assert.equal(listeners.length, 1);
+  assert.equal(listeners[0].type, 'error');
+  assert.equal(listeners[0].capture, true, 'resource error events do not bubble');
+  const fail = listeners[0].listener;
+  for (const event of [{error: new Error('ordinary')}, {target: new Script('')}, {target: {tagName: 'LINK'}}])
+    fail(event);
+  assert.equal(current.dataset.moduleLoadFailure, undefined);
+  fail({target: new Script('module')});
+  assert.equal(current.dataset.moduleLoadFailure, 'true');
+  assert.equal(current.getAttribute('role'), 'alert');
+  assert.match(current.textContent, /Unable to load the application.*Hard-reload/);
+  current.textContent = 'existing failure';
+  fail({error: new SyntaxError('bad module')});
+  assert.equal(current.textContent, 'existing failure');
+  current = fakeElement('div');
+  current.classList.add('error');
+  current.textContent = 'application boot failure';
+  fail({error: new SyntaxError('late failure')});
+  assert.equal(current.textContent, 'application boot failure');
+  current = fakeElement('div');
+  fail({error: new SyntaxError('bad module')});
+  assert.equal(current.getAttribute('role'), 'alert');
+  current = null;
+  assert.doesNotThrow(() => fail({target: new Script('module')}));
+  assert.equal(current.id, 'loading-overlay');
+  assert.equal(current.getAttribute('role'), 'alert');
+  assert.match(current.style.cssText, /position:fixed/);
+  const zIndex = Number(current.style.cssText.match(/z-index:\s*(-?\d+)/)?.[1]);
+  const stacked = SERVED_PAGES.flatMap(({ sheets }) => sheets)
+    .flatMap((sheet) => [...read(...sheet).matchAll(/z-index:\s*(-?\d+)/g)].map(([, z]) => Number(z)));
+  assert.ok(stacked.length > 0);
+  assert.ok(zIndex >= Math.max(...stacked), 'the failure banner overlays every page layer');
+  assert.match(current.textContent, /Unable to load the application/);
+  current = null;
+  document.readyState = 'complete';
+  fail({error: new SyntaxError('failure after boot')});
+  assert.equal(current, null);
+});
 
 
 test('shared keyboard rings outrank Firefox preflight without changing stylesheet order', () => {

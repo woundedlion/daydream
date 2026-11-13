@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync, spawnSync} from 'node:child_process';
-import {existsSync} from 'node:fs';
+import {existsSync, statSync} from 'node:fs';
 import {join} from 'node:path';
 import {isolatedGitEnv, scratchDir, writeFileAt} from './helpers/fixture_repo.js';
 
@@ -37,4 +37,14 @@ test('fixture git ignores the operator template directory', (t) => {
   const env = isolatedGitEnv({...process.env, GIT_TEMPLATE_DIR: template});
   execFileSync('git', ['-C', root, 'init', '-q', fixture], {env});
   assert.equal(existsSync(join(fixture, '.git', 'hooks', 'pre-commit')), false);
+});
+
+test('fixture git config isolation lives in a private temporary directory', () => {
+  const env = isolatedGitEnv();
+  assert.equal(existsSync(env.GIT_CONFIG_GLOBAL), false);
+  assert.equal(env.GIT_CONFIG_SYSTEM, env.GIT_CONFIG_GLOBAL);
+  assert.equal(statSync(env.XDG_CONFIG_HOME).isDirectory(), true);
+  if (process.platform !== 'win32') {
+    assert.equal(statSync(env.XDG_CONFIG_HOME).mode & 0o777, 0o700);
+  }
 });
