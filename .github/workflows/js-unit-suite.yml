@@ -80,6 +80,8 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
+      - name: Install the engine-pinned clang-format
+        run: pip install --require-hashes -r engine/requirements/clang-format.txt
       - name: Install shellcheck
         run: pip install --require-hashes -r requirements/shellcheck.txt
       - name: Lint shell
@@ -119,6 +121,7 @@ jobs:
           echo "actionlint clean: ${#FILES[@]} workflows linted."
       - name: Test
         env:
+          CLANG_FORMAT_REQUIRED: '1'
           DAYDREAM_HOOK_SH_REQUIRED: '1'
           HOLOSPHERE_ENGINE_REQUIRED: '1'
         run: npm test

@@ -368,7 +368,7 @@ test('deployment MIME and presence checks cover every published engine module', 
 });
 
 // The engine-parity and hook cases skip without their flags.
-test('the JS unit suite arms the engine-parity and hook cases', () => {
+test('the JS unit suite arms engine-parity, formatter and hook cases', () => {
   const source = workflowText('js-unit-suite.yml');
   const checkout = source.match(
     /- name: Checkout the pinned engine\n[\s\S]*?(?=\n\s{6}- )/,
@@ -377,5 +377,7 @@ test('the JS unit suite arms the engine-parity and hook cases', () => {
   const step = source.match(/- name: Test\n[\s\S]*?(?=\n\s{6}- |\s*$)/)?.[0] ?? '';
   assert.match(step, /^\s+HOLOSPHERE_ENGINE_REQUIRED: '1'$/m);
   assert.match(step, /^\s+DAYDREAM_HOOK_SH_REQUIRED: '1'$/m);
+  assert.match(step, /^\s+CLANG_FORMAT_REQUIRED: '1'$/m);
+  assert.match(source, /run: pip install --require-hashes -r engine\/requirements\/clang-format\.txt/);
   assert.match(step, /^\s+run: npm test$/m);
 });
