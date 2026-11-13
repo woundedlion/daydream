@@ -581,7 +581,7 @@ const CONTRAST_EXEMPT = {
   'solids.css': {
     '#footer::-webkit-scrollbar-thumb:hover': 'scrollbar graphics contain no text',
     '.drag-handle': 'an SVG grip, not text; SC 1.4.3 is a text criterion',
-    '#meshStats': 'translucent readout over the live canvas',
+    '#meshStats': 'measured separately over a white canvas',
     '#arenaStats': 'translucent readout measured separately over a white canvas',
   },
   'mobius.css': {
@@ -776,10 +776,13 @@ test('segment stats text retains AA contrast over a white canvas', () => {
   }
 });
 
-test('solids arena stats retain AA contrast over a white canvas', () => {
-  const css = `${read('tools', 'solids.css')} .white-canvas { background: #fff; }`;
-  const ratio = contrast(css, '#arenaStats', ['#arenaStats', '.white-canvas']);
-  assert.ok(ratio >= AA_CONTRAST, `arena stats contrast is ${ratio.toFixed(2)}:1`);
+test('solids stats retain AA contrast over a white canvas', () => {
+  const css = `${read('tools', 'tools.css')} ${read('tools', 'solids.css')}
+    .white-canvas { background: #fff; }`;
+  for (const selector of ['#arenaStats', '#meshStats']) {
+    const ratio = contrast(css, selector, [selector, '.white-canvas']);
+    assert.ok(ratio >= AA_CONTRAST, `${selector} contrast is ${ratio.toFixed(2)}:1`);
+  }
 });
 
 test('CSS readers ignore comments and honor later declarations', () => {

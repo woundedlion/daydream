@@ -294,7 +294,7 @@ body {
   padding: 0.4rem 0.8rem;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.65rem;
-  color: rgba(165, 180, 252, 0.8);
+  color: #a5b4fc;
   text-transform: uppercase;
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
