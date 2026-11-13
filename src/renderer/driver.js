@@ -119,6 +119,7 @@ export class Daydream {
   // Keyboard orbit: radians of rotation per arrow press, dolly factor per +/-.
   static KEY_ORBIT_STEP = Math.PI / 36;
   static KEY_ZOOM_STEP = 1.1;
+  static VIEW_RESET_MS = 250;
 
   static SPHERE_RADIUS = 30;
   static COLUMN_FILL_OVERLAP = 1.15;
@@ -294,6 +295,7 @@ export class Daydream {
     this.compactViewport = false;
     this.fittedDistance = 0;
     this.setCanvasSize();
+    this.setupViewReset();
 
     this.resizeObserver = new this.win.ResizeObserver(() => {
       this.setCanvasSize();
@@ -432,6 +434,49 @@ export class Daydream {
     this.canvas.addEventListener("keydown", this.onCanvasKeyDown);
     this.canvas.addEventListener("focus", /** @type {EventListener} */ (this.onCanvasFocus));
     this.canvas.addEventListener("blur", /** @type {EventListener} */ (this.onCanvasBlur));
+  }
+
+  /** Bind the viewport reset button, double-click, and interruption listeners. */
+  setupViewReset() {
+    this.viewResetFrame = 0;
+    this.resetViewButton = this.doc.getElementById('reset-view');
+    this.onResetView = () => this.resetView();
+    this.onCancelViewReset = () => this.cancelViewReset();
+    this.resetViewButton?.addEventListener('click', this.onResetView);
+    this.canvas.addEventListener('dblclick', this.onResetView);
+    this.canvas.addEventListener('keydown', this.onCancelViewReset);
+    this.controls.addEventListener('start', this.onCancelViewReset);
+  }
+
+  /** Return to the default orientation and center while preserving zoom. */
+  resetView() {
+    this.cancelViewReset();
+    const target = this.controls.target.clone();
+    const orbit = new THREE.Spherical().setFromVector3(
+      this.camera.position.clone().sub(target));
+    const started = this.win.performance.now();
+    const duration = this.win.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? 0 : Daydream.VIEW_RESET_MS;
+    const offset = new THREE.Vector3();
+    const spherical = new THREE.Spherical();
+    const animate = (/** @type {number} */ now) => {
+      const progress = duration === 0 ? 1 : THREE.MathUtils.clamp((now - started) / duration, 0, 1);
+      const remaining = (1 - progress) ** 3;
+      spherical.set(orbit.radius, Math.PI / 2 + (orbit.phi - Math.PI / 2) * remaining,
+        orbit.theta * remaining);
+      this.controls.target.copy(target).multiplyScalar(remaining);
+      this.camera.position.copy(this.controls.target).add(offset.setFromSpherical(spherical));
+      this.controls.update();
+      this.needsRender = true;
+      this.viewResetFrame = progress < 1 ? this.win.requestAnimationFrame(animate) : 0;
+    };
+    animate(started);
+  }
+
+  /** Cancel an in-flight return to the default orientation. */
+  cancelViewReset() {
+    if (this.viewResetFrame) this.win.cancelAnimationFrame(this.viewResetFrame);
+    this.viewResetFrame = 0;
   }
 
   /**
@@ -1066,6 +1111,16 @@ export class Daydream {
         "webglcontextrestored", /** @type {EventListener} */ (this.onContextRestored), false);
     }
     this.contextLostOverlay?.remove();
+
+    if (this.onResetView) {
+      this.cancelViewReset();
+      this.resetViewButton?.removeEventListener('click', this.onResetView);
+      this.canvas.removeEventListener('dblclick', this.onResetView);
+    }
+    if (this.onCancelViewReset) {
+      this.canvas.removeEventListener('keydown', this.onCancelViewReset);
+      this.controls.removeEventListener('start', this.onCancelViewReset);
+    }
 
     if (this.onCanvasKeyDown) {
       this.canvas.removeEventListener("keydown", this.onCanvasKeyDown);

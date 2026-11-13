@@ -184,6 +184,34 @@
   /* Clip canvas overflow */
 }
 
+.viewport-reset {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgb(var(--page-bg-rgb) / 0.65);
+  color: var(--muted-text);
+  cursor: pointer;
+}
+
+.viewport-reset:hover,
+.viewport-reset:focus-visible {
+  border-color: var(--button-border-hover);
+  background: var(--panel-bg);
+  color: var(--bright-text);
+}
+
+.canvas-container.recording .viewport-reset {
+  top: 36px;
+}
+
 /* Recording indicator — pulsing red dot */
 .canvas-container.recording::after {
   content: '';

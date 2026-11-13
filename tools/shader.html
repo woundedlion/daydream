@@ -72,12 +72,18 @@
     <main class="main-area">
       <section id="chain-strip" class="chain-strip-region" aria-label="Shader chain"></section>
       <div id="canvas-container" class="canvas-container">
+        <button id="reset-view" class="viewport-reset" type="button" aria-label="Reset viewport orientation"
+          title="Reset view (or double-click the viewport)">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6" />
+          </svg>
+        </button>
         <div id="loading-overlay" class="loading-overlay" role="status"><div class="spinner"></div><span>Loading Shader workbench…</span></div>
         <div id="apply-notice" class="apply-notice" role="alert">
           <div id="apply-notice-body" class="apply-notice-body" hidden><span id="apply-notice-text"></span><button id="apply-notice-dismiss" class="apply-notice-dismiss" type="button" aria-label="Dismiss message">&times;</button></div>
         </div>
         <canvas id="canvas" tabindex="0" role="application" aria-keyshortcuts="Space ArrowLeft ArrowRight ArrowUp ArrowDown Plus - Shift+ArrowRight"
-                        aria-label="Real-time preview of the authored Shader document. When the canvas is focused, arrow keys orbit the view; plus and minus zoom. Space pauses; while paused, Right steps one frame and Shift+Right orbits."></canvas>
+                        aria-label="Real-time preview of the authored Shader document. Double-click to reset the view orientation. When the canvas is focused, arrow keys orbit the view; plus and minus zoom. Space pauses; while paused, Right steps one frame and Shift+Right orbits."></canvas>
       </div>
       <div id="gui-container" class="gui-container"></div>
     </main>

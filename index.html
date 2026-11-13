@@ -74,6 +74,12 @@
                 </table>
             </div>
             <div id="canvas-container" class="canvas-container">
+                <button id="reset-view" class="viewport-reset" type="button" aria-label="Reset viewport orientation"
+                    title="Reset view (or double-click the viewport)">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6" />
+                    </svg>
+                </button>
                 <div id="loading-overlay" class="loading-overlay" role="status">
                     <div class="spinner"></div>
                     <span>Loading engine...</span>
@@ -89,7 +95,7 @@
                 </div>
                 <canvas id="canvas" tabindex="0" role="application"
                     aria-keyshortcuts="Space ArrowLeft ArrowRight ArrowUp ArrowDown Plus - Shift+ArrowRight"
-                    aria-label="Real-time 3D simulation of the LED sphere. When the canvas is focused, arrow keys orbit the view; plus and minus zoom. Space pauses; while paused, Right steps one frame and Shift+Right orbits; while running, Left and Right change preset when focus is outside a control."></canvas>
+                    aria-label="Real-time 3D simulation of the LED sphere. Double-click to reset the view orientation. When the canvas is focused, arrow keys orbit the view; plus and minus zoom. Space pauses; while paused, Right steps one frame and Shift+Right orbits; while running, Left and Right change preset when focus is outside a control."></canvas>
             </div>
         </main>
         <section id="gui-container" class="gui-container" aria-label="Controls"></section>
