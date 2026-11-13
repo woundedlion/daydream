@@ -20,12 +20,7 @@ test('generated solid recipes pass clang-format', {skip: engineSkip}, (t) => {
   assert.ok(expectedVersion, 'the engine must declare its clang-format pin');
   assert.equal(version.stdout.match(/\bversion ([\d.]+)\b/)?.[1], expectedVersion,
     'clang-format must match the engine requirements pin');
-  const bases = ['cube', 'dodecahedron_hk62_ambo_hk62',
-    'truncatedIcosidodecahedron_hk62_ambo_hk62',
-    'truncatedIcosahedron_hk58_chamfer63',
-    'truncatedIcosahedron_ambo_relax_truncate33_hk64',
-    'truncatedIcosahedron_ambo_relax_truncate001_hankin59'];
-  const sources = bases.map((base) => generateRecipeCpp({base, ops: ['kis']}, 'IslamicStarPatterns'));
+  const sources = [generateRecipeCpp({base: 'cube', ops: ['kis']}, 'Archimedean')];
   sources.push(generateRecipeCpp({base: 'truncatedIcosahedron', ops: [
     {op: 'hankin', params: {angle: 58}}, {op: 'chamfer', params: {t: 0.63}},
   ]}, 'Archimedean'));

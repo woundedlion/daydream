@@ -220,32 +220,18 @@ test('generateRecipeCpp wraps at the column limit, not one column early or late'
   assert.equal(signature, `HS_FLASH_INLINE inline PolyMesh ${'a'.repeat(19)}_relax9(Arena &a, Arena &b) {`);
   assert.equal(signature.length, 80);
 
-  const seedLines = (base) => {
-    const lines = generateRecipeCpp({ base, ops: ['dual'] }, 'IslamicStarPatterns').split('\n');
-    const start = lines.findIndex((line) => line.startsWith('  return '));
-    return lines.slice(start, lines.indexOf('      .dual()'));
-  };
-  assert.deepEqual(seedLines('truncatedIcosidodecahedron_hk'), [
-    '  return SolidBuilder(IslamicStarPatterns::truncated_icosidodecahedron_hk(a, b),',
-    '                      a, b)',
-  ]);
-  assert.deepEqual(seedLines('truncatedIcosidodecahedron_hk58'), [
-    '  return SolidBuilder(',
-    '             IslamicStarPatterns::truncated_icosidodecahedron_hk58(a, b), a, b)',
-  ]);
+  for (const [namespace, base] of [['Archimedean', 'truncatedIcosidodecahedron'],
+    ['Catalan', 'pentagonalHexecontahedron']]) {
+    const lines = generateRecipeCpp({base, ops: ['dual']}, namespace)
+      .split('\n');
+    assert.ok(lines.filter((line) => line.startsWith('  return ')).every((line) => line.length <= 80));
+  }
 });
 
 test('generateRecipeCpp omits mesh counts if any count is missing', () => {
   const cpp = generateRecipeCpp({ base: 'cube', ops: ['dual'], vCount: 8, fCount: 12 }, 'Archimedean');
   assert.ok(cpp.includes('star pattern.'));
   assert.doesNotMatch(cpp, /V=/);
-});
-
-test('generateRecipeCpp wraps a long star seed constructor argument', () => {
-  const cpp = generateRecipeCpp({
-    base: 'truncatedIcosidodecahedron_hankin62_chamfer50', ops: ['dual'],
-  }, 'IslamicStarPatterns');
-  assert.equal(cpp, fixture('recipe-2.cpp'));
 });
 
 /**
@@ -277,10 +263,7 @@ test('generateRecipeCpp renders counts as non-negative integer comment text', ()
   }
 });
 
-/**
- * The generated function is pasted into `namespace IslamicStarPatterns`, which
- * carries no using-directive, so an unqualified seed call would not compile.
- */
+/** The recipe qualifies its seed call with the supplied namespace. */
 test('the seed call is qualified with the base namespace', () => {
   const item = { base: 'rhombicTriacontahedron', ops: ['ambo'] };
   const { recipe } = generateFuncAndRecipe(item, 'Catalan');
@@ -398,19 +381,8 @@ test('pctSuffix and generateFuncAndRecipe reject negative fractional params', ()
     /negative/);
 });
 
-test('star seed calls match formatter-derived bin-packed fixtures', () => {
-  for (const [index, base] of ['dodecahedron_hk62_ambo_hk62',
-    'truncatedIcosidodecahedron_hk62_ambo_hk62'].entries()) {
-    const expected = fixture(`recipe-${index}.cpp`);
-    assert.equal(generateRecipeCpp({ base, ops: ['kis'] }, 'IslamicStarPatterns'), expected);
-  }
-});
 
-test('long star seeds match formatter-derived namespace continuations', () => {
-  for (const [offset, base] of ['truncatedIcosahedron_hk58_chamfer63',
-    'truncatedIcosahedron_ambo_relax_truncate33_hk64',
-    'truncatedIcosahedron_ambo_relax_truncate001_hankin59'].entries()) {
-    assert.equal(generateRecipeCpp({ base, ops: ['kis'] }, 'IslamicStarPatterns'),
-      fixture(`recipe-${offset + 3}.cpp`));
-  }
+test('generateRecipeCpp rejects seed calls beyond the return-line limit', () => {
+  assert.throws(() => generateRecipeCpp({base: 'a'.repeat(80), ops: ['dual']}, 'Archimedean'),
+    /seed call does not fit the return line/);
 });

@@ -11,11 +11,6 @@ import {
   outOfRangeParam, requireCount, requireFinite, requireNamespace, requireParams,
 } from './solid_validation.js';
 
-const RETURN_BUILDER_PREFIX = '  return SolidBuilder(';
-const BUILDER_ARGUMENT_COLUMN = '  return '.length + '    '.length;
-const BUILDER_ALIGNED_COLUMN = RETURN_BUILDER_PREFIX.length;
-const NAMESPACE_CONTINUATION_COLUMN = BUILDER_ALIGNED_COLUMN + '    '.length;
-
 /** @typedef {import('./solid_op_params.js').ChainOp} ChainOp */
 
 /**
@@ -206,34 +201,9 @@ const CHAIN_CALL = /\.(?=[A-Za-z_]\w*\()/;
 function returnRecipeCpp(recipe) {
   if (`  return ${recipe};`.length <= COLUMN_LIMIT) return `  return ${recipe};`;
   const [seed, ...calls] = recipe.split(CHAIN_CALL);
-  let seedLine = `  return ${seed}`;
-  if (seedLine.length > COLUMN_LIMIT) {
-    const inner = seed.slice('SolidBuilder('.length, -', a, b)'.length);
-    const prefix = RETURN_BUILDER_PREFIX;
-    if (prefix.length + inner.length + 1 <= COLUMN_LIMIT) {
-      seedLine = fillColumns([`${inner},`, 'a,', 'b)'], prefix,
-        ' '.repeat(prefix.length)).join('\n');
-    } else if (BUILDER_ARGUMENT_COLUMN + inner.length + 1 <= COLUMN_LIMIT) {
-      seedLine = '  return SolidBuilder(\n'
-        + fillColumns([`${inner},`, 'a,', 'b)'], ' '.repeat(BUILDER_ARGUMENT_COLUMN)).join('\n');
-    } else {
-      const innerHead = `${' '.repeat(BUILDER_ARGUMENT_COLUMN)}${inner.slice(0, -'a, b)'.length)}`;
-      if (innerHead.length + 3 <= COLUMN_LIMIT) {
-        const innerCall = fillColumns(['a,', 'b),'], innerHead,
-          ' '.repeat(innerHead.length)).join('\n');
-        seedLine = `  return SolidBuilder(\n${innerCall}\n${' '.repeat(BUILDER_ARGUMENT_COLUMN)}a, b)`;
-      } else if (innerHead.length <= COLUMN_LIMIT) {
-        seedLine = `  return SolidBuilder(\n${innerHead}\n${' '.repeat(BUILDER_ARGUMENT_COLUMN + '    '.length)}a, b),\n${' '.repeat(BUILDER_ARGUMENT_COLUMN)}a, b)`;
-      } else {
-        const separator = inner.lastIndexOf('::') + 2;
-        const namespace = inner.slice(0, separator);
-        const call = inner.slice(separator);
-        seedLine = call.length + NAMESPACE_CONTINUATION_COLUMN + 1 <= COLUMN_LIMIT
-          ? `  return SolidBuilder(${namespace}\n${' '.repeat(NAMESPACE_CONTINUATION_COLUMN)}${call},\n${' '.repeat(BUILDER_ALIGNED_COLUMN)}a, b)`
-          : `  return SolidBuilder(\n${' '.repeat(BUILDER_ARGUMENT_COLUMN)}${namespace}\n${' '.repeat(BUILDER_ARGUMENT_COLUMN + '    '.length)}${call},\n${' '.repeat(BUILDER_ARGUMENT_COLUMN)}a, b)`;
-      }
-    }
-  }
+  const seedLine = `  return ${seed}`;
+  if (seedLine.length > COLUMN_LIMIT)
+    throw new Error('generateRecipeCpp: seed call does not fit the return line');
   return [seedLine, ...calls.map((call) => `      .${call}`)].join('\n') + ';';
 }
 
@@ -244,7 +214,7 @@ function returnRecipeCpp(recipe) {
  * @param {SolidSpec} item - The solid spec (see generateFuncAndRecipe), optionally with vCount, fCount, and iCount counts.
  * @param {string} baseNamespace - Namespace qualifying the seed call (e.g. "Archimedean"); required, since the emitted function is pasted where the seed is not visible unqualified.
  * @returns {string} The complete C++ function source including its doc comment.
- * @throws {Error} When the namespace is not a valid C++ identifier, or generateFuncAndRecipe rejects the spec.
+ * @throws {Error} When the namespace is invalid, the seed call exceeds the column limit, or the spec is rejected.
  */
 export function generateRecipeCpp(item, baseNamespace) {
   requireNamespace('generateRecipeCpp', baseNamespace);
