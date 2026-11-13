@@ -13,8 +13,8 @@ import {
   applyOp, meshOpFailure, requireParams, unsweepableReason,
 } from './solid_validation.js';
 import {
-  chainOpName, CATALAN_BASES, D2R_F32, DEFINED_SEED_CONSTANTS, OP_DEFS, KNOWN_OPS,
-  SIMPLE_SEEDS, exactHankinDegrees, opParams,
+  chainOpName, CATALAN_BASES, DEFINED_SEED_CONSTANTS, OP_DEFS, KNOWN_OPS,
+  SIMPLE_SEEDS, exactHankinDegrees, opParams, opsFromRecipe,
 } from './solid_op_params.js';
 import { generateFuncAndRecipe, snakeIdentifier } from './solid_codegen.js';
 import { engineHalted } from '../../shared/engine_halt.js';
@@ -56,9 +56,7 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
   await validator.withValidator((mod) => {
     if (!mod) throw new Error('Registry validation engine unavailable');
     const ops = [
-      ...(baseRecipe?.ops ?? []).map(({ op, param, twist }) => ({ op, params: {
-        t: param, angle: param / D2R_F32, iter: param, twist,
-      } })),
+      ...opsFromRecipe(baseRecipe?.ops ?? []),
       ...item.ops,
     ];
     /** @type {import('./solid_validation.js').MeshWrapper|null} */

@@ -454,6 +454,27 @@ test('long registry arguments move below a wrapped function call', () => {
 });
 
 
+test('registry validation replays star-base hankin angles in engine radians', async () => {
+  const angles = [];
+  const seeds = [];
+  const mesh = {
+    getFaces: () => ({counts: [3, 3, 3, 3]}),
+    hankin: angle => { angles.push(angle); return mesh; },
+    delete() {},
+  };
+  const mod = { MeshOps: {
+    fromSolidName: seed => { seeds.push(seed); return mesh; },
+    clearToolingMemory() {},
+  } };
+  const validator = {withValidator: async task => task(mod), noteDeath() {}};
+  const radians = Math.fround(62 * D2R_F32);
+  await validateRegistryFaces(validator, {base: 'star', ops: []}, {
+    seed: 'icosahedron', ops: [{op: 'hankin', param: radians, twist: 0}],
+  });
+  assert.deepEqual(seeds, ['icosahedron']);
+  assert.deepEqual(angles, [radians]);
+});
+
 test('registry validation refuses unavailable engines and rejected seeds', async () => {
   const item = { name: 'Rejected', base: 'cube', ops: [] };
   await assert.rejects(validateRegistryFaces({ withValidator: async (task) => task(null) }, item),
