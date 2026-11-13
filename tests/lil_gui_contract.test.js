@@ -7,7 +7,7 @@ import { wiring } from './helpers/effect_gui_harness.js';
 import { enumChoices } from '../src/effects/param_sync.js';
 import { GUI as DeepLinkGUI } from '../src/ui/gui.js';
 import { createEffectGui } from '../src/ui/effect_gui.js';
-import { addParamControl } from '../src/ui/effect_param_controls.js';
+import { addParamControl, presentReadonlyParam } from '../src/ui/effect_param_controls.js';
 import { syncParamAdvisories } from '../src/ui/effect_param_advisories.js';
 import { installConsoleCapture } from './helpers/fake_console.js';
 import { fakePanelGui } from './helpers/fake_gui.js';
@@ -68,6 +68,26 @@ test('fold band decorates a real lil-gui slider without changing its range or va
     assert.equal(controller.getValue(), 0.7);
     controller.setValue(0.9);
     assert.equal(state.strength, 0.9);
+  } finally { gui.destroy(); }
+});
+
+test('readonly sliders block drag and wheel handlers while preserving browser defaults', async () => {
+  const gui = await realGUI();
+  try {
+    const state = { frames: 12 };
+    const controller = addParamControl(gui, state,
+      { name: 'frames', value: 12, min: 0, max: 100 });
+    presentReadonlyParam(controller);
+    let reached = 0;
+    for (const widget of [controller.$slider, controller.$input]) {
+      for (const type of ['mousedown', 'touchstart', 'wheel']) {
+        widget.addEventListener(type, () => { reached++; });
+        assert.equal(widget.dispatch(type).defaultPrevented, false);
+        assert.equal(reached, 0, `${type} must not reach the widget`);
+      }
+    }
+    assert.equal(reached, 0);
+    assert.equal(state.frames, 12);
   } finally { gui.destroy(); }
 });
 

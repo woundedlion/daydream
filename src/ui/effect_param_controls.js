@@ -140,6 +140,11 @@ export function presentReadonlyParam(controller) {
     };
   }
   controller.domElement.classList.add('param-readonly');
+  for (const type of ['mousedown', 'touchstart', 'wheel']) {
+    controller.domElement.addEventListener(type, (/** @type {Event} */ event) => {
+      event.stopPropagation();
+    }, true);
+  }
   controller.domElement.addEventListener('keydown', (/** @type {KeyboardEvent} */ event) => {
     if (typeof event.key === 'string' && ((controller.$select && event.key.length === 1
         && !event.ctrlKey && !event.metaKey && !event.altKey) || event.key.startsWith('Arrow')
