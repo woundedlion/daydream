@@ -1546,6 +1546,36 @@ test('lightness lift preserves the noise recipe and clamps only strength in one 
   assert.deepEqual(savedValues(harness), original);
 });
 
+test('configured-single resets its coupled noise fields in one admitted batch and undo', async () => {
+  const harness = await editorWorkbench();
+  const edit = stageEditor(harness, 'modulation');
+  edit('modulation.pattern-noise-variant', 'octave-contour');
+  edit('modulation.pattern-noise-basis', 'fbm3');
+  edit('modulation.pattern-contrast', 2);
+  const original = savedValues(harness);
+  const batches = [];
+  const apply = harness.engine.bindings.setShaderChainParameters;
+  harness.engine.bindings.setShaderChainParameters = (writes) => {
+    const result = apply(writes);
+    batches.push({writes, result});
+    return result;
+  };
+  edit('modulation.pattern-noise-variant', 'configured-single');
+  assert.deepEqual(batches, [{writes: [
+    {name: 'modulation.pattern-noise-variant',
+      value: optionIndex(MODULATION_OPERATOR, 'pattern-noise-variant', 'configured-single')},
+    {name: 'modulation.pattern-noise-basis',
+      value: optionIndex(MODULATION_OPERATOR, 'pattern-noise-basis', 'simplex')},
+    {name: 'modulation.pattern-contrast', value: 0},
+  ], result: ParamSetResult.APPLIED}]);
+  const values = savedValues(harness);
+  assert.equal(values['modulation.pattern-noise-variant'], 'configured-single');
+  assert.equal(values['modulation.pattern-noise-basis'], 'simplex');
+  assert.equal(values['modulation.pattern-contrast'], 0);
+  harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
+  assert.deepEqual(savedValues(harness), original);
+});
+
 test('baked sampling clamps an existing direct Noise scale in the same edit', async () => {
   const harness = await editorWorkbench();
   const edit = stageEditor(harness, 'modulation');

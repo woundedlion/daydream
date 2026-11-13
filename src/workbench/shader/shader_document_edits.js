@@ -197,6 +197,10 @@ function stageEditValues(parameterId, value, descriptor, presetValues) {
     };
     if (field === 'modulation-source' && value !== 'noise')
       values[`${label}.modulation-evaluation`] = 'direct';
+    if (field === 'pattern-noise-variant' && value === 'configured-single') {
+      values[`${label}.pattern-noise-basis`] = 'simplex';
+      values[`${label}.pattern-contrast`] = 0;
+    }
     if (field === 'modulation-mechanic') {
       const limits = modulationValueLimits('modulation-amount', valueOf);
       if (limits) {
