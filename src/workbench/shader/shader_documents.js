@@ -24,7 +24,7 @@ import {
 } from './shader_deeplink.js';
 
 import {createShaderStageEditor, compiledControlFor, documentControlFor, applyFixedShaderDocument} from './shader_document_edits.js';
-import {createShaderDocumentLoader, createShaderDocumentLinks, diagnosticText} from './shader_document_loader.js';
+import {CHAIN_EFFECT, SCRATCH_FILENAME, createShaderDocumentLoader, createShaderDocumentLinks, diagnosticText} from './shader_document_loader.js';
 import {createShaderDocumentPersistence} from './shader_document_persistence.js';
 export {applyFixedShaderDocument};
 
@@ -33,14 +33,8 @@ export { SHADER_LINK_DEBOUNCE_MS, SHADER_LINK_MAX_WAIT_MS } from './shader_deepl
 const PATTERN_CATALOG_URL = '../../../generated/shader/patterns/catalog.json';
 const CATALOG_URL = '../../../generated/shader/engine_catalog.json';
 
-// The engine's chain interpreter, programmed through setShaderChain.
-const CHAIN_EFFECT = canonicalEffectId('ShaderChain');
-
 // Digest characters the toolbar shows; the button copies all of it.
 const DIGEST_ABBREVIATION = 12;
-
-// The download name used by Save for the scratch document.
-const SCRATCH_FILENAME = 'scratch.shader.json';
 
 /** @typedef {import('./chain_apply.js').ParameterDefinition} ParameterDefinition */
 /** @typedef {import('./chain_apply.js').CompiledDocument} CompiledDocument */

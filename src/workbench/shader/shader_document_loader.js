@@ -11,8 +11,8 @@ import {scratchChainDocument} from './chain_document_store.js';
 import {snapshotValueEqual} from './shader_document_edits.js';
 /** @typedef {import('./chain_apply.js').CompiledDocument} CompiledDocument */
 /** @typedef {import('./shader_documents.js').ActiveDocument} ActiveDocument */
-const CHAIN_EFFECT = canonicalEffectId('ShaderChain');
-const SCRATCH_FILENAME = 'scratch.shader.json';
+export const CHAIN_EFFECT = canonicalEffectId('ShaderChain');
+export const SCRATCH_FILENAME = 'scratch.shader.json';
 
 /**
  * Every diagnostic the compile collected, one per line.
