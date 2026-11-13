@@ -152,15 +152,29 @@ export function exportStatus(h) {
 /**
  * Build the module under test over doubles for every collaborator.
  * @param {Object} [options] - Engine/page state the panel reads.
- * @param {(p: Object) => boolean} [options.pausesOnWrite] - The engine's implicit
- *   pause rule, applied by the setEngineParam double: which parameter writes
- *   leave the engine reporting paused animations.
- * @param {Function} [options.onEngineParam] - Optional engine-side reaction to
- *   a parameter write, used to model a dynamic descriptor rebind; returning
- *   false models an engine refusal.
- * @param {boolean} [options.rebuildOnApply] - Makes the injected applyEffect run
- *   the app's real destroy/build/mount sequence instead of only recording the
- *   call, which is what the Reset button drives.
+ * @param {Object[]} [options.params] - Engine parameter descriptors.
+ * @param {number[]} [options.engineValues] - Engine parameter values.
+ * @param {number[]|null} [options.segmentValues] - Worker parameter values.
+ * @param {boolean} [options.ownsDisplay] - Worker display ownership.
+ * @param {number} [options.generation] - Parameter descriptor generation.
+ * @param {Function|null} [options.copyText] - Clipboard copy operation, if available.
+ * @param {boolean} [options.isMobile] - Mobile panel layout.
+ * @param {Function} [options.canPausePresets] - Preset pause availability.
+ * @param {Object} [options.container] - Panel mount element.
+ * @param {Object} [options.hydrated] - GUI values restored on construction.
+ * @param {Object} [options.acceptedStored] - Stored values accepted by the GUI.
+ * @param {(p: Object) => boolean} [options.pausesOnWrite] - Engine pause rule.
+ * @param {Function} [options.onEngineParam] - Parameter-write reaction; false refuses.
+ * @param {Function} [options.onReadAdvisories] - Advisory-read reaction.
+ * @param {boolean} [options.rebuildOnApply] - Rebuilds the panel when applying.
+ * @param {Function} [options.onSynchronizePreset] - Preset-sync reaction.
+ * @param {number} [options.presetCount] - Available preset count.
+ * @param {number} [options.presetIndex] - Selected preset index.
+ * @param {boolean} [options.presetSelectionAccepted] - Accepts preset selection.
+ * @param {boolean} [options.presetSyncAccepted] - Accepts preset synchronization.
+ * @param {boolean} [options.chainSnapshotEnabled] - Enables chain configuration.
+ * @param {Object|null} [options.chainSnapshot] - Initial chain configuration.
+ * @param {boolean} [options.restoreChainSnapshotAccepted] - Accepts chain restore.
  * @returns {Object} The panel plus the doubles and sinks a test asserts on.
  */
 export function makeHarness({
@@ -185,7 +199,7 @@ export function makeHarness({
   presetSelectionAccepted = true,
   presetSyncAccepted = true,
   chainSnapshotEnabled = false,
-  chainSnapshot = null,
+  chainSnapshot: initialChainSnapshot = null,
   restoreChainSnapshotAccepted = true,
 } = {}) {
   installDocument({ body: fakeElement('body', { connected: true }), activeElement: null });
@@ -204,7 +218,7 @@ export function makeHarness({
     presetCount,
     presetIndex,
     hostPresetIndex: presetIndex,
-    chainSnapshot,
+    chainSnapshot: initialChainSnapshot,
   };
   const writes = [];
   const warnings = [];
