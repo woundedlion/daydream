@@ -864,14 +864,10 @@ function getDragTargetIndex(e, list) {
 const DRAG_SLOP_PX = 4;
 
 /**
- * Wires one row's reorder drag onto its grip, with the pointer captured on the grip.
- * @param {HTMLElement} grip - The row's drag handle.
- * @param {number} index - The op's position in the chain.
- * @param {HTMLElement} el - The row element.
- * @param {HTMLElement} list - The #opsList container.
- * @param {number} revision - opsRevision this row was rendered against; the
- *   queued commit drops the drag when the list has changed since.
- * @returns {void}
+ * Update the row reorder preview for the current pointer position.
+ * @param {typeof page} page - Page state.
+ * @param {{el: HTMLElement, grip: HTMLElement, list: HTMLElement, index: number, originX: number, originY: number, originListTop: number, originListLeft: number}} gesture - Drag state.
+ * @param {PointerEvent} e - Pointer position.
  */
 function moveRowDragPreview(page, gesture, e) {
   const {el, grip, list, index, originX, originY, originListTop, originListLeft} = gesture;
@@ -906,6 +902,16 @@ function moveRowDragPreview(page, gesture, e) {
     });
 }
 
+/**
+ * Wires one row's reorder drag onto its grip, with the pointer captured on the grip.
+ * @param {HTMLElement} grip - The row's drag handle.
+ * @param {number} index - The op's position in the chain.
+ * @param {HTMLElement} el - The row element.
+ * @param {HTMLElement} list - The #opsList container.
+ * @param {number} revision - opsRevision this row was rendered against; the
+ *   queued commit drops the drag when the list has changed since.
+ * @returns {void}
+ */
 function wireRowDrag(grip, index, el, list, revision) {
   const gesture = {el, grip, list, index, originX: 0, originY: 0, originListTop: 0, originListLeft: 0};
   let dragging = false;

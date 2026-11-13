@@ -436,7 +436,7 @@ function engineSeedConstants(source, bases) {
 }
 
 /**
- * Pins solid_codegen.js's DEFINED_SEED_CONSTANTS to the constants solids.h
+ * Pins solid_op_params.js's DEFINED_SEED_CONSTANTS to the constants solids.h
  * declares, and each constant's value to its SIMPLE_SEEDS index.
  */
 test('DEFINED_SEED_CONSTANTS matches core/mesh/solids.h', { skip: engineSkip }, () => {

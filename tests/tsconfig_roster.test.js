@@ -16,8 +16,8 @@ const NOT_CHECKED = new Set([
 ]);
 
 // Top-level directories never entered: dependency and git metadata, the linked worktrees, the vendored
-// third-party drops, the engine checkout, and tests/, which tsconfig.json puts
-// out of scope.
+// third-party drops, the engine checkout and its installed bundle, local agent tooling
+// (.claude, prompts), and tests/, which tsconfig.json puts out of scope.
 const SKIP_DIRS = new Set([
   'node_modules', '.git', '.worktrees', 'vendor', 'three.js', 'tests', 'engine', 'engine-bundle',
   '.claude', 'prompts',

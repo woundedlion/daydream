@@ -77,7 +77,8 @@ export function setupKeyboardOrbit(driver) {
   driver.canvas.addEventListener("blur", /** @type {EventListener} */ (driver.onCanvasBlur));
 }
 
-/** Bind the viewport reset button, double-click, and interruption listeners. * @param {import('./driver.js').Daydream} driver - Display state.
+/** Bind the viewport reset button, double-click, and interruption listeners.
+ * @param {import('./driver.js').Daydream} driver - Display state.
  */
 export function setupViewReset(driver) {
   driver.viewResetFrame = 0;
@@ -90,7 +91,8 @@ export function setupViewReset(driver) {
   driver.controls.addEventListener('start', driver.onCancelViewReset);
 }
 
-/** Return to the default orientation and center while preserving zoom. * @param {import('./driver.js').Daydream} driver - Display state.
+/** Return to the default orientation and center while preserving zoom.
+ * @param {import('./driver.js').Daydream} driver - Display state.
  */
 export function resetView(driver) {
   driver.cancelViewReset();
@@ -116,7 +118,8 @@ export function resetView(driver) {
   animate(started);
 }
 
-/** Cancel an in-flight return to the default orientation. * @param {import('./driver.js').Daydream} driver - Display state.
+/** Cancel an in-flight return to the default orientation.
+ * @param {import('./driver.js').Daydream} driver - Display state.
  */
 export function cancelViewReset(driver) {
   if (driver.viewResetFrame) driver.win.cancelAnimationFrame(driver.viewResetFrame);
@@ -126,9 +129,9 @@ export function cancelViewReset(driver) {
 /**
  * Keyboard handler: space toggles pause; right-arrow single-steps while
  * paused; left/right select presets while running.
+ * @param {import('./driver.js').Daydream} driver - Display state.
  * @param {KeyboardEvent} e - The keydown event driving playback or presets.
  * @param {(delta: number) => boolean} [movePreset] - Selects an adjacent preset.
- * @param {import('./driver.js').Daydream} driver - Display state.
  */
 export function keydown(driver, e, movePreset = () => false) {
   // An Alt/Ctrl/Meta chord is the browser's or the OS's — Ctrl+Space and
