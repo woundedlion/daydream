@@ -1,7 +1,8 @@
 # Tool fonts
 
-`../fonts.css` preserves the Inter 400/600/700 and JetBrains Mono 400 faces,
-Unicode ranges, and `font-display: swap` from the Google Fonts CSS response:
+`../fonts.css` declares each Inter subset as a 400–700 weight range over its
+shared variable font file. The JetBrains Mono 400 faces, Unicode ranges, and
+`font-display: swap` come from the Google Fonts CSS response:
 
 <https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap>
 
