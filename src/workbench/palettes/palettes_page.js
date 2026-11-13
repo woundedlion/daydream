@@ -62,7 +62,6 @@ function switchTab(tabName, updateUrl = true) {
   updatePalette();
 }
 
-
 const DEFAULT_PARAMS = {
   A_R: 0.500, A_G: 0.500, A_B: 0.500,
   B_R: 0.500, B_G: 0.500, B_B: 0.500,
@@ -362,7 +361,6 @@ function redrawForViewport() {
   stripController?.syncResetZoom();
 }
 
-
 /**
  * Updates the code output block with the current parameters.
  */
@@ -632,7 +630,6 @@ async function init() {
   renderRecipeControls();
 
   window.addEventListener('resize', scheduleViewportRedraw);
-
 
   stripController = createStripController({canvas: colorStripCanvas, viewport: paletteViewport,
     model: recipeModel, getTab: () => activeTab, getPalette: () => palette, visiblePhaseRange,

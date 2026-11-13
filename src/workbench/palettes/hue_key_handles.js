@@ -6,8 +6,11 @@
 import {createSliderProxy} from '../../shared/slider.js';
 import {HUE_KEY_NAMES} from './palette_wheel.js';
 
-/** @param {HTMLElement} group @param {(index: number) => void} select
- * @param {(event: KeyboardEvent, index: number) => void} nudgeKey */
+/** Creates accessible hue-key slider handles.
+ * @param {HTMLElement} group @param {(index: number) => void} select
+ * @param {(event: KeyboardEvent, index: number) => void} nudgeKey
+ * @returns {{syncHandles: (degrees: number[]) => void, focus: (index: number) => void,
+ * dispose: () => void}} Handle updates, focus, and cleanup. */
 export function createHueKeyHandles(group, select, nudgeKey) {
   /** @type {HTMLElement[]} */
   let handles = [];

@@ -143,14 +143,6 @@ export function createStripController({canvas: colorStripCanvas, viewport, model
     paletteRangeHeading.textContent = view.heading;
   }
 
-
-
-
-
-
-
-
-
   function zoomAroundCenter() {
     if (getTab() === 'procedural') {
       viewport.zoom(0.4, 0.6);

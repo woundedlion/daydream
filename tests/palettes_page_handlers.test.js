@@ -14,7 +14,6 @@ const handler = (name, context) => extractHandler(name, Object.assign(context, {
   HTMLCanvasElement: null, HTMLButtonElement: null,
 }));
 
-
 for (const end of ['minimum', 'maximum']) {
   test(`an axis ${end} edit keeps the opposite endpoint and refreshes the controls`, () => {
     const writes = [];
@@ -145,8 +144,6 @@ test('tab switches synchronize tab and panel ARIA state', () => {
   }
 });
 
-
-
 test('loading a recipe clears a stale hue-key refusal and renders the loaded recipe', () => {
   const status = { textContent: 'Choose another key.' };
   const recipeModel = new PaletteRecipeModel();
@@ -164,7 +161,6 @@ test('loading a recipe clears a stale hue-key refusal and renders the loaded rec
   assert.equal(rendered, 'MIRROR');
   assert.equal(scheduled, 1);
 });
-
 
 test('base hue rounding wraps the full turn without changing slider precision', () => {
   const input = fakeElement('input');

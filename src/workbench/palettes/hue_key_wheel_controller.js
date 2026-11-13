@@ -99,9 +99,6 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
   const ensureCustomHue = () =>
     model.recipe().hue.mode === PaletteV4.hueMode.CUSTOM || activateCustomHue();
 
-
-
-
   /**
    * @param {RecipeView} recipe - The recipe to paint.
    * @returns {void}

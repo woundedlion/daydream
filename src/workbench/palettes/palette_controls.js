@@ -95,7 +95,6 @@ export function equivalentTurnNear(wrappedTurn, referenceTurn) {
   return referenceTurn + signedTurnDelta(wrappedTurn - referenceTurn);
 }
 
-
 const PALETTE_TABS = new Set(['procedural', 'generative']);
 
 /**
@@ -888,8 +887,6 @@ export function applyPaletteControls(recipe, controls) {
   }
   return recipe;
 }
-
-
 
 /**
  * The PaletteV4 member name an ordinal stands for — the value the matching
