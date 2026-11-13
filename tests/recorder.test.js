@@ -814,6 +814,23 @@ test('a session retains only non-empty chunks', (t) => {
  * before the old recorder's async onstop fires. The stale handler must download
  * ITS OWN chunks and must NOT tear down the newer active session.
  */
+test('a stale empty session does not notify the session that replaced it', (t) => {
+  t.after(installRecorderEnv());
+  t.mock.method(console, 'warn', () => {});
+  let empty = 0;
+  const rec = new VideoRecorder(recordableCanvas());
+  rec.onEmptySession = () => { empty++; };
+  rec.start('first');
+  const recorderA = rec.mediaRecorder;
+  rec.stop();
+  rec.start('second');
+  const recorderB = rec.mediaRecorder;
+  recorderA.onstop();
+  assert.equal(empty, 0);
+  assert.equal(rec.mediaRecorder, recorderB);
+  assert.equal(rec.isRecording, true);
+});
+
 test('a stale onstop does not clobber the session that replaced it', (t) => {
   t.after(installRecorderEnv());
   const rec = new VideoRecorder(recordableCanvas());

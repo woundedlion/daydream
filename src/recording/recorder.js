@@ -616,7 +616,7 @@ export class VideoRecorder {
   finishBuffered(recorder, effectName, chunks) {
     if (chunks.length === 0) {
       console.warn('VideoRecorder: session produced no data; nothing to download');
-      this.onEmptySession?.();
+      if (this.mediaRecorder === null || this.mediaRecorder === recorder) this.onEmptySession?.();
       return;
     }
     try {
