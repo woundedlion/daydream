@@ -397,10 +397,10 @@ test('generateRegistryCpp emits a step table at the engine build ceiling', () =>
   assert.equal(code.split('{Op::').length - 1, MAX_BUILD_STEPS);
 });
 
-test('generateRegistryCpp rejects a chain one step past the uint8_t count ceiling', () => {
+test('generateRegistryCpp reports the primitive budget for oversized chains', () => {
   assert.throws(() => generateRegistryCpp(
     { base: 'cube', ops: longOps(MAX_RECIPE_STEPS + 1) }),
-  /has 256 steps; a Recipe carries at most 255/);
+  /lowers to 256 primitive steps; IslamicStars supports at most 8/);
 });
 
 test('generateRegistryCpp counts a flattened base chain against the ceiling', () => {

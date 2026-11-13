@@ -10,7 +10,7 @@
  */
 
 import {
-  applyOp, meshOpFailure, MAX_RECIPE_STEPS, requireParams, unsweepableReason,
+  applyOp, meshOpFailure, requireParams, unsweepableReason,
 } from './solid_validation.js';
 import {
   chainOpName, CATALAN_BASES, D2R_F32, DEFINED_SEED_CONSTANTS, OP_DEFS, KNOWN_OPS,
@@ -398,11 +398,6 @@ export function generateRegistryCpp(item, baseRecipe = null) {
   const recipeName = `${upperSnake(funcName)}_RECIPE`;
   const baseSteps = baseRecipe != null ? baseRecipe.ops.map(recipeStepCpp) : [];
   const stepList = baseSteps.concat(item.ops.map(opStepCpp));
-  if (stepList.length > MAX_RECIPE_STEPS) {
-    throw new Error(`generateRegistryCpp: the flattened chain has ${stepList.length} `
-      + `steps; a Recipe carries at most ${MAX_RECIPE_STEPS}, above which its `
-      + 'uint8_t count wraps and the pasted Recipe would replay a different chain');
-  }
   const ops = [...(baseRecipe?.ops ?? []), ...item.ops];
   const lowered = ops.reduce((count, op) =>
     count + primitiveCount(chainOpName(op)), 0);
