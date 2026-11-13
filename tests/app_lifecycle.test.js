@@ -1028,7 +1028,7 @@ test('failure reporting cannot prevent teardown', () => {
 test('a startup module trap reports its remedy and stops the test walk before teardown', async () => {
   const log = [];
   const host = new EngineHost();
-  const reportFailure = pageHandlers(new URL('../src/app/daydream.js', import.meta.url))(
+  const reportFailure = pageHandlers(new URL('../src/app/app_boot.js', import.meta.url))(
     'reportModuleFailure', {
       host, doc: {}, win: { location: {} }, MODULE_TRAP_NOTICE: 'module trap remedy',
       console: { error: () => {} },

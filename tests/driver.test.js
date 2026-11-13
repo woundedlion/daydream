@@ -2415,7 +2415,7 @@ test('the driver hands its own document to every collaborator that defaults to t
   const local = [...DRIVER_SOURCE.matchAll(
     /export class (\w+)(?:(?!export class)[\s\S])*?constructor\([^)]*doc = globalThis\.document/gu)]
     .map(([, name]) => name).filter((name) => name !== 'Daydream');
-  assert.ok(local.includes('LabelPool'));
+  assert.ok(modules.includes('LabelPool'));
   const collaborators = [...modules, ...local];
   // Guards the derivation, not the roster.
   assert.ok(collaborators.length > 0,

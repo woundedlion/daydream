@@ -20,6 +20,8 @@ import { generateFuncAndRecipe, snakeIdentifier } from './solid_codegen.js';
 import { engineHalted } from '../../shared/engine_halt.js';
 import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns, formatFloatCpp } from '../../shared/cpp_format.js';
 
+const MAKE_RECIPE_ARGUMENT_COLUMN = 'make_recipe('.length;
+
 /** Maximum lowered primitive steps accepted by the effect. */
 export const MAX_BUILD_STEPS = 8;
 /** Maximum face count of replay endpoints and morph intermediates. */
@@ -309,7 +311,7 @@ function recipeDefinitionCpp(name, seed, steps) {
   const pad = ' '.repeat(indent);
   if (indent + call.length <= COLUMN_LIMIT) return `${head}\n${pad}${call}`;
   const argumentsFit = indent + seed.length + steps.length + 4 <= COLUMN_LIMIT;
-  const alignedStepsFit = indent + 12 + steps.length + 2 <= COLUMN_LIMIT;
+  const alignedStepsFit = indent + MAKE_RECIPE_ARGUMENT_COLUMN + steps.length + 2 <= COLUMN_LIMIT;
   if ((argumentsFit || !alignedStepsFit)
       && (head.split('\n').at(-1) ?? '').length + ' make_recipe('.length <= COLUMN_LIMIT) {
     const argumentsText = fillColumns([`${seed},`, `${steps});`], pad).join('\n');
@@ -319,7 +321,7 @@ function recipeDefinitionCpp(name, seed, steps) {
     const argumentsText = fillColumns([`${seed},`, `${steps});`], ' '.repeat(indent + 4)).join('\n');
     return `${head}\n${pad}make_recipe(\n${argumentsText}`;
   }
-  return `${head}\n${pad}make_recipe(${seed},\n${' '.repeat(indent + 12)}${steps});`;
+  return `${head}\n${pad}make_recipe(${seed},\n${' '.repeat(indent + MAKE_RECIPE_ARGUMENT_COLUMN)}${steps});`;
 }
 
 /**

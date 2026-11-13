@@ -5,6 +5,7 @@
 
 /** The effect and resolution apply path and its switch/rollback transaction, over injected collaborators. */
 
+import {createEffectSelector, readSidebarMetrics} from './effect_apply_helpers.js';
 import { resolveActiveEffect } from "./effect_roster.js";
 import { getChainSnapshot as readEngineChainSnapshot, restoreChainSnapshot as restoreEngineChainSnapshot } from '../engine/workbench_bindings.js';
 
@@ -375,34 +376,9 @@ export function createApplyPipeline({
   moduleDead = () => false,
   onColumnDefault = () => {},
 }) {
-  /** @type {HolosphereEngine|null} */
-  let strobeEngine = null;
-  /** @type {string|null} */
-  let strobeEffect = null;
-
-  /**
-   * Point the engine at the state's effect and mirror its strobe layout onto the
-   * driver.
-   * @returns {boolean} False when the engine rejected the effect.
-   */
-  function selectEngineEffect() {
-    const engine = /** @type {HolosphereEngine} */ (getEngine());
-    const effect = appState.get('effect');
-    // Compare against the enum value, never by truthiness (every
-    // Module.EffectSetResult value is a truthy object).
-    const applied =
-      engine.setEffect(effect) === getModule().EffectSetResult.INSTALLED;
-    if (applied && (engine !== strobeEngine || effect !== strobeEffect)) {
-      driver.setStrobeColumns(engine.strobeColumns());
-      onColumnDefault();
-      strobeEngine = engine;
-      strobeEffect = effect;
-    }
-    if (!applied) {
-      logError(`setEffect("${effect}") failed; effect unavailable.`);
-    }
-    return applied;
-  }
+  const selectEngineEffect = createEffectSelector({
+    appState, getEngine, getModule, driver, onColumnDefault, logError,
+  });
 
   /**
    * Tear down the current effect GUI and build a new one for the active effect.
@@ -482,23 +458,7 @@ export function createApplyPipeline({
 
     driver.updateResolution(p.w, p.h, p.dotSize);
 
-    /** @type {Record<string, number>|null} */
-    let effectSizes = null;
-    /** @type {Record<string, number>|null} */
-    let presetCounts = null;
-    if (engine) {
-      // Sidebar queries are cosmetic, but a trapped module rethrows.
-      try { effectSizes = engine.getEffectSizes(); }
-      catch (e) {
-        if (moduleDead(e)) throw e;
-        logWarn('getEffectSizes failed (sidebar sizes unavailable):', e);
-      }
-      try { presetCounts = engine.getEffectPresetCounts(); }
-      catch (e) {
-        if (moduleDead(e)) throw e;
-        logWarn('getEffectPresetCounts failed (sidebar preset counts unavailable):', e);
-      }
-    }
+    const {effectSizes, presetCounts} = readSidebarMetrics(engine, moduleDead, logWarn);
     sidebar.setEffects(offered, effectSizes, presetCounts);
 
     // Done after updateResolution()/setEffects() so the re-apply builds against

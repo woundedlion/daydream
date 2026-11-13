@@ -9,14 +9,14 @@
  * the CUSTOM handoff a key edit starts from another hue mode.
  */
 
-import { createSliderProxy } from '../../shared/slider.js';
+import {createHueKeyHandles} from './hue_key_handles.js';
 import { createPointerDrag, innerRect } from '../../shared/pointer_drag.js';
 import {
   PaletteV4, customHueKeyState, customHueSweepRepresentable,
   hueKeyState,
 } from './palette_controls.js';
 import {
-  HUE_KEY_GRAB_RADIUS, HUE_KEY_NAMES, canvasPoint, hueKeyHandoff, hueKeyNudgeTurns,
+  HUE_KEY_GRAB_RADIUS, canvasPoint, hueKeyHandoff, hueKeyNudgeTurns,
   wheelTurnAt, hitTestHueKeyMarker,
 } from './palette_wheel.js';
 
@@ -99,26 +99,8 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
   const ensureCustomHue = () =>
     model.recipe().hue.mode === PaletteV4.hueMode.CUSTOM || activateCustomHue();
 
-  /** @type {HTMLElement[]} */
-  let handles = [];
 
-  /**
-   * @param {number[]} degrees - Every drawn key's hue, in whole degrees.
-   * @returns {void}
-   */
-  const syncHandles = (degrees) => {
-    handles.forEach((handle, index) => {
-      if (index < degrees.length) {
-        handle.hidden = false;
-        handle.setAttribute('aria-valuenow', String(degrees[index]));
-        handle.setAttribute('aria-valuetext', `${degrees[index]} degrees`);
-        return;
-      }
-      if (handle === document.activeElement && degrees.length > 0)
-        handles[degrees.length - 1].focus();
-      handle.hidden = true;
-    });
-  };
+
 
   /**
    * @param {RecipeView} recipe - The recipe to paint.
@@ -147,7 +129,7 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
     drawnPoints = drawn.points;
     drawnScale = drawn.scale;
     selectedKey = Math.min(selectedKey, drawn.points.length - 1);
-    syncHandles(enabled ? drawn.degrees : []);
+    handles.syncHandles(enabled ? drawn.degrees : []);
   };
 
   /**
@@ -168,25 +150,16 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
     }
     if (selectedKey !== keyIndex) {
       draw(model.recipe());
-      handles[selectedKey].focus();
+      handles.focus(selectedKey);
     }
     model.nudgeHueKey(selectedKey, delta);
     scheduleUpdate();
   };
 
-  handles = HUE_KEY_NAMES.map((name, index) => {
-    const handle = createSliderProxy({ label: `Hue key ${name}`, min: 0, max: 360,
-      keys: 'ArrowLeft ArrowRight ArrowUp ArrowDown '
-        + 'Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown' });
-    handle.hidden = true;
-    handle.addEventListener('focus', () => {
-      selectedKey = index;
-      scheduleUpdate();
-    });
-    handle.addEventListener('keydown', (event) => nudgeKey(event, index));
-    group.appendChild(handle);
-    return handle;
-  });
+  const handles = createHueKeyHandles(group, (index) => {
+    selectedKey = index;
+    scheduleUpdate();
+  }, nudgeKey);
 
   /**
    * @param {PointerEvent} event - A pointer event over the wheel.
@@ -245,7 +218,7 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
       if (!enabled) {
         drag.stop();
         canvas.style.cursor = 'default';
-        syncHandles([]);
+        handles.syncHandles([]);
       }
     },
     onHueModeChange(mode) {
@@ -270,8 +243,7 @@ export function createHueKeyWheel({ model, scheduleUpdate, onRecipeChange, canva
     },
     dispose() {
       drag.remove();
-      for (const handle of handles) handle.remove();
-      handles = [];
+      handles.dispose();
     },
   };
 }

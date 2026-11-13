@@ -7,7 +7,13 @@ import { PaletteV4, defaultPaletteRecipe } from '../src/workbench/palettes/palet
 import { PaletteRecipeModel } from '../src/workbench/palettes/palette_recipe_model.js';
 import { captureConsole } from './helpers/fake_console.js';
 
-const handler = pageHandlers(new URL('../src/workbench/palettes/palettes_page.js', import.meta.url));
+const extractHandler = pageHandlers(new URL('../src/workbench/palettes/palettes_page.js', import.meta.url));
+const handler = (name, context) => extractHandler(name, Object.assign(context, {
+  byId: (id) => context.document.getElementById(id),
+  HTMLElement: null, HTMLInputElement: null, HTMLSelectElement: null,
+  HTMLCanvasElement: null, HTMLButtonElement: null,
+}));
+
 
 for (const end of ['minimum', 'maximum']) {
   test(`an axis ${end} edit keeps the opposite endpoint and refreshes the controls`, () => {

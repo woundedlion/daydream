@@ -121,9 +121,9 @@ test('solids validator resolves the module factory after async initialization', 
   const match = SOLIDS_PAGE.match(/\bcreateChainValidator\((.+)\);/);
   assert.ok(match);
   const instantiate = Function('createChainValidator', 'Mod', `
-    let createHolosphereModule = null;
+    const page = {createHolosphereModule: null};
     const validator = createChainValidator(${match[1]});
-    createHolosphereModule = async () => Mod;
+    page.createHolosphereModule = async () => Mod;
     return validator.acquire();
   `);
   const { Mod } = fakeModule();

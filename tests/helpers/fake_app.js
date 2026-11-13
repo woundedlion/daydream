@@ -1,6 +1,7 @@
 // Builds daydream.js's composition root against injected seams (document, page
 // target, navigator, driver, GUI factory, module loader).
 import { afterEach } from 'node:test';
+import {parse} from 'espree';
 import { fakeElement, installDocument, stashGlobals } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 import { EffectSetResult, ParamSetResult, ResolutionSetResult } from './fake_engine.js';
@@ -12,8 +13,14 @@ import {fakeGui} from './fake_gui.js';
 
 /** @returns {Set<string>} Fields assigned by the Daydream driver. */
 export function daydreamFields() {
-  return new Set([...Daydream.toString().matchAll(/\bthis\.([A-Za-z_$][\w$]*)\s*=(?!=)/g)]
+  const source = Daydream.toString();
+  const fields = new Set([...source.matchAll(/\bthis\.([A-Za-z_$][\w$]*)\s*=(?!=)/g)]
     .map((match) => match[1]));
+  const declaration = parse(source, {ecmaVersion: 'latest', sourceType: 'module'}).body[0];
+  for (const member of declaration.body.body) {
+    if (member.type === 'PropertyDefinition' && !member.static) fields.add(member.key.name);
+  }
+  return fields;
 }
 
 /**

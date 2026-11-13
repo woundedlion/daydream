@@ -44,12 +44,8 @@ import { enumChoices } from "../effects/param_sync.js";
  *   children and removes the row; must run before the GUI is destroyed.
  */
 
-// How long a transient button label (Export status) stays before reverting.
-export const FLASH_MS = 1500;
-// Transient Export button labels.
-export const EXPORT_COPIED = '\u2713 Copied!';
-export const EXPORT_FAILED = '\u2717 Copy failed';
-export const EXPORT_REFUSED = '\u2717 Export failed';
+export {FLASH_MS, EXPORT_COPIED, EXPORT_FAILED, EXPORT_REFUSED} from './effect_action_feedback.js';
+import {createActionFeedback, presentAction} from './effect_action_feedback.js';
 const EXPORT_ICON = '\u29c9';
 const RESET_ICON = '\u21ba';
 const PREVIOUS_ICON = '\u25c0';
@@ -62,92 +58,33 @@ const NEXT_ICON = '\u25b6';
  * @returns {EffectActions}
  */
 export function createEffectActions(fx, deps) {
-  const { presets, onPresetChange, onReset, buildExport, copyText, isActive, logWarn, showNotice } = deps;
+  const { presets, onPresetChange, onReset } = deps;
   const { gui } = fx;
   /** @type {GuiController[]} */
   let controllers = [];
   /** @type {HTMLElement|null} */
   let actionRow = null;
-  /** @type {ReturnType<typeof setTimeout>|undefined} */
-  let flashTimer;
   /** @type {GuiController|null} */
   let presetController = null;
   /** @type {{reset: () => void, export: () => Promise<void>|void, presetIndex?: number, previousPreset?: () => boolean, nextPreset?: () => boolean}} */
   const state = {
     reset() { onReset(); },
-    export() { return exportAndFlash(); },
+    export() { return feedback.exportAndFlash(); },
   };
 
-  /** @param {GuiController} controller @param {string} icon @param {string} label */
-  const presentAction = (controller, icon, label) => {
-    controller.name(icon);
-    const button = controller.$button ?? controller.domElement;
-    button.setAttribute('aria-label', label);
-    button.setAttribute('title', label);
-  };
+
 
   /** @type {GuiController} */
   let exportCtrl;
   /** @type {HTMLElement} */
   let exportStatus;
+  const feedback = createActionFeedback(fx, deps, () => exportCtrl, () => exportStatus);
 
-  /**
-   * Flash a transient status label on the Export button and announce it in the
-   * action row's live region, restoring the default label after the flash
-   * window. Supersedes any flash still pending for this row.
-   * @param {string} label - The transient button label to show.
-   * @returns {void}
-   */
-  function flashExport(label) {
-    clearTimeout(flashTimer);
-    presentAction(exportCtrl, label === EXPORT_COPIED ? '\u2713' : '\u2717', label);
-    // A changed live-region string re-announces repeated messages.
-    exportStatus.textContent = exportStatus.textContent === label
-      ? `${label}\u200B` : label;
-    flashTimer = setTimeout(() => {
-      presentAction(exportCtrl, EXPORT_ICON, 'Export');
-      exportStatus.textContent = '';
-    }, FLASH_MS);
-  }
 
-  /**
-   * Copy text and report the outcome through Export feedback and notices. A
-   * copy that lands after the record was replaced reports nothing.
-   * @param {string} text - The text to copy.
-   * @returns {Promise<void>} Clipboard completion.
-   */
-  function copyAndFlash(text) {
-    return copyText(text).then((copied) => {
-      if (!isActive(fx)) return;
-      if (copied) {
-        showNotice(null);
-        flashExport(EXPORT_COPIED);
-      } else {
-        logWarn('Export: clipboard copy failed');
-        showNotice('Export: clipboard copy failed');
-        flashExport(EXPORT_FAILED);
-      }
-    }).catch((err) => {
-      logWarn('Export: clipboard copy failed', err);
-      if (isActive(fx)) {
-        showNotice('Export: clipboard copy failed');
-        flashExport(EXPORT_FAILED);
-      }
-    });
-  }
 
-  /** @returns {Promise<void>|void} Clipboard completion, or nothing when blocked. */
-  function exportAndFlash() {
-    const result = buildExport();
-    if ('error' in result) {
-      if (result.cause === undefined) logWarn(result.error);
-      else logWarn(result.error, result.cause);
-      showNotice(result.error);
-      flashExport(EXPORT_REFUSED);
-      return;
-    }
-    return copyAndFlash(result.text);
-  }
+
+
+
 
   /** @param {number} count @param {number} index */
   function showPreset(count, index) {
@@ -176,8 +113,7 @@ export function createEffectActions(fx, deps) {
   }
 
   function cancel() {
-    clearTimeout(flashTimer);
-    flashTimer = undefined;
+    feedback.cancel();
   }
 
   function detach() {

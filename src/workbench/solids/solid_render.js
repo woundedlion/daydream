@@ -125,6 +125,208 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
     return null;
   }
 
+  /** @param {SolidMeshData} meshData @param {SolidViewFlags} view @param {Int32Array|null} faceClasses */
+  function buildFaceGeometry(meshData, view, faceClasses) {
+    /** @type {number[]} */
+    const vertices = [];
+    /** @type {number[]} */
+    const faceColors = []; // per-vertex RGB, filled only when colorizing
+    const classColor = new THREE.Color();
+
+    /** @type {any[]} */
+    const faceCenters = [];
+    /** @type {any[]} */
+    const faceNormals = [];
+
+    // Geodesic mode forces the centroid fan: a face emits f.length triangles.
+    let geoN = 1;
+    if (view.showFaces && view.showGeodesics) {
+      let triCount = 0;
+      let maxArc = 0;
+      // The centroid fan's arcs: each face edge and each centroid spoke.
+      meshData.faces.forEach(f => {
+        triCount += f.length;
+        const centroid = new THREE.Vector3();
+        f.forEach(idx => centroid.add(meshData.vertices[idx]));
+        centroid.divideScalar(f.length);
+        for (let i = 0; i < f.length; i++) {
+          const a = meshData.vertices[f[i]];
+          const b = meshData.vertices[f[(i + 1) % f.length]];
+          maxArc = Math.max(maxArc, a.angleTo(b), centroid.angleTo(a));
+        }
+      });
+      geoN = geodesicSegments(maxArc, triCount);
+    }
+
+    const pushVert = (/** @type {Point} */ v) => {
+      vertices.push(v.x, v.y, v.z);
+      if (faceClasses) {
+        faceColors.push(classColor.r, classColor.g, classColor.b);
+      }
+    };
+
+    // Append one fan triangle's geoN² spherical sub-triangles, matching
+    // pushVert's per-vertex color emission.
+    const emitSphericalTri = (/** @type {Point} */ a, /** @type {Point} */ b, /** @type {Point} */ c) => {
+      const xyz = geodesicTriangleVertices(a, b, c, geoN);
+      for (let i = 0; i < xyz.length; i += 3) {
+        vertices.push(xyz[i], xyz[i + 1], xyz[i + 2]);
+        if (faceClasses) {
+          faceColors.push(classColor.r, classColor.g, classColor.b);
+        }
+      }
+    };
+
+    const emitFlatTri = (/** @type {Point} */ a, /** @type {Point} */ b, /** @type {Point} */ c) => {
+      pushVert(a);
+      pushVert(b);
+      pushVert(c);
+    };
+    const emitTri = view.showGeodesics ? emitSphericalTri : emitFlatTri;
+
+    meshData.faces.forEach((f, fi) => {
+      if (view.showFaces) {
+        if (faceClasses) {
+          // Golden-ratio hue stride keeps consecutive class ids far apart on
+          // the color wheel, so adjacent face groups stay distinguishable.
+          classColor.setHSL((faceClasses[fi] * 0.618034) % 1, 0.65, 0.55);
+        }
+        fanTriangulateFace(meshData.vertices, f, emitTri, view.showGeodesics);
+      }
+
+      if (!view.showNormals) return;
+
+      const center = new THREE.Vector3();
+      f.forEach(idx => {
+        let v = new THREE.Vector3().copy(meshData.vertices[idx]);
+        if (view.showGeodesics) v.normalize();
+        center.add(v);
+      });
+      center.divideScalar(f.length);
+      if (view.showGeodesics) center.normalize();
+      faceCenters.push(center);
+
+      faceNormals.push(new THREE.Vector3().copy(faceNormal(meshData.vertices, f)).normalize());
+    });
+
+  return {vertices, faceColors, faceCenters, faceNormals};
+  }
+
+  /** @param {SolidViewFlags} view @param {Int32Array|null} faceClasses @param {number[]} vertices @param {number[]} faceColors */
+  function uploadFaces(view, faceClasses, vertices, faceColors) {
+    if (view.showFaces) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      if (view.showGeodesics) {
+        // Every emitted vertex sits on the unit sphere, so its normal is its position.
+        geometry.setAttribute('normal', new THREE.Float32BufferAttribute(vertices, 3));
+      } else {
+        geometry.computeVertexNormals();
+      }
+      if (faceClasses) {
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(faceColors, 3));
+      }
+
+      // Flat shading ignores the normal attribute; geodesic mode needs smooth normals.
+      const wantFlat = !view.showGeodesics;
+      for (const m of [materials.face, materials.faceColorize]) {
+        if (m.flatShading !== wantFlat) {
+          m.flatShading = wantFlat;
+          m.needsUpdate = true;
+        }
+      }
+
+      mainMesh = new THREE.Mesh(geometry, faceClasses ? materials.faceColorize : materials.face);
+      scene.add(mainMesh);
+    }
+
+  }
+
+  /** @param {SolidMeshData} meshData @param {SolidViewFlags} view */
+  function uploadVertices(meshData, view) {
+    if (view.showVertices) {
+      const dotGeo = new THREE.BufferGeometry().setFromPoints(meshData.vertices);
+      vertPoints = new THREE.Points(dotGeo, materials.vert);
+      scene.add(vertPoints);
+    }
+
+  }
+
+  /** @param {SolidMeshData} meshData @param {SolidViewFlags} view */
+  function uploadEdges(meshData, view) {
+    const edges = uniqueEdges(meshData.faces, meshData.vertices.length);
+
+    /** @type {number[]} */
+    const linePositions = [];
+    const arcStart = new THREE.Vector3();
+    const arcEnd = new THREE.Vector3();
+    for (const [ai, bi] of edges) {
+      const va = meshData.vertices[ai];
+      const vb = meshData.vertices[bi];
+
+      if (view.showGeodesics) {
+        const steps = Math.max(12, Math.ceil(va.angleTo(vb) / GEODESIC_SEGMENT_ARC));
+        for (let j = 0; j < steps; j++) {
+          const t1 = j / steps;
+          const t2 = (j + 1) / steps;
+          arcStart.copy(va).lerp(vb, t1).normalize().multiplyScalar(1.002);
+          arcEnd.copy(va).lerp(vb, t2).normalize().multiplyScalar(1.002);
+          linePositions.push(arcStart.x, arcStart.y, arcStart.z, arcEnd.x, arcEnd.y, arcEnd.z);
+        }
+      } else {
+        linePositions.push(va.x, va.y, va.z, vb.x, vb.y, vb.z);
+      }
+    }
+
+    const lineGeo = new THREE.BufferGeometry();
+    lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+    edgeLines = new THREE.LineSegments(lineGeo, materials.edge);
+    scene.add(edgeLines);
+
+  return edges.length;
+  }
+
+  /** @param {SolidViewFlags} view @param {any[]} faceCenters @param {any[]} faceNormals */
+  function uploadNormals(view, faceCenters, faceNormals) {
+    if (view.showNormals) {
+      /** @type {any[]} */
+      const normalPoints = [];
+      /** @type {number[]} */
+      const colors = [];
+      faceCenters.forEach((c, i) => {
+        const n = faceNormals[i];
+        const p2 = c.clone().add(n.multiplyScalar(0.15));
+        normalPoints.push(c, p2);
+        colors.push(0, 1, 0, 0, 1, 0);
+      });
+      const normGeo = new THREE.BufferGeometry().setFromPoints(normalPoints);
+      normGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      normalLines = new THREE.LineSegments(normGeo, materials.normal);
+      scene.add(normalLines);
+    }
+
+  }
+
+  /** @param {SolidMeshData} meshData @param {SolidViewFlags} view */
+  function buildIndexLabels(meshData, view) {
+    let labelsBuilt = false;
+    if (view.showIndices && labelsContainer
+        && meshData.vertices.length < MAX_INDEX_LABELS) {
+      const frag = doc.createDocumentFragment();
+      meshData.vertices.forEach((v, i) => {
+        const el = doc.createElement('div');
+        el.textContent = String(i);
+        el.className = 'absolute text-[0.75rem] font-mono text-white bg-black/50 px-1 rounded transform -translate-x-1/2 -translate-y-1/2 pointer-events-none';
+        el.dataset.index = String(i);
+        frag.appendChild(el);
+      });
+      labelsContainer.appendChild(frag);
+      labelsBuilt = true;
+    }
+
+  return labelsBuilt;
+  }
+
   return {
     /**
      * Frees the geometry of whatever is currently built, for page teardown.
@@ -153,187 +355,13 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
       normalLines = discard(normalLines);
       if (labelsContainer) labelsContainer.replaceChildren();
 
-      // Faces
-      /** @type {number[]} */
-      const vertices = [];
-      /** @type {number[]} */
-      const faceColors = []; // per-vertex RGB, filled only when colorizing
-      const classColor = new THREE.Color();
-
-      /** @type {any[]} */
-      const faceCenters = [];
-      /** @type {any[]} */
-      const faceNormals = [];
-
-      // Geodesic mode forces the centroid fan: a face emits f.length triangles.
-      let geoN = 1;
-      if (view.showFaces && view.showGeodesics) {
-        let triCount = 0;
-        let maxArc = 0;
-        // The centroid fan's arcs: each face edge and each centroid spoke.
-        meshData.faces.forEach(f => {
-          triCount += f.length;
-          const centroid = new THREE.Vector3();
-          f.forEach(idx => centroid.add(meshData.vertices[idx]));
-          centroid.divideScalar(f.length);
-          for (let i = 0; i < f.length; i++) {
-            const a = meshData.vertices[f[i]];
-            const b = meshData.vertices[f[(i + 1) % f.length]];
-            maxArc = Math.max(maxArc, a.angleTo(b), centroid.angleTo(a));
-          }
-        });
-        geoN = geodesicSegments(maxArc, triCount);
-      }
-
-      const pushVert = (/** @type {Point} */ v) => {
-        vertices.push(v.x, v.y, v.z);
-        if (faceClasses) {
-          faceColors.push(classColor.r, classColor.g, classColor.b);
-        }
-      };
-
-      // Append one fan triangle's geoN² spherical sub-triangles, matching
-      // pushVert's per-vertex color emission.
-      const emitSphericalTri = (/** @type {Point} */ a, /** @type {Point} */ b, /** @type {Point} */ c) => {
-        const xyz = geodesicTriangleVertices(a, b, c, geoN);
-        for (let i = 0; i < xyz.length; i += 3) {
-          vertices.push(xyz[i], xyz[i + 1], xyz[i + 2]);
-          if (faceClasses) {
-            faceColors.push(classColor.r, classColor.g, classColor.b);
-          }
-        }
-      };
-
-      const emitFlatTri = (/** @type {Point} */ a, /** @type {Point} */ b, /** @type {Point} */ c) => {
-        pushVert(a);
-        pushVert(b);
-        pushVert(c);
-      };
-      const emitTri = view.showGeodesics ? emitSphericalTri : emitFlatTri;
-
-      meshData.faces.forEach((f, fi) => {
-        if (view.showFaces) {
-          if (faceClasses) {
-            // Golden-ratio hue stride keeps consecutive class ids far apart on
-            // the color wheel, so adjacent face groups stay distinguishable.
-            classColor.setHSL((faceClasses[fi] * 0.618034) % 1, 0.65, 0.55);
-          }
-          fanTriangulateFace(meshData.vertices, f, emitTri, view.showGeodesics);
-        }
-
-        if (!view.showNormals) return;
-
-        const center = new THREE.Vector3();
-        f.forEach(idx => {
-          let v = new THREE.Vector3().copy(meshData.vertices[idx]);
-          if (view.showGeodesics) v.normalize();
-          center.add(v);
-        });
-        center.divideScalar(f.length);
-        if (view.showGeodesics) center.normalize();
-        faceCenters.push(center);
-
-        faceNormals.push(new THREE.Vector3().copy(faceNormal(meshData.vertices, f)).normalize());
-      });
-
-      if (view.showFaces) {
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        if (view.showGeodesics) {
-          // Every emitted vertex sits on the unit sphere, so its normal is its position.
-          geometry.setAttribute('normal', new THREE.Float32BufferAttribute(vertices, 3));
-        } else {
-          geometry.computeVertexNormals();
-        }
-        if (faceClasses) {
-          geometry.setAttribute('color', new THREE.Float32BufferAttribute(faceColors, 3));
-        }
-
-        // Flat shading ignores the normal attribute; geodesic mode needs smooth normals.
-        const wantFlat = !view.showGeodesics;
-        for (const m of [materials.face, materials.faceColorize]) {
-          if (m.flatShading !== wantFlat) {
-            m.flatShading = wantFlat;
-            m.needsUpdate = true;
-          }
-        }
-
-        mainMesh = new THREE.Mesh(geometry, faceClasses ? materials.faceColorize : materials.face);
-        scene.add(mainMesh);
-      }
-
-      // Vertices
-      if (view.showVertices) {
-        const dotGeo = new THREE.BufferGeometry().setFromPoints(meshData.vertices);
-        vertPoints = new THREE.Points(dotGeo, materials.vert);
-        scene.add(vertPoints);
-      }
-
-      // Edges
-      const edges = uniqueEdges(meshData.faces, meshData.vertices.length);
-
-      /** @type {number[]} */
-      const linePositions = [];
-      const arcStart = new THREE.Vector3();
-      const arcEnd = new THREE.Vector3();
-      for (const [ai, bi] of edges) {
-        const va = meshData.vertices[ai];
-        const vb = meshData.vertices[bi];
-
-        if (view.showGeodesics) {
-          const steps = Math.max(12, Math.ceil(va.angleTo(vb) / GEODESIC_SEGMENT_ARC));
-          for (let j = 0; j < steps; j++) {
-            const t1 = j / steps;
-            const t2 = (j + 1) / steps;
-            arcStart.copy(va).lerp(vb, t1).normalize().multiplyScalar(1.002);
-            arcEnd.copy(va).lerp(vb, t2).normalize().multiplyScalar(1.002);
-            linePositions.push(arcStart.x, arcStart.y, arcStart.z, arcEnd.x, arcEnd.y, arcEnd.z);
-          }
-        } else {
-          linePositions.push(va.x, va.y, va.z, vb.x, vb.y, vb.z);
-        }
-      }
-
-      const lineGeo = new THREE.BufferGeometry();
-      lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
-      edgeLines = new THREE.LineSegments(lineGeo, materials.edge);
-      scene.add(edgeLines);
-
-      // Normals
-      if (view.showNormals) {
-        /** @type {any[]} */
-        const normalPoints = [];
-        /** @type {number[]} */
-        const colors = [];
-        faceCenters.forEach((c, i) => {
-          const n = faceNormals[i];
-          const p2 = c.clone().add(n.multiplyScalar(0.15));
-          normalPoints.push(c, p2);
-          colors.push(0, 1, 0, 0, 1, 0);
-        });
-        const normGeo = new THREE.BufferGeometry().setFromPoints(normalPoints);
-        normGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-        normalLines = new THREE.LineSegments(normGeo, materials.normal);
-        scene.add(normalLines);
-      }
-
-      // Indices, inserted as one DocumentFragment.
-      let labelsBuilt = false;
-      if (view.showIndices && labelsContainer
-          && meshData.vertices.length < MAX_INDEX_LABELS) {
-        const frag = doc.createDocumentFragment();
-        meshData.vertices.forEach((v, i) => {
-          const el = doc.createElement('div');
-          el.textContent = String(i);
-          el.className = 'absolute text-[0.75rem] font-mono text-white bg-black/50 px-1 rounded transform -translate-x-1/2 -translate-y-1/2 pointer-events-none';
-          el.dataset.index = String(i);
-          frag.appendChild(el);
-        });
-        labelsContainer.appendChild(frag);
-        labelsBuilt = true;
-      }
-
-      return { edgeCount: edges.length, labelsBuilt };
+      const {vertices, faceColors, faceCenters, faceNormals} = buildFaceGeometry(meshData, view, faceClasses);
+      uploadFaces(view, faceClasses, vertices, faceColors);
+      uploadVertices(meshData, view);
+      const edgeCount = uploadEdges(meshData, view);
+      uploadNormals(view, faceCenters, faceNormals);
+      const labelsBuilt = buildIndexLabels(meshData, view);
+      return { edgeCount, labelsBuilt };
     },
   };
 }

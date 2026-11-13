@@ -12,7 +12,13 @@ import { meshCounts } from '../src/workbench/solids/solid_render.js';
 import { createPointerDrag } from '../src/shared/pointer_drag.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
-const handler = pageHandlers(new URL('../src/workbench/solids/solids_page.js', import.meta.url));
+const extractHandler = pageHandlers(new URL('../src/workbench/solids/solids_page.js', import.meta.url));
+const handler = (name, context) => {
+  Object.assign(context, {page: context});
+  if (name === 'wireRowDrag') context.moveRowDragPreview = extractHandler('moveRowDragPreview', context);
+  return extractHandler(name, context);
+};
+
 
 test('solids view toggles share the state used to render and publish them', () => {
   const state = { autoRotate: false, showNormals: false, showIndices: true };

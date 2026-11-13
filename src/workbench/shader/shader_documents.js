@@ -6,23 +6,27 @@
 import { canonicalEffectId, effectDisplayName } from "../../effects/effect_identity.js";
 import { engineHalted } from '../../shared/engine_halt.js';
 import { callWorkbenchBinding, getChainSnapshot, restoreChainSnapshot, shaderChainCatalog } from '../../engine/workbench_bindings.js';
-import { enumConstantName, replayParameterWrites } from '../../effects/param_sync.js';
 import {
-  fieldOf as fieldSegment, labelOf, MODULATION_OPERATOR, modulationValueLimits,
+  fieldOf as fieldSegment, labelOf,
 } from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
-import { applyChainDocument, resolveParameterWrite, writeChainParameters } from './chain_apply.js';
+import { applyChainDocument } from './chain_apply.js';
 import {
   createChainDocumentStore, documentFromChainSnapshot, scratchChainDocument,
 } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
-import { BAKED_CONSTANT_IDS, bakedTopologyFields, documentModulationBinding, promotedControlNames } from '../../../generated/shader/shader_workbench.mjs';
+import { BAKED_CONSTANT_IDS, bakedTopologyFields } from '../../../generated/shader/shader_workbench.mjs';
 import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../../effects/effect_persistence.js';
 import { copyToClipboard } from '../../shared/copy_text.js';
 import { downloadBlob } from '../../shared/download_file.js';
 import {
-  createShaderLinkWriter, decodeShaderStateHash, replaceShaderStateHash,
+  decodeShaderStateHash,
 } from './shader_deeplink.js';
+
+import {createShaderStageEditor, compiledControlFor, documentControlFor, applyFixedShaderDocument} from './shader_document_edits.js';
+import {createShaderDocumentLoader, createShaderDocumentLinks, diagnosticText} from './shader_document_loader.js';
+import {createShaderDocumentPersistence} from './shader_document_persistence.js';
+export {applyFixedShaderDocument};
 
 export { SHADER_LINK_DEBOUNCE_MS, SHADER_LINK_MAX_WAIT_MS } from './shader_deeplink.js';
 
@@ -38,189 +42,13 @@ const DIGEST_ABBREVIATION = 12;
 // The download name used by Save for the scratch document.
 const SCRATCH_FILENAME = 'scratch.shader.json';
 
-/** @param {*} expected @param {*} actual @returns {boolean} Float32 snapshot equality. */
-function snapshotValueEqual(expected, actual) {
-  if (typeof expected === 'number' && typeof actual === 'number')
-    return Math.fround(expected) === Math.fround(actual);
-  if (expected === null || actual === null || typeof expected !== 'object'
-      || typeof actual !== 'object') return expected === actual;
-  if (Array.isArray(expected) !== Array.isArray(actual)) return false;
-  const keys = Object.keys(expected);
-  return keys.length === Object.keys(actual).length
-    && keys.every((key) => Object.hasOwn(actual, key) && snapshotValueEqual(expected[key], actual[key]));
-}
-
 /** @typedef {import('./chain_apply.js').ParameterDefinition} ParameterDefinition */
 /** @typedef {import('./chain_apply.js').CompiledDocument} CompiledDocument */
 /** @typedef {{effectId: string, descriptorDigest?: string, presetIds: string[]}} OfficialDocument */
+/** @typedef {{active: ActiveDocument|null, chainUi: {store: import('./chain_document_store.js').ChainStore, strip: *}|null,
+ * compiler: *, operatorCatalog: *, sourceCatalog: Map<string, *>, cachedDocumentDefinitions: *|null,
+ * rebuildAfterParameterCommit: boolean, linkWriter: ReturnType<typeof import('./shader_deeplink.js').createShaderLinkWriter>}} DocumentControllerState */
 /** @typedef {{compiled: CompiledDocument, filename: string, official: OfficialDocument|null, compiledSide: boolean, presetId: string|null, referencePresetIds: string[], savedDocument?: string|null}} ActiveDocument */
-
-/**
- * @param {string} parameterId
- * @param {ParameterDefinition[]} definitions
- * @param {Set<string>} baked
- * @param {*} descriptor
- * @param {*} catalog
- * @returns {{name: string|null, refusal: string|null}} Compiled control or refusal.
- */
-function compiledControlFor(parameterId, definitions, baked, descriptor, catalog = null) {
-  const name = promotedControlNames(parameterId, descriptor, catalog)
-    .find((candidate) => definitions.some((definition) =>
-      definition.name === candidate && !definition.readonly));
-  if (name) return { name, refusal: null };
-  if (BAKED_CONSTANT_IDS.has(parameterId) || baked.has(fieldSegment(parameterId)))
-    return { name: null, refusal: null };
-  return { name: null, refusal: `no engine parameter matches "${parameterId}"` };
-}
-
-/**
- * @param {string} id @param {*} control @param {ParameterDefinition[]} definitions
- * @param {{unregistered?: true}} binding - An `unregistered` binding is live wherever a control resolves.
- */
-function liveDerivedControl(id, control, definitions, binding) {
-  if (control.name === null) return false;
-  if (binding.unregistered) return true;
-  const label = labelOf(id);
-  const resource = control.name.slice(0, control.name.lastIndexOf('.'));
-  return control.name === fieldSegment(id) || control.name.endsWith('.' + fieldSegment(id))
-    || definitions.some((definition) => !definition.readonly
-      && [label + '.modulation-source', resource + '.modulation-source', 'modulation-source',
-        label + '.coverage-mode', resource + '.coverage-mode', 'coverage-mode']
-        .includes(definition.name));
-}
-
-/** @param {*} engine @param {*} module @param {Array<{name: string, stored: number}>} writes */
-function performEngineWrites(engine, module, writes) {
-  const rejected = replayParameterWrites(writes.map(({name, stored}) => ({name, value: stored})),
-    (name, value) => engine.setParameter(name, value), module.ParamSetResult);
-  const refusal = rejected[0];
-  return refusal ? `"${refusal.name}" was refused: ${enumConstantName(module.ParamSetResult, refusal.result)}` : null;
-}
-
-/** @param {*} descriptor @param {string} parameterId @param {*[]} definitions */
-function documentControlFor(descriptor, parameterId, definitions) {
-  const binding = documentModulationBinding(descriptor, parameterId);
-  return binding && definitions.find((definition) => definition.resource === binding.resource
-    && definition.id === binding.id);
-}
-
-/** @param {*} definition @param {*} value @returns {*|string|null} */
-function resolveDocumentWrite(definition, value) {
-  if (typeof value !== 'number' || !Number.isFinite(value))
-    return `"${definition.id}" has no numeric value`;
-  if (definition.readonly) return snapshotValueEqual(value, definition.value)
-    ? null : `"${definition.id}" must match the fixed build's value ${definition.value}`;
-  return {resource: definition.resource, id: definition.id, stored: value};
-}
-
-/** @param {*} engine @param {*} module @param {*[]} writes @returns {string|null} */
-function performDocumentWrites(engine, module, writes) {
-  for (const {resource, id, stored} of writes) {
-    const result = engine.setDocumentParameter(resource, id, stored);
-    if (result !== module.ParamSetResult.APPLIED)
-      return `"${resource}.${id}" was refused: ${enumConstantName(module.ParamSetResult, result)}`;
-  }
-  return null;
-}
-
-/**
- * Resolves fixed-build values before any engine or document write is performed.
- * @param {Record<string, *>} values
- * @param {ParameterDefinition[]} definitions
- * @param {*[]} documentDefinitions
- * @param {*} descriptor
- * @param {(id: string) => {name: string|null, refusal: string|null}} resolveControl
- * @param {(id: string, control: {name: string|null, refusal: string|null}) => boolean} skip
- * @returns {{writes: Array<{name: string, stored: *}>, documentWrites: *[], refusal: string|null}}
- */
-function resolveFixedWrites(values, definitions, documentDefinitions, descriptor, resolveControl, skip) {
-  const writes = [];
-  const documentWrites = [];
-  for (const [id, value] of Object.entries(values)) {
-    const control = resolveControl(id);
-    if (skip(id, control)) continue;
-    if (control.refusal) {
-      const definition = documentControlFor(descriptor, id, documentDefinitions);
-      if (!definition) return {writes, documentWrites, refusal: control.refusal};
-      const write = resolveDocumentWrite(definition, value);
-      if (typeof write === 'string') return {writes, documentWrites, refusal: write};
-      if (write) documentWrites.push(write);
-    } else if (control.name !== null) {
-      const write = resolveParameterWrite(definitions, control.name, value);
-      if (typeof write === 'string') return {writes, documentWrites, refusal: write};
-      writes.push(write);
-    }
-  }
-  return {writes, documentWrites, refusal: null};
-}
-
-/**
- * @param {import('../../../generated/holosphere_wasm.js').HolosphereEngine} engine @param {import('../../../generated/holosphere_wasm.js').HolosphereModule} module @param {CompiledDocument} compiled
- * @param {Record<string, *>} values - Values from the selected document preset.
- * @param {Set<string>} baked - The topology fields the effect bakes in.
- * @param {Set<string>} derived - Validated fields computed by the fixed effect.
- * @param {*} catalog
- * @returns {string|null} Refusal reason, or null once every writable value is written.
- *   Baked and derived values are skipped; an unregistered id refuses before any write.
- */
-function applyDocumentValues(engine, module, compiled, values, baked, derived, catalog) {
-  const definitions = engine.getParameterDefinitions();
-  const resolved = resolveFixedWrites(values, definitions,
-    engine.getDocumentParameterDefinitions?.() ?? [], compiled.document.descriptor,
-    (id) => compiledControlFor(id, definitions, baked, compiled.document.descriptor, catalog),
-    (id) => derived.has(id));
-  return resolved.refusal ?? performEngineWrites(engine, module, resolved.writes)
-    ?? performDocumentWrites(engine, module, resolved.documentWrites);
-}
-
-/**
- * Applies one authored preset to a matching concrete fixed-pipeline effect.
- * @param {import('../../../generated/holosphere_wasm.js').HolosphereEngine} engine
- * @param {import('../../../generated/holosphere_wasm.js').HolosphereModule} module
- * @param {CompiledDocument} compiled
- * @param {string} presetId
- * @param {string[]} referencePresetIds
- * @param {Set<string>} baked - The topology fields the effect bakes in.
- * @param {(descriptor: *, parameterId: string, values: *) => *} deriveBinding - Compiler binding resolver.
- * @param {*} [catalog] - Operator fields used by the native controls.
- * @returns {string|null} Refusal reason, or null once applied.
- */
-export function applyFixedShaderDocument(engine, module, compiled, presetId,
-                                         referencePresetIds, baked, deriveBinding, catalog = null) {
-  const referenceId = referencePresetIds.includes(presetId)
-    ? presetId : referencePresetIds[0];
-  if (typeof referenceId !== 'string') return 'the effect has no reference preset';
-  const preset = compiled.document.preset_bank.presets
-    .find((/** @type {*} */ candidate) => candidate.preset_id === presetId);
-  if (!preset) return `the document has no preset "${presetId}"`;
-  const values = preset.values ?? {};
-  const derived = new Set();
-  const definitions = engine.getParameterDefinitions();
-  for (const parameterId of Object.keys(values)) {
-    const binding = deriveBinding(compiled.document.descriptor, parameterId, values);
-    if (!binding) continue;
-    const control = compiledControlFor(parameterId, definitions, baked, compiled.document.descriptor, catalog);
-    if (liveDerivedControl(parameterId, control, definitions, binding)) continue;
-    if (!binding.valid)
-      return `"${parameterId}" must match the fixed build's derived value ${binding.expected}`;
-    derived.add(parameterId);
-  }
-  if (engine.selectPresetById?.(referenceId) !== true)
-    return `the engine refused reference preset "${referenceId}"`;
-  return applyDocumentValues(engine, module, compiled, values, baked, derived, catalog);
-}
-
-/**
- * Every diagnostic the compile collected, one per line.
- * @param {CompiledDocument} compiled
- */
-function diagnosticText(compiled) {
-  const diagnostics = /** @type {*[]} */ (compiled.diagnostics ?? []);
-  if (diagnostics.length === 0) return compiled.status ?? 'INVALID';
-  return diagnostics
-    .map((diagnostic) => `${diagnostic.code} at ${diagnostic.path}: ${diagnostic.message}`)
-    .join('\n');
-}
 
 /** @param {Document} doc @param {string} filename @param {string} source */
 function defaultDownload(doc, filename, source) {
@@ -320,8 +148,26 @@ export function createShaderDocumentController({
   /** @type {{store: import('./chain_document_store.js').ChainStore, strip: *}|null} */
   let chainUi = null;
   let rebuildAfterParameterCommit = false;
-  /** @type {number} Save As copies this session, which their ids count off. */
-  let copies = 0;
+
+  /** @type {DocumentControllerState} */
+  const controllerState = {
+    get active() { return active; },
+    set active(value) { active = value; },
+    get chainUi() { return chainUi; },
+    set chainUi(value) { chainUi = value; },
+    get compiler() { return compiler; },
+    set compiler(value) { compiler = value; },
+    get operatorCatalog() { return operatorCatalog; },
+    set operatorCatalog(value) { operatorCatalog = value; },
+    get sourceCatalog() { return sourceCatalog; },
+    set sourceCatalog(value) { sourceCatalog = value; },
+    get cachedDocumentDefinitions() { return cachedDocumentDefinitions; },
+    set cachedDocumentDefinitions(value) { cachedDocumentDefinitions = value; },
+    get rebuildAfterParameterCommit() { return rebuildAfterParameterCommit; },
+    set rebuildAfterParameterCommit(value) { rebuildAfterParameterCommit = value; },
+    get linkWriter() { return linkWriter; },
+  };
+
   /** @param {string} message @param {boolean} error */
   const writeStatus = (message, error) => {
     if (notice) notice.textContent = error ? '' : message;
@@ -535,115 +381,10 @@ export function createShaderDocumentController({
       && !compiler.fixedDerivedBinding?.(descriptor, parameterId, {});
   };
 
-  /**
-   * Routes an inline stage-control edit into the active preset: the document is
-   * the source of truth and the engine write is its side effect.
-   * @param {string} parameterId - The edited parameter's id.
-   * @param {*} value - The document value: a number, or an enum8 option id.
-   * @returns {boolean}
-   */
-  const writeStageEdit = (parameterId, value) => {
-    if (!parameterLive(parameterId)) return false;
-    try {
-      if (chainUi === null || active === null || active.presetId === null) return false;
-      const presetId = active.presetId;
-      const compiledSide = active.compiledSide;
-      const store = chainUi.store;
-      const presetValues = store.presetValuesView(presetId);
-      if (presetValues === null) return false;
-      const descriptor = { chain: store.chainView() };
-      const values = { [parameterId]: value };
-      const label = labelOf(parameterId);
-      const field = fieldSegment(parameterId);
-      const modulated = descriptor.chain.some((/** @type {*} */ entry) =>
-        entry.label === label && entry.operator === MODULATION_OPERATOR);
-      if (modulated) {
-        const valueOf = (/** @type {string} */ field) => {
-          const id = `${label}.${field}`;
-          return values[id] ?? presetValues[id];
-        };
-        if (field === 'modulation-source' && value !== 'noise')
-          values[`${label}.modulation-evaluation`] = 'direct';
-        if (field === 'modulation-mechanic') {
-          const limits = modulationValueLimits('modulation-amount', valueOf);
-          if (limits) {
-            const amount = Number(valueOf('modulation-amount') ?? 0);
-            values[`${label}.modulation-amount`] = Math.max(limits.min, Math.min(limits.max, amount));
-          }
-        }
-        if (field === 'modulation-evaluation') {
-          const limits = modulationValueLimits('pattern-scale', valueOf);
-          if (limits && Number(valueOf('pattern-scale') ?? 1) > limits.max)
-            values[`${label}.pattern-scale`] = limits.max;
-        }
-      }
-      const addsDeclaration = Object.keys(values).some(id => !store.declares(id));
-      const coupled = Object.keys(values).length > 1;
-      const result = store.setPresetValues(presetId, values, () => {
-        if (addsDeclaration && compiledSide) return { ok: true };
-        const engine = getEngine();
-        const module = getModule();
-        if (!engine || !module) return { ok: true };
-        const definitions = engine.getParameterDefinitions();
-        const control = engineControlName(parameterId, definitions);
-        const paused = getAnimationsPaused();
-        let refusal = control.refusal;
-        if (compiledSide || (refusal === null && control.name !== null)) {
-          if (coupled && !compiledSide) {
-            const written = writeChainParameters(engine, module, definitions, Object.entries(values));
-            refusal = written.refusal;
-            if (written.code !== null)
-              refusal = `"${parameterId}" was refused: ${enumConstantName(module.ParamSetResult, written.code)}`;
-          } else if (compiledSide) {
-            cachedDocumentDefinitions = null;
-            const resolved = resolveFixedWrites(values, definitions,
-              engine.getDocumentParameterDefinitions?.() ?? [], descriptor,
-              (id) => engineControlName(id, definitions),
-              (id, control) => {
-                const binding = compiler.fixedDerivedBinding?.(descriptor, id, {...presetValues, ...values});
-                return Boolean(binding && !liveDerivedControl(id, control, definitions, binding));
-              });
-            refusal = resolved.refusal ?? performEngineWrites(engine, module, resolved.writes)
-              ?? performDocumentWrites(engine, module, resolved.documentWrites);
-          } else if (control.name !== null) {
-            const write = resolveParameterWrite(definitions, control.name, value);
-            refusal = typeof write === 'string' ? write : performEngineWrites(engine, module, [write]);
-          }
-        }
-        restoreAnimationsPaused(paused);
-        invalidate();
-        return refusal ? { ok: false, diagnostics: [{
-          severity: 'error', phase: 'apply', code: 'ENGINE_REFUSAL',
-          path: parameterId, message: refusal,
-        }] } : { ok: true };
-      });
-      if (!result.ok) {
-        const diagnostic = result.diagnostics[0];
-        announce(diagnostic.code === 'ENGINE_REFUSAL' ? diagnostic.message
-          : `"${parameterId}" was refused: ${diagnostic.message}`);
-        return false;
-      }
-      linkWriter.releaseOriginalLink();
-      let applied = true;
-      if (addsDeclaration) {
-        const dropped = syncParity();
-        applied = applyPreset(active.presetId);
-        if (dropped && applied) {
-          rebuildAfterParameterCommit = true;
-          showParityDropStatus();
-        }
-      }
-      if (Object.keys(values).length > 1) chainUi.strip.syncParameterValues(values);
-      chainUi.strip.syncHistory();
-      if (applied && status.dataset.status === 'error') showPreviewStatus();
-      linkWriter.schedule();
-      return true;
-    } catch (error) {
-      markHalted(error);
-      showError(`The preview edit failed: ${errorDetail(error)}`);
-      return false;
-    }
-  };
+  const {writeStageEdit} = createShaderStageEditor({state: controllerState,
+    parameterLive, getEngine, getModule, getAnimationsPaused, engineControlName,
+    restoreAnimationsPaused, invalidate, announce, syncParity, applyPreset,
+    showParityDropStatus, showPreviewStatus, status, markHalted, showError});
 
   /**
    * Builds the pipeline strip over one document store, wiring structural
@@ -690,166 +431,6 @@ export function createShaderDocumentController({
   };
 
   /**
-   * @param {string|*} source - Document JSON, or the document itself.
-   * @param {string} [filename]
-   * @param {*} [precompiled] - The catalog's already-compiled document, when the
-   *   source is a catalog entry rather than an imported study.
-   * @param {*|null} [session] - Deep-linked preset, bypass, and pause state.
-   */
-  const loadSourceNow = async (source, filename = 'import.shader.json',
-                               precompiled = null, session = null) => {
-    await flushDeepLink();
-    linkWriter.invalidate();
-    compiler ??= await importCompiler();
-    let compiled = precompiled;
-    if (compiled === null) {
-      // A malformed document yields diagnostics; a throw is a compiler failure.
-      try {
-        compiled = compiler.compileShaderDocument(source, { catalog: operatorCatalog });
-      } catch (error) {
-        const detail = errorDetail(error);
-        showError(`The document could not be compiled: ${detail}`);
-        return false;
-      }
-    }
-    if (compiled.status !== 'VALID') {
-      showError(diagnosticText(compiled));
-      return false;
-    }
-    // Resolved before anything is built: the strip renders the active preset's values.
-    const presetId = session?.preset
-      ?? compiled.document.preset_bank.presets[0]?.preset_id;
-    if (!presetId) {
-      showError('The document is valid, but it carries no preset to preview.');
-      return false;
-    }
-    if (!compiled.document.preset_bank.presets.some(
-      (/** @type {*} */ preset) => preset.preset_id === presetId)) {
-      showError(`The shader link names no document preset "${presetId}".`);
-      return false;
-    }
-    // Every load previews through the interpreter; a digest match arms the parity toggle.
-    const previousSnapshot = getChainSnapshot(getEngine());
-    const official = [...sourceCatalog.values()].find((candidate) =>
-      candidate.descriptorDigest === compiled.descriptor_digest) ?? null;
-    // Ahead of the teardown, so a refusal leaves the current editor standing.
-    try {
-      if (!selectEffect(CHAIN_EFFECT)) {
-        showError(`The preview engine rejected effect "${effectDisplayName(CHAIN_EFFECT)}".`);
-        return false;
-      }
-    } catch (error) {
-      showError(`The preview edit failed: ${errorDetail(error)}`);
-      return false;
-    }
-    const previous = active;
-    const previousUi = chainUi;
-    const candidateMount = stripMount ? doc.createElement('div') : null;
-    if (candidateMount) candidateMount.style.display = 'contents';
-    chainUi = null;
-    active = {
-      compiled,
-      filename,
-      official,
-      compiledSide: false,
-      presetId,
-      referencePresetIds: official?.presetIds ?? [],
-    };
-    /**
-     * Puts the toolbar back on the document the engine is rendering, writing the
-     * previous program back when the refused load had already written its own.
-     * @param {Object} [options]
-     * @param {boolean} [options.written=false] - Whether the program write has run.
-     * @returns {boolean} The load's refusal.
-     */
-    const abandon = ({ written = false } = {}) => {
-      teardownChainUi();
-      active = previous;
-      chainUi = previousUi;
-      setParamFilter(previousUi ? { external: true } : null);
-      if (previous) {
-        populatePresets(previous.compiled);
-        presetSelect.value = previous.presetId ?? '';
-        showDigest();
-        syncParity();
-      }
-      if (previous?.compiledSide && previous.official)
-        selectEffect(previous.official.effectId);
-      if (previous && (written || previous.compiledSide)) {
-        const refusal = status.textContent;
-        applyPreset(previous.presetId ?? presetSelect.value);
-        if (previousSnapshot) restoreChainSnapshot(getEngine(), getModule(), previousSnapshot);
-        showError(refusal ?? '');
-      }
-      return false;
-    };
-    if (candidateMount && typeof compiler.validateShaderDocument === 'function') {
-      try {
-        chainUi = await buildChainUi(compiled.document, candidateMount);
-      } catch (error) {
-        const detail = errorDetail(error);
-        showError(`The chain editor could not adopt the document: ${detail}`);
-        return abandon({ written: true });
-      }
-    }
-    if (session && chainUi) {
-      for (const label of session.bypassed) {
-        const result = chainUi.store.setBypassed(label, true);
-        if (!result.ok) {
-          showError(`The shader link could not bypass "${label}": `
-            + `${result.diagnostics[0].message}.`);
-          return abandon();
-        }
-      }
-      chainUi.strip.render();
-    }
-    populatePresets(compiled);
-    presetSelect.value = presetId;
-    saveButton.disabled = false;
-    if (saveAsButton) saveAsButton.disabled = false;
-    showDigest();
-    syncParity();
-    if (!applyPreset(presetId)) return abandon({ written: true });
-    if (session?.chainSnapshot) {
-      const expected = getChainSnapshot(getEngine());
-      const snapshot = session.chainSnapshot;
-      const values = new Map(snapshot.parameters.map((/** @type {*} */ entry) => [entry.name, entry.value]));
-      if (!expected || JSON.stringify(expected.chain) !== JSON.stringify(snapshot.chain)
-          || !snapshotValueEqual(expected.modulation, snapshot.modulation)
-          || expected.parameters.length !== values.size
-          || expected.parameters.some((/** @type {*} */ entry) => entry.value !== Math.fround(values.get(entry.name)))) {
-        showError('The shader link snapshot does not match its document and preset.');
-        return abandon({ written: true });
-      }
-      if (restoreChainSnapshot(getEngine(), getModule(), snapshot)
-          !== getModule().ChainSnapshotRestoreResult.APPLIED) {
-        showError('The shader link runtime snapshot was rejected.');
-        return abandon({ written: true });
-      }
-    }
-    if (session) {
-      setAnimationsPaused(session.paused);
-      showAnimationState();
-      syncEffectGui();
-      invalidate();
-    }
-    active.savedDocument = JSON.stringify(currentDocument());
-    previousUi?.strip.destroy();
-    if (stripMount && candidateMount) stripMount.replaceChildren(candidateMount);
-    return true;
-  };
-
-  /** @type {Promise<void>} */
-  let loadQueue = Promise.resolve();
-  /** @type {typeof loadSourceNow} */
-  const loadSource = (source, filename, precompiled, session) => {
-    const queued = loadQueue.then(() =>
-      loadSourceNow(source, filename, precompiled, session));
-    loadQueue = queued.then(() => undefined, () => undefined);
-    return queued;
-  };
-
-  /**
    * The document as it stands: the store's once the editor is live, else the
    * load-time compile.
    * @returns {*} An isolated copy.
@@ -867,106 +448,19 @@ export function createShaderDocumentController({
     ? chainUi.store.exportDocument()
     : structuredClone((/** @type {ActiveDocument} */ (active)).compiled.document);
 
-  const linkWriter = createShaderLinkWriter({
-    canWrite: () => active !== null && active.presetId !== null,
-    readState: () => {
-      const chainSnapshot = getChainSnapshot(getEngine());
-      return {
-        document: currentDocument(),
-        preset: active?.presetId,
-        bypassed: chainUi?.store.bypassedLabels() ?? [],
-        paused: getAnimationsPaused() === true,
-        ...(chainSnapshot ? {chainSnapshot} : {}),
-      };
-    },
-    replace: (hash) => replaceShaderStateHash(hash, win),
-    onError: (error) => showError(`The shader link could not be updated: ${errorDetail(error)}.`),
-    onOriginalLinkReleased,
+  const {linkWriter, flushDeepLink} = createShaderDocumentLinks({state: controllerState,
+    currentDocument, getEngine, getAnimationsPaused, win, showError, onOriginalLinkReleased});
+
+  const {loadSource, loadLinkedSource} = createShaderDocumentLoader({
+    state: controllerState, doc, stripMount, presetSelect, saveButton, saveAsButton,
+    status, importCompiler, flushDeepLink, getEngine, getModule, selectEffect,
+    teardownChainUi, setParamFilter, populatePresets, showDigest, syncParity,
+    applyPreset, buildChainUi, showError, setAnimationsPaused, showAnimationState,
+    syncEffectGui, invalidate, currentDocument,
+    selectLoadedSource: (effect, filename, kind) => selectLoadedSource(effect, filename, kind),
   });
-
-  const flushDeepLink = () => {
-    chainUi?.strip.flushParameterEdit();
-    return linkWriter.flush();
-  };
-
-  /**
-   * @param {*} document - The document to write.
-   * @param {string} filename - The download name.
-   * @returns {boolean} Always true.
-   */
-  const exportDocument = (document, filename) => {
-    download(filename, compiler.exportShaderDocumentJson(document));
-    (/** @type {ActiveDocument} */ (active)).savedDocument = JSON.stringify(currentDocument());
-    showStatus(`Saved ${filename}.`);
-    return true;
-  };
-
-  const save = () => {
-    if (!active) return false;
-    void flushDeepLink();
-    let document;
-    try {
-      document = exportableDocument();
-    } catch (error) {
-      showError(`The shader document could not be saved: ${errorDetail(error)}.`);
-      return false;
-    }
-    return exportDocument(document, active.filename.endsWith('.shader.json')
-      ? active.filename : `${document.effect_id ?? document.document_id}.shader.json`);
-  };
-
-  /**
-   * Writes a copy under a fresh document id. The loaded document keeps its own
-   * id and download name, so a following Save still re-exports the original.
-   * @returns {Promise<boolean>} Whether a document was written.
-   */
-  const saveAs = async () => {
-    if (!active) return false;
-    void flushDeepLink();
-    const savedActive = active;
-    const savedDocument = JSON.stringify(currentDocument());
-    try {
-      const document = exportableDocument();
-      document.document_id = `${document.document_id}-copy${copies + 1}`;
-      let filename = `${document.document_id}.shader.json`;
-      const source = compiler.exportShaderDocumentJson(document);
-      if (typeof win.showSaveFilePicker === 'function') {
-        const file = await win.showSaveFilePicker({
-          suggestedName: filename,
-          types: [{ description: 'Shader document', accept: { 'application/json': ['.json'] } }],
-        });
-        const writable = await file.createWritable();
-        try {
-          await writable.write(source);
-          await writable.close();
-        } catch (error) {
-          await writable.abort().catch(() => {});
-          throw error;
-        }
-        filename = file.name;
-      } else {
-        const entered = win.prompt('Save shader as:', filename);
-        if (entered === null) return false;
-        filename = entered.trim();
-        if (!filename) {
-          showError('Enter a filename for the shader document.');
-          return false;
-        }
-        if (!filename.toLowerCase().endsWith('.json')) filename += '.shader.json';
-        download(filename, source);
-      }
-      copies += 1;
-      if (active === savedActive) {
-        active.savedDocument = savedDocument;
-        showStatus(`Saved ${filename}.`);
-      }
-      return true;
-    } catch (error) {
-      if (!(error instanceof Error && error.name === 'AbortError'))
-        showError(`The shader document could not be saved: ${errorDetail(error)}.`);
-      return false;
-    }
-  };
+  const {save, saveAs} = createShaderDocumentPersistence({state: controllerState,
+    win, flushDeepLink, currentDocument, exportableDocument, download, showStatus, showError});
 
   /**
    * Opens the default chain on catalog defaults through the ordinary load path.
@@ -994,23 +488,6 @@ export function createShaderDocumentController({
     }
     sourceSelect.value = effectId ?? '__loaded-document__';
     selectedSource = sourceSelect.value;
-  };
-
-  /** @param {NonNullable<Awaited<ReturnType<typeof decodeShaderStateHash>>>} linked */
-  const loadLinkedSource = async (linked) => {
-    const effectId = linked.document.effect_id;
-    const entry = [...sourceCatalog.values()].find(
-      (candidate) => candidate.compiled.document.effect_id === effectId);
-    const scratch = effectId === 'scratch';
-    const filename = entry?.filename ?? (scratch ? SCRATCH_FILENAME : 'linked.shader.json');
-    if (await loadSource(linked.document, filename, null, linked)) {
-      (/** @type {ActiveDocument} */ (active)).savedDocument = entry ? JSON.stringify(entry.compiled.document)
-        : scratch ? JSON.stringify(compiler.compileShaderDocument(
-          scratchChainDocument(operatorCatalog), { catalog: operatorCatalog }).document) : null;
-      selectLoadedSource(scratch ? '' : entry?.effectId ?? null, filename, scratch ? '' : 'Linked');
-      return true;
-    }
-    return false;
   };
 
   const init = async () => {

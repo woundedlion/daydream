@@ -32,8 +32,8 @@ import { engineHalted } from "../shared/engine_halt.js";
 const post = /** @type {(msg: ControllerInboundMsg, transfer?: Transferable[]) => void} */ (
   self.postMessage.bind(self));
 
-/** Installs an isolated worker protocol session. @returns {void} */
-export function installSegmentWorker() {
+/** Creates an isolated worker protocol session. */
+function createSegmentWorkerSession() {
   // Sent before the WASM instantiate; a failed module fetch never runs this line.
   post({ type: 'booted', version: PROTOCOL_VERSION });
 
@@ -216,97 +216,306 @@ export function installSegmentWorker() {
     post({ type: 'engineRejected', reason: `${type} before a completed init` });
   }
 
-  /**
-   * Process one protocol message. Must run through the serialized queue, so a
-   * message arriving mid-init waits for init's WASM instantiate to finish.
-   * @param {WorkerInboundMsg} msg - The inbound protocol message to process.
-   * @returns {Promise<void>} Resolves once the message has been fully handled.
-   */
-  async function handleMessage(msg) {
-    if (engineDead) return;
-    if (msg.type === 'init') {
-      // Version check precedes reading any other field or touching WASM.
-      if (msg.version !== PROTOCOL_VERSION) {
-        post({ type: 'engineRejected',
-               reason: `protocol version ${msg.version} != worker ${PROTOCOL_VERSION}`
-                       + ` (stale cached worker or controller)` });
-        return;
-      }
-      if (engine || wasmModule) {
-        post({ type: 'engineRejected', reason: 'duplicate init' });
-        return;
-      }
+  /** @param {Extract<WorkerInboundMsg, {type: 'init'}>} msg */
+  async function instantiateModule(msg) {
+    /** @type {Parameters<typeof createHolosphereModule>[0]} */
+    const options = {};
+    // Only segment 0 prints engine logs; printErr stays live everywhere.
+    if (segId !== 0) options.print = () => {};
+    const compiled = msg.wasmModule;
+    let failInstantiation = () => {};
+    /** @type {Promise<null>} */
+    const instantiationFailed = new Promise((resolve) => {
+      failInstantiation = () => resolve(null);
+    });
+    if (compiled) {
+      // Each instance of the shared compilation owns a private heap.
+      options.instantiateWasm = (imports, onInstance) => {
+        WebAssembly.instantiate(compiled, imports).then(
+          (instance) => onInstance(instance, compiled),
+          // The glue's instantiate has no rejection path; settle the race here.
+          (error) => {
+            post({ type: 'engineRejected',
+                   reason: `shared module instantiate failed: ${error}`,
+                   sharedModule: true });
+            failInstantiation();
+          });
+        return {};
+      };
+    }
+    const mod = await Promise.race([createHolosphereModule(options), instantiationFailed]);
+    return mod;
+  }
 
-      if (typeof msg.effectName !== 'string' || !msg.effectName.trim()) {
-        post({ type: 'engineRejected', reason: 'init requires an effect name' });
-        return;
-      }
-
-      paramRejectedKey = '';
-      divergenceWarnings = new Map();
-      segId = msg.segId;
-      totalSegs = msg.totalSegs;
-      paramRevision = msg.paramRevision;
-
-      /** @type {Parameters<typeof createHolosphereModule>[0]} */
-      const options = {};
-      // Only segment 0 prints engine logs; printErr stays live everywhere.
-      if (segId !== 0) options.print = () => {};
-      const compiled = msg.wasmModule;
-      let failInstantiation = () => {};
-      /** @type {Promise<null>} */
-      const instantiationFailed = new Promise((resolve) => {
-        failInstantiation = () => resolve(null);
-      });
-      if (compiled) {
-        // Each instance of the shared compilation owns a private heap.
-        options.instantiateWasm = (imports, onInstance) => {
-          WebAssembly.instantiate(compiled, imports).then(
-            (instance) => onInstance(instance, compiled),
-            // The glue's instantiate has no rejection path; settle the race here.
-            (error) => {
-              post({ type: 'engineRejected',
-                     reason: `shared module instantiate failed: ${error}`,
-                     sharedModule: true });
-              failInstantiation();
-            });
-          return {};
-        };
-      }
-      const mod = await Promise.race([createHolosphereModule(options), instantiationFailed]);
-      if (!mod) return;
-      wasmModule = mod;
-      engine = new mod.HolosphereEngine();
-      if (!engine.setDisplayCaps(msg.topCap ?? 0, msg.bottomCap ?? 0)) {
-        post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
-        return;
-      }
-      engine.setTemporalSampling(msg.temporalSampling ?? false);
-      // The latch tracks the live engine; a fresh one starts unlatched.
-      awaitingEffect = false;
-      // A rejected resolution leaves no usable geometry.
-      if (engine.setResolution(msg.w, msg.h)
-          === wasmModule.ResolutionSetResult.UNSUPPORTED) {
-        post({ type: 'engineRejected',
-               reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
-        return;
-      }
-      canvasW = msg.w;
-      canvasH = msg.h;
-      segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
-
-      if (engine.setEffect(msg.effectName)
-          !== wasmModule.EffectSetResult.INSTALLED) {
-        post({ type: 'engineRejected',
-               reason: `setEffect(${msg.effectName}) rejected` });
-        return;
-      }
-      if (typeof msg.poleLod === 'number') engine.setPoleLod(msg.poleLod);
-      if (!applyEffectState(msg)) return;
-
-      post({ type: 'ready' });
+  /** @param {Extract<WorkerInboundMsg, {type: 'init'}>} msg */
+  async function initializeSession(msg) {
+    // Version check precedes reading any other field or touching WASM.
+    if (msg.version !== PROTOCOL_VERSION) {
+      post({ type: 'engineRejected',
+             reason: `protocol version ${msg.version} != worker ${PROTOCOL_VERSION}`
+                     + ` (stale cached worker or controller)` });
       return;
     }
+    if (engine || wasmModule) {
+      post({ type: 'engineRejected', reason: 'duplicate init' });
+      return;
+    }
+
+    if (typeof msg.effectName !== 'string' || !msg.effectName.trim()) {
+      post({ type: 'engineRejected', reason: 'init requires an effect name' });
+      return;
+    }
+
+    paramRejectedKey = '';
+    divergenceWarnings = new Map();
+    segId = msg.segId;
+    totalSegs = msg.totalSegs;
+    paramRevision = msg.paramRevision;
+
+    const mod = await instantiateModule(msg);
+    if (!mod) return;
+    wasmModule = mod;
+    engine = new mod.HolosphereEngine();
+    if (!engine.setDisplayCaps(msg.topCap ?? 0, msg.bottomCap ?? 0)) {
+      post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
+      return;
+    }
+    engine.setTemporalSampling(msg.temporalSampling ?? false);
+    // The latch tracks the live engine; a fresh one starts unlatched.
+    awaitingEffect = false;
+    // A rejected resolution leaves no usable geometry.
+    if (engine.setResolution(msg.w, msg.h)
+        === wasmModule.ResolutionSetResult.UNSUPPORTED) {
+      post({ type: 'engineRejected',
+             reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
+      return;
+    }
+    canvasW = msg.w;
+    canvasH = msg.h;
+    segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
+
+    if (engine.setEffect(msg.effectName)
+        !== wasmModule.EffectSetResult.INSTALLED) {
+      post({ type: 'engineRejected',
+             reason: `setEffect(${msg.effectName}) rejected` });
+      return;
+    }
+    if (typeof msg.poleLod === 'number') engine.setPoleLod(msg.poleLod);
+    if (!applyEffectState(msg)) return;
+
+    post({ type: 'ready' });
+    return;
+  }
+
+  /** @param {Extract<WorkerInboundMsg, {type: 'setEffect'}>} msg */
+  function handleSetEffect(msg) {
+    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+
+    // INSTALLED is the sole success; either rejection keeps the old effect.
+    if (engine.setEffect(msg.name)
+        !== wasmModule.EffectSetResult.INSTALLED) {
+      post({ type: 'engineRejected',
+             reason: `setEffect(${msg.name}) rejected` });
+      return;
+    }
+    paramRejectedKey = '';
+    divergenceWarnings = new Map();
+    arenaMetricsWarned = false;
+    awaitingEffect = false;
+    if (applyEffectState(msg)) paramRevision = msg.paramRevision;
+    return;
+  }
+
+  /** @param {Extract<WorkerInboundMsg, {type: 'setResolution'}>} msg */
+  function handleSetResolution(msg) {
+    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+
+    // RESIZED and ALREADY_ACTIVE both commit; RESIZED also dropped the
+    // effect and the clip.
+    const resolutionResult = engine.setResolution(msg.w, msg.h);
+    if (resolutionResult === wasmModule.ResolutionSetResult.UNSUPPORTED) {
+      post({ type: 'engineRejected',
+             reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
+      return;
+    }
+    if (resolutionResult === wasmModule.ResolutionSetResult.RESIZED) {
+      awaitingEffect = true;
+    }
+    canvasW = msg.w;
+    canvasH = msg.h;
+    arenaMetricsWarned = false;
+    segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
+    return;
+  }
+
+  /** @param {Extract<WorkerInboundMsg, {type: 'setParameter'}>} msg */
+  function handleSetParameter(msg) {
+    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+
+    applyParam(msg.name, msg.value);
+    paramRevision = msg.paramRevision;
+    return;
+  }
+
+  /** @param {Extract<WorkerInboundMsg, {type: 'setAnimationsPaused'}>} msg */
+  function handleSetAnimationsPaused(msg) {
+    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+
+    engine.setAnimationsPaused(msg.paused);
+    return;
+  }
+
+  /** @param {Extract<WorkerInboundMsg, {type: 'selectPreset'}>} msg */
+  function handleSelectPreset(msg) {
+    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+
+    applyPreset(msg.index);
+    paramRevision = msg.paramRevision;
+    return;
+  }
+
+  /** @param {Extract<WorkerInboundMsg, {type: 'setDisplayCaps'}>} msg */
+  function handleSetDisplayCaps(msg) {
+    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+
+    if (!engine.setDisplayCaps(msg.topCap, msg.bottomCap)) {
+      post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
+      return;
+    }
+    arenaMetricsWarned = false;
+    applyClip();
+    return;
+  }
+
+  /** @param {Extract<WorkerInboundMsg, {type: 'setPoleLod'}>} msg */
+  function handleSetPoleLod(msg) {
+    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+
+    engine.setPoleLod(msg.value);
+    return;
+  }
+
+  /** @param {Extract<WorkerInboundMsg, {type: 'setTemporalSampling'}>} msg */
+  function handleSetTemporalSampling(msg) {
+    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+
+    engine.setTemporalSampling(msg.enabled);
+    return;
+  }
+
+  /** @param {Extract<WorkerInboundMsg, {type: 'render'}>} msg @param {number} elapsed */
+  function replyFrame(msg, elapsed) {
+    if (!engine || !segRange) throw new Error('segment_worker: frame reply without a live segment');
+    // Segment 0 mirrors its post-frame param values back.
+    const paramValues =
+      segId === 0 ? Array.from(engine.getParamValues()) : null;
+    const presetCount = segId === 0 ? engine.getPresetCount() : null;
+    const presetIndex = segId === 0 ? engine.getPresetIndex() : null;
+
+    const allPixels = engine.getPixels();
+    const { x0, x1, y0, y1, w: qw, h: qh } = segRange;
+    // A short source leaves the destination tail unchanged, including recycled pixels.
+    const expectedLen = canvasW * canvasH * 3;
+    if (allPixels.length !== expectedLen) {
+      throw new Error(
+        `segment_worker: pixel buffer length ${allPixels.length} != ` +
+        `${expectedLen} (canvasW=${canvasW}, canvasH=${canvasH})`);
+    }
+    if (x0 < 0 || y0 < 0 || x1 > canvasW || y1 > canvasH) {
+      throw new Error(
+        `segment_worker: segment rect [${x0},${y0})-[${x1},${y1}) out of ` +
+        `bounds for the ${canvasW}x${canvasH} canvas`);
+    }
+    // Reuse a recycled buffer of the right size; extractSegment overwrites
+    // every element.
+    const segLen = qw * qh * 3;
+    const pixelsCopy = (msg.recycle && msg.recycle.length === segLen)
+      ? msg.recycle : new Uint16Array(segLen);
+    extractSegment(allPixels, pixelsCopy, canvasW, segRange);
+
+    /** @type {SegArenaMetrics | null} */
+    let arenaMetrics;
+    try {
+      const metrics = engine.getArenaMetrics();
+      /** @param {SegArenaMetrics['scratch_arena_a']} arena */
+      const toWire = (arena) => ({
+        usage: arena.usage,
+        high_water_mark: arena.high_water_mark,
+        capacity: arena.capacity,
+      });
+      arenaMetrics = {
+        scratch_arena_a: toWire(metrics.scratch_arena_a),
+        scratch_arena_b: toWire(metrics.scratch_arena_b),
+        persistent_arena: toWire(metrics.persistent_arena),
+      };
+    } catch (e) {
+      if (engineHalted(e, wasmModule)) throw e;
+      if (!arenaMetricsWarned) {
+        console.warn('segment_worker: getArenaMetrics failed:', e);
+        arenaMetricsWarned = true;
+      }
+      arenaMetrics = null;
+    }
+
+    post({
+      type: 'frame',
+      segId,
+      x0, x1, y0, y1,
+      pixels: pixelsCopy,
+      elapsed,
+      arenaMetrics,
+      paramValues,
+      paramRevision,
+      presetCount,
+      presetIndex,
+      warnings: divergenceWarnings.size > 0 ? [...divergenceWarnings.values()] : undefined,
+    }, [pixelsCopy.buffer]);
+    return;
+  }
+
+  /** @param {Extract<WorkerInboundMsg, {type: 'render'}>} msg */
+  function handleRender(msg) {
+    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+
+    // Fail fast: no reply would leave the frame outstanding until the watchdog.
+    if (!segRange)
+      throw new Error('segment_worker: render without a configured segment range');
+    // A missing setEffect is the controller's sequencing fault; report it.
+    if (awaitingEffect) {
+      post({
+        type: 'engineRejected',
+        reason: `render at ${canvasW}x${canvasH} with no effect: the resize `
+          + 'tore the effect and clip down and no setEffect followed',
+      });
+      return;
+    }
+
+    // elapsed: JS wall time (ms) incl. embind overhead.
+    const t0 = performance.now();
+    engine.drawFrame();
+    const elapsed = performance.now() - t0;
+
+    replyFrame(msg, elapsed);
+  }
+
+  /** @type {{[Type in WorkerInboundMsg['type']]: (msg: Extract<WorkerInboundMsg, {type: Type}>) => void|Promise<void>}} */
+  const handlers = {
+    init: initializeSession,
+    setEffect: handleSetEffect,
+    setResolution: handleSetResolution,
+    setParameter: handleSetParameter,
+    setAnimationsPaused: handleSetAnimationsPaused,
+    selectPreset: handleSelectPreset,
+    setDisplayCaps: handleSetDisplayCaps,
+    setPoleLod: handleSetPoleLod,
+    setTemporalSampling: handleSetTemporalSampling,
+    render: handleRender,
+  };
+
+  /** @param {WorkerInboundMsg} msg @returns {Promise<void>} */
+  async function handleMessage(msg) {
+    if (engineDead) return;
+    if (msg.type === 'init') return handlers.init(msg);
     if (!engine || !wasmModule) {
       if (msg.type === 'render') {
         throw new Error('segment_worker: render before a completed init '
@@ -320,164 +529,15 @@ export function installSegmentWorker() {
       return;
     }
     switch (msg.type) {
-      case 'setEffect': {
-        // INSTALLED is the sole success; either rejection keeps the old effect.
-        if (engine.setEffect(msg.name)
-            !== wasmModule.EffectSetResult.INSTALLED) {
-          post({ type: 'engineRejected',
-                 reason: `setEffect(${msg.name}) rejected` });
-          break;
-        }
-        paramRejectedKey = '';
-        divergenceWarnings = new Map();
-        arenaMetricsWarned = false;
-        awaitingEffect = false;
-        if (applyEffectState(msg)) paramRevision = msg.paramRevision;
-        break;
-      }
-
-      case 'setResolution': {
-        // RESIZED and ALREADY_ACTIVE both commit; RESIZED also dropped the
-        // effect and the clip.
-        const resolutionResult = engine.setResolution(msg.w, msg.h);
-        if (resolutionResult === wasmModule.ResolutionSetResult.UNSUPPORTED) {
-          post({ type: 'engineRejected',
-                 reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
-          break;
-        }
-        if (resolutionResult === wasmModule.ResolutionSetResult.RESIZED) {
-          awaitingEffect = true;
-        }
-        canvasW = msg.w;
-        canvasH = msg.h;
-        arenaMetricsWarned = false;
-        segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
-        break;
-      }
-
-      case 'setParameter': {
-        applyParam(msg.name, msg.value);
-        paramRevision = msg.paramRevision;
-        break;
-      }
-
-      case 'setAnimationsPaused': {
-        engine.setAnimationsPaused(msg.paused);
-        break;
-      }
-
-      case 'selectPreset': {
-        applyPreset(msg.index);
-        paramRevision = msg.paramRevision;
-        break;
-      }
-
-      case 'setDisplayCaps': {
-        if (!engine.setDisplayCaps(msg.topCap, msg.bottomCap)) {
-          post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
-          break;
-        }
-        arenaMetricsWarned = false;
-        applyClip();
-        break;
-      }
-
-      case 'setPoleLod': {
-        engine.setPoleLod(msg.value);
-        break;
-      }
-
-      case 'setTemporalSampling': {
-        engine.setTemporalSampling(msg.enabled);
-        break;
-      }
-
-      case 'render': {
-        // Fail fast: no reply would leave the frame outstanding until the watchdog.
-        if (!segRange)
-          throw new Error('segment_worker: render without a configured segment range');
-        // A missing setEffect is the controller's sequencing fault; report it.
-        if (awaitingEffect) {
-          post({
-            type: 'engineRejected',
-            reason: `render at ${canvasW}x${canvasH} with no effect: the resize `
-              + 'tore the effect and clip down and no setEffect followed',
-          });
-          break;
-        }
-
-        // elapsed: JS wall time (ms) incl. embind overhead.
-        const t0 = performance.now();
-        engine.drawFrame();
-        const elapsed = performance.now() - t0;
-
-        // Segment 0 mirrors its post-frame param values back.
-        const paramValues =
-          segId === 0 ? Array.from(engine.getParamValues()) : null;
-        const presetCount = segId === 0 ? engine.getPresetCount() : null;
-        const presetIndex = segId === 0 ? engine.getPresetIndex() : null;
-
-        const allPixels = engine.getPixels();
-        const { x0, x1, y0, y1, w: qw, h: qh } = segRange;
-        // A short source leaves the destination tail unchanged, including recycled pixels.
-        const expectedLen = canvasW * canvasH * 3;
-        if (allPixels.length !== expectedLen) {
-          throw new Error(
-            `segment_worker: pixel buffer length ${allPixels.length} != ` +
-            `${expectedLen} (canvasW=${canvasW}, canvasH=${canvasH})`);
-        }
-        if (x0 < 0 || y0 < 0 || x1 > canvasW || y1 > canvasH) {
-          throw new Error(
-            `segment_worker: segment rect [${x0},${y0})-[${x1},${y1}) out of ` +
-            `bounds for the ${canvasW}x${canvasH} canvas`);
-        }
-        // Reuse a recycled buffer of the right size; extractSegment overwrites
-        // every element.
-        const segLen = qw * qh * 3;
-        const pixelsCopy = (msg.recycle && msg.recycle.length === segLen)
-          ? msg.recycle : new Uint16Array(segLen);
-        extractSegment(allPixels, pixelsCopy, canvasW, segRange);
-
-        /** @type {SegArenaMetrics | null} */
-        let arenaMetrics;
-        try {
-          const metrics = engine.getArenaMetrics();
-          /** @param {SegArenaMetrics['scratch_arena_a']} arena */
-          const toWire = (arena) => ({
-            usage: arena.usage,
-            high_water_mark: arena.high_water_mark,
-            capacity: arena.capacity,
-          });
-          arenaMetrics = {
-            scratch_arena_a: toWire(metrics.scratch_arena_a),
-            scratch_arena_b: toWire(metrics.scratch_arena_b),
-            persistent_arena: toWire(metrics.persistent_arena),
-          };
-        } catch (e) {
-          if (engineHalted(e, wasmModule)) throw e;
-          if (!arenaMetricsWarned) {
-            console.warn('segment_worker: getArenaMetrics failed:', e);
-            arenaMetricsWarned = true;
-          }
-          arenaMetrics = null;
-        }
-
-        post({
-          type: 'frame',
-          segId,
-          x0, x1, y0, y1,
-          pixels: pixelsCopy,
-          elapsed,
-          arenaMetrics,
-          paramValues,
-          paramRevision,
-          presetCount,
-          presetIndex,
-          warnings: divergenceWarnings.size > 0 ? [...divergenceWarnings.values()] : undefined,
-        }, [pixelsCopy.buffer]);
-        break;
-      }
-
+      case 'setEffect': return handlers.setEffect(msg);
+      case 'setResolution': return handlers.setResolution(msg);
+      case 'setParameter': return handlers.setParameter(msg);
+      case 'setAnimationsPaused': return handlers.setAnimationsPaused(msg);
+      case 'selectPreset': return handlers.selectPreset(msg);
+      case 'setDisplayCaps': return handlers.setDisplayCaps(msg);
+      case 'setPoleLod': return handlers.setPoleLod(msg);
+      case 'setTemporalSampling': return handlers.setTemporalSampling(msg);
+      case 'render': return handlers.render(msg);
       default: {
         // Fail fast on protocol drift; `never` makes an unhandled
         // WorkerInboundMsg member a typecheck error.
@@ -492,7 +552,7 @@ export function installSegmentWorker() {
   // Serialize message handling. The catch rethrows on a fresh task so a failure
   // reaches the global error handler without wedging the chain.
   let messageQueue = Promise.resolve();
-  self.onmessage = (e) => {
+  const onMessage = (/** @type {MessageEvent} */ e) => {
     const msg = /** @type {WorkerInboundMsg} */ (e.data);
     if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string') {
       post({ type: 'engineRejected', reason: 'invalid worker message envelope' });
@@ -509,10 +569,18 @@ export function installSegmentWorker() {
     return messageQueue;
   };
 
-  self.onmessageerror = (e) => {
+  const onMessageError = (/** @type {MessageEvent} */ e) => {
     console.error('segment_worker: message deserialization failed', e);
     post({ type: 'engineRejected', reason: 'message deserialization failed' });
   };
+  return {onMessage, onMessageError};
+}
+
+/** Installs one serialized worker session. */
+export function installSegmentWorker() {
+  const session = createSegmentWorkerSession();
+  self.onmessage = session.onMessage;
+  self.onmessageerror = session.onMessageError;
 }
 
 installSegmentWorker();

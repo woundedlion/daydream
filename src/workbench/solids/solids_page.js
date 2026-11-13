@@ -31,10 +31,15 @@ import { showCopyFeedback } from '../../shared/clipboard.js';
 import { createPointerDrag } from '../../shared/pointer_drag.js';
 import { downloadBlob } from '../../shared/download_file.js';
 
-let camera, scene, renderer, controls;
-let meshRenderer = null;
-let labelsContainer;
-let createHolosphereModule = null;
+const page = {
+  camera: undefined,
+  scene: undefined,
+  renderer: undefined,
+  controls: undefined,
+  meshRenderer: null,
+  labelsContainer: undefined,
+  createHolosphereModule: null,
+};
 
 const FACE_MATERIAL_OPTIONS = {
   transparent: true,
@@ -64,10 +69,10 @@ const scheduleUpdate = createFrameScheduler(update);
 const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 
 // WASM Module
-let wasmModule = null;
-let meshOpsWasm = null;
+page.wasmModule = null;
+page.meshOpsWasm = null;
 
-const state = {
+page.state = {
   base: 'cube',
   ops: [], // Array of objects { op: string, params: object }
   autoRotate: reducedMotion?.matches !== true,
@@ -89,43 +94,43 @@ const VIEW_TOGGLES = /** @type {const} */ ({
   toggleIndices: 'showIndices',
 });
 
-const baseThumbnails = {};
+page.baseThumbnails = {};
 
-let currentMesh = null;
-let currentMeshIsCurrent = false;
+page.currentMesh = null;
+page.currentMeshIsCurrent = false;
 // Per-face topology class ids for the Colorize Faces toggle, cached from the
 // last recompute: classifyFaces() needs the live WASM mesh, which update() frees.
-let currentFaceClasses = null;
+page.currentFaceClasses = null;
 /** @type {?string} */
-let currentClassifyFailure = null;
+page.currentClassifyFailure = null;
 
 // Lists (populated from WASM)
-let simpleSolids = [];
-let islamicStarPatterns = [];
+page.simpleSolids = [];
+page.islamicStarPatterns = [];
 // Every name the engine registry defines; empty until the registry loads.
-let registrySolidNames = new Set();
+page.registrySolidNames = new Set();
 
-async function init() {
+async function initializeSolidEngine() {
   try {
-    ({ default: createHolosphereModule } = await import('../../../generated/holosphere_wasm.js'));
-    wasmModule = await createHolosphereModule();
-    meshOpsWasm = wasmModule.MeshOps;
+    ({ default: page.createHolosphereModule } = await import('../../../generated/holosphere_wasm.js'));
+    page.wasmModule = await page.createHolosphereModule();
+    page.meshOpsWasm = page.wasmModule.MeshOps;
 
-    const registry = meshOpsWasm.getRegistry();
-    simpleSolids = [];
-    islamicStarPatterns = [];
-    registrySolidNames = new Set();
+    const registry = page.meshOpsWasm.getRegistry();
+    page.simpleSolids = [];
+    page.islamicStarPatterns = [];
+    page.registrySolidNames = new Set();
 
     for (let i = 0; i < registry.length; i++) {
       const item = registry[i];
       const name = item.name;
       const cat = item.category;
 
-      registrySolidNames.add(name);
+      page.registrySolidNames.add(name);
       if (cat === "Complex") {
-        islamicStarPatterns.push(name);
+        page.islamicStarPatterns.push(name);
       } else {
-        simpleSolids.push(name);
+        page.simpleSolids.push(name);
       }
     }
 
@@ -134,15 +139,97 @@ async function init() {
     showFatalError('Failed to load the Holosphere WASM engine — the solids '
       + 'tool needs the built holosphere_wasm artifacts. Build the WASM '
       + 'target and reload.');
-    return;
+    return false;
   }
+
+  return true;
+}
+
+function mountSolidScene(page) {
+  const result = initScene('canvas-container', 'canvas', {
+    cameraPosition: [2, 1.5, 2],
+    far: 100,
+    minDistance: 0,
+    maxDistance: Infinity,
+    autoRotate: page.state.autoRotate,
+    autoRotateSpeed: 2.0,
+    lights: true,
+    showSphere: false,
+    onAfterRender: updateLabels,
+    onAfterResize: () => { page.labelsNeedReproject = true; },
+  });
+  page.scene = result.scene;
+  page.camera = result.camera;
+  page.renderer = result.renderer;
+  page.controls = result.controls;
+  const stopWatchingReducedMotion = watchMediaMatch(
+    reducedMotion, () => setAutoRotate(false));
+
+  // Cancel the pending frame so a queued recompute never runs on the disposed scene.
+  onPageTeardown(() => {
+    stopWatchingReducedMotion();
+    scheduleUpdate.cancel();
+    page.meshRenderer?.disposeGeometry();
+    faceMaterial.dispose();
+    faceColorizeMaterial.dispose();
+    vertMaterial.dispose();
+    edgeMaterial.dispose();
+    normalMaterial.dispose();
+    result.dispose();
+  });
+
+  wireViewToggles();
+  wireCanvasTap(document.getElementById('canvas'));
+
+  page.labelsContainer = document.getElementById('labels');
+  page.meshRenderer = createMeshRenderer({
+    THREE,
+    scene: page.scene,
+    materials: {
+      face: faceMaterial,
+      faceColorize: faceColorizeMaterial,
+      vert: vertMaterial,
+      edge: edgeMaterial,
+      normal: normalMaterial,
+    },
+    labelsContainer: page.labelsContainer,
+  });
+
+
+}
+
+function wireSavedSolidControls() {
+  document.getElementById('saveBtn').addEventListener('click', saveSolid);
+
+  document.getElementById('clearOpsBtn').addEventListener('click', resetOps);
+  document.getElementById('exportSavedBtn').addEventListener('click', exportSavedSolids);
+  const importFile = document.getElementById('importSavedFile');
+  document.getElementById('importSavedBtn').addEventListener('click', () => importFile.click());
+  importFile.addEventListener('change', async () => {
+    const file = importFile.files?.[0];
+    try {
+      if (file) importSavedSolids(await file.text());
+    } catch (error) {
+      showGateMsg(`import failed: ${error.message}`);
+    } finally {
+      importFile.value = '';
+    }
+  });
+  document.getElementById('clearSavedBtn').addEventListener('click', clearSavedSolids);
+  document.getElementById('addOpGrid').addEventListener('click', activateAddOp);
+
+
+}
+
+async function init() {
+  if (!await initializeSolidEngine()) return;
 
   let arenaMetricsTimer = null;
   function updateArenaMetrics() {
-    if (!meshOpsWasm) return;
+    if (!page.meshOpsWasm) return;
     arenaMetricsTimer = null;
     try {
-      const m = meshOpsWasm.getArenaMetrics();
+      const m = page.meshOpsWasm.getArenaMetrics();
       // Peak over the module's life: clearToolingMemory() zeroes the windowed
       // high_water_mark.
       const fmt = (x) => `${formatKB(x.lifetime_high_water_mark, 0)} / ${formatKB(x.capacity, 0)}KB`;
@@ -163,75 +250,11 @@ async function init() {
     if (arenaMetricsTimer !== null) { clearTimeout(arenaMetricsTimer); arenaMetricsTimer = null; }
   });
   updateArenaMetrics();
-  if (!wasmModule) return;
+  if (!page.wasmModule) return;
 
-  const result = initScene('canvas-container', 'canvas', {
-    cameraPosition: [2, 1.5, 2],
-    far: 100,
-    minDistance: 0,
-    maxDistance: Infinity,
-    autoRotate: state.autoRotate,
-    autoRotateSpeed: 2.0,
-    lights: true,
-    showSphere: false,
-    onAfterRender: updateLabels,
-    onAfterResize: () => { labelsNeedReproject = true; },
-  });
-  scene = result.scene;
-  camera = result.camera;
-  renderer = result.renderer;
-  controls = result.controls;
-  const stopWatchingReducedMotion = watchMediaMatch(
-    reducedMotion, () => setAutoRotate(false));
+  mountSolidScene(page);
 
-  // Cancel the pending frame so a queued recompute never runs on the disposed scene.
-  onPageTeardown(() => {
-    stopWatchingReducedMotion();
-    scheduleUpdate.cancel();
-    meshRenderer?.disposeGeometry();
-    faceMaterial.dispose();
-    faceColorizeMaterial.dispose();
-    vertMaterial.dispose();
-    edgeMaterial.dispose();
-    normalMaterial.dispose();
-    result.dispose();
-  });
-
-  wireViewToggles();
-  wireCanvasTap(document.getElementById('canvas'));
-
-  labelsContainer = document.getElementById('labels');
-  meshRenderer = createMeshRenderer({
-    THREE,
-    scene,
-    materials: {
-      face: faceMaterial,
-      faceColorize: faceColorizeMaterial,
-      vert: vertMaterial,
-      edge: edgeMaterial,
-      normal: normalMaterial,
-    },
-    labelsContainer,
-  });
-
-  document.getElementById('saveBtn').addEventListener('click', saveSolid);
-
-  document.getElementById('clearOpsBtn').addEventListener('click', resetOps);
-  document.getElementById('exportSavedBtn').addEventListener('click', exportSavedSolids);
-  const importFile = document.getElementById('importSavedFile');
-  document.getElementById('importSavedBtn').addEventListener('click', () => importFile.click());
-  importFile.addEventListener('change', async () => {
-    const file = importFile.files?.[0];
-    try {
-      if (file) importSavedSolids(await file.text());
-    } catch (error) {
-      showGateMsg(`import failed: ${error.message}`);
-    } finally {
-      importFile.value = '';
-    }
-  });
-  document.getElementById('clearSavedBtn').addEventListener('click', clearSavedSolids);
-  document.getElementById('addOpGrid').addEventListener('click', activateAddOp);
+  wireSavedSolidControls();
 
   generateThumbnails(thumbnailAbort.signal).catch(e => {
     if (engineTrapped(e)) return;
@@ -258,12 +281,7 @@ function handleBaseSolidKeyDown(event) {
   next.click();
 }
 
-async function generateThumbnails(signal) {
-  const baseSolids = document.getElementById('baseSolids');
-  const starPatterns = document.getElementById('starPatterns');
-
-  const thumbKeys = [...simpleSolids, ...islamicStarPatterns];
-
+function createThumbnailScene() {
   const width = 256;
   const height = 256;
   const offRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -292,6 +310,16 @@ async function generateThumbnails(signal) {
     scene: offScene,
     materials: { face: mat, faceColorize: mat, edge: lineMat },
   });
+  return {offRenderer, offScene, offCamera, mat, lineMat, thumbRenderer};
+}
+
+async function generateThumbnails(signal) {
+  const baseSolids = document.getElementById('baseSolids');
+  const starPatterns = document.getElementById('starPatterns');
+
+  const thumbKeys = [...page.simpleSolids, ...page.islamicStarPatterns];
+
+  const {offRenderer, offScene, offCamera, mat, lineMat, thumbRenderer} = createThumbnailScene();
   const THUMB_VIEW = {
     showFaces: true,
     showGeodesics: false,
@@ -304,7 +332,7 @@ async function generateThumbnails(signal) {
   try {
     for (const key of thumbKeys) {
       await new Promise(resolve => setTimeout(resolve));
-      if (signal.aborted || !meshOpsWasm) break;
+      if (signal.aborted || !page.meshOpsWasm) break;
 
       const meshData = buildBaseMesh(key, `Thumbnail for "${key}"`, buildContext(showThumbnailError));
       if (!meshData) continue;
@@ -319,10 +347,10 @@ async function generateThumbnails(signal) {
       img.alt = '';
       const dataURL = offRenderer.domElement.toDataURL();
       img.src = dataURL;
-      baseThumbnails[key] = dataURL;
+      page.baseThumbnails[key] = dataURL;
 
       // Refresh the selected preview when its thumbnail becomes available.
-      if (key === state.base) {
+      if (key === page.state.base) {
         document.getElementById('baseThumb').src = dataURL;
       }
 
@@ -339,7 +367,7 @@ async function generateThumbnails(signal) {
       btn.appendChild(img);
       btn.appendChild(span);
       btn.appendChild(fullName);
-      if (islamicStarPatterns.includes(key)) {
+      if (page.islamicStarPatterns.includes(key)) {
         starPatterns.appendChild(btn);
       } else {
         baseSolids.appendChild(btn);
@@ -364,13 +392,13 @@ async function generateThumbnails(signal) {
  */
 function configureBaseSolidThumbnail(btn, key) {
   btn.type = 'button';
-  btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
-  if (islamicStarPatterns.includes(key)) {
+  btn.className = `thumb-btn ${page.state.base === key ? 'active' : ''}`;
+  if (page.islamicStarPatterns.includes(key)) {
     btn.classList.add('thumb-star');
   } else {
     btn.setAttribute('role', 'radio');
-    btn.setAttribute('aria-checked', state.base === key ? 'true' : 'false');
-    btn.tabIndex = state.base === key ? 0 : -1;
+    btn.setAttribute('aria-checked', page.state.base === key ? 'true' : 'false');
+    btn.tabIndex = page.state.base === key ? 0 : -1;
     btn.addEventListener('keydown', handleBaseSolidKeyDown);
   }
   btn.dataset.solid = key;
@@ -388,22 +416,22 @@ function configureBaseSolidThumbnail(btn, key) {
 function selectBaseSolid(key, btn) {
   queueCommit(async () => {
     let base = key;
-    let ops = state.ops;
-    if (islamicStarPatterns.includes(key)) {
-      const recipe = meshOpsWasm.getRecipe(key);
+    let ops = page.state.ops;
+    if (page.islamicStarPatterns.includes(key)) {
+      const recipe = page.meshOpsWasm.getRecipe(key);
       if (!recipe) {
         showGateMsg(`rejected: "${formatSolidName(key)}" has no authored chain to load`);
         return;
       }
-      if (state.ops.length > 1 && !window.confirm(
-        `Replace all ${state.ops.length} operations with the ${formatSolidName(key)} chain?`)) return;
+      if (page.state.ops.length > 1 && !window.confirm(
+        `Replace all ${page.state.ops.length} operations with the ${formatSolidName(key)} chain?`)) return;
       base = recipe.seed;
       ops = opsFromRecipe(recipe.ops);
     }
     if (ops.length) {
       const check = await chainIsValid(base, ops);
       if (!check.ok) {
-        showGateMsg(ops === state.ops
+        showGateMsg(ops === page.state.ops
           ? `rejected: the op stack fails on this solid — ${check.message}`
           : `rejected: ${check.message}`);
         highlightBaseSolid();
@@ -414,8 +442,8 @@ function selectBaseSolid(key, btn) {
       }
     }
     showGateMsg('');
-    state.base = base;
-    if (ops !== state.ops) {
+    page.state.base = base;
+    if (ops !== page.state.ops) {
       setOps(ops);
       renderOps();
     }
@@ -428,9 +456,9 @@ function selectBaseSolid(key, btn) {
 function wireViewToggles() {
   for (const [id, flag] of Object.entries(VIEW_TOGGLES)) {
     const toggle = flag === 'autoRotate'
-      ? () => setAutoRotate(!state.autoRotate)
+      ? () => setAutoRotate(!page.state.autoRotate)
       : () => {
-        state[flag] = !state[flag];
+        page.state[flag] = !page.state[flag];
         updateToggles();
         renderMesh();
       };
@@ -442,15 +470,15 @@ function updateToggles() {
   for (const [id, flag] of Object.entries(VIEW_TOGGLES)) {
     const btn = document.getElementById(id);
     if (!btn) continue;
-    const on = state[flag];
+    const on = page.state[flag];
     btn.classList.toggle('is-on', on);
     btn.setAttribute('aria-checked', String(on));
   }
 }
 
 function setAutoRotate(on) {
-  state.autoRotate = on;
-  controls.autoRotate = on;
+  page.state.autoRotate = on;
+  page.controls.autoRotate = on;
   updateToggles();
 }
 
@@ -462,7 +490,7 @@ function wireCanvasTap(canvasEl) {
     onMove: (event) => { moved ||= Math.hypot(event.clientX - x, event.clientY - y) >= 5; },
     onEnd: (event) => {
       if (!moved && event && Math.hypot(event.clientX - x, event.clientY - y) < 5)
-        setAutoRotate(!state.autoRotate);
+        setAutoRotate(!page.state.autoRotate);
     },
     onCancel: () => {},
   });
@@ -512,8 +540,8 @@ function importSavedSolids(text) {
 }
 
 function captureSavedThumbnail() {
-  renderer.render(scene, camera);
-  const source = renderer.domElement;
+  page.renderer.render(page.scene, page.camera);
+  const source = page.renderer.domElement;
   const canvas = document.createElement('canvas');
   canvas.width = SAVED_THUMB_SIZE;
   canvas.height = SAVED_THUMB_SIZE;
@@ -528,17 +556,17 @@ function captureSavedThumbnail() {
 
 function saveSolid() {
   // Nothing to save until the first successful update() has produced a mesh.
-  if (!currentMesh || !currentMeshIsCurrent) {
+  if (!page.currentMesh || !page.currentMeshIsCurrent) {
     showGateMsg("rejected: the current chain has no successful preview to save");
     return;
   }
 
   // A base with no ops has no exportable recipe.
-  if (state.ops.length === 0) {
+  if (page.state.ops.length === 0) {
     showGateMsg('rejected: add at least one op — a bare seed has no recipe to export');
     return;
   }
-  const shapeError = savedChainShapeError(state.base, state.ops);
+  const shapeError = savedChainShapeError(page.state.base, page.state.ops);
   if (shapeError) {
     showGateMsg(`rejected: the loaded or edited chain cannot be saved: ${shapeError}; `
       + "pattern values may fall outside the editor's save grid");
@@ -555,11 +583,11 @@ function saveSolid() {
 
   const dataURL = thumbnail.dataURL;
 
-  const title = formatSolidName(state.base);
+  const title = formatSolidName(page.state.base);
 
-  const {vertices: vCount, edges: eCount, faces: fCount, indices: iCount} = meshCounts(currentMesh);
+  const {vertices: vCount, edges: eCount, faces: fCount, indices: iCount} = meshCounts(page.currentMesh);
 
-  const opsSummary = state.ops.map(o => {
+  const opsSummary = page.state.ops.map(o => {
     if (o.op === 'truncate') return `Tr(${o.params.t})`;
     if (o.op === 'hankin') return `Hk(${o.params.angle.toFixed(2)})`;
     const name = o.op.charAt(0).toUpperCase() + o.op.slice(1);
@@ -568,14 +596,14 @@ function saveSolid() {
   }).join(', ');
 
   const item = {
-    base: state.base,
-    ops: structuredClone(state.ops),
-    geodesics: state.showGeodesics,
-    faces: state.showFaces,
-    colorize: state.colorizeFaces,
-    vertices: state.showVertices,
-    normals: state.showNormals,
-    indices: state.showIndices,
+    base: page.state.base,
+    ops: structuredClone(page.state.ops),
+    geodesics: page.state.showGeodesics,
+    faces: page.state.showFaces,
+    colorize: page.state.colorizeFaces,
+    vertices: page.state.showVertices,
+    normals: page.state.showNormals,
+    indices: page.state.showIndices,
     thumb: dataURL,
     title: title,
     desc: opsSummary,
@@ -586,7 +614,7 @@ function saveSolid() {
   // A name matching an engine registry entry would redefine it at paste time.
   showGateMsg('');
   const funcName = savedFuncName(item);
-  if (funcName && registrySolidNames.has(registryDisplayName(item, funcName))) {
+  if (funcName && page.registrySolidNames.has(registryDisplayName(item, funcName))) {
     showGateMsg(`saved: "${funcName}" is already in the engine registry — `
       + `the exported C++ would redefine it; vary an op parameter`);
   } else if (funcName && savedSolids.some(s => savedFuncName(s) === funcName)) {
@@ -622,14 +650,14 @@ function renderSavedList() {
 
   savedSolids.forEach((item, index) => {
     const funcName = savedFuncName(item);
-    const inRegistry = funcName !== null && registrySolidNames.has(registryDisplayName(item, funcName));
+    const inRegistry = funcName !== null && page.registrySolidNames.has(registryDisplayName(item, funcName));
     const clashMessage = funcName && (inRegistry || nameCounts.get(funcName) > 1)
       ? inRegistry
         ? `Exports as ${funcName}, which the engine registry already defines`
         : `Exports as ${funcName}, which another saved solid also exports`
       : '';
     const el = buildSavedCard(item, index, {
-      count: savedSolids.length, funcName, clashMessage, canRestore: Boolean(wasmModule),
+      count: savedSolids.length, funcName, clashMessage, canRestore: Boolean(page.wasmModule),
       on: {restore: restoreSolid, remove: deleteSolid, copy: copyCode, explain: showGateMsg},
       doc: document,
     });
@@ -656,11 +684,11 @@ async function copyCode(index, lang, btn) {
     showCopyFailure(btn, `export failed: ${shapeError}`);
     return;
   }
-  if (!registrySolidNames.has(item.base)) {
+  if (!page.registrySolidNames.has(item.base)) {
     showCopyFailure(btn, `export failed: unknown base solid ${item.base}`);
     return;
   }
-  const baseIsStar = islamicStarPatterns.includes(item.base);
+  const baseIsStar = page.islamicStarPatterns.includes(item.base);
 
   let code;
   let validationError = null;
@@ -676,11 +704,11 @@ async function copyCode(index, lang, btn) {
       let baseRecipe = null;
       if (baseIsStar) {
         // Flatten the star base's authored chain into the registry recipe.
-        if (!meshOpsWasm) {
+        if (!page.meshOpsWasm) {
           showCopyFailure(btn, 'export failed: the engine has stood down; reload to export a registry');
           return;
         }
-        baseRecipe = meshOpsWasm.getRecipe(item.base);
+        baseRecipe = page.meshOpsWasm.getRecipe(item.base);
         if (!baseRecipe) {
           showCopyFailure(btn, `export failed: no authored chain for "${item.base}" — `
             + 'its registry recipe cannot be generated');
@@ -741,16 +769,16 @@ function restoreSolid(item) {
 
 function applyRestore(item) {
   showGateMsg('');
-  state.base = item.base;
+  page.state.base = item.base;
   setOps(structuredClone(item.ops));
   // A flag the card lacks lands on the page default.
   const flag = (value, fallback) => !!(value ?? fallback);
-  state.showGeodesics = flag(item.geodesics, true);
-  state.showFaces = flag(item.faces, true);
-  state.colorizeFaces = flag(item.colorize, false);
-  state.showVertices = flag(item.vertices, false);
-  state.showNormals = flag(item.normals, false);
-  state.showIndices = flag(item.indices, false);
+  page.state.showGeodesics = flag(item.geodesics, true);
+  page.state.showFaces = flag(item.faces, true);
+  page.state.colorizeFaces = flag(item.colorize, false);
+  page.state.showVertices = flag(item.vertices, false);
+  page.state.showNormals = flag(item.normals, false);
+  page.state.showIndices = flag(item.indices, false);
 
   updateToggles();
   renderOps();
@@ -764,9 +792,9 @@ function applyRestore(item) {
 function highlightBaseSolid() {
   const radios = [...document.querySelectorAll('.thumb-btn[role="radio"]')];
   // With no radio checked, the first radio is the group's tab stop.
-  const stop = radios.find(b => b.dataset.solid === state.base) ?? radios[0];
+  const stop = radios.find(b => b.dataset.solid === page.state.base) ?? radios[0];
   radios.forEach(b => {
-    const selected = b.dataset.solid === state.base;
+    const selected = b.dataset.solid === page.state.base;
     b.classList.toggle('active', selected);
     b.setAttribute('aria-checked', selected ? 'true' : 'false');
     b.tabIndex = b === stop ? 0 : -1;
@@ -774,8 +802,8 @@ function highlightBaseSolid() {
 }
 
 function renderBaseSolid() {
-  const thumb = baseThumbnails[state.base];
-  const title = formatSolidName(state.base);
+  const thumb = page.baseThumbnails[page.state.base];
+  const title = formatSolidName(page.state.base);
   const image = document.getElementById('baseThumb');
   if (thumb) image.src = thumb;
   else image.removeAttribute('src');
@@ -786,18 +814,18 @@ function renderBaseSolid() {
 
 function reorderOp(from, to, revision) {
   // Ahead of the state read: a stale index can sit past the end of the list.
-  if (revision !== opsRevision) return;
-  if (to < 0 || to >= state.ops.length || from === to) return;
-  const opName = state.ops[from].op;
+  if (revision !== page.opsRevision) return;
+  if (to < 0 || to >= page.state.ops.length || from === to) return;
+  const opName = page.state.ops[from].op;
   queueCommit(async () => {
-    if (revision !== opsRevision) return;
-    const check = await chainIsValid(state.base, movedOps(state.ops, from, to));
+    if (revision !== page.opsRevision) return;
+    const check = await chainIsValid(page.state.base, movedOps(page.state.ops, from, to));
     if (!check.ok) {
       showGateMsg(`rejected: ${check.message}`);
       return;
     }
     // Re-derived from the live ops: param edits land outside the commit queue.
-    setOps(movedOps(state.ops, from, to));
+    setOps(movedOps(page.state.ops, from, to));
     renderOps();
     showGateMsg('');
     update();
@@ -811,19 +839,19 @@ function reorderOp(from, to, revision) {
   });
 }
 
-let dropSlotChecks = new Map();
-let dropSlotGen = 0;
+page.dropSlotChecks = new Map();
+page.dropSlotGen = 0;
 async function checkDropSlot(fromIndex, target) {
-  if (dropSlotChecks.has(target)) return;
-  const gen = dropSlotGen;
-  dropSlotChecks.set(target, null);
+  if (page.dropSlotChecks.has(target)) return;
+  const gen = page.dropSlotGen;
+  page.dropSlotChecks.set(target, null);
   const to = dropTargetIndex(target, fromIndex);
   if (to === fromIndex) {
-    dropSlotChecks.set(target, { ok: true, message: '' });
+    page.dropSlotChecks.set(target, { ok: true, message: '' });
     return;
   }
-  const check = await chainIsValid(state.base, movedOps(state.ops, fromIndex, to));
-  if (gen === dropSlotGen) dropSlotChecks.set(target, check);
+  const check = await chainIsValid(page.state.base, movedOps(page.state.ops, fromIndex, to));
+  if (gen === page.dropSlotGen) page.dropSlotChecks.set(target, check);
 }
 
 // Pointer y in the list's own coordinate space (the container is relative).
@@ -845,11 +873,41 @@ const DRAG_SLOP_PX = 4;
  *   queued commit drops the drag when the list has changed since.
  * @returns {void}
  */
+function moveRowDragPreview(page, gesture, e) {
+  const {el, grip, list, index, originX, originY, originListTop, originListLeft} = gesture;
+    const rect = list.getBoundingClientRect();
+    const dx = e.clientX - originX + originListLeft - rect.left + list.scrollLeft;
+    const dy = e.clientY - originY + originListTop - rect.top + list.scrollTop;
+    el.style.transform = `translate(${dx}px, ${dy}px)`;
+
+    const targetIndex = getDragTargetIndex(e, list);
+    void checkDropSlot(index, targetIndex).catch(console.error);
+    const items = [...list.children];
+    const draggingItem = items[index];
+    if (!draggingItem) return;
+
+    // An engine-invalid slot gets no insertion preview and no drop cursor.
+    const targetCheck = page.dropSlotChecks.get(targetIndex);
+    const blocked = targetCheck?.ok === false;
+    grip.classList.toggle('drop-blocked', blocked);
+    if (blocked) {
+      items.forEach((item, idx) => {
+        if (idx !== index) item.style.transform = '';
+      });
+      return;
+    }
+
+    // Amount to visual shift: height of item + gap (space-y-1 is 0.25rem = 4px)
+    const shiftAmount = draggingItem.offsetHeight + 4;
+    items.forEach((item, idx) => {
+      if (idx === index) return;
+      const shift = reorderPreviewShift(index, targetIndex, idx);
+      item.style.transform = shift === 0 ? '' : `translateY(${shift * shiftAmount}px)`;
+    });
+}
+
 function wireRowDrag(grip, index, el, list, revision) {
-  let originX = 0;
-  let originY = 0;
-  let originListTop = 0;
-  let originListLeft = 0;
+  const gesture = {el, grip, list, index, originX: 0, originY: 0, originListTop: 0, originListLeft: 0};
   let dragging = false;
 
   const clearPreview = () => {
@@ -858,62 +916,36 @@ function wireRowDrag(grip, index, el, list, revision) {
     for (const item of list.children) item.style.transform = '';
   };
 
+
+
   createPointerDrag({
     element: grip,
     onStart: (e) => {
-      if (!wasmModule) return false;
+      if (!page.wasmModule) return false;
       const rect = list.getBoundingClientRect();
-      originX = e.clientX;
-      originY = e.clientY;
-      originListTop = rect.top - list.scrollTop;
-      originListLeft = rect.left - list.scrollLeft;
+      gesture.originX = e.clientX;
+      gesture.originY = e.clientY;
+      gesture.originListTop = rect.top - list.scrollTop;
+      gesture.originListLeft = rect.left - list.scrollLeft;
       dragging = false;
     },
     onMove: (e) => {
-      if (!wasmModule) return;
+      if (!page.wasmModule) return;
       if (!dragging) {
-        if (Math.abs(e.clientY - originY) < DRAG_SLOP_PX) return;
+        if (Math.abs(e.clientY - gesture.originY) < DRAG_SLOP_PX) return;
         dragging = true;
         el.classList.add('dragging');
-        dropSlotGen += 1;
-        dropSlotChecks = new Map();
+        page.dropSlotGen += 1;
+        page.dropSlotChecks = new Map();
       }
 
-      const rect = list.getBoundingClientRect();
-      const dx = e.clientX - originX + originListLeft - rect.left + list.scrollLeft;
-      const dy = e.clientY - originY + originListTop - rect.top + list.scrollTop;
-      el.style.transform = `translate(${dx}px, ${dy}px)`;
-
-      const targetIndex = getDragTargetIndex(e, list);
-      void checkDropSlot(index, targetIndex).catch(console.error);
-      const items = [...list.children];
-      const draggingItem = items[index];
-      if (!draggingItem) return;
-
-      // An engine-invalid slot gets no insertion preview and no drop cursor.
-      const targetCheck = dropSlotChecks.get(targetIndex);
-      const blocked = targetCheck?.ok === false;
-      grip.classList.toggle('drop-blocked', blocked);
-      if (blocked) {
-        items.forEach((item, idx) => {
-          if (idx !== index) item.style.transform = '';
-        });
-        return;
-      }
-
-      // Amount to visual shift: height of item + gap (space-y-1 is 0.25rem = 4px)
-      const shiftAmount = draggingItem.offsetHeight + 4;
-      items.forEach((item, idx) => {
-        if (idx === index) return;
-        const shift = reorderPreviewShift(index, targetIndex, idx);
-        item.style.transform = shift === 0 ? '' : `translateY(${shift * shiftAmount}px)`;
-      });
+      moveRowDragPreview(page, gesture, e);
     },
     onEnd: (e) => {
       if (!dragging) return;
       dragging = false;
       clearPreview();
-      if (!wasmModule) return;
+      if (!page.wasmModule) return;
 
       const rawTarget = getDragTargetIndex(e, list);
       const toIndex = dropTargetIndex(rawTarget, index);
@@ -921,7 +953,7 @@ function wireRowDrag(grip, index, el, list, revision) {
         renderOps();
         return;
       }
-      const slotCheck = dropSlotChecks.get(rawTarget);
+      const slotCheck = page.dropSlotChecks.get(rawTarget);
       if (slotCheck && !slotCheck.ok) {
         showGateMsg(`rejected: ${slotCheck.message}`);
         renderOps();
@@ -941,11 +973,11 @@ function renderOps() {
   const list = document.getElementById('opsList');
   list.replaceChildren();
 
-  const revision = opsRevision;
-  state.ops.forEach((o, i) => {
+  const revision = page.opsRevision;
+  page.state.ops.forEach((o, i) => {
     const el = buildOpRow(o, i, {
       opDef: OP_DEFS[o.op],
-      count: state.ops.length,
+      count: page.state.ops.length,
       on: {
         wireDrag: (grip, row) => wireRowDrag(grip, i, row, list, revision),
         move: (from, to) => reorderOp(from, to, revision),
@@ -962,23 +994,23 @@ function renderOps() {
 const parameterEdits = new Map();
 
 function updateOpParam(index, key, value, revision) {
-  if (revision !== opsRevision || !state.ops[index]) return;
+  if (revision !== page.opsRevision || !page.state.ops[index]) return;
   // Typed number inputs can bypass min/max/step; reject non-numbers and snap to the op grid.
-  const def = OP_DEFS[state.ops[index].op]?.params?.[key];
+  const def = OP_DEFS[page.state.ops[index].op]?.params?.[key];
   let val = parseFloat(value);
   const invalidValue = Number.isNaN(val);
   if (invalidValue) {
-    val = state.ops[index].params[key];
+    val = page.state.ops[index].params[key];
   } else if (def) {
-    val = val === state.ops[index].params[key]
-      ? val : snapToStep(val, authoredParamRange(def, state.ops[index].params[key]));
+    val = val === page.state.ops[index].params[key]
+      ? val : snapToStep(val, authoredParamRange(def, page.state.ops[index].params[key]));
   }
   const editKey = `${revision}:${index}:${key}`;
   const edit = Symbol();
   parameterEdits.set(editKey, edit);
   const candidateOp = {
-    op: state.ops[index].op,
-    params: { ...state.ops[index].params, [key]: val },
+    op: page.state.ops[index].op,
+    params: { ...page.state.ops[index].params, [key]: val },
   };
 
   // Sync UI elements by the row's data-key.
@@ -997,16 +1029,16 @@ function updateOpParam(index, key, value, revision) {
 
   // truncate and bevel short-circuit to ambo at t == 0.5, so a slider tick can
   // change the topology and goes through the gate.
-  if (opTopologyKey(state.ops[index]) !== opTopologyKey(candidateOp)) {
+  if (opTopologyKey(page.state.ops[index]) !== opTopologyKey(candidateOp)) {
     scheduleUpdate.cancel();
     queueCommit(async () => {
-      if (revision !== opsRevision || parameterEdits.get(editKey) !== edit) return;
-      const candidate = structuredClone(state.ops);
+      if (revision !== page.opsRevision || parameterEdits.get(editKey) !== edit) return;
+      const candidate = structuredClone(page.state.ops);
       candidate[index].params[key] = val;
-      const check = await chainIsValid(state.base, candidate);
-      if (revision !== opsRevision || parameterEdits.get(editKey) !== edit) return;
+      const check = await chainIsValid(page.state.base, candidate);
+      if (revision !== page.opsRevision || parameterEdits.get(editKey) !== edit) return;
       if (check.ok) {
-        state.ops[index].params[key] = val;
+        page.state.ops[index].params[key] = val;
         showGateMsg('');
         update();
         return;
@@ -1022,7 +1054,7 @@ function updateOpParam(index, key, value, revision) {
     });
     return;
   }
-  state.ops[index].params[key] = val;
+  page.state.ops[index].params[key] = val;
   scheduleUpdate();
 }
 
@@ -1032,26 +1064,26 @@ const commitQueue = createCommitQueue((error) => {
 });
 // Once the page has stood down, a commit still queued is dropped.
 const queueCommit = (/** @type {() => any} */ fn) =>
-  commitQueue(() => (wasmModule ? fn() : undefined));
+  commitQueue(() => (page.wasmModule ? fn() : undefined));
 
 // Row handlers reject stale membership/order revisions; parameter edits retain the revision.
-let opsRevision = 0;
+page.opsRevision = 0;
 
 /** Replaces the op list and marks every render-time index stale.
  * @param {Array<{op: string, params: Object<string, number>}>} next - The new op list.
  * @returns {void} */
 function setOps(next) {
-  state.ops = next;
+  page.state.ops = next;
   parameterEdits.clear();
-  opsRevision++;
+  page.opsRevision++;
 }
 
 function removeOp(index, revision) {
   queueCommit(async () => {
-    if (revision !== opsRevision) return;
+    if (revision !== page.opsRevision) return;
     // Removing an op can invalidate the remainder (e.g. the ambo between two hankins).
-    const candidate = state.ops.filter((op, i) => i !== index);
-    const check = await chainIsValid(state.base, candidate);
+    const candidate = page.state.ops.filter((op, i) => i !== index);
+    const check = await chainIsValid(page.state.base, candidate);
     if (!check.ok) {
       showGateMsg(`rejected: ${check.message}`);
       return;
@@ -1078,23 +1110,23 @@ function activateAddOp(event) {
 
 function addOp(opName) {
   // Bounds only the tool's share of a flattened star-base chain.
-  if (state.ops.length >= MAX_RECIPE_STEPS) {
+  if (page.state.ops.length >= MAX_RECIPE_STEPS) {
     showGateMsg(`rejected: a chain carries at most ${MAX_RECIPE_STEPS} ops`);
     return;
   }
   queueCommit(async () => {
     // Earlier queued adds can fill the chain before this runs.
-    if (state.ops.length >= MAX_RECIPE_STEPS) {
+    if (page.state.ops.length >= MAX_RECIPE_STEPS) {
       showGateMsg(`rejected: a chain carries at most ${MAX_RECIPE_STEPS} ops`);
       return;
     }
-    const newOp = { op: opName, params: seedOpParams(opName, currentMeshIsCurrent ? currentMesh : null) };
-    const check = await chainIsValid(state.base, [...state.ops, newOp]);
+    const newOp = { op: opName, params: seedOpParams(opName, page.currentMeshIsCurrent ? page.currentMesh : null) };
+    const check = await chainIsValid(page.state.base, [...page.state.ops, newOp]);
     if (!check.ok) {
       showGateMsg(`rejected: ${check.message}`);
       return;
     }
-    setOps([...state.ops, newOp]);
+    setOps([...page.state.ops, newOp]);
     renderOps();
     showGateMsg('');
     update();
@@ -1103,7 +1135,7 @@ function addOp(opName) {
 
 function resetOps() {
   queueCommit(async () => {
-    if (state.ops.length > 1 && !window.confirm(`Clear all ${state.ops.length} operations?`)) return;
+    if (page.state.ops.length > 1 && !window.confirm(`Clear all ${page.state.ops.length} operations?`)) return;
     setOps([]);
     renderOps();
     showGateMsg('');
@@ -1121,17 +1153,17 @@ function clearSavedSolids() {
 
 // Candidate chains are proven on a sacrificial module instance before the
 // live module runs them.
-const validator = createChainValidator(() => createHolosphereModule());
+const validator = createChainValidator(() => page.createHolosphereModule());
 const { chainIsValid } = validator;
 const opGate = createOpGate(validator);
 
-let gateMsgTimer = null;
+page.gateMsgTimer = null;
 function showGateMsg(text, { persist = true } = {}) {
   const el = document.getElementById('opGateMsg');
   if (!el) return;
   el.innerText = text;
-  clearTimeout(gateMsgTimer);
-  gateMsgTimer = persist ? null : setTimeout(() => { el.innerText = ''; }, 3000);
+  clearTimeout(page.gateMsgTimer);
+  page.gateMsgTimer = persist ? null : setTimeout(() => { el.innerText = ''; }, 3000);
 }
 
 function setOpBlocked(btn, reason) {
@@ -1154,7 +1186,7 @@ function setOpBlocked(btn, reason) {
  * @returns {void}
  */
 function openOpGate(reason) {
-  if (!wasmModule) return;
+  if (!page.wasmModule) return;
   for (const btn of document.querySelectorAll('#addOpGrid [data-op]')) {
     setOpBlocked(btn, null);
   }
@@ -1164,10 +1196,10 @@ function openOpGate(reason) {
 // Gray out add-op buttons whose op would be refused or trap on the current mesh.
 async function refreshOpGating() {
   const buttons = [...document.querySelectorAll('#addOpGrid [data-op]')];
-  const probe = await opGate.refresh(state.base, state.ops,
-    buttons.map((btn) => btn.dataset.op), currentMeshIsCurrent ? currentMesh : null);
+  const probe = await opGate.refresh(page.state.base, page.state.ops,
+    buttons.map((btn) => btn.dataset.op), page.currentMeshIsCurrent ? page.currentMesh : null);
   // A pass landing after the page stood down would re-enable the frozen grid.
-  if (!probe || !wasmModule) return;
+  if (!probe || !page.wasmModule) return;
 
   if (probe.abandoned) {
     openOpGate('the validator module will not start');
@@ -1184,8 +1216,8 @@ async function refreshOpGating() {
 
 // Terminal state drops engine handles and freezes editing and preview.
 function standDown(message) {
-  meshOpsWasm = null;
-  wasmModule = null;
+  page.meshOpsWasm = null;
+  page.wasmModule = null;
   scheduleUpdate.cancel();
   freezeEditing();
   showFatalError(message);
@@ -1201,7 +1233,7 @@ function freezeEditing() {
 
 // The live module is unrecoverable after an engine trap; fail loudly once.
 function engineTrapped(e) {
-  return standDownIfHalted(e, wasmModule, standDown,
+  return standDownIfHalted(e, page.wasmModule, standDown,
     '(The op that caused this slipped past validation; please report the chain.)');
 }
 
@@ -1221,8 +1253,8 @@ function showThumbnailError(message) {
 // Assembled per call: an engine halt nulls the module handles.
 function buildContext(onError = showMeshError) {
   return {
-    Mod: wasmModule,
-    meshOps: meshOpsWasm,
+    Mod: page.wasmModule,
+    meshOps: page.meshOpsWasm,
     vector: (x, y, z) => new THREE.Vector3(x, y, z),
     onError,
     onFatal: standDown,
@@ -1231,19 +1263,19 @@ function buildContext(onError = showMeshError) {
 }
 
 function update() {
-  currentMeshIsCurrent = false;
-  if (!wasmModule || !meshOpsWasm) return;
+  page.currentMeshIsCurrent = false;
+  if (!page.wasmModule || !page.meshOpsWasm) return;
 
-  const built = buildChainMesh(state.base, state.ops, buildContext());
+  const built = buildChainMesh(page.state.base, page.state.ops, buildContext());
   if (!built) return;
 
-  currentMesh = built.meshData;
-  currentMeshIsCurrent = true;
-  currentFaceClasses = built.faceClasses;
-  currentClassifyFailure = built.classifyFailure;
+  page.currentMesh = built.meshData;
+  page.currentMeshIsCurrent = true;
+  page.currentFaceClasses = built.faceClasses;
+  page.currentClassifyFailure = built.classifyFailure;
 
   renderMesh();
-  if (currentClassifyFailure) console.error(currentClassifyFailure);
+  if (page.currentClassifyFailure) console.error(page.currentClassifyFailure);
 
   // The mesh changed, so which ops would now overflow changed too.
   refreshOpGating().catch((e) => {
@@ -1260,30 +1292,30 @@ function updateIndexLabelNotice(capped) {
 
 /** Rebuild the scene from cached mesh data without replaying the op chain. */
 function renderMesh() {
-  const meshData = currentMesh;
-  if (!meshData || !meshRenderer) return;
+  const meshData = page.currentMesh;
+  if (!meshData || !page.meshRenderer) return;
 
-  const { edgeCount, labelsBuilt } = meshRenderer.render(
-    meshData, state, currentFaceClasses);
-  if (labelsBuilt) labelsNeedReproject = true;
-  updateIndexLabelNotice(state.showIndices && meshData.vertices.length >= MAX_INDEX_LABELS);
+  const { edgeCount, labelsBuilt } = page.meshRenderer.render(
+    meshData, page.state, page.currentFaceClasses);
+  if (labelsBuilt) page.labelsNeedReproject = true;
+  updateIndexLabelNotice(page.state.showIndices && meshData.vertices.length >= MAX_INDEX_LABELS);
 
   renderBaseSolid();
-  if (!currentMeshIsCurrent) return;
+  if (!page.currentMeshIsCurrent) return;
   const stats = document.getElementById('meshStats');
-  const statsText = currentClassifyFailure ?? meshStatsLine(meshData, edgeCount);
+  const statsText = page.currentClassifyFailure ?? meshStatsLine(meshData, edgeCount);
   if (stats.textContent !== statsText) stats.textContent = statsText;
   document.getElementById('canvas').setAttribute('aria-label',
-    meshCanvasLabel(formatSolidName(state.base), state.ops.map((o) => o.op),
+    meshCanvasLabel(formatSolidName(page.state.base), page.state.ops.map((o) => o.op),
       meshData, edgeCount));
 }
 
 // Set when labels or viewport change, even if the camera pose is unchanged.
-let labelsNeedReproject = false;
+page.labelsNeedReproject = false;
 // Camera transform from the last projection; updateLabels skips unchanged frames.
 const labelCam = { px: NaN, py: NaN, pz: NaN, qx: NaN, qy: NaN, qz: NaN, qw: NaN };
 function labelCameraMoved() {
-  const p = camera.position, q = camera.quaternion;
+  const p = page.camera.position, q = page.camera.quaternion;
   if (p.x === labelCam.px && p.y === labelCam.py && p.z === labelCam.pz &&
       q.x === labelCam.qx && q.y === labelCam.qy && q.z === labelCam.qz && q.w === labelCam.qw) {
     return false;
@@ -1299,19 +1331,19 @@ const labelSize = new THREE.Vector2();
 // Project vertex-index labels onto the canvas after each render; guarded
 // because the loop starts before init finishes.
 function updateLabels() {
-  if (state.showIndices && currentMesh && labelsContainer && labelsContainer.children.length > 0) {
+  if (page.state.showIndices && page.currentMesh && page.labelsContainer && page.labelsContainer.children.length > 0) {
     const moved = labelCameraMoved();
-    if (!moved && !labelsNeedReproject) return;
-    labelsNeedReproject = false;
+    if (!moved && !page.labelsNeedReproject) return;
+    page.labelsNeedReproject = false;
 
     // The renderer's own size: a bounding-rect read would flush layout.
-    const size = renderer.getSize(labelSize);
+    const size = page.renderer.getSize(labelSize);
     const tempV = new THREE.Vector3();
-    const camPos = camera.position;
+    const camPos = page.camera.position;
 
-    Array.from(labelsContainer.children).forEach(el => {
+    Array.from(page.labelsContainer.children).forEach(el => {
       const i = parseInt(el.dataset.index);
-      const v = currentMesh.vertices[i];
+      const v = page.currentMesh.vertices[i];
       if (v) {
         const dot = v.dot(camPos) - v.lengthSq();
 
@@ -1321,7 +1353,7 @@ function updateLabels() {
         }
 
         tempV.copy(v);
-        tempV.project(camera);
+        tempV.project(page.camera);
 
         if (tempV.z > 1) {
           el.style.display = 'none';

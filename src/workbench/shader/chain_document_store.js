@@ -6,6 +6,9 @@
 
 import { LABEL_PATTERN, declarationFromCatalogField as parameterFromField }
   from '../../../generated/shader/shader_workbench.mjs';
+import {createChainHistory} from './chain_document_history.js';
+import {createChainLegality} from './chain_document_legality.js';
+import {createChainDocumentEdits, refusal} from './chain_document_edits.js';
 import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from './shader_deeplink.js';
 import { MODULATION_OPERATOR, PALETTE_OPERATOR } from './chain_presentation.js';
 
@@ -23,18 +26,6 @@ import { MODULATION_OPERATOR, PALETTE_OPERATOR } from './chain_presentation.js';
 /** @typedef {{operator: CatalogOperator, legal: boolean, reason?: string}} LegalityEntry */
 /** @typedef {{operators: CatalogOperator[]}} SequenceEntry */
 /** @typedef {{id: string, classification: string, storage: string, unit: string, domain: *, interpolation: *, default: *}} ParameterDeclaration */
-
-/**
- * A single-diagnostic edit refusal.
- * @param {string} code - Diagnostic code.
- * @param {string} path - JSON path the refusal is about.
- * @param {string} message - Human-readable reason.
- * @returns {EditResult} The refusal.
- */
-const refusal = (code, path, message) => ({
-  ok: false,
-  diagnostics: [{ severity: 'error', phase: 'edit', code, path, message }],
-});
 
 /**
  * Undo entries one session keeps, each a whole document clone; the oldest is
@@ -231,410 +222,28 @@ export async function createChainDocumentStore({
     /** @type {CatalogOperator} */ (operators.get(entry.operator));
   /** @param {CatalogOperator} op */
   const isEndomorphism = (op) => op.input === op.output;
-  /** @param {number} index */
-  const carrierBefore = (index) =>
-    index === 0 ? entryCarrier : operatorOf(chain()[index - 1]).output;
-  /** @param {number} index */
-  const carrierAfter = (index) =>
-    index === chain().length ? exitCarrier : operatorOf(chain()[index]).input;
-
   // Session state may only name a live endomorphism (selection: any live label).
-  const pruneSession = () => {
-    const live = new Map(chain().map((entry) => [entry.label, operatorOf(entry)]));
-    if (selected !== null && !live.has(selected)) selected = null;
-    for (const label of [...bypassed]) {
-      const op = live.get(label);
-      if (op === undefined || !isEndomorphism(op)) bypassed.delete(label);
-    }
+  /** @type {import('./chain_document_history.js').ChainSession} */
+  const sessionState = {
+    get doc() { return doc; },
+    set doc(value) { doc = value; },
+    get selected() { return selected; },
+    set selected(value) { selected = value; },
+    get coalesceKey() { return coalesceKey; },
+    set coalesceKey(value) { coalesceKey = value; },
+    get bypassed() { return bypassed; },
+    get undoStack() { return undoStack; },
+    get redoStack() { return redoStack; },
   };
+  const {commit, history} = createChainHistory({state: sessionState, chain,
+    operatorOf, isEndomorphism, diagnosticsOf, undoDepth: UNDO_DEPTH});
 
-  /**
-   * Validates a candidate and, when green, makes it current under one undo
-   * entry. A refused candidate is discarded whole.
-   * @param {*} candidate - The reconciled document to adopt.
-   * @param {string|null} [coalesce] - Control key consecutive commits share one
-   *   undo entry under, so a slider drag's stream of writes is undone whole.
-   *   Null for a structural edit, which also ends any open run.
-   * @param {(() => EditResult)|null} [admit] - Admission after document validation.
-   * @returns {EditResult} The outcome.
-   * @details History past UNDO_DEPTH entries is dropped oldest first. Redo
-   * entries only ever come off the undo stack, so the pair stays within it.
-   */
-  const commit = (candidate, coalesce = null, admit = null) => {
-    const diagnostics = diagnosticsOf(candidate);
-    if (diagnostics.length > 0) return { ok: false, diagnostics };
-    const admission = admit?.();
-    if (admission && !admission.ok) return admission;
-    if (coalesce === null || coalesce !== coalesceKey) {
-      undoStack.push(doc);
-      if (undoStack.length > UNDO_DEPTH) undoStack.shift();
-    }
-    coalesceKey = coalesce;
-    redoStack.length = 0;
-    doc = candidate;
-    pruneSession();
-    return { ok: true };
-  };
+  const {budgetReason, spanError, spanLegality, legalSequences} = createChainLegality({
+    compiler, budgets, catalog, entryCarrier, exitCarrier, chain, operatorOf});
 
-  /** @param {CatalogOperator[]} ops @returns {string|null} */
-  const budgetReason = (ops) => compiler.chainBudgetReasons(ops, budgets)[0] ?? null;
-
-  /**
-   * @param {number} start - First chain index of the span.
-   * @param {number} deleteCount - Entries the span covers.
-   * @returns {string|null} Why the span is malformed, or null.
-   */
-  const spanError = (start, deleteCount) => {
-    if (!Number.isInteger(start) || !Number.isInteger(deleteCount) ||
-        start < 0 || deleteCount < 0 || start + deleteCount > chain().length)
-      return `a span needs integer bounds inside the ${chain().length}-entry chain`;
-    return null;
-  };
-
-  /**
-   * Every catalog operator's legality as a one-operator replacement of the
-   * span: carrier agreement with the span's neighbors (chain entry and exit
-   * at the ends) plus the declared budgets over the resulting chain.
-   * @param {number} start - First chain index of the span.
-   * @param {number} deleteCount - Entries the span covers (0 = insertion).
-   * @returns {LegalityEntry[]} One entry per catalog operator, in catalog order.
-   * @throws {RangeError} If the span bounds are not integer positions inside the chain.
-   */
-  const spanLegality = (start, deleteCount) => {
-    const error = spanError(start, deleteCount);
-    if (error !== null) throw new RangeError(`chain document store: ${error}`);
-    const before = carrierBefore(start);
-    const after = carrierAfter(start + deleteCount);
-    const kept = chain().map(operatorOf);
-    kept.splice(start, deleteCount);
-    return catalog.operators.map((/** @type {CatalogOperator} */ op) => {
-      if (op.input !== before) {
-        return { operator: op, legal: false,
-          reason: `consumes the ${op.input} carrier; the chain carries ${before} here` };
-      }
-      if (op.output !== after) {
-        return { operator: op, legal: false,
-          reason: `produces the ${op.output} carrier; the chain needs ${after} here` };
-      }
-      const reason = budgetReason([...kept.slice(0, start), op, ...kept.slice(start)]);
-      if (reason !== null) return { operator: op, legal: false, reason };
-      return { operator: op, legal: true };
-    });
-  };
-
-  /**
-   * Every legal sequence of at most `maxLength` operators that replaces the
-   * span, shortest first and in catalog order within a length. A sequence is
-   * either the empty removal, one operator the span's neighbors accept, or a
-   * run of crossings carrying the chain from the span's entry carrier to its
-   * exit while crossing each carrier at most once. Every candidate is costed
-   * against the declared budgets.
-   * @param {number} start - First chain index of the span.
-   * @param {number} deleteCount - Entries the span covers (0 = insertion).
-   * @param {number} maxLength - Longest sequence to enumerate.
-   * @returns {SequenceEntry[]} The legal sequences.
-   * @throws {RangeError} If the span bounds are not integer positions inside the chain.
-   */
-  const legalSequences = (start, deleteCount, maxLength) => {
-    const error = spanError(start, deleteCount);
-    if (error !== null) throw new RangeError(`chain document store: ${error}`);
-    const before = carrierBefore(start);
-    const after = carrierAfter(start + deleteCount);
-    const kept = chain().map(operatorOf);
-    kept.splice(start, deleteCount);
-    /** @type {CatalogOperator[][]} */
-    const candidates = [];
-    if (before === after) candidates.push([]);
-    if (maxLength >= 1) {
-      for (const op of catalog.operators)
-        if (op.input === before && op.output === after) candidates.push([op]);
-    }
-    /** @type {{ops: CatalogOperator[], carrier: string, seen: Set<string>}[]} */
-    let frontier = [{ ops: [], carrier: before, seen: new Set([before]) }];
-    for (let length = 1; length <= maxLength && frontier.length > 0; length += 1) {
-      /** @type {typeof frontier} */
-      const next = [];
-      for (const node of frontier) {
-        for (const op of catalog.operators) {
-          if (op.input !== node.carrier || op.input === op.output) continue;
-          if (node.seen.has(op.output)) continue;
-          const ops = [...node.ops, op];
-          // The exit carrier ends the run: nothing may leave it and return.
-          if (op.output === after) {
-            if (length >= 2) candidates.push(ops);
-            continue;
-          }
-          next.push({ ops, carrier: op.output, seen: new Set([...node.seen, op.output]) });
-        }
-      }
-      frontier = next;
-    }
-    return candidates
-      .filter((ops) => budgetReason(
-        [...kept.slice(0, start), ...ops, ...kept.slice(start)]) === null)
-      .map((operators) => ({ operators }));
-  };
-
-  /**
-   * Strips the removed instances from parameters, serialization fields,
-   * staggered path-policy groups and every preset.
-   * @param {*} candidate - Document being reconciled.
-   * @param {string[]} labels - Labels leaving the chain.
-   */
-  const removeInstances = (candidate, labels) => {
-    const prefixes = labels.map((label) => `${label}.`);
-    /** @param {string} id */
-    const owned = (id) => prefixes.some((prefix) => id.startsWith(prefix));
-    const descriptor = candidate.descriptor;
-    descriptor.parameters = descriptor.parameters.filter(
-      (/** @type {{id: string}} */ parameter) => !owned(parameter.id));
-    descriptor.serialization.fields = descriptor.serialization.fields.filter(
-      (/** @type {string} */ id) => !owned(id));
-    // A staggered group names a parameter's shared interpolation group where it
-    // declares one and its id otherwise, so an instance prefix does not name
-    // every group its removal strands.
-    const groups = new Set(descriptor.parameters.map(
-      (/** @type {{id: string, interpolation?: {group?: string}}} */ parameter) =>
-        parameter.interpolation?.group ?? parameter.id));
-    for (const policy of descriptor.path_policies) {
-      if (policy.kind === 'STAGGERED_ORDERED')
-        policy.groups = policy.groups.filter((/** @type {string} */ group) => groups.has(group));
-    }
-    for (const preset of candidate.preset_bank.presets) {
-      for (const key of Object.keys(preset.values))
-        if (owned(key)) delete preset.values[key];
-    }
-  };
-
-  /** @param {*} candidate @param {ParameterDeclaration} parameter */
-  const addParameter = (candidate, parameter) => {
-    candidate.descriptor.parameters.push(parameter);
-    candidate.descriptor.serialization.fields.push(parameter.id);
-    // A staggered group names a parameter's shared interpolation group where
-    // it declares one and its id otherwise; sharers contribute one group.
-    const group = parameter.interpolation.group ?? parameter.id;
-    for (const policy of candidate.descriptor.path_policies) {
-      if (policy.kind === 'STAGGERED_ORDERED' && !policy.groups.includes(group))
-        policy.groups.push(group);
-    }
-    for (const preset of candidate.preset_bank.presets)
-      preset.values[parameter.id] = parameter.default;
-  };
-
-  /**
-   * Declares the operator's full catalog schema for an added instance.
-   * Declarations snapshotted from the loaded document supply authored defaults;
-   * remaining fields use catalog defaults. Every preset receives those defaults.
-   * @param {*} candidate - Document being reconciled.
-   * @param {ChainEntry} entry - The added chain entry.
-   */
-  const addInstance = (candidate, entry) => {
-    const op = /** @type {CatalogOperator} */ (operators.get(entry.operator));
-    const templates = new Map((declarationTemplates.get(entry.operator) ?? []).map(
-      (template) => [template.parameter.id.slice(template.label.length + 1), template]));
-    const parameters = op.params.map((field) => {
-      const template = templates.get(field.id);
-      if (template === undefined) return parameterFromField(entry.label, field, entry.operator);
-      const parameter = structuredClone(template.parameter);
-      const prefix = `${template.label}.`;
-      parameter.id = `${entry.label}.${parameter.id.slice(prefix.length)}`;
-      if (parameter.interpolation.group?.startsWith(prefix)) {
-        parameter.interpolation.group =
-          `${entry.label}.${parameter.interpolation.group.slice(prefix.length)}`;
-      }
-      return parameter;
-    });
-    for (const parameter of parameters) addParameter(candidate, parameter);
-  };
-
-  /** @param {*} candidate */
-  const dropDegenerateEdges = (candidate) => {
-    const previous = new Map(doc.preset_bank.presets.map(
-      (/** @type {{preset_id: string, values: Object}} */ preset) =>
-        [preset.preset_id, compiler.stableStringify(preset.values)]));
-    const signatures = new Map(candidate.preset_bank.presets.map(
-      (/** @type {{preset_id: string, values: Object}} */ preset) =>
-        [preset.preset_id, compiler.stableStringify(preset.values)]));
-    candidate.preset_bank.edges = candidate.preset_bank.edges.filter(
-      (/** @type {{from: string, to: string}} */ edge) =>
-        previous.get(edge.from) === previous.get(edge.to) ||
-        signatures.get(edge.from) !== signatures.get(edge.to));
-  };
-
-  /**
-   * The one structural mutation: replaces a contiguous span of the chain with
-   * a catalog sequence, reconciles the whole document (backfill added
-   * instances, strip removed ones, drop degenerate transition edges) and
-   * commits only if the result passes the v2 validator. An entry whose label
-   * survives with the same operator keeps its parameter values; a label
-   * omitted from a sequence entry takes the operator's stem, numbered from
-   * 1 only where the stem is taken. A replacement that leaves the chain
-   * as it stands changes nothing and pushes no undo entry.
-   * @param {number} start - First chain index of the span.
-   * @param {number} deleteCount - Entries the span replaces (0 = insertion).
-   * @param {ChainEdit[]} sequence - Replacement entries; [] removes the span.
-   * @returns {EditResult} The outcome; a refusal leaves the store untouched.
-   */
-  const replaceSpan = (start, deleteCount, sequence) => {
-    const error = spanError(start, deleteCount);
-    if (error !== null) return refusal('INVALID_SPAN', '$.descriptor.chain', error);
-    if (!Array.isArray(sequence))
-      return refusal('INVALID_SEQUENCE', '$.descriptor.chain',
-        'a replacement sequence is an array of {label?, operator} entries');
-    const current = chain();
-    const used = new Set([
-      ...current.slice(0, start),
-      ...current.slice(start + deleteCount),
-    ].map((entry) => entry.label));
-    for (const item of sequence) {
-      if (item && typeof item === 'object' && item.label !== undefined) used.add(item.label);
-    }
-    /** @type {ChainEntry[]} */
-    const entries = [];
-    for (const item of sequence) {
-      if (item === null || typeof item !== 'object' || typeof item.operator !== 'string')
-        return refusal('INVALID_SEQUENCE', '$.descriptor.chain',
-          'a replacement sequence is an array of {label?, operator} entries');
-      if (!operators.has(item.operator))
-        return refusal('UNKNOWN_OPERATOR', '$.descriptor.chain',
-          `the catalog carries no operator "${item.operator}"`);
-      let label = item.label;
-      if (label === undefined) {
-        const stem = labelStem(item.operator);
-        label = stem;
-        for (let suffix = 1; used.has(label); suffix += 1) label = `${stem}${suffix}`;
-      }
-      used.add(label);
-      entries.push({ label, operator: item.operator });
-    }
-
-    const newChain = [
-      ...current.slice(0, start).map((entry) => ({ ...entry })),
-      ...entries,
-      ...current.slice(start + deleteCount).map((entry) => ({ ...entry })),
-    ];
-    if (newChain.length === current.length && newChain.every((entry, index) =>
-      entry.label === current[index].label && entry.operator === current[index].operator))
-      return { ok: true };
-
-    const newOps = new Map(newChain.map((entry) => [entry.label, entry.operator]));
-    if (newOps.size !== newChain.length) {
-      return refusal('DUPLICATE_LABEL', '$.descriptor.chain',
-        'the edited chain repeats an instance label');
-    }
-    const budget = budgetReason(newChain.map(operatorOf));
-    if (budget !== null)
-      return refusal('BUDGET_EXCEEDED', '$.descriptor.chain', budget);
-
-    // A label kept under a different operator is a fresh instance: its old
-    // values are dropped and the new operator's defaults backfilled.
-    const oldOps = new Map(current.map((entry) => [entry.label, entry.operator]));
-    const removed = [...oldOps.keys()].filter(
-      (label) => newOps.get(label) !== oldOps.get(label));
-    const added = newChain.filter((entry) => oldOps.get(entry.label) !== entry.operator);
-
-    const candidate = structuredClone(doc);
-    candidate.descriptor.chain = newChain;
-    if (removed.length > 0) removeInstances(candidate, removed);
-    try {
-      for (const entry of added) addInstance(candidate, entry);
-    } catch (error) {
-      return refusal('INVALID_CATALOG_FIELD', '$.descriptor.chain',
-        error instanceof Error ? error.message : String(error));
-    }
-    if (removed.length > 0) dropDegenerateEdges(candidate);
-    return commit(candidate);
-  };
-
-  /**
-   * Renames one instance, rewriting every `<label>.<field>` id in place across
-   * parameters, presets, staggered path-policy groups and serialization
-   * fields. Selection and bypass follow the rename.
-   * @param {string} oldLabel - The instance's current label.
-   * @param {string} newLabel - The label to adopt.
-   * @returns {EditResult} The outcome; a refusal leaves the store untouched.
-   */
-  const relabel = (oldLabel, newLabel) => {
-    if (!chain().some((entry) => entry.label === oldLabel))
-      return refusal('UNKNOWN_LABEL', '$.descriptor.chain',
-        `no chain entry is labeled "${oldLabel}"`);
-    if (typeof newLabel !== 'string' || !LABEL_PATTERN.test(newLabel))
-      return refusal('INVALID_LABEL', '$.descriptor.chain',
-        'an instance label is a single kebab-case segment');
-    if (newLabel === oldLabel) return { ok: true };
-    if (chain().some((entry) => entry.label === newLabel))
-      return refusal('DUPLICATE_LABEL', '$.descriptor.chain',
-        `the chain already carries an instance labeled "${newLabel}"`);
-    const prefix = `${oldLabel}.`;
-    /** @param {string} id */
-    const rewrite = (id) =>
-      id.startsWith(prefix) ? `${newLabel}.${id.slice(prefix.length)}` : id;
-    const candidate = structuredClone(doc);
-    for (const entry of candidate.descriptor.chain)
-      if (entry.label === oldLabel) entry.label = newLabel;
-    for (const parameter of candidate.descriptor.parameters) {
-      parameter.id = rewrite(parameter.id);
-      if (typeof parameter.interpolation.group === 'string')
-        parameter.interpolation.group = rewrite(parameter.interpolation.group);
-    }
-    candidate.descriptor.serialization.fields =
-      candidate.descriptor.serialization.fields.map(rewrite);
-    for (const policy of candidate.descriptor.path_policies) {
-      if (policy.kind === 'STAGGERED_ORDERED')
-        policy.groups = policy.groups.map(rewrite);
-    }
-    for (const preset of candidate.preset_bank.presets) {
-      preset.values = Object.fromEntries(Object.entries(preset.values)
-        .map(([id, value]) => [rewrite(id), value]));
-    }
-    const followBypass = bypassed.has(oldLabel);
-    const followSelection = selected === oldLabel;
-    const result = commit(candidate);
-    if (result.ok) {
-      if (followBypass) bypassed.add(newLabel);
-      if (followSelection) selected = newLabel;
-    }
-    return result;
-  };
-
-  /**
-   * Writes one preset's values for one or more parameters atomically through
-   * the same validator and history as a structural edit. Consecutive writes to
-   * the same preset and identical ordered parameter IDs collapse into one undo
-   * entry; any other edit, undo or redo ends the run.
-   * @param {string} presetId - The preset the values belong to.
-   * @param {Object<string, *>} values - Catalog parameter IDs and their values; enum8 takes its option id.
-   * @param {(() => EditResult)|null} [admit] - Admission before changing document or history.
-   * @returns {EditResult} The outcome; a refusal leaves the store untouched.
-   */
-  const setPresetValues = (presetId, values, admit = null) => {
-    const index = doc.preset_bank.presets.findIndex(
-      (/** @type {{preset_id: string}} */ preset) => preset.preset_id === presetId);
-    if (index < 0)
-      return refusal('UNKNOWN_PRESET', '$.preset_bank.presets',
-        `the preset bank carries no preset "${presetId}"`);
-    const candidate = structuredClone(doc);
-    for (const [parameterId, value] of Object.entries(values)) {
-      if (!candidate.descriptor.parameters.some(
-        (/** @type {{id: string}} */ parameter) => parameter.id === parameterId)) {
-        const entry = chain().find((entry) => parameterId.startsWith(`${entry.label}.`));
-        const field = entry && operatorOf(entry).params.find(
-          (field) => `${entry.label}.${field.id}` === parameterId);
-        if (!entry || !field)
-          return refusal('UNKNOWN_PARAMETER', '$.descriptor.parameters',
-            `the catalog carries no parameter "${parameterId}" for this chain`);
-        addParameter(candidate, parameterFromField(entry.label, field, entry.operator));
-      }
-      candidate.preset_bank.presets[index].values[parameterId] = value;
-    }
-    return commit(candidate, `${presetId} ${Object.keys(values).join(' ')}`, admit);
-  };
-
-  /** Stores one preset value in a coalesced control edit.
-   * @param {string} presetId @param {string} parameterId @param {*} value
-   * @param {(() => EditResult)|null} [admit] @returns {EditResult} */
-  const setPresetValue = (presetId, parameterId, value, admit = null) =>
-    setPresetValues(presetId, { [parameterId]: value }, admit);
+  const {removeInstances, dropDegenerateEdges, replaceSpan, relabel, setPresetValues,
+    setPresetValue} = createChainDocumentEdits({state: sessionState, operators,
+    declarationTemplates, compiler, chain, operatorOf, labelStem, spanError, budgetReason, commit});
 
   return {
     /** @returns {*} An isolated copy of the current (always-valid) document. */
@@ -778,41 +387,7 @@ export async function createChainDocumentStore({
     setPresetValue,
     setPresetValues,
 
-    /** Ends a control's coalesced value run so its next gesture opens a new entry. */
-    endValueRun: () => { coalesceKey = null; },
-
-    /** @returns {boolean} Whether an edit or coalesced value run can be undone. */
-    canUndo: () => undoStack.length > 0,
-
-    /** @returns {boolean} Whether an undone edit can be reapplied. */
-    canRedo: () => redoStack.length > 0,
-
-    /**
-     * Reverts the last edit or coalesced value run, reconciliation included.
-     * Selection and bypass are session state, not history: they are pruned
-     * against the restored chain, never restored.
-     * @returns {boolean} Whether an edit was undone.
-     */
-    undo: () => {
-      const previous = undoStack.pop();
-      if (previous === undefined) return false;
-      redoStack.push(doc);
-      doc = previous;
-      coalesceKey = null;
-      pruneSession();
-      return true;
-    },
-
-    /** @returns {boolean} Whether an undone edit was reapplied. */
-    redo: () => {
-      const next = redoStack.pop();
-      if (next === undefined) return false;
-      undoStack.push(doc);
-      doc = next;
-      coalesceKey = null;
-      pruneSession();
-      return true;
-    },
+    ...history,
   };
 }
 

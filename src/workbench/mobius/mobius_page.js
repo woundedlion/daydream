@@ -232,9 +232,9 @@ const startPreset = (preset) => {
   }
 };
 
-const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
+function createComplexPlaneElements(id, maxExtent) {
   const container = document.getElementById(`${id}_control_container`);
-  if (!container) return;
+  if (!container) return null;
 
   const controlId = `${id}_plane`;
   const dotId = `${id}_dot`;
@@ -276,6 +276,11 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
   const labelElement = makeDiv('complex-plane-label', labelId);
   container.replaceChildren(planeElement, labelElement);
 
+  return {planeElement, reElement, imElement, labelElement, dotElement};
+}
+
+function createComplexPlanePainter(paramObj, maxExtent,
+  {reElement, imElement, labelElement, dotElement}) {
   let lastLabel = null, lastLeft = null, lastTop = null;
   const updateUI = () => {
     const re = paramObj.re;
@@ -305,6 +310,17 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
       lastTop = top;
     }
   };
+
+  return updateUI;
+}
+
+const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
+  const elements = createComplexPlaneElements(id, maxExtent);
+  if (!elements) return;
+  const {planeElement, reElement, imElement, labelElement, dotElement} = elements;
+
+  const updateUI = createComplexPlanePainter(paramObj, maxExtent,
+    {reElement, imElement, labelElement, dotElement});
 
   uiUpdaters[id] = updateUI;
 

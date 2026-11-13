@@ -5,6 +5,7 @@
 
 /** Conservative fold estimates on field-strength controls. */
 
+import { describeBy } from '../shared/aria_description.js';
 import { focusWidget } from './effect_panel_view.js';
 
 /**
@@ -27,10 +28,7 @@ export function syncParamAdvisories(controllers, advisories) {
       root.classList.remove('param-fold-advisory');
       if (note) {
         const noteId = note.id;
-        const described = (widget.getAttribute('aria-describedby') ?? '').split(' ')
-          .filter((id) => id && id !== noteId);
-        if (described.length) widget.setAttribute('aria-describedby', described.join(' '));
-        else widget.removeAttribute('aria-describedby');
+        describeBy(widget, noteId, false);
         note.remove();
       }
       continue;
@@ -45,8 +43,7 @@ export function syncParamAdvisories(controllers, advisories) {
       note.className = 'param-fold-note';
       note.id = `param-fold-${encodeURIComponent(name)}`;
       root.appendChild(note);
-      const described = widget.getAttribute('aria-describedby');
-      widget.setAttribute('aria-describedby', [described, note.id].filter(Boolean).join(' '));
+      describeBy(widget, note.id);
     }
     const text = `Folds may appear above strength ${estimate.toPrecision(3)} in magnitude. Shaded values remain available.`;
     if (note.textContent !== text) note.textContent = text;

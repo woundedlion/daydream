@@ -20,7 +20,9 @@
     "skipLibCheck": true,
     "types": [],
     "paths": {
-      "lil-gui": ["./node_modules/lil-gui/dist/lil-gui.esm.d.ts"]
+      "lil-gui": [
+        "./node_modules/lil-gui/dist/lil-gui.esm.d.ts"
+      ]
     }
   },
   "files": [
@@ -126,6 +128,44 @@
     "src/recording/recording_controls.js",
     "src/ui/effect_panel_view.js",
     "src/effects/effect_identity.js",
-    "src/effects/effect_roster.js"
+    "src/effects/effect_roster.js",
+    "src/renderer/driver_capture.js",
+    "src/renderer/driver_context.js",
+    "src/renderer/driver_dots.js",
+    "src/renderer/driver_input.js",
+    "src/renderer/driver_labels.js",
+    "src/renderer/driver_views.js",
+    "src/renderer/label_pool.js",
+    "src/shared/aria_description.js",
+    "src/shared/dom.js",
+    "src/ui/effect_param_controllers.js",
+    "src/ui/readonly_number_adapter.js",
+    "src/workbench/shader/chain_chip_drag.js",
+    "src/workbench/shader/chain_selection.js",
+    "src/workbench/shader/chain_viewport.js",
+    "src/app/app_boot.js",
+    "src/app/app_context.js",
+    "src/app/app_controls.js",
+    "src/app/app_effects.js",
+    "src/app/app_engine_controls.js",
+    "src/app/app_frame_loop.js",
+    "src/app/app_instances.js",
+    "src/app/app_route_state.js",
+    "src/app/app_segments.js",
+    "src/app/app_shader_documents.js",
+    "src/app/app_shell.js",
+    "src/app/app_teardown.js",
+    "src/effects/effect_apply_helpers.js",
+    "src/renderer/driver_pov.js",
+    "src/ui/effect_action_feedback.js",
+    "src/workbench/palettes/hue_key_handles.js",
+    "src/workbench/palettes/strip_copy_feedback.js",
+    "src/workbench/shader/chain_row_controls.js",
+    "src/workbench/shader/chain_document_edits.js",
+    "src/workbench/shader/chain_document_history.js",
+    "src/workbench/shader/chain_document_legality.js",
+    "src/workbench/shader/shader_document_edits.js",
+    "src/workbench/shader/shader_document_loader.js",
+    "src/workbench/shader/shader_document_persistence.js"
   ]
 }

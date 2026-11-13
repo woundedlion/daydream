@@ -10,7 +10,7 @@ import {
 import { EFFECT_IDENTITIES } from '../generated/engine_contract.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 import { getActiveURLSync, URL_FLUSH_DEBOUNCE_MS } from '../src/app/state.js';
 import { pageWarmer } from '../src/segments/module_warmer.js';
@@ -388,7 +388,9 @@ test('resolution rollback restores an unpaused animated parameter snapshot', asy
 });
 
 test('the segmented controls have their own notice owner', async (t) => {
-  const source = readFileSync(new URL('../src/app/daydream.js', import.meta.url), 'utf8');
+  const directory = new URL('../src/app/', import.meta.url);
+  const source = readdirSync(directory).filter((name) => name.endsWith('.js'))
+    .map((name) => readFileSync(new URL(name, directory), 'utf8')).join('\n');
   const owners = [...source.matchAll(/const \w+_NOTICE = '([^']+)'/g)].map((match) => match[1]);
   assert.ok(owners.length > 1);
   assert.equal(new Set(owners).size, owners.length);

@@ -10,7 +10,7 @@ const PALETTE_MARGIN = 8;
 const PALETTE_GAP = 4;
 
 /**
- * @param {{doc: *, el: (tag: string, classes: string) => *,
+ * @param {{doc: *, el: import('./chain_row_controls.js').ElementFactory,
  *   store: import('./chain_document_store.js').ChainStore,
  *   presentation: ReturnType<typeof import('./chain_presentation.js').createChainPresentation>,
  *   commit: (label: string|null) => boolean,

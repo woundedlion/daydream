@@ -12,6 +12,8 @@ import { enumChoices, paramControlKind } from "../effects/param_sync.js";
 import { focusWidget } from './effect_panel_view.js';
 import { stageControlLabel } from "../effects/shader_stages.js";
 import { float32Decimal } from '../shared/cpp_format.js';
+import { describeBy } from '../shared/aria_description.js';
+import { updateReadonlyNumber } from './readonly_number_adapter.js';
 export { stageGrouping } from "../effects/shader_stages.js";
 
 /** Engine toggles omit the range fields.
@@ -118,7 +120,7 @@ export function addParamControl(
     controller.domElement.appendChild(note);
     controller.domElement.classList.add('param-warning');
     widget.setAttribute('aria-invalid', 'true');
-    widget.setAttribute('aria-describedby', [widget.getAttribute('aria-describedby'), note.id].filter(Boolean).join(' '));
+    describeBy(widget, note.id);
   }
   return controller;
 }
@@ -131,13 +133,7 @@ export function addParamControl(
 export function presentReadonlyParam(controller) {
   controller.isReadonly = true;
   if (controller.isContinuous) {
-    const updateDisplay = controller.updateDisplay.bind(controller);
-    controller.updateDisplay = () => {
-      const inputFocused = controller._inputFocused;
-      controller._inputFocused = false;
-      try { return updateDisplay(); }
-      finally { controller._inputFocused = inputFocused; }
-    };
+    updateReadonlyNumber(controller);
   }
   controller.domElement.classList.add('param-readonly');
   for (const type of ['mousedown', 'touchstart', 'wheel']) {

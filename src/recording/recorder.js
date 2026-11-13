@@ -92,6 +92,26 @@ export function selectMimeType(
  * }} VideoSink
  */
 
+/**
+ * @typedef {object} StreamingSession
+ * @property {MediaRecorder} recorder
+ * @property {string} effectName
+ * @property {Blob[]} chunks
+ * @property {number} bitrateMbps
+ * @property {string} filename
+ * @property {string} ext
+ * @property {(message: string, cause: unknown) => void} saveFailure
+ * @property {FileSystemFileHandle|null} handle
+ * @property {FileSystemWritableFileStream|null} writable
+ * @property {boolean} failed
+ * @property {number} backlogBytes
+ * @property {boolean} overflowed
+ * @property {number} maxBacklogBytes
+ * @property {(data: Blob) => void} hold
+ * @property {Promise<void>} opened
+ * @property {Promise<void>} chain
+ */
+
 export class VideoRecorder {
   /**
    * Constructs a recorder bound to a source canvas.
@@ -257,6 +277,23 @@ export class VideoRecorder {
       return;
     }
 
+    const capture = this.createCaptureStream(captureSource);
+    if (!capture) return;
+    const {stream, track} = capture;
+
+    // One latch for the encoder and the sink's backlog bound: a host may leave
+    // the field unset or non-numeric, and both must read the same real number.
+    const bitrateMbps = this.bitrateMbps > 0 ? this.bitrateMbps
+      : DEFAULT_BITRATE_MBPS;
+
+    const selected = this.createMediaRecorder(stream, bitrateMbps);
+    if (!selected) return;
+    const {recorder, notifyFallback} = selected;
+    this.beginRecordingSession({recorder, stream, track, effectName, bitrateMbps, notifyFallback});
+  }
+
+  /** @param {HTMLCanvasElement} captureSource */
+  createCaptureStream(captureSource) {
     // framerate 0: manual frame-request mode, frames are captured on
     // requestFrame(). Browsers without requestFrame would record an empty video
     // in that mode, so fall back to a timed captureStream at the frame rate.
@@ -275,26 +312,25 @@ export class VideoRecorder {
       }
     } catch (err) {
       this.abandonStart(stream, 'captureStream failed; recording aborted.', err);
-      return;
+      return null;
     }
 
-    // No video track means captureFrame would silently no-op the whole session.
     if (!track) {
       this.abandonStart(stream, 'capture stream produced no video track; recording aborted.');
-      return;
+      return null;
     }
 
-    // One latch for the encoder and the sink's backlog bound: a host may leave
-    // the field unset or non-numeric, and both must read the same real number.
-    const bitrateMbps = this.bitrateMbps > 0 ? this.bitrateMbps
-      : DEFAULT_BITRATE_MBPS;
+    return {stream, track};
+  }
 
+  /** @param {MediaStream} stream @param {number} bitrateMbps */
+  createMediaRecorder(stream, bitrateMbps) {
     let mimeType;
     try {
       mimeType = selectMimeType(this.format);
     } catch (err) {
       this.abandonStart(stream, 'MediaRecorder format probing failed.', err);
-      return;
+      return null;
     }
 
     // An explicitly-chosen container with no supported codec falls back to the
@@ -312,10 +348,16 @@ export class VideoRecorder {
       recorder = new MediaRecorder(stream, options);
     } catch (err) {
       this.abandonStart(stream, 'MediaRecorder construction failed.', err);
-      return;
+      return null;
     }
     const notifyFallback = !mimeType && this.format !== 'auto';
 
+    return {recorder, notifyFallback};
+  }
+
+  /** @param {{recorder: MediaRecorder, stream: MediaStream, track: CaptureTrack,
+   * effectName: string, bitrateMbps: number, notifyFallback: boolean}} session */
+  beginRecordingSession({recorder, stream, track, effectName, bitrateMbps, notifyFallback}) {
     // ondataavailable/onstop/onerror fire after a fast stop→start may have installed
     // a new session, so the closures bind the per-session chunks/stream/recorder/sink
     // rather than read this.*.
@@ -634,6 +676,14 @@ export class VideoRecorder {
    * @param {number} bitrateMbps @returns {VideoSink} The file sink with a bounded download fallback.
    */
   streamingSink(recorder, effectName, chunks, bitrateMbps) {
+    const session = this.openStreamingSession(recorder, effectName, chunks, bitrateMbps);
+    return {ready: session.opened,
+      write: (data) => this.writeStreamingChunk(session, data),
+      finish: () => this.finishStreamingSession(session)};
+  }
+
+  /** @param {MediaRecorder} recorder @param {string} effectName @param {Blob[]} chunks @param {number} bitrateMbps */
+  openStreamingSession(recorder, effectName, chunks, bitrateMbps) {
     // The picker needs the user gesture; a browser-default type may still be unknown.
     const ext = recorder.mimeType ? this.extension(recorder) : 'video';
     const filename = this.timestampedName(effectName, ext);
@@ -643,25 +693,24 @@ export class VideoRecorder {
       this.onSaveError?.(new Error(message, { cause }), filename);
     };
 
-    /** @type {FileSystemFileHandle|null} */
-    let handle = null;
-    /** @type {FileSystemWritableFileStream|null} */
-    let writable = null;
-    let failed = false;
-    let backlogBytes = 0;
-    let overflowed = false;
-    const maxBacklogBytes = (bitrateMbps * 1_000_000 / 8) * WRITE_BACKLOG_SECONDS;
-    const hold = this.boundedBuffer(recorder, chunks, 'the streaming save was unavailable');
-    const opened = globalThis.showSaveFilePicker({
-      suggestedName: filename,
-      ...(recorder.mimeType ? { types: [{ description: 'Video',
-        accept: { [this.mimeForExt(ext)]: [`.${ext}`] } }] } : {}),
+    /** @type {StreamingSession} */
+    const session = {
+      recorder, effectName, chunks, bitrateMbps, filename, ext, saveFailure,
+      handle: null, writable: null, failed: false, backlogBytes: 0, overflowed: false,
+      maxBacklogBytes: (bitrateMbps * 1_000_000 / 8) * WRITE_BACKLOG_SECONDS,
+      hold: this.boundedBuffer(recorder, chunks, 'the streaming save was unavailable'),
+      opened: Promise.resolve(), chain: Promise.resolve(),
+    };
+    session.opened = globalThis.showSaveFilePicker({
+      suggestedName: session.filename,
+      ...(session.recorder.mimeType ? { types: [{ description: 'Video',
+        accept: { [this.mimeForExt(session.ext)]: [`.${session.ext}`] } }] } : {}),
     })
-      .then((h) => { handle = h; })
+      .then((h) => { session.handle = h; })
       .catch((err) => {
         if (err?.name === 'AbortError') {
           // Stop and notify the host only if this recorder still owns the cancelled session.
-          if (this.stopLive(recorder)) {
+          if (this.stopLive(session.recorder)) {
             notifyHost(() => this.reportFailure('the Save dialog was cancelled, so nothing was saved.'));
           }
         } else {
@@ -669,98 +718,97 @@ export class VideoRecorder {
             new Error('Streaming save unavailable; saving to Downloads instead.', { cause: err })));
         }
       });
+    return session;
+  }
 
-    // Serialize chunks; create the writable on the first chunk, preserving files for empty sessions.
-    let chain = Promise.resolve();
-    return {
-      ready: opened,
-      write: (data) => {
-        if (overflowed || failed) return;
-        if (!handle && backlogBytes === 0) { hold(data); return; }
-        if (backlogBytes + data.size > maxBacklogBytes) {
-          overflowed = true;
-          if (this.stopLive(recorder)) {
-            this.reportFailure(
-              'the streaming save could not keep up '
-              + `while ${Math.round(maxBacklogBytes / 1_000_000)} MB of video `
-              + `(${WRITE_BACKLOG_SECONDS}s at ${bitrateMbps} Mbps) piled up in memory. `
-              + 'Queued video will be saved if writing completes.');
-          }
+  /** @param {StreamingSession} session @param {Blob} data */
+  writeStreamingChunk(session, data) {
+    if (session.overflowed || session.failed) return;
+    if (!session.handle && session.backlogBytes === 0) { session.hold(data); return; }
+    if (session.backlogBytes + data.size > session.maxBacklogBytes) {
+      session.overflowed = true;
+      if (this.stopLive(session.recorder)) {
+        this.reportFailure(
+          'the streaming save could not keep up '
+          + `while ${Math.round(session.maxBacklogBytes / 1_000_000)} MB of video `
+          + `(${WRITE_BACKLOG_SECONDS}s at ${session.bitrateMbps} Mbps) piled up in memory. `
+          + 'Queued video will be saved if writing completes.');
+      }
+      return;
+    }
+    session.backlogBytes += data.size;
+    session.chain = session.chain.then(async () => {
+      // No file handle (picker unavailable, or createWritable failed):
+      // buffer every chunk for the blob-download fallback.
+      if (!session.handle) { session.hold(data); return; }
+      // A prior write errored the writable; stop feeding it.
+      if (session.failed) return;
+      if (!session.writable) {
+        try {
+          session.writable = await session.handle.createWritable();
+        } catch (err) {
+          session.handle = null;
+          session.hold(data);
+          notifyHost(() => this.onSaveFallback?.(
+            new Error('The selected file could not be opened; saving to Downloads instead.', { cause: err })));
           return;
         }
-        backlogBytes += data.size;
-        chain = chain.then(async () => {
-          // No file handle (picker unavailable, or createWritable failed):
-          // buffer every chunk for the blob-download fallback.
-          if (!handle) { hold(data); return; }
-          // A prior write errored the writable; stop feeding it.
-          if (failed) return;
-          if (!writable) {
-            try {
-              writable = await handle.createWritable();
-            } catch (err) {
-              handle = null;
-              hold(data);
-              notifyHost(() => this.onSaveFallback?.(
-                new Error('The selected file could not be opened; saving to Downloads instead.', { cause: err })));
-              return;
-            }
-          }
-          try {
-            await writable.write(data);
-          } catch (err) {
-            failed = true;
-            if (this.stopLive(recorder)) {
-              this.reportFailure(
-                'streaming write failed mid-session; recording stopped.',
-                err);
-            }
-          }
-        }).catch((err) => {
-          // A throwing link (e.g. a host hook) would otherwise reject `chain` for
-          // good and drop every later chunk.
-          console.error(
-            'VideoRecorder: a streaming write link failed; the recording continues.',
+      }
+      try {
+        await session.writable.write(data);
+      } catch (err) {
+        session.failed = true;
+        if (this.stopLive(session.recorder)) {
+          this.reportFailure(
+            'streaming write failed mid-session; recording stopped.',
             err);
-        }).finally(() => { backlogBytes -= data.size; });
-      },
-      finish: () => {
-        return chain
-          .then(async () => {
-            // No writable opened — the picker was unavailable (chunks buffered)
-            // or the session streamed no data (the chosen file was never
-            // truncated). Download the buffer if there is one.
-            if (!writable) {
-              this.finishBuffered(recorder, effectName, chunks);
-              return;
-            }
-            if (failed) {
-              let message = 'streaming write failed; the saved file is truncated.';
-              try {
-                await writable.close();
-              } catch {
-                message = 'the recording could not be saved; the chosen file was not updated.';
-              }
-              console.error(`VideoRecorder: ${message}`);
-              this.onSaveError?.(new Error(message), handle?.name ?? filename);
-              return;
-            }
-            // A close() failure can still leave the file unflushed or truncated.
-            try {
-              await writable.close();
-            } catch (err) {
-              console.error('VideoRecorder: finalizing the streamed file failed; it may be truncated or incomplete.', err);
-              this.onSaveError?.(new Error(
-                'finalizing the file failed; it may be truncated or incomplete.',
-                { cause: err }), handle?.name ?? filename);
-            }
-          })
-          .catch((err) => {
-            saveFailure('streaming save failed; any buffered video will be saved to Downloads.', err);
-            if (chunks.length) this.finishBuffered(recorder, effectName, chunks);
-          });
-      },
-    };
+        }
+      }
+    }).catch((err) => {
+      // A throwing link (e.g. a host hook) would otherwise reject `chain` for
+      // good and drop every later chunk.
+      console.error(
+        'VideoRecorder: a streaming write link failed; the recording continues.',
+        err);
+    }).finally(() => { session.backlogBytes -= data.size; });
+  }
+
+  /** @param {StreamingSession} session @returns {Promise<void>} */
+  finishStreamingSession(session) {
+    return session.chain
+      .then(async () => {
+        // No writable opened — the picker was unavailable (chunks buffered)
+        // or the session streamed no data (the chosen file was never
+        // truncated). Download the buffer if there is one.
+        if (!session.writable) {
+          this.finishBuffered(session.recorder, session.effectName, session.chunks);
+          return;
+        }
+        if (session.failed) {
+          let message = 'streaming write failed; the saved file is truncated.';
+          try {
+            await session.writable.close();
+          } catch {
+            message = 'the recording could not be saved; the chosen file was not updated.';
+          }
+          console.error(`VideoRecorder: ${message}`);
+          this.onSaveError?.(new Error(message), session.handle?.name ?? session.filename);
+          return;
+        }
+        // A close() failure can still leave the file unflushed or truncated.
+        try {
+          await session.writable.close();
+        } catch (err) {
+          console.error('VideoRecorder: finalizing the streamed file failed; it may be truncated or incomplete.', err);
+          this.onSaveError?.(new Error(
+            'finalizing the file failed; it may be truncated or incomplete.',
+            { cause: err }), session.handle?.name ?? session.filename);
+        }
+      })
+      .catch((err) => {
+        session.saveFailure('streaming save failed; any buffered video will be saved to Downloads.', err);
+        if (session.chunks.length) this.finishBuffered(session.recorder, session.effectName, session.chunks);
+      });
   }
 
   /**

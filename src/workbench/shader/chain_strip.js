@@ -11,8 +11,9 @@ import {
   createChainPresentation, fieldOf, PALETTE_OPERATOR, MODULATION_OPERATOR,
 } from './chain_presentation.js';
 
-import { createFrameScheduler } from '../../shared/page_lifecycle.js';
-import { createPointerDrag } from '../../shared/pointer_drag.js';
+import {createChipDrag} from './chain_chip_drag.js';
+import {createChainViewport} from './chain_viewport.js';
+import {createChainSelection} from './chain_selection.js';
 
 /**
  * The pipeline strip: the document's operator chain in execution order as chips
@@ -37,13 +38,7 @@ import { createPointerDrag } from '../../shared/pointer_drag.js';
 const BYPASS_UNAVAILABLE = 'Bypass applies to the interpreter only: '
   + 'the compiled build renders the whole chain.';
 
-const MIN_SCROLL_STEP = 160;
-const SCROLL_STEP_RATIO = 0.75;
-const DRAG_SLOP_PX = 5;
-const DRAG_SCROLL_EDGE_PX = 24;
 
-// Pixels one WheelEvent.DOM_DELTA_LINE notch stands for.
-const WHEEL_LINE_PX = 16;
 
 /**
  * A socket's function name, by the carrier the crossing produces.
@@ -61,8 +56,8 @@ const SOURCE_GROUP_NAMES = { sphere: 'Spherical sources', plane: 'Planar sources
 /**
  * Builds the pipeline strip into a container and wires its gestures.
  * @param {Object} options - The strip's collaborators.
- * @param {*} options.doc - Document the strip renders into.
- * @param {*} options.container - Element the strip owns.
+ * @param {Document} options.doc - Document the strip renders into.
+ * @param {HTMLElement} options.container - Element the strip owns.
  * @param {ChainStore} options.store - The chain document store.
  * @param {OperatorCatalog} options.catalog - The operator catalog.
  * @param {(message: string) => void} options.announce - Writes the shared live
@@ -72,7 +67,7 @@ const SOURCE_GROUP_NAMES = { sphere: 'Spherical sources', plane: 'Planar sources
  *   bypass toggle.
  * @param {() => string|null} [options.presetId] - The preset the inline stage
  *   controls read and write; null falls back to the document's first.
- * @param {(parameterId: string, value: *) => boolean|void} [options.onEditParameter] -
+ * @param {(parameterId: string, value: number|string) => boolean|void} [options.onEditParameter] -
  *   Takes every inline control edit as the document value the store stores: a
  *   number for a binary32 field, the option id for an enum8 one.
  * @param {() => void} [options.onCommitParameter] - Runs once an inline control
@@ -96,11 +91,11 @@ export function createChainStrip({
 
   /** @type {string|null} Roving-tabindex position, by instance label. */
   let focusedLabel = null;
-  /** @type {{undo: *, redo: *}|null} The current render's history buttons. */
+  /** @type {{undo: HTMLButtonElement, redo: HTMLButtonElement}|null} The current render's history buttons. */
   let history = null;
   /** @type {ParameterDeclaration[]} The current render's declarations. */
   let declarations = [];
-  /** @type {Object<string, *>} The values the inline controls show. */
+  /** @type {Object<string, number|string>} The values the inline controls show. */
   let values = {};
   /** @type {Set<string>} */
   const pinnedLabels = new Set();
@@ -108,9 +103,10 @@ export function createChainStrip({
   const drags = [];
 
   /**
-   * @param {string} tag - Element tag.
+   * @template {keyof HTMLElementTagNameMap} K
+   * @param {K} tag - Element tag.
    * @param {string} classes - Class attribute.
-   * @returns {*} The created element.
+   * @returns {HTMLElementTagNameMap[K]} The created element.
    */
   const el = (tag, classes) => {
     const node = doc.createElement(tag);
@@ -122,19 +118,19 @@ export function createChainStrip({
    * @param {string} selector - Element class selector.
    * @param {string} attribute - Dataset key to match.
    * @param {string} value - Value to match.
-   * @returns {*|null} The first match.
+   * @returns {HTMLElement|null} The first match.
    */
   const elementBy = (selector, attribute, value) => {
-    for (const node of container.querySelectorAll(selector)) {
+    for (const node of /** @type {NodeListOf<HTMLElement>} */ (container.querySelectorAll(selector))) {
       if (node.dataset[attribute] === value) return node;
     }
     return null;
   };
 
-  /** @param {string} label @returns {*|null} The chip carrying the instance. */
+  /** @param {string} label @returns {HTMLElement|null} The chip carrying the instance. */
   const chipByLabel = (label) => elementBy('.chain-chip', 'label', label);
 
-  /** @param {number} index @returns {*|null} The chip at that chain index. */
+  /** @param {number} index @returns {HTMLElement|null} The chip at that chain index. */
   const chipAt = (index) => elementBy('.chain-chip', 'index', String(index));
 
   /** @param {ChainEntry} entry @param {boolean} bypassed @returns {string} Accessible chip name. */
@@ -173,20 +169,10 @@ export function createChainStrip({
     return true;
   };
 
-  /**
-   * Toggles a chip's pin and selection and re-renders.
-   * @param {string} label - The instance label.
-   * @returns {void}
-   */
-  const select = (label) => {
-    const open = !pinnedLabels.has(label);
-    const selected = open ? label : store.selectedLabel() === label ? null : store.selectedLabel();
-    if (!store.setSelectedLabel(selected)) return;
-    if (selected !== null) focusedLabel = selected;
-    if (open) pinnedLabels.add(label);
-    else pinnedLabels.delete(label);
-    render({ focusLabel: label });
-  };
+  const select = createChainSelection({
+    store, pinnedLabels, setFocusedLabel: (label) => { focusedLabel = label; },
+    render: (options) => render(options),
+  });
 
   /**
    * Moves the chip at one chain index to a gap, as the m-for-m span replacement
@@ -207,133 +193,9 @@ export function createChainStrip({
     return commit(entry.label);
   };
 
-  /**
-   * @param {*} chip - The movable chip.
-   * @param {*} header - Its drag surface.
-   * @param {number} index - The chip's chain index.
-   * @param {string|null} name - The stage name shown while dragging.
-   * @returns {() => boolean} Whether a completed drag consumes the next click.
-   */
-  const wireChipDrag = (chip, header, index, name) => {
-    let originX = 0;
-    let originY = 0;
-    let offsetX = 0;
-    let offsetY = 0;
-    let dragging = false;
-    let suppressClick = false;
-    /** @type {PointerEvent|null} */
-    let lastPointer = null;
-    /** @type {*|null} */
-    let preview = null;
-    /** @type {*|null} */
-    let marker = null;
-
-    const clearMarker = () => {
-      marker?.classList.remove('chain-chip--drop-before', 'chain-chip--drop-after');
-      marker = null;
-    };
-    const clear = () => {
-      scrollFrame.cancel();
-      lastPointer = null;
-      clearMarker();
-      preview?.remove();
-      preview = null;
-      dragging = false;
-      chip.classList.remove('chain-chip--dragging');
-    };
-    const dropGap = (/** @type {PointerEvent} */ event) => {
-      clearMarker();
-      const band = chip.parentNode;
-      const bounds = band.getBoundingClientRect();
-      const viewport = container.querySelector('.chain-strip-viewport').getBoundingClientRect();
-      if (event.clientX < bounds.left || event.clientX > bounds.right
-          || event.clientY < Math.max(bounds.top, viewport.top)
-          || event.clientY > Math.min(bounds.bottom, viewport.bottom)) return null;
-      const siblings = [...band.querySelectorAll('.chain-chip')];
-      const before = siblings.find((other) => {
-        const rect = other.getBoundingClientRect();
-        return event.clientY < rect.top + rect.height / 2;
-      });
-      const target = before ?? siblings[siblings.length - 1];
-      const gap = Number(target.dataset.index) + (before ? 0 : 1);
-      if (gap === index || gap === index + 1) return null;
-      marker = target;
-      marker.classList.add(before ? 'chain-chip--drop-before' : 'chain-chip--drop-after');
-      return gap;
-    };
-    const scrollViewport = (/** @type {PointerEvent} */ event) => {
-      const viewport = container.querySelector('.chain-strip-viewport');
-      const bounds = viewport.getBoundingClientRect();
-      if (event.clientX < bounds.left || event.clientX > bounds.right) return false;
-      const direction = event.clientY < bounds.top + DRAG_SCROLL_EDGE_PX ? -1
-        : event.clientY > bounds.bottom - DRAG_SCROLL_EDGE_PX ? 1 : 0;
-      const before = viewport.scrollTop;
-      viewport.scrollTop = Math.max(0, Math.min(
-        viewport.scrollHeight - viewport.clientHeight,
-        before + direction * DRAG_SCROLL_EDGE_PX));
-      return viewport.scrollTop !== before;
-    };
-    const scrollFrame = createFrameScheduler(() => {
-      if (lastPointer === null || !scrollViewport(lastPointer)) return;
-      dropGap(lastPointer);
-      scrollFrame();
-    });
-    const drag = createPointerDrag({
-      element: header,
-      onStart(event) {
-        suppressClick = false;
-        const target = /** @type {Element} */ (event.target);
-        if (target.closest('button, input, select, textarea, label, a')) return false;
-        originX = event.clientX;
-        originY = event.clientY;
-        const rect = header.getBoundingClientRect();
-        offsetX = originX - rect.left;
-        offsetY = originY - rect.top;
-        return true;
-      },
-      onMove(event) {
-        if (!dragging) {
-          if (Math.hypot(event.clientX - originX, event.clientY - originY) < DRAG_SLOP_PX) return;
-          dragging = true;
-          suppressClick = true;
-          focusChip(index);
-          chip.classList.add('chain-chip--dragging');
-          preview = el('div', 'chain-drag-preview');
-          preview.setAttribute('aria-hidden', 'true');
-          preview.textContent = name;
-          preview.style.width = `${header.getBoundingClientRect().width}px`;
-          doc.body.appendChild(preview);
-        }
-        preview.style.left = `${event.clientX - offsetX}px`;
-        preview.style.top = `${event.clientY - offsetY}px`;
-        lastPointer = event;
-        if (scrollViewport(event)) scrollFrame();
-        dropGap(event);
-      },
-      onEnd(event) {
-        if (!dragging) return;
-        const gap = event === null ? null : dropGap(event);
-        clear();
-        if (gap !== null) moveChip(index, gap);
-      },
-      onCancel: clear,
-    });
-    const cancelKeydown = (/** @type {*} */ event) => {
-      if (event.key !== 'Escape' || !dragging) return;
-      event.preventDefault();
-      drag.stop();
-    };
-    chip.addEventListener('keydown', cancelKeydown);
-    drags.push({ remove() {
-      chip.removeEventListener('keydown', cancelKeydown);
-      drag.remove();
-    } });
-    return () => {
-      const consumed = suppressClick;
-      suppressClick = false;
-      return consumed;
-    };
-  };
+  const wireChipDrag = createChipDrag({
+    doc, container, el, focusChip: (index) => focusChip(index), moveChip, drags,
+  });
 
   /**
    * Removes one endomorphism, the empty span replacement legality makes
@@ -434,11 +296,11 @@ export function createChainStrip({
   };
 
   /**
-   * @param {*} event - A chip's keydown.
+   * @param {KeyboardEvent} event - A chip's keydown.
    * @param {number} index - The chip's chain index.
    * @param {ChainEntry} entry - The chain entry.
    * @param {boolean} crossing - Whether the operator crosses carriers.
-   * @param {*} chip - The chip element.
+   * @param {HTMLElement} chip - The chip element.
    * @returns {void}
    */
   const chipKeydown = (event, index, entry, crossing, chip) => {
@@ -493,7 +355,7 @@ export function createChainStrip({
    * @param {string|null} view.selected - The selected label.
    * @param {Set<string>} view.bypassed - The bypassed labels.
    * @param {string|null} view.tabLabel - The roving-tabindex label.
-   * @returns {*} The chip element.
+   * @returns {HTMLElement} The chip element.
    */
   const chipElement = (index, entry, {
     crossing, selected, bypassed, tabLabel,
@@ -677,7 +539,7 @@ export function createChainStrip({
 
   /**
    * @param {BandLayout} band - The band the button belongs to.
-   * @returns {*|null} The band's insertion affordance, when a stage fits.
+   * @returns {HTMLButtonElement|null} The band's insertion affordance, when a stage fits.
    */
   const bandAddButton = (band) => {
     const title = titleCase(band.carrier);
@@ -714,27 +576,7 @@ export function createChainStrip({
     return add;
   };
 
-  /** @param {*} viewport @param {number} direction */
-  const scrollPipeline = (viewport, direction) => {
-    const distance = Math.max(MIN_SCROLL_STEP,
-      Number(viewport.clientHeight ?? 0) * SCROLL_STEP_RATIO);
-    viewport.scrollTop = Math.max(0,
-      Number(viewport.scrollTop ?? 0) + direction * distance);
-  };
-
-  /** @param {*} viewport @param {number} direction @returns {*} */
-  const scrollButton = (viewport, direction) => {
-    const button = el('button', 'chain-scroll-button');
-    button.type = 'button';
-    button.setAttribute('aria-label', direction < 0
-      ? 'Scroll shader chain up' : 'Scroll shader chain down');
-    const icon = el('span', direction < 0
-      ? 'chain-scroll-icon chain-scroll-icon--up' : 'chain-scroll-icon');
-    icon.setAttribute('aria-hidden', 'true');
-    button.appendChild(icon);
-    button.addEventListener('click', () => scrollPipeline(viewport, direction));
-    return button;
-  };
+  const {scrollButton, wireViewport} = createChainViewport(el);
 
   /**
    * Rebuilds the whole strip from the store. Keyboard focus is restored to the
@@ -824,27 +666,7 @@ export function createChainStrip({
     viewport.setAttribute('role', 'group');
     viewport.setAttribute('aria-label', 'Scrollable shader chain');
     viewport.appendChild(strip);
-    viewport.addEventListener('wheel', (/** @type {*} */ event) => {
-      if (event.target?.closest?.('.chain-palette')) return;
-      const delta = event.deltaY;
-      if (delta === 0) return;
-      const height = Number(viewport.clientHeight ?? 0);
-      const overflow = Number(viewport.scrollHeight ?? 0) - height;
-      if (overflow <= 0) return;
-      closePalette();
-      // deltaMode counts pixels, lines or pages.
-      const scale = event.deltaMode === 1 ? WHEEL_LINE_PX
-        : event.deltaMode === 2 ? Math.max(MIN_SCROLL_STEP, height) : 1;
-      viewport.scrollTop = Math.min(overflow,
-        Math.max(0, Number(viewport.scrollTop ?? 0) + delta * scale));
-      event.preventDefault();
-    }, { passive: false });
-    viewport.addEventListener('keydown', (/** @type {*} */ event) => {
-      if (event.target !== viewport
-        || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
-      event.preventDefault();
-      scrollPipeline(viewport, event.key === 'ArrowUp' ? -1 : 1);
-    });
+    wireViewport(viewport, closePalette);
 
     container.replaceChildren(actions, scrollButton(viewport, -1), viewport,
       scrollButton(viewport, 1));
@@ -852,7 +674,8 @@ export function createChainStrip({
     if (scrolled > 0) viewport.scrollTop = scrolled;
     parameterRows.syncParameterRows();
 
-    const action = focusAction === null ? null : actions.querySelector(focusAction);
+    const action = focusAction === null ? null
+      : /** @type {HTMLButtonElement|null} */ (actions.querySelector(focusAction));
     if (action && !action.disabled) {
       action.focus();
       return;
@@ -861,7 +684,7 @@ export function createChainStrip({
     if (target) {
       focusedLabel = focusLabel;
       if (focusControl !== null) {
-        const control = target.querySelector(focusControl);
+        const control = /** @type {HTMLElement|null} */ (target.querySelector(focusControl));
         (control ?? target).focus();
       } else {
         target.focus();

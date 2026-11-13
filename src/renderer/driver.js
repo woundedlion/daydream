@@ -5,98 +5,28 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
+import { CSS2DRenderer } from "three/addons/renderers/CSS2DRenderer.js";
 import { pixelToSpherical } from "./geometry.js";
 import { isViewLive } from "./pixel_view.js";
 import { FPS } from "./frame_constants.js";
-import { PovSweep } from "./pov_sweep.js";
+import { LabelPool } from "./label_pool.js";
+import {ensurePovSweep, updatePovSweep, sweepFraction,
+  resetPovNow, resetPovOnNextFrame, setStrobeColumns} from './driver_pov.js';
+import { setupContextLossHandling } from "./driver_context.js";
+import { setupKeyboardOrbit, setupViewReset, resetView, cancelViewReset, keydown } from "./driver_input.js";
+import { refreshLabels } from "./driver_labels.js";
+import { renderMainView, renderPip, renderDisplayViews } from "./driver_views.js";
+import { updateStats } from "./driver_capture.js";
+import { setupDots } from "./driver_dots.js";
 import { MOBILE_BREAKPOINT_PX } from "../shared/layout.js";
 
 /** @typedef {Omit<THREE.InstancedBufferAttribute, 'array'> & {array: Uint16Array|null}} RgbAttribute */
 /** @typedef {Omit<THREE.InstancedMesh, 'instanceColor'> & {instanceColor: RgbAttribute|null}} RgbMesh */
 /** @typedef {import('../../generated/holosphere_wasm.js').ArenaMetrics} ArenaMetrics */
 
-/**
- * Reuses CSS2DObject label sprites across frames so axis labels can be
- * rebuilt every frame without churning the DOM. acquire() hands out pooled
- * objects in order; cleanup() removes from the scene any left over from the
- * previous frame.
- */
-export class LabelPool {
-  /**
-   * @param {THREE.Scene} scene - Scene that pooled label objects are added to and removed from.
-   * @param {number} radius - Sphere radius that unit label directions are scaled to.
-   * @param {Document} [doc] - Document label elements are created in; defaults to the global `document`.
-   */
-  constructor(scene, radius, doc = globalThis.document) {
-    this.scene = scene;
-    this.radius = radius;
-    this.doc = doc;
-    /** @type {CSS2DObject[]} */
-    this.pool = [];
-    this.activeCount = 0;
-  }
+export { LabelPool } from "./label_pool.js";
 
-  /**
-   * Mark all pooled labels free for reuse this frame (without hiding them yet).
-   */
-  reset() {
-    this.activeCount = 0;
-  }
 
-  /**
-   * Place the next pooled label at `position` (a unit direction, scaled to the
-   * sphere surface) showing `content`, growing the pool if exhausted.
-   * @param {THREE.Vector3} position - Unit direction, scaled to the sphere surface for placement.
-   * @param {string} content - Plain-text label content (set via textContent so it cannot inject markup).
-   */
-  acquire(position, content) {
-    let labelObj;
-
-    if (this.activeCount < this.pool.length) {
-      labelObj = this.pool[this.activeCount];
-    } else {
-      const div = this.doc.createElement("div");
-      div.className = "label";
-      labelObj = new CSS2DObject(div);
-      labelObj.center.set(0, 0);
-      this.pool.push(labelObj);
-    }
-
-    if (labelObj.parent !== this.scene) {
-      this.scene.add(labelObj);
-    }
-
-    labelObj.position.copy(position).multiplyScalar(this.radius);
-    labelObj.visible = true;
-
-    if (labelObj.element.textContent !== content) {
-      labelObj.element.textContent = content;
-    }
-
-    this.activeCount++;
-  }
-
-  /**
-   * Remove from the scene any pooled labels not acquired this frame, so stale
-   * labels from a busier previous frame disappear.
-   */
-  cleanup() {
-    for (let i = this.activeCount; i < this.pool.length; i++) {
-      const obj = this.pool[i];
-      if (obj.parent === this.scene) {
-        this.scene.remove(obj);
-      }
-    }
-  }
-}
-
-/**
- * @param {number} accumulator - Accumulated simulation time.
- * @param {number} interval - Duration of one step, in the same units.
- * @returns {number} Fractional progress through the current step.
- */
-const sweepFraction = (accumulator, interval) => (accumulator % interval) / interval;
 
 /**
  * Browser-side simulator: drives the three.js scene that renders the LED
@@ -105,6 +35,36 @@ const sweepFraction = (accumulator, interval) => (accumulator % interval) / inte
  * the pixel color buffer alias.
  */
 export class Daydream {
+  /** @type {boolean} */
+  contextLost = false;
+  /** @type {HTMLElement|null} */
+  contextLostDetail = null;
+  /** @type {HTMLElement|null} */
+  contextLostOverlay = null;
+  /** @type {(event: Event) => void} */
+  onContextLost = () => {};
+  /** @type {() => void} */
+  onContextRestored = () => {};
+  /** @type {() => void} */
+  onCanvasFocus = () => {};
+  /** @type {() => void} */
+  onCanvasBlur = () => {};
+  /** @type {(event: KeyboardEvent) => void} */
+  onCanvasKeyDown = () => {};
+  /** @type {number} */
+  viewResetFrame = 0;
+  /** @type {HTMLElement|null} */
+  resetViewButton = null;
+  /** @type {() => void} */
+  onResetView = () => {};
+  /** @type {() => void} */
+  onCancelViewReset = () => {};
+  /** @type {{uCameraPos: {value: THREE.Vector3}, uCullThreshold: {value: number}, uColumnFillArc: {value: number}}|null} */
+  cullUniforms = null;
+  /** @type {THREE.SphereGeometry|null} */
+  dotGeometry = null;
+  /** @type {THREE.MeshBasicMaterial|null} */
+  dotMaterial = null;
   static SCENE_ANTIALIAS = true;
   static SCENE_ALPHA = true;
   static SCENE_BACKGROUND_COLOR = 0x000000;
@@ -263,6 +223,7 @@ export class Daydream {
     this.povFidelity = false;
     this.povResponseScale = 1;
     this.showSweepBoundary = false;
+    /** @type {import('./pov_sweep.js').PovSweep|null} */
     this.povSweep = null;
     this.povResetPending = false;
 
@@ -316,54 +277,7 @@ export class Daydream {
    * show a reload prompt.
    */
   setupContextLossHandling() {
-    this.contextLost = false;
-
-    const overlay = this.doc.createElement("div");
-    overlay.className = "loading-overlay error context-lost-overlay";
-    overlay.setAttribute("role", "alert");
-    overlay.tabIndex = -1;
-    overlay.style.display = "none";
-    // Shares classes with bootstrap's load-failure overlay.
-    const title = this.doc.createElement("span");
-    title.className = "load-error-title";
-    title.textContent = "GPU context lost";
-    this.contextLostDetail = this.doc.createElement("span");
-    this.contextLostDetail.className = "load-error-detail";
-    const reload = this.doc.createElement("button");
-    reload.type = "button";
-    reload.className = "context-lost-reload";
-    reload.textContent = "Reload";
-    reload.addEventListener("click", () => this.win.location.reload());
-    overlay.append(title, this.contextLostDetail, reload);
-    this.canvasParent.appendChild(overlay);
-    this.contextLostOverlay = overlay;
-
-    this.onContextLost = (/** @type {Event} */ e) => {
-      e.preventDefault(); // signal intent to handle a restore
-      this.contextLost = true;
-      const reason = /** @type {WebGLContextEvent} */ (e).statusMessage || "no reason reported";
-      console.error(`[daydream] WebGL context lost: ${reason}`);
-      /** @type {HTMLElement} */ (this.contextLostDetail).textContent =
-        `${reason}. The GPU process was likely reset — reload to recover.`;
-      overlay.style.display = "flex";
-      overlay.focus({ preventScroll: true });
-      // The canvas feeds no more frames into the capture stream.
-      this.recorder?.abort(`WebGL context lost (${reason}).`);
-    };
-
-    this.onContextRestored = () => {
-      this.contextLost = false;
-      console.warn("[daydream] WebGL context restored");
-      if (overlay.contains(this.doc.activeElement))
-        this.canvas.focus({ preventScroll: true });
-      overlay.style.display = "none";
-      // Repaint so instanceColor/instanceMatrix re-upload even while paused.
-      this.needsRender = true;
-    };
-
-    this.canvas.addEventListener("webglcontextlost", this.onContextLost, false);
-    this.canvas.addEventListener(
-      "webglcontextrestored", /** @type {EventListener} */ (this.onContextRestored), false);
+    setupContextLossHandling(this);
   }
 
   /**
@@ -372,111 +286,22 @@ export class Daydream {
    * target, +/- dolly in and out.
    */
   setupKeyboardOrbit() {
-    const offset = new THREE.Vector3();
-    const spherical = new THREE.Spherical();
-
-    // :focus-visible promotes a pointer-focused element the moment any key is
-    // pressed, so a global shortcut (space) would ring the whole viewport.
-    // Latch the arrival modality instead: keyboard focus rings and orbits,
-    // pointer focus does neither, keeping the global arrow-key frame step.
-    this.onCanvasFocus = () => {
-      this.canvas.classList.toggle(
-        "keyboard-focus", this.canvas.matches(":focus-visible"));
-    };
-    this.onCanvasBlur = () => {
-      this.canvas.classList.remove("keyboard-focus");
-    };
-
-    this.onCanvasKeyDown = (/** @type {KeyboardEvent} */ e) => {
-      if (e.altKey || e.ctrlKey || e.metaKey) return;
-      if (!this.canvas.classList.contains("keyboard-focus")) return;
-      if (this.paused && e.key === "ArrowRight" && !e.shiftKey) return;
-
-      let dTheta = 0;
-      let dPhi = 0;
-      let dolly = 1;
-      switch (e.key) {
-        case "ArrowLeft": dTheta = -Daydream.KEY_ORBIT_STEP; break;
-        case "ArrowRight": dTheta = Daydream.KEY_ORBIT_STEP; break;
-        case "ArrowUp": dPhi = -Daydream.KEY_ORBIT_STEP; break;
-        case "ArrowDown": dPhi = Daydream.KEY_ORBIT_STEP; break;
-        case "+": case "=": dolly = 1 / Daydream.KEY_ZOOM_STEP; break;
-        case "-": case "_": dolly = Daydream.KEY_ZOOM_STEP; break;
-        default: return;
-      }
-
-      offset.copy(this.camera.position).sub(this.controls.target);
-      spherical.setFromVector3(offset);
-      spherical.theta += dTheta;
-      spherical.phi = THREE.MathUtils.clamp(
-        spherical.phi + dPhi,
-        this.controls.minPolarAngle,
-        this.controls.maxPolarAngle
-      );
-      spherical.radius = THREE.MathUtils.clamp(
-        spherical.radius * dolly,
-        this.controls.minDistance,
-        this.controls.maxDistance
-      );
-      spherical.makeSafe(); // keeps phi off the poles, where the orbit basis degenerates
-      this.camera.position
-        .copy(this.controls.target)
-        .add(offset.setFromSpherical(spherical));
-      this.camera.lookAt(this.controls.target);
-      this.controls.update();
-      this.needsRender = true;
-
-      e.preventDefault();
-      // Else the window handler also reads ArrowRight as a paused frame step.
-      e.stopPropagation();
-    };
-
-    this.canvas.addEventListener("keydown", this.onCanvasKeyDown);
-    this.canvas.addEventListener("focus", /** @type {EventListener} */ (this.onCanvasFocus));
-    this.canvas.addEventListener("blur", /** @type {EventListener} */ (this.onCanvasBlur));
+    setupKeyboardOrbit(this);
   }
 
   /** Bind the viewport reset button, double-click, and interruption listeners. */
   setupViewReset() {
-    this.viewResetFrame = 0;
-    this.resetViewButton = this.doc.getElementById('reset-view');
-    this.onResetView = () => this.resetView();
-    this.onCancelViewReset = () => this.cancelViewReset();
-    this.resetViewButton?.addEventListener('click', this.onResetView);
-    this.canvas.addEventListener('dblclick', this.onResetView);
-    this.canvas.addEventListener('keydown', this.onCancelViewReset);
-    this.controls.addEventListener('start', this.onCancelViewReset);
+    setupViewReset(this);
   }
 
   /** Return to the default orientation and center while preserving zoom. */
   resetView() {
-    this.cancelViewReset();
-    const target = this.controls.target.clone();
-    const orbit = new THREE.Spherical().setFromVector3(
-      this.camera.position.clone().sub(target));
-    const started = this.win.performance.now();
-    const duration = this.win.matchMedia('(prefers-reduced-motion: reduce)').matches
-      ? 0 : Daydream.VIEW_RESET_MS;
-    const offset = new THREE.Vector3();
-    const spherical = new THREE.Spherical();
-    const animate = (/** @type {number} */ now) => {
-      const progress = duration === 0 ? 1 : THREE.MathUtils.clamp((now - started) / duration, 0, 1);
-      const remaining = (1 - progress) ** 3;
-      spherical.set(orbit.radius, Math.PI / 2 + (orbit.phi - Math.PI / 2) * remaining,
-        orbit.theta * remaining);
-      this.controls.target.copy(target).multiplyScalar(remaining);
-      this.camera.position.copy(this.controls.target).add(offset.setFromSpherical(spherical));
-      this.controls.update();
-      this.needsRender = true;
-      this.viewResetFrame = progress < 1 ? this.win.requestAnimationFrame(animate) : 0;
-    };
-    animate(started);
+    resetView(this);
   }
 
   /** Cancel an in-flight return to the default orientation. */
   cancelViewReset() {
-    if (this.viewResetFrame) this.win.cancelAnimationFrame(this.viewResetFrame);
-    this.viewResetFrame = 0;
+    cancelViewReset(this);
   }
 
   /**
@@ -486,21 +311,7 @@ export class Daydream {
    * @param {(delta: number) => boolean} [movePreset] - Selects an adjacent preset.
    */
   keydown(e, movePreset = () => false) {
-    // An Alt/Ctrl/Meta chord is the browser's or the OS's — Ctrl+Space and
-    // Cmd+Space among them — so no playback shortcut claims one.
-    if (e.altKey || e.ctrlKey || e.metaKey) return;
-    if (e.key === ' ') {
-      e.preventDefault();
-      if (e.repeat) return;
-      this.paused = !this.paused;
-      if (!this.paused) this.stepFrames = 0;
-    } else if (this.paused && e.key === "ArrowRight") {
-      this.stepFrames++;
-      e.preventDefault();
-    } else if (!this.paused && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
-      const delta = e.key === "ArrowLeft" ? -1 : 1;
-      if (movePreset(delta)) e.preventDefault();
-    }
+    keydown(this, e, movePreset);
   }
 
   /**
@@ -592,17 +403,7 @@ export class Daydream {
   render(adapter) {
     if (this.contextLost) return;
 
-    if (this.povFidelity && isViewLive(this.pixels)
-        && (!this.povSweep || this.povSweep.width !== this.W
-          || this.povSweep.height !== this.H)) {
-      this.povSweep = new PovSweep(this.W, this.H, this.pixels,
-        sweepFraction(this.timeAccumulator, this.frameInterval),
-        this.frameInterval * 1000);
-    } else if (!this.povFidelity && this.povSweep) {
-      this.povSweep = null;
-      if (this.dotMesh?.instanceColor) this.dotMesh.instanceColor.needsUpdate = true;
-      this.needsRender = true;
-    }
+    ensurePovSweep(this);
 
     // A pending single-step must fire immediately, even while paused and before
     // the fixed-timestep clock has accrued a full interval; the frame clock still
@@ -613,21 +414,7 @@ export class Daydream {
       (clockReady || this.stepFrames !== 0) && this.stepSimulation(adapter);
     const captureReady = typeof adapter?.captureReady === 'function'
       ? adapter.captureReady(advanced) : advanced;
-    if (this.povSweep && !isViewLive(this.pixels)) adapter?.refreshPixelView?.();
-    if (this.povResetPending && captureReady && isViewLive(this.pixels)) {
-      this.povSweep?.reset(/** @type {Uint16Array} */ (this.pixels));
-      this.povResetPending = false;
-      this.needsRender = true;
-    }
-    const panelDue = advanced || this.paused || this.needsRender;
-    if (this.povSweep && isViewLive(this.pixels)) {
-      if (!this.povResetPending && (this.paused ? captureReady : advanced))
-        this.povSweep.beginFrame(this.pixels);
-      const fraction = sweepFraction(this.timeAccumulator, this.frameInterval);
-      if (this.povSweep.advance(fraction)) this.needsRender = true;
-      if (this.timeAccumulator !== previousSweepTime)
-        this.needsRender = true;
-    }
+    const panelDue = updatePovSweep(this, advanced, captureReady, previousSweepTime, adapter);
     if (panelDue) adapter?.sync?.(advanced);
 
     // Services live pointer interaction; emits 'change' (→ needsRender).
@@ -661,30 +448,7 @@ export class Daydream {
       colorAttribute.needsUpdate = true;
     }
     try {
-      this.xAxis.visible = this.labelAxes;
-      this.yAxis.visible = this.labelAxes;
-      this.zAxis.visible = this.labelAxes;
-
-      this.updateCullUniforms();
-
-      this.renderer.setScissorTest(true);
-      this.renderMainView();
-
-      // One requestFrame per repaint: several in a single task carry one timestamp,
-      // so the stream cannot emit them as separate video frames while the elapsed
-      // counter charges for each. A backlog drains one per repaint instead.
-      const owed = this.recorder ? (captureDue ? 1 : 0) + this.heldCaptures : 0;
-      this.heldCaptures = owed > 0 ? owed - 1 : 0;
-      if (owed > 0) /** @type {import('../recording/recorder.js').VideoRecorder} */ (this.recorder).captureFrame();
-      if (this.heldCaptures > 0) this.needsRender = true;
-
-      this.refreshLabels();
-      if (this.labelPool.activeCount > 0) {
-        this.labelRenderer.render(this.scene, this.camera);
-      }
-
-      this.renderPip();
-      this.renderer.setScissorTest(false);
+      renderDisplayViews(this, captureDue);
     } finally {
       if (this.povSweep && colorAttribute)
         colorAttribute.array = /** @type {Uint16Array|null} */ (sourcePixels);
@@ -754,12 +518,12 @@ export class Daydream {
 
   /** Replace POV history with the current displayed pixels. */
   resetPovNow() {
-    this.povSweep?.reset(/** @type {Uint16Array} */ (this.pixels));
+    resetPovNow(this);
   }
 
   /** Replace POV history when the next complete effect frame is displayed. */
   resetPovOnNextFrame() {
-    this.povResetPending = true;
+    resetPovOnNextFrame(this);
   }
 
   /**
@@ -767,21 +531,7 @@ export class Daydream {
    * the camera-facing hemisphere.
    */
   refreshLabels() {
-    this.labelPool.reset();
-
-    if (this.labelAxes) {
-      // position is a unit direction, so position·cameraPos == |cameraPos|·cos(angle);
-      // scaling the cutoff by the live distance keeps the visible set zoom-independent.
-      const facingThreshold =
-        Daydream.LABEL_VISIBILITY_FRAMING_RATIO * this.camera.position.length();
-      for (const label of Daydream.AXIS_LABELS) {
-        if (label.position.dot(this.camera.position) > facingThreshold) {
-          this.labelPool.acquire(label.position, label.content);
-        }
-      }
-    }
-
-    this.labelPool.cleanup();
+    refreshLabels(this);
   }
 
   /**
@@ -805,8 +555,7 @@ export class Daydream {
    * @param {boolean} strobe - true to strobe columns, false to persist/smear.
    */
   setStrobeColumns(strobe) {
-    this.noBlackColumns = !strobe;
-    this.invalidate();
+    setStrobeColumns(this, strobe);
   }
 
   /**
@@ -814,22 +563,7 @@ export class Daydream {
    * already enabled by the caller.
    */
   renderMainView() {
-    this.renderer.setViewport(
-      this.mainViewport.x,
-      this.mainViewport.y,
-      this.mainViewport.width,
-      this.mainViewport.height
-    );
-    this.renderer.setScissor(
-      this.mainViewport.x,
-      this.mainViewport.y,
-      this.mainViewport.width,
-      this.mainViewport.height
-    );
-
-    // render() clears the scissored viewport itself: a THREE.Color scene
-    // background forces a clear to that color before the pass.
-    this.renderer.render(this.scene, this.camera);
+    renderMainView(this);
   }
 
   /**
@@ -838,28 +572,7 @@ export class Daydream {
    * under headless automation (navigator.webdriver), and while recording.
    */
   renderPip() {
-    if (!this.showPip || this.compactViewport || this.nav.webdriver ||
-        this.recorder?.isRecording) return;
-
-    this.renderer.setViewport(
-      this.pipViewport.x,
-      this.pipViewport.y,
-      this.pipViewport.width,
-      this.pipViewport.height
-    );
-    this.renderer.setScissor(
-      this.pipViewport.x,
-      this.pipViewport.y,
-      this.pipViewport.width,
-      this.pipViewport.height
-    );
-    const target = this.controls.target;
-    this.pipCamera.position.copy(target).sub(this.camera.position).add(target);
-    this.pipCamera.lookAt(target);
-    if (this.cullUniforms) {
-      this.cullUniforms.uCameraPos.value.copy(this.pipCamera.position);
-    }
-    this.renderer.render(this.scene, this.pipCamera);
+    renderPip(this);
   }
 
   /** Dispose the dot mesh after detaching its WASM-aliased instanceColor array. */
@@ -880,94 +593,7 @@ export class Daydream {
    * sphere tessellation that drops as pixel count rises to cap geometry cost.
    */
   setupDots() {
-    this.releaseDotMesh();
-
-    if (!this.dotMaterial) {
-      this.dotMaterial = new THREE.MeshBasicMaterial({
-        side: THREE.FrontSide,
-        blending: THREE.CustomBlending,
-        blendEquation: THREE.MaxEquation,
-        depthWrite: false
-      });
-
-      // Backface-cull + column gap-fill uniforms, updated per frame in
-      // updateCullUniforms().
-      this.cullUniforms = {
-        uCameraPos: { value: new THREE.Vector3(0, 0, 1) },
-        uCullThreshold: { value: -0.06 },
-        uColumnFillArc: { value: 0 }
-      };
-
-      const uniforms = this.cullUniforms;
-      this.dotMaterial.onBeforeCompile = (shader) => {
-        if (!shader.vertexShader.includes('#include <begin_vertex>'))
-          throw new Error('Dot shader is missing the begin_vertex chunk');
-        shader.uniforms.uCameraPos = uniforms.uCameraPos;
-        shader.uniforms.uCullThreshold = uniforms.uCullThreshold;
-        shader.uniforms.uColumnFillArc = uniforms.uColumnFillArc;
-
-        shader.vertexShader = 'uniform vec3 uCameraPos;\nuniform float uCullThreshold;\nuniform float uColumnFillArc;\n' + shader.vertexShader;
-
-        shader.vertexShader = shader.vertexShader.replace(
-          '#include <begin_vertex>',
-          `
-          #include <begin_vertex>
-          #if defined(USE_INSTANCING_COLOR)
-             // Hide black pixels
-             if (dot(instanceColor, instanceColor) < 1e-10) {
-                 transformed *= 0.0;
-             }
-             vec3 instPos = (instanceMatrix[3]).xyz;
-             // Column gap-fill (uColumnFillArc > 0): extend each
-             // dot east-west into a PILL whose STRAIGHT (full-radius) middle
-             // reaches the column-cell boundary, so a run of lit columns tiles
-             // flush — flat seams, no scalloping — and only the run's terminal
-             // caps stay rounded. The dot's local +x is the longitude (sweep)
-             // tangent after the per-instance lookAt. We TRANSLATE the two
-             // x-halves apart by ext (not scale — scaling a sphere yields an
-             // oval): the bridge between them becomes a full-radius cylinder and
-             // the original rounded caps ride OUT past the cell boundary into the
-             // neighbour cell. Where the neighbour is lit, its own straight body
-             // buries this cap (flat join); where the neighbour is dark (culled
-             // to nothing) the cap shows as the rounded terminal. ext = the cell
-             // half-arc times COLUMN_FILL_OVERLAP = uColumnFillArc * sinPhi; sinPhi (latitude
-             // foreshortening from instPos) shrinks the cell toward the poles.
-             // uColumnFillArc == 0 leaves round dots.
-             float sinPhi = length(instPos.xz) / max(length(instPos), 1e-6);
-             float ext = uColumnFillArc * sinPhi;
-             transformed.x += sign(transformed.x) * ext;
-             // Backface cull: dot of instance position with camera direction
-             float facing = dot(normalize(instPos), normalize(uCameraPos));
-             if (facing < uCullThreshold) {
-                 transformed *= 0.0;
-             }
-          #endif
-          `
-        );
-      };
-    }
-
-    const totalPixels = this.W * this.H;
-    const detail = dotDetailFor(totalPixels);
-
-    this.dotGeometry = new THREE.SphereGeometry(
-      this.DOT_SIZE,
-      detail,
-      detail,
-      0,
-      Math.PI
-    );
-
-    this.dotMesh = /** @type {RgbMesh} */ (new THREE.InstancedMesh(
-      this.dotGeometry,
-      this.dotMaterial,
-      totalPixels
-    ));
-
-    this.dotMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-    this.dotMesh.count = totalPixels;
-    this.dotMesh.frustumCulled = false;
-    this.scene.add(this.dotMesh);
+    setupDots(this);
   }
 
   /**
@@ -1043,7 +669,7 @@ export class Daydream {
    * @param {{getArenaMetrics?: () => ArenaMetrics|null}} adapter - Render adapter; its getArenaMetrics() supplies arena usage when present.
    */
   updateStats(duration, adapter) {
-    this.statsView?.update(duration, adapter?.getArenaMetrics?.() ?? null);
+    return updateStats(this, duration, adapter);
   }
 
   /** Updates the zoom bounds to keep dot caps inside the clipping planes. */

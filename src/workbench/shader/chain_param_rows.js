@@ -4,10 +4,11 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import {createParameterRowControls} from './chain_row_controls.js';
 import { titleCase } from '../../shared/labels.js';
 import { createFrameScheduler } from '../../shared/page_lifecycle.js';
 import {
-  deactivatedParameterIds, formatNumericValue, nudgeStep,
+  deactivatedParameterIds, formatNumericValue,
   numericSliderPosition, numericSliderValue, fieldOf, labelOf,
   COLOR_PARAMETER_GROUPS, MODULATION_PARAMETER_GROUPS, COLOR_PARAMETER_NAMES,
   POTENTIAL_OPERATOR, POTENTIAL_PARAMETER_GROUPS,
@@ -23,19 +24,19 @@ export const BAKED_PARAMETER_REASON = 'This parameter is baked into the compiled
 
 /**
  * Owns inline parameter rows and their pending edits across strip renders.
- * @param {{el: (tag: string, classes: string) => *, container: *,
+ * @param {{el: import('./chain_row_controls.js').ElementFactory, container: HTMLElement,
  *   store: import('./chain_document_store.js').ChainStore,
  *   catalog: import('./chain_presentation.js').OperatorCatalog,
  *   opOf: (entry: ChainEntry) => import('./chain_document_store.js').CatalogOperator,
- *   chipByLabel: (label: string) => *,
+ *   chipByLabel: (label: string) => HTMLElement|null,
  *   chipLabel: (entry: ChainEntry, bypassed: boolean) => string,
  *   parameterLive: (id: string) => boolean,
  *   parameterRanges: () => ParameterRange[],
- *   onEditParameter: (id: string, value: *) => boolean|void,
+ *   onEditParameter: (id: string, value: number|string) => boolean|void,
  *   onCommitParameter: () => void,
  *   render: () => void,
  *   commit: (label: string|null) => boolean,
- *   report: (result: *) => boolean,
+ *   report: (result: import('./chain_document_store.js').EditResult) => boolean,
  *   pinnedLabels: Set<string>}} deps
  */
 export function createChainParamRows({
@@ -44,9 +45,9 @@ export function createChainParamRows({
 }) {
   /** @type {ParameterDeclaration[]} */
   let declarations = [];
-  /** @type {Record<string, *>} */
+  /** @type {Record<string, number|string>} */
   let values = {};
-  /** @type {Map<string, *>} */
+  /** @type {Map<string, HTMLElement>} */
   const rows = new Map();
   /** @type {Map<string, Map<number, boolean>>} */
   const potentialSectionChoices = new Map();
@@ -85,7 +86,7 @@ export function createChainParamRows({
       admittedRanges = new Map(parameterRanges().map((range) => [range.name, range]));
     const ranges = admittedRanges;
     const off = deactivatedParameterIds(declarations, values, chain, catalog);
-    for (const control of container.querySelectorAll('.chain-modulation-enabled')) {
+    for (const control of /** @type {NodeListOf<HTMLButtonElement>} */ (container.querySelectorAll('.chain-modulation-enabled'))) {
       const id = `${control.dataset.label}.modulation-enabled`;
       const disabled = values[id] === 'disabled';
       control.setAttribute('aria-pressed', String(disabled));
@@ -98,9 +99,9 @@ export function createChainParamRows({
         chip?.setAttribute('aria-label', chipLabel(entry, disabled));
       }
     }
-    for (const control of container.querySelectorAll('.chain-palette-type')) {
-      const id = control.dataset.parameter;
-      control.value = values[id];
+    for (const control of /** @type {NodeListOf<HTMLSelectElement>} */ (container.querySelectorAll('.chain-palette-type'))) {
+      const id = /** @type {string} */ (control.dataset.parameter);
+      control.value = String(values[id]);
       control.disabled = !parameterLive(id);
     }
     for (const [id, row] of rows) {
@@ -145,7 +146,7 @@ export function createChainParamRows({
         || (modulation && modulationParameterHidden(field, (field) => values[`${label}.${field}`]));
       const shown = row.querySelector('.chain-param-note');
       const live = parameterLive(id);
-      for (const control of row.querySelectorAll('input, select')) control.disabled = !live;
+      for (const control of /** @type {NodeListOf<HTMLInputElement|HTMLSelectElement>} */ (row.querySelectorAll('input, select'))) control.disabled = !live;
       if (!row.hidden && !live) {
         row.dataset.deactivated = 'true';
         if (shown !== null) { shown.textContent = BAKED_PARAMETER_REASON; continue; }
@@ -161,8 +162,8 @@ export function createChainParamRows({
         describeControls(row, null);
       }
     }
-    for (const group of container.querySelectorAll('.chain-param-group')) {
-      group.hidden = [...group.querySelectorAll('.chain-param')].every((row) => row.hidden);
+    for (const group of /** @type {NodeListOf<HTMLElement>} */ (container.querySelectorAll('.chain-param-group'))) {
+      group.hidden = [.../** @type {NodeListOf<HTMLElement>} */ (group.querySelectorAll('.chain-param'))].every((row) => row.hidden);
     }
   };
 
@@ -176,26 +177,27 @@ export function createChainParamRows({
    * strip keeps the value it now shows so a topology edit re-dims what the new
    * selection hides.
    * @param {string} parameterId - The edited parameter.
-   * @param {*} value - The document value.
+   * @param {number|string} value - The document value.
    * @returns {boolean}
    */
   const editParameter = (parameterId, value) => {
     if (!parameterLive(parameterId)) return false;
-    const control = rows.get(parameterId)?.querySelector('.chain-param-control');
+    const control = /** @type {HTMLInputElement|HTMLSelectElement|null} */ (rows.get(parameterId)?.querySelector('.chain-param-control'));
     if (control?.tagName === 'SELECT'
-        && [...control.options].some((option) => option.value === value && option.disabled)) {
+        && [...(/** @type {HTMLSelectElement} */ (control)).options].some((option) => option.value === value && option.disabled)) {
       control.value = String(values[parameterId]);
       return false;
     }
     if (typeof value === 'number') {
       if (control?.type === 'range') {
         const declaration = declarations.find((parameter) => parameter.id === parameterId);
-        const minimum = numericSliderValue(declaration, Number(control.min));
-        const maximum = numericSliderValue(declaration, Number(control.max));
+        const minimum = numericSliderValue(declaration, Number((/** @type {HTMLInputElement} */ (control)).min));
+        const maximum = numericSliderValue(declaration, Number((/** @type {HTMLInputElement} */ (control)).max));
         value = Math.min(maximum, Math.max(minimum, value));
         control.value = String(numericSliderPosition(declaration, value));
         control.setAttribute('aria-valuetext', formatNumericValue(value));
-        rows.get(parameterId).querySelector('.chain-param-value').value = formatNumericValue(value);
+        const row = /** @type {HTMLElement} */ (rows.get(parameterId));
+        /** @type {HTMLInputElement} */ (row.querySelector('.chain-param-value')).value = formatNumericValue(value);
       }
     }
     if (onEditParameter(parameterId, value) === false) {
@@ -225,7 +227,7 @@ export function createChainParamRows({
 
   /**
    * @param {ParameterDeclaration} declaration - An enum8 declaration.
-   * @returns {*} The control for its domain values.
+   * @returns {HTMLInputElement|HTMLSelectElement} The control for its domain values.
    */
   const enumControl = (declaration) => {
     if (fieldOf(declaration.id) === 'random-center'
@@ -261,8 +263,8 @@ export function createChainParamRows({
 
   /**
    * @param {ParameterDeclaration} declaration - A binary32 declaration.
-   * @param {*} readout - The row's value readout, repainted as the slider moves.
-   * @returns {*} The slider over its domain.
+   * @param {HTMLInputElement} readout - The row's value readout, repainted as the slider moves.
+   * @returns {HTMLInputElement} The slider over its domain.
    */
   const sliderControl = (declaration, readout) => {
     const slider = el('input', 'chain-param-control');
@@ -273,8 +275,8 @@ export function createChainParamRows({
     slider.max = String(numericSliderPosition(declaration, maximum));
     // Any step grid would re-snap the authored value on first touch.
     slider.step = 'any';
-    slider.value = String(numericSliderPosition(declaration, values[declaration.id]));
-    slider.setAttribute('aria-valuetext', formatNumericValue(values[declaration.id]));
+    slider.value = String(numericSliderPosition(declaration, /** @type {number} */ (values[declaration.id])));
+    slider.setAttribute('aria-valuetext', formatNumericValue(/** @type {number} */ (values[declaration.id])));
     slider.addEventListener('input', (/** @type {*} */ event) => {
       const position = Math.min(Number(slider.max), Math.max(Number(slider.min), Number(event.target.value)));
       const value = numericSliderValue(declaration, position);
@@ -326,13 +328,16 @@ export function createChainParamRows({
     return row;
   };
 
+  const appendParameterControl = createParameterRowControls({
+    el, enumControl, sliderControl, getValues: () => values, editParameter, store,
+    commitParameter,
+  });
+
   /**
-   * The chip's own controls, one row per parameter the store reports
-   * for the instance (authored declarations plus undeclared catalog fields),
-   * labeled by the field segment alone: the chip already names the instance.
-   * @param {ChainEntry} entry - The chain entry.
-   * @param {ParameterDeclaration[]} declared - The instance's parameters.
-   * @returns {*} The parameter region.
+   * Builds the chip's parameter rows.
+   * @param {ChainEntry} entry - Chain instance.
+   * @param {ParameterDeclaration[]} declared - Instance parameters.
+   * @returns {HTMLElement} The parameter region.
    */
   const paramsElement = (entry, declared) => {
     const palette = entry.operator === PALETTE_OPERATOR;
@@ -352,7 +357,7 @@ export function createChainParamRows({
       note.textContent = 'No adjustable parameters';
       region.appendChild(note);
     }
-    /** @type {Map<string, *>} */
+    /** @type {Map<string, HTMLElement>} */
     const groups = new Map();
     const ordered = grouped ? parameterGroups.flatMap((group) => group.fields.flatMap(
       (field) => declared.filter((parameter) => fieldOf(parameter.id) === field))) : declared;
@@ -366,6 +371,7 @@ export function createChainParamRows({
           .replace(/^(sine|interference|grid)-/, ''))
         : potential && localField === 'l' ? 'Degree'
           : potential && localField === 'm' ? 'Order' : titleCase(localField);
+      /** @type {HTMLElement} */
       let parent = region;
       if (grouped) {
         const definition = parameterGroups.find((group) => group.fields.includes(field));
@@ -386,7 +392,7 @@ export function createChainParamRows({
             content.setAttribute('id', contentId);
             content.hidden = !(potentialSectionChoices.get(entry.label)?.get(term)
               ?? (term === 1 || Number(values[`${entry.label}.term-${term}-amplitude`] ?? 0) !== 0));
-            heading.type = 'button';
+            /** @type {HTMLButtonElement} */ (heading).type = 'button';
             heading.setAttribute('aria-label', groupName);
             heading.setAttribute('aria-controls', contentId);
             heading.setAttribute('aria-expanded', String(!content.hidden));
@@ -395,7 +401,7 @@ export function createChainParamRows({
             chevron.textContent = '\u25b8';
             heading.appendChild(chevron);
             heading.addEventListener('click', () => {
-              const open = content.hidden;
+              const open = /** @type {boolean} */ (content.hidden);
               content.hidden = !open;
               heading.setAttribute('aria-expanded', String(open));
               if (!potentialSectionChoices.has(entry.label))
@@ -407,7 +413,7 @@ export function createChainParamRows({
           region.appendChild(group);
           groups.set(groupName, content);
         }
-        parent = groups.get(groupName);
+        parent = /** @type {HTMLElement} */ (groups.get(groupName));
       }
       const row = el('div', 'chain-param');
       row.dataset.parameter = declaration.id;
@@ -418,55 +424,7 @@ export function createChainParamRows({
       if (color && field === 'pattern-speed')
         label.setAttribute('title', 'Animation rate. Zero freezes the noise; negative values reverse it.');
       row.appendChild(label);
-      if (declaration.storage === 'enum8') {
-        const control = enumControl(declaration);
-        control.setAttribute('aria-label', name);
-        row.appendChild(control);
-      } else {
-        const readout = el('input', 'chain-param-value');
-        readout.type = 'number';
-        readout.value = formatNumericValue(values[declaration.id]);
-        const slider = sliderControl(declaration, readout);
-        slider.setAttribute('aria-label', name);
-        readout.min = String(declaration.domain?.minimum);
-        readout.max = String(declaration.domain?.maximum);
-        // Any step grid would report a stored binary32 as stepMismatch.
-        readout.step = 'any';
-        readout.setAttribute('aria-label', `${name} value`);
-        /** @param {string} raw - The entered text. @returns {void} */
-        const enterValue = (raw) => {
-          // Unparseable number-input content reads as '', which Number() makes 0.
-          const trimmed = raw.trim();
-          const typed = trimmed === '' ? Number.NaN : Number(trimmed);
-          const current = Number(values[declaration.id]);
-          const value = Number.isFinite(typed)
-            ? Math.min(Number(readout.max), Math.max(Number(readout.min), typed))
-            : current;
-          readout.value = formatNumericValue(value);
-          if (value === current) return;
-          slider.value = String(numericSliderPosition(declaration, value));
-          editParameter(declaration.id, value);
-        };
-        readout.addEventListener('change', (/** @type {*} */ event) => {
-          enterValue(String(event.target.value ?? ''));
-          store.endValueRun();
-          commitParameter();
-        });
-        readout.addEventListener('keydown', (/** @type {*} */ event) => {
-          const direction = event.key === 'ArrowUp' ? 1
-            : event.key === 'ArrowDown' ? -1 : 0;
-          if (direction === 0) return;
-          event.preventDefault();
-          const shown = readout.value.trim() === '' ? NaN : Number(readout.value);
-          const from = Number.isFinite(shown) ? shown : Number(values[declaration.id]);
-          enterValue(String(numericSliderValue(declaration,
-            numericSliderPosition(declaration, from) + direction * nudgeStep(declaration))));
-          store.endValueRun();
-          commitParameter();
-        });
-        row.appendChild(slider);
-        row.appendChild(readout);
-      }
+      appendParameterControl(row, declaration, name);
       rows.set(declaration.id, row);
       parent.appendChild(row);
     }
@@ -482,7 +440,7 @@ export function createChainParamRows({
     editParameter,
     commitParameter,
     flushParameterEdit: commitSliderEdit,
-    /** @param {ParameterDeclaration[]} nextDeclarations @param {Record<string, *>} nextValues */
+    /** @param {ParameterDeclaration[]} nextDeclarations @param {Record<string, number|string>} nextValues */
     reset(nextDeclarations, nextValues) {
       rows.clear();
       declarations = nextDeclarations;
@@ -498,14 +456,14 @@ export function createChainParamRows({
         values[id] = value;
         const row = rows.get(id);
         if (!row) continue;
-        const control = row.querySelector('.chain-param-control');
-        if (control.type === 'checkbox') control.checked = value === 'on';
+        const control = /** @type {HTMLInputElement|HTMLSelectElement} */ (row.querySelector('.chain-param-control'));
+        if (control.type === 'checkbox') /** @type {HTMLInputElement} */ (control).checked = value === 'on';
         else if (control.type === 'range') {
           const declaration = declarations.find((parameter) => parameter.id === id);
           control.value = String(numericSliderPosition(declaration, Number(value)));
           control.setAttribute('aria-valuetext', formatNumericValue(value));
         } else control.value = String(value);
-        const readout = row.querySelector('.chain-param-value');
+        const readout = /** @type {HTMLInputElement|null} */ (row.querySelector('.chain-param-value'));
         if (readout) readout.value = formatNumericValue(value);
       }
       syncParameterRows();
