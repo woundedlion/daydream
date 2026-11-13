@@ -129,6 +129,26 @@ test('strip clicks copy at pointer coordinates', async () => {
   f.controller.dispose();
 });
 
+test('zoomed strip copies sample the visible phase for each tab', async () => {
+  const copies = [];
+  const palette = {get: phase => [phase, 0, 0]};
+  const f = setup({getPalette: () => palette,
+    copy: async hex => { copies.push(hex); return true; }});
+  f.viewport.zoom(0.2, 0.6);
+  f.drag.onStart({clientX:50, clientY:10});
+  f.drag.onEnd({clientX:50, clientY:10});
+  await Promise.resolve();
+  assert.equal(copies.at(-1), linearRgbToHex(...palette.get(0.4)));
+  assert.notEqual(copies.at(-1), linearRgbToHex(...palette.get(0.5)));
+  f.setTab('generative');
+  f.model.setWindow(0.2, 0.4);
+  f.canvas.dispatch('keydown', {key:'Enter'});
+  await Promise.resolve();
+  assert.equal(copies.length, 2);
+  assert.equal(copies.at(-1), linearRgbToHex(...palette.get(0.5)));
+  f.controller.dispose();
+});
+
 test('abandoned strip drags cannot zoom', () => {
   const f = setup();
   f.drag.onStart({clientX:10, clientY:10});

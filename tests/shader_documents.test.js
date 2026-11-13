@@ -1811,10 +1811,13 @@ test('source and file switches preserve edits when discard is refused', async ()
   assert.equal(source.value, before);
   assert.equal(harness.win.location.hash, hash);
   const file = harness.elements.get('shader-document-file');
-  file.files = [{ size: 100, name: 'new.shader.json', text: () => {
-    throw new Error('refused file must not be read');
+  let reads = 0;
+  file.files = [{ size: 100, name: 'new.shader.json', text: async () => {
+    reads += 1;
+    return CHAIN_STUDY;
   } }];
   await onChange(file)();
+  assert.equal(reads, 0);
   assert.equal(confirmations, 2);
   assert.equal(harness.win.location.hash, hash);
   harness.controller.save();
@@ -1965,7 +1968,6 @@ for (const route of ['link', 'query']) {
   test(`schema ${CHAIN_SNAPSHOT_SCHEMA_VERSION} ${route} Twist snapshots restore total angles and runtime`, async () => {
     const catalog = JSON.parse(ENGINE_CATALOG);
     const twist = catalog.operators.find((operator) => operator.id === 'sphere.lens.twist.v2');
-    Object.assign(twist.params[0], {id: 'twist-angle', name: 'Twist Angle (rad)', min: -96, max: 96, default: Math.PI * 2});
     const document = scratchChainDocument(catalog, [
       {label: 'lens', operator: twist.id}, ...SCRATCH.descriptor.chain,
     ]);
