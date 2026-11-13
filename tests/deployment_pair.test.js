@@ -170,6 +170,7 @@ test('record and attempt publish their success and pending statuses', async (t) 
     calls.push(args); return {id: 42};
   });
   assert.equal(calls[1][1].log_url, 'https://github.com/example/daydream/actions/runs/5');
+  assert.equal(calls[1][1].state, 'success');
   calls.length = 0;
   await run('attempt', {...env, GITHUB_SERVER_URL: 's', GITHUB_RUN_ID: '1'}, async (...args) => {
     calls.push(args); return {id: 42};

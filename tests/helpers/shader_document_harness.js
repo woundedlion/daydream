@@ -518,10 +518,7 @@ const expectStageAbsent = (document, label) => {
 function stageEditor(harness, label) {
   stripChips(harness).find((chip) => chip.dataset.label === label).dispatch('click');
   return (parameterId, value) => {
-    const row = stripChips(harness)
-      .find((chip) => chip.dataset.label === label)
-      .querySelectorAll('.chain-param')
-      .find((row) => row.dataset.parameter === parameterId);
+    const row = paramRow(harness, label, parameterId);
     const control = row.querySelector('.chain-param-control');
     const readout = row.querySelector('.chain-param-value');
     control.value = String(control.type === 'range' && control.min !== readout.min

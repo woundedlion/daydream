@@ -552,16 +552,16 @@ const CONTRAST_EXEMPT = {
     '.gui-container .effect-gui .param-warning-note, .gui-container .effect-gui .param-fold-note':
       'lil-gui supplies its own background in its vendored stylesheet',
     'div.label': 'text over the live canvas',
-    '.segment-stats': 'translucent readout over the live canvas',
-    '.segment-stats th': 'translucent readout over the live canvas',
-    '.segment-stats .seg-label': 'translucent readout over the live canvas',
-    '.segment-stats .seg-label.seg-diverged': 'translucent readout over the live canvas',
-    '.segment-stats .seg-time': 'translucent readout over the live canvas',
-    '.segment-stats .seg-time.slow': 'translucent readout over the live canvas',
-    '.segment-stats .seg-status': 'translucent readout over the live canvas',
-    '.segment-stats .seg-status.seg-fault': 'translucent readout over the live canvas',
-    '.segment-stats .seg-detail': 'translucent readout over the live canvas',
-    '.segment-stats .seg-notices': 'translucent readout over the live canvas',
+    '.segment-stats': 'measured separately over a white canvas',
+    '.segment-stats th': 'measured separately over a white canvas',
+    '.segment-stats .seg-label': 'measured separately over a white canvas',
+    '.segment-stats .seg-label.seg-diverged': 'measured separately over a white canvas',
+    '.segment-stats .seg-time': 'measured separately over a white canvas',
+    '.segment-stats .seg-time.slow': 'measured separately over a white canvas',
+    '.segment-stats .seg-status': 'measured separately over a white canvas',
+    '.segment-stats .seg-status.seg-fault': 'measured separately over a white canvas',
+    '.segment-stats .seg-detail': 'measured separately over a white canvas',
+    '.segment-stats .seg-notices': 'measured separately over a white canvas',
   },
   'shader.css': {
     '.shader-toolbar button:disabled':
@@ -762,9 +762,15 @@ function contrast(css, text, surfaces) {
   return (light + 0.05) / (dark + 0.05);
 }
 
-test('segment status text retains AA contrast over a white canvas', () => {
-  const css = `${read('styles', 'index.css')} .white-canvas { background: #fff; }`;
-  for (const selector of ['.segment-stats .seg-status', '.segment-stats .seg-status.seg-fault']) {
+test('segment stats text retains AA contrast over a white canvas', () => {
+  const sheet = read('styles', 'index.css');
+  const css = `${sheet} .white-canvas { background: #fff; }`;
+  const selectors = rules(sheet)
+    .filter(([selector, declarations]) => selector.startsWith('.segment-stats')
+      && /(?:^|;)\s*color\s*:/.test(declarations))
+    .map(([selector]) => selector);
+  assert.ok(selectors.length > 0);
+  for (const selector of selectors) {
     const ratio = contrast(css, selector, ['.segment-stats', '.white-canvas']);
     assert.ok(ratio >= AA_CONTRAST, `${selector} contrast is ${ratio.toFixed(2)}:1`);
   }
