@@ -1,28 +1,24 @@
 // Real-engine contract pin for the WASM surface: loads the shipped module and
 // exercises the methods and return shapes FakeEngine models, plus MeshOps and
 // PaletteOps.
-import { EFFECT_IDENTITIES } from '../generated/engine_contract.mjs';
-
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { isDeepStrictEqual } from 'node:util';
+
+import { EFFECT_IDENTITIES } from '../generated/engine_contract.mjs';
 import createHolosphereModule from '../generated/holosphere_wasm.js';
+
 import { LOWERING, validateRegistryFaces } from '../src/workbench/solids/solid_registry_codegen.js';
 import { MAX_DISPLAY_CAP_PERCENT } from '../src/renderer/display_caps.js';
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
-
-import { createChainValidator } from '../src/workbench/solids/solid_validation.js';
+import { applyOp, createChainValidator, meshOpFailure } from '../src/workbench/solids/solid_validation.js';
 import { KNOWN_OPS, OP_DEFS, CATALAN_BASES, SIMPLE_SEEDS, DEFINED_SEED_CONSTANTS } from '../src/workbench/solids/solid_op_params.js';
-import { applyOp, meshOpFailure } from '../src/workbench/solids/solid_validation.js';
-
 import { isViewLive, refreshPixelView } from '../src/renderer/pixel_view.js';
 import { DEFAULT_EFFECT, resolutionPresets } from '../src/effects/effect_roster.js';
 import { paletteControlsFromRecipe, paletteRecipeFromControls, PaletteV4 } from '../src/workbench/palettes/palette_controls.js';
 import { paletteAdjustmentSummary } from '../src/workbench/palettes/palette_math.js';
 import { stageGrouping } from '../src/effects/shader_stages.js';
-
-
 
 // Capture the bridge's diagnostics for clamped MeshOps arguments.
 const moduleLogs = [];
@@ -98,8 +94,6 @@ function interfaceBody(name) {
   assert.ok(end > at, `interface ${name} must be closed at column 0`);
   return DTS.slice(at, end).replace(/\/\*[\s\S]*?\*\//g, '');
 }
-
-
 
 /**
  * Members of a named `export interface` and of everything it extends. Only
@@ -1368,7 +1362,6 @@ test('registry validation expands composite and flattened base recipes', async (
   }));
   assert.deepEqual(calls, ['hankin', 'dual']);
 });
-
 
 test('generated effect IDs and display names install the same preset and parameter signature', () => {
   assert.deepEqual(engine.getEffectIdentities(), EFFECT_IDENTITIES);

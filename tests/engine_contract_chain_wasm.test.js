@@ -1,25 +1,20 @@
 // ShaderChain WASM binding contract against FakeChainEngine.
 
-import {chainSnapshot} from './helpers/effect_gui_harness.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import createHolosphereModule from '../generated/holosphere_wasm.js';
+import { declarationFromCatalogField } from '../generated/shader/shader_workbench.mjs';
 
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
+import {resolutionPresets} from '../src/effects/effect_roster.js';
+import { deactivatedParameterIds, modulationValueLimits } from '../src/workbench/shader/chain_presentation.js';
 
-
+import {chainSnapshot} from './helpers/effect_gui_harness.js';
 import {
   FakeChainEngine, ChainSnapshotRestoreResult, ChainStatus, PALETTE_FADE_FRAMES, PALETTE_HUE_STEP,
 } from './helpers/fake_engine.js';
-
-import {resolutionPresets} from '../src/effects/effect_roster.js';
-
-
-
-import { deactivatedParameterIds, modulationValueLimits } from '../src/workbench/shader/chain_presentation.js';
-import { declarationFromCatalogField } from '../generated/shader/shader_workbench.mjs';
 
 const sink = () => {};
 const M = await createHolosphereModule({print: sink, printErr: sink});
@@ -191,7 +186,6 @@ test('adapter decode rejects nested authoring and deletion from getters', async 
     assert.equal(module.HS_MODULE_DEAD, true);
   }
 });
-
 
 const DEFAULT_CHAIN = [
   { instance: 'camera', operator: 'sphere.rotate.v2' },
