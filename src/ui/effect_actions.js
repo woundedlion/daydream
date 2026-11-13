@@ -9,6 +9,7 @@
  */
 
 import { enumChoices } from "../effects/param_sync.js";
+import {createActionFeedback, EXPORT_ICON, presentAction} from './effect_action_feedback.js';
 
 /** @typedef {import("./effect_param_controls.js").GuiController} GuiController */
 /** @typedef {import("./effect_param_controls.js").Gui} Gui */
@@ -45,8 +46,6 @@ import { enumChoices } from "../effects/param_sync.js";
  */
 
 export {FLASH_MS, EXPORT_COPIED, EXPORT_FAILED, EXPORT_REFUSED} from './effect_action_feedback.js';
-import {createActionFeedback, presentAction} from './effect_action_feedback.js';
-const EXPORT_ICON = '\u29c9';
 const RESET_ICON = '\u21ba';
 const PREVIOUS_ICON = '\u25c0';
 const NEXT_ICON = '\u25b6';
@@ -72,19 +71,11 @@ export function createEffectActions(fx, deps) {
     export() { return feedback.exportAndFlash(); },
   };
 
-
-
   /** @type {GuiController} */
   let exportCtrl;
   /** @type {HTMLElement} */
   let exportStatus;
   const feedback = createActionFeedback(fx, deps, () => exportCtrl, () => exportStatus);
-
-
-
-
-
-
 
   /** @param {number} count @param {number} index */
   function showPreset(count, index) {

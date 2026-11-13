@@ -9,7 +9,7 @@ export const FLASH_MS = 1500;
 export const EXPORT_COPIED = '\u2713 Copied!';
 export const EXPORT_FAILED = '\u2717 Copy failed';
 export const EXPORT_REFUSED = '\u2717 Export failed';
-const EXPORT_ICON = '\u29c9';
+export const EXPORT_ICON = '\u29c9';
 
 /** @typedef {import('./effect_param_controls.js').GuiController} GuiController */
 /** @typedef {import('./effect_param_controls.js').Gui} Gui */
@@ -45,12 +45,12 @@ export function createActionFeedback(fx, deps, getController, getStatus) {
     }, FLASH_MS);
   }
 
-/**
- * Copy text and report the outcome through Export feedback and notices. A
- * copy that lands after the record was replaced reports nothing.
- * @param {string} text - The text to copy.
- * @returns {Promise<void>} Clipboard completion.
- */
+  /**
+   * Copy text and report the outcome through Export feedback and notices. A
+   * copy that lands after the record was replaced reports nothing.
+   * @param {string} text - The text to copy.
+   * @returns {Promise<void>} Clipboard completion.
+   */
   function copyAndFlash(text) {
     return copyText(text).then((copied) => {
       if (!isActive(fx)) return;
@@ -71,7 +71,7 @@ export function createActionFeedback(fx, deps, getController, getStatus) {
     });
   }
 
-/** @returns {Promise<void>|void} Clipboard completion, or nothing when blocked. */
+  /** @returns {Promise<void>|void} Clipboard completion, or nothing when blocked. */
   function exportAndFlash() {
     const result = buildExport();
     if ('error' in result) {
