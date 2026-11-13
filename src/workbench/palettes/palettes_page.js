@@ -54,7 +54,7 @@ function switchTab(tabName, updateUrl = true) {
   });
   // Named Palettes loads procedural coefficients, so it only applies here.
   const palettesPanel = byId('named_palettes_panel', HTMLElement);
-  if (palettesPanel) palettesPanel.style.display = (tabName === 'procedural') ? '' : 'none';
+  palettesPanel.style.display = (tabName === 'procedural') ? '' : 'none';
 
   if (updateUrl)
     replaceUrl(paletteTabUrl(window.location.href, tabName));
@@ -368,7 +368,6 @@ function redrawForViewport() {
  */
 function updatePaletteCodeOutput() {
   const codeOutput = byId('palette_code_output', HTMLElement);
-  if (!codeOutput) return;
 
   if (activeTab === 'procedural') {
     codeOutput.textContent = proceduralPaletteCpp(
@@ -398,7 +397,6 @@ function loadNamedPalette(entry) {
  */
 function buildPaletteGallery() {
   const gallery = byId('palette_gallery', HTMLElement);
-  if (!gallery) return;
   namedPalettes.forEach(entry => {
     const label = prettyPaletteName(entry.name);
 
@@ -512,11 +510,11 @@ async function initializePaletteEngine() {
 
 function initializePaletteCanvases() {
   colorStripCanvas = byId('colorStripCanvas', HTMLCanvasElement);
-  colorStripCtx = colorStripCanvas ? colorStripCanvas.getContext('2d') : null;
+  colorStripCtx = colorStripCanvas.getContext('2d');
   waveGraphCanvas = byId('waveGraphCanvas', HTMLCanvasElement);
-  waveGraphCtx = waveGraphCanvas ? waveGraphCanvas.getContext('2d') : null;
+  waveGraphCtx = waveGraphCanvas.getContext('2d');
   hueKeyWheelCanvas = byId('hueKeyWheelCanvas', HTMLCanvasElement);
-  hueKeyWheelCtx = hueKeyWheelCanvas ? hueKeyWheelCanvas.getContext('2d') : null;
+  hueKeyWheelCtx = hueKeyWheelCanvas.getContext('2d');
   resetZoomButton = byId('resetZoomButton', HTMLButtonElement);
   paletteRangeHeading = byId('palette_range_heading', HTMLElement);
   copyFeedback = byId('palette_copy_feedback', HTMLElement);
@@ -524,8 +522,7 @@ function initializePaletteCanvases() {
   copyFeedbackStatus = byId('palette_copy_status', HTMLElement);
   copyFeedbackHex = byId('palette_copy_hex', HTMLElement);
 
-  if (!colorStripCanvas || !waveGraphCanvas || !hueKeyWheelCanvas ||
-      !colorStripCtx || !waveGraphCtx || !hueKeyWheelCtx) {
+  if (!colorStripCtx || !waveGraphCtx || !hueKeyWheelCtx) {
     showFatalError('The palette tool could not acquire its canvases — a '
       + 'canvas element is missing or the browser refused a 2D context. '
       + 'The controls below are inert.');
