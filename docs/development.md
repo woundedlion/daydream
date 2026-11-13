@@ -31,7 +31,7 @@ See [deployment](deployment.md) for installing and verifying an engine package.
 Composed parameter definitions carry `group: {name, title, order}` from C++.
 The panel groups unfamiliar display labels by that metadata.
 
-`src/app/daydream.js` injects the statistics view into the segment controller.
+`src/app/app_segments.js` injects `SegmentStatsView` into the segment controller.
 The controller publishes `SegmentStatsState` without constructing DOM views.
 Application and workbench URL writes use `src/shared/url.js`.
 
@@ -112,9 +112,10 @@ After `npm ci` and an engine install, run `npm run lint`, `npm run typecheck`, a
 The application composition root, renderer, and GUI wrapper are part of the
 checked source roster. TypeScript resolves the installed lil-gui declarations
 and the exact Three.js type package pinned in `package-lock.json`. Engine calls
-use the declarations from the installed engine bundle. The module-ready and
-display-ready views in `daydream.js` describe callbacks that run after engine
-installation and mesh allocation; the host's early lifecycle state stays nullable.
+use the declarations from the installed engine bundle. The `loaded` and `display` casts in `src/app/app_instances.js`, typed by
+`LoadedHost` and `ReadyDisplay` in `src/app/app_context.js`, describe callbacks
+that run after engine installation and mesh allocation; the host's early lifecycle
+state stays nullable.
 
 A local green run can include skipped checks. Engine source checks search
 `engine`, `../Holosphere`, and `../pov` relative to this checkout; set
