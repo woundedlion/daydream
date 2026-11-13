@@ -5,7 +5,6 @@
 
 /** @typedef {import('../../generated/holosphere_wasm.js').ArenaMetrics} ArenaMetrics */
 
-
 /**
  * Hand one frame's measurements to the stats overlay.
  * @param {number} duration - Frame draw time in milliseconds.
@@ -15,7 +14,6 @@
 export function updateStats(driver, duration, adapter) {
   driver.statsView?.update(duration, adapter?.getArenaMetrics?.() ?? null);
 }
-
 
 /** @param {import('./driver.js').Daydream} driver @param {boolean} captureDue */
 export function captureDisplayFrame(driver, captureDue) {

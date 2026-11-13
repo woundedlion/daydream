@@ -5,7 +5,6 @@
 
 import {captureDisplayFrame} from './driver_capture.js';
 
-
 /**
  * Render the main sphere view into its viewport. Assumes the scissor test is
  * already enabled by the caller.
@@ -60,7 +59,6 @@ export function renderPip(driver) {
   }
   driver.renderer.render(driver.scene, driver.pipCamera);
 }
-
 
 /** @param {import('./driver.js').Daydream} driver @param {boolean} captureDue */
 export function renderDisplayViews(driver, captureDue) {

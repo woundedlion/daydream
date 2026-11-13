@@ -26,8 +26,6 @@ import { MOBILE_BREAKPOINT_PX } from "../shared/layout.js";
 
 export { LabelPool } from "./label_pool.js";
 
-
-
 /**
  * Browser-side simulator: drives the three.js scene that renders the LED
  * sphere as instanced dots, on a fixed-timestep sim clock with on-demand

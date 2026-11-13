@@ -43,7 +43,6 @@ export function setupDots(driver) {
   driver.scene.add(driver.dotMesh);
 }
 
-
 /** @param {import('./driver.js').Daydream} driver */
 function initializeDotMaterial(driver) {
   if (!driver.dotMaterial) {
@@ -110,6 +109,5 @@ function initializeDotMaterial(driver) {
       );
     };
   }
-
 
 }

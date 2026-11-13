@@ -48,7 +48,7 @@ export function updatePovSweep(driver, advanced, captureReady, previousSweepTime
     if (driver.timeAccumulator !== previousSweepTime)
       driver.needsRender = true;
   }
-return panelDue;
+  return panelDue;
 }
 
 /** @param {import('./driver.js').Daydream} driver */

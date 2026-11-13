@@ -61,5 +61,5 @@ export function readSidebarMetrics(engine, moduleDead, logWarn) {
       logWarn('getEffectPresetCounts failed (sidebar preset counts unavailable):', e);
     }
   }
-return {effectSizes, presetCounts};
+  return {effectSizes, presetCounts};
 }

@@ -209,7 +209,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
       faceNormals.push(new THREE.Vector3().copy(faceNormal(meshData.vertices, f)).normalize());
     });
 
-  return {vertices, faceColors, faceCenters, faceNormals};
+    return {vertices, faceColors, faceCenters, faceNormals};
   }
 
   /** @param {SolidViewFlags} view @param {Int32Array|null} faceClasses @param {number[]} vertices @param {number[]} faceColors */
@@ -239,7 +239,6 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
       mainMesh = new THREE.Mesh(geometry, faceClasses ? materials.faceColorize : materials.face);
       scene.add(mainMesh);
     }
-
   }
 
   /** @param {SolidMeshData} meshData @param {SolidViewFlags} view */
@@ -249,7 +248,6 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
       vertPoints = new THREE.Points(dotGeo, materials.vert);
       scene.add(vertPoints);
     }
-
   }
 
   /** @param {SolidMeshData} meshData @param {SolidViewFlags} view */
@@ -283,7 +281,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
     edgeLines = new THREE.LineSegments(lineGeo, materials.edge);
     scene.add(edgeLines);
 
-  return edges.length;
+    return edges.length;
   }
 
   /** @param {SolidViewFlags} view @param {any[]} faceCenters @param {any[]} faceNormals */
@@ -304,7 +302,6 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
       normalLines = new THREE.LineSegments(normGeo, materials.normal);
       scene.add(normalLines);
     }
-
   }
 
   /** @param {SolidMeshData} meshData @param {SolidViewFlags} view */
@@ -324,7 +321,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
       labelsBuilt = true;
     }
 
-  return labelsBuilt;
+    return labelsBuilt;
   }
 
   return {

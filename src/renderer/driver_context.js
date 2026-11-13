@@ -3,7 +3,6 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-
 /**
  * Wire WebGL context-loss / -restore handling on the canvas: on loss, flag
  * contextLost (render() then stops issuing GL calls), end any recording, and

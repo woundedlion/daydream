@@ -195,7 +195,6 @@ function mountSolidScene(page) {
     labelsContainer: page.labelsContainer,
   });
 
-
 }
 
 function wireSavedSolidControls() {
@@ -217,7 +216,6 @@ function wireSavedSolidControls() {
   });
   document.getElementById('clearSavedBtn').addEventListener('click', clearSavedSolids);
   document.getElementById('addOpGrid').addEventListener('click', activateAddOp);
-
 
 }
 
@@ -871,35 +869,35 @@ const DRAG_SLOP_PX = 4;
  */
 function moveRowDragPreview(page, gesture, e) {
   const {el, grip, list, index, originX, originY, originListTop, originListLeft} = gesture;
-    const rect = list.getBoundingClientRect();
-    const dx = e.clientX - originX + originListLeft - rect.left + list.scrollLeft;
-    const dy = e.clientY - originY + originListTop - rect.top + list.scrollTop;
-    el.style.transform = `translate(${dx}px, ${dy}px)`;
+  const rect = list.getBoundingClientRect();
+  const dx = e.clientX - originX + originListLeft - rect.left + list.scrollLeft;
+  const dy = e.clientY - originY + originListTop - rect.top + list.scrollTop;
+  el.style.transform = `translate(${dx}px, ${dy}px)`;
 
-    const targetIndex = getDragTargetIndex(e, list);
-    void checkDropSlot(index, targetIndex).catch(console.error);
-    const items = [...list.children];
-    const draggingItem = items[index];
-    if (!draggingItem) return;
+  const targetIndex = getDragTargetIndex(e, list);
+  void checkDropSlot(index, targetIndex).catch(console.error);
+  const items = [...list.children];
+  const draggingItem = items[index];
+  if (!draggingItem) return;
 
-    // An engine-invalid slot gets no insertion preview and no drop cursor.
-    const targetCheck = page.dropSlotChecks.get(targetIndex);
-    const blocked = targetCheck?.ok === false;
-    grip.classList.toggle('drop-blocked', blocked);
-    if (blocked) {
-      items.forEach((item, idx) => {
-        if (idx !== index) item.style.transform = '';
-      });
-      return;
-    }
-
-    // Amount to visual shift: height of item + gap (space-y-1 is 0.25rem = 4px)
-    const shiftAmount = draggingItem.offsetHeight + 4;
+  // An engine-invalid slot gets no insertion preview and no drop cursor.
+  const targetCheck = page.dropSlotChecks.get(targetIndex);
+  const blocked = targetCheck?.ok === false;
+  grip.classList.toggle('drop-blocked', blocked);
+  if (blocked) {
     items.forEach((item, idx) => {
-      if (idx === index) return;
-      const shift = reorderPreviewShift(index, targetIndex, idx);
-      item.style.transform = shift === 0 ? '' : `translateY(${shift * shiftAmount}px)`;
+      if (idx !== index) item.style.transform = '';
     });
+    return;
+  }
+
+  // Amount to visual shift: height of item + gap (space-y-1 is 0.25rem = 4px)
+  const shiftAmount = draggingItem.offsetHeight + 4;
+  items.forEach((item, idx) => {
+    if (idx === index) return;
+    const shift = reorderPreviewShift(index, targetIndex, idx);
+    item.style.transform = shift === 0 ? '' : `translateY(${shift * shiftAmount}px)`;
+  });
 }
 
 /**
@@ -921,8 +919,6 @@ function wireRowDrag(grip, index, el, list, revision) {
     grip.classList.remove('drop-blocked');
     for (const item of list.children) item.style.transform = '';
   };
-
-
 
   createPointerDrag({
     element: grip,

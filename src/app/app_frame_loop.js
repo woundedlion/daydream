@@ -22,5 +22,4 @@ export function startAppFrameLoop({daydream, host, recording, getTeardown}) {
     onModuleDead: () => getTeardown()?.dispose(),
   }));
 
-
 }

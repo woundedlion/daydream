@@ -32,5 +32,4 @@ export function createSimulatorTeardown({win, onKeyDown, pageFailureListeners, o
     removeOverlay: () => recording.removeOverlay(),
   });
 
-
 }
