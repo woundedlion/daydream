@@ -7,7 +7,7 @@
 // Lissajous curves and rational-frequency matching.
 import { formatFloatCpp } from '../../shared/cpp_format.js';
 
-const TWO_PI = 2 * Math.PI;
+export const TWO_PI = 2 * Math.PI;
 
 /**
  * The largest denominator the ratio search admits, and its default numerator

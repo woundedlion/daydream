@@ -11,13 +11,13 @@ import { createSlider } from '../../shared/slider.js';
 import { createFrameScheduler, onPageTeardown } from '../../shared/page_lifecycle.js';
 import {
   MAX_RATIONAL_TERM,
+  TWO_PI,
   lissajous,
   snapToRationalRatio,
   lissajousCodeString,
   domainClosureWarning,
 } from './lissajous_math.js';
 
-const TWO_PI = 2 * Math.PI;
 
 const config = {
   C1: { min: 1, max: 100, step: 0.01, default: 12, scale: 100, label: "C₁" },
