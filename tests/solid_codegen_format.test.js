@@ -26,9 +26,28 @@ test('generated solid recipes pass clang-format', {skip: engineSkip}, (t) => {
     'truncatedIcosahedron_ambo_relax_truncate33_hk64',
     'truncatedIcosahedron_ambo_relax_truncate001_hankin59'];
   const sources = bases.map((base) => generateRecipeCpp({base, ops: ['kis']}, 'IslamicStarPatterns'));
-  const [definitions, entry] = generateRegistryCpp({base: 'cube', ops: ['kis']})
-    .split('// Append this Entry to islamic_registry.\n');
-  sources.push(`${definitions}inline constexpr Entry islamic_registry[] = {\n${entry}\n};`);
+  sources.push(generateRecipeCpp({base: 'truncatedIcosahedron', ops: [
+    {op: 'hankin', params: {angle: 58}}, {op: 'chamfer', params: {t: 0.63}},
+  ]}, 'Archimedean'));
+  sources.push(generateRecipeCpp({base: 'pentagonalHexecontahedron', ops: [
+    {op: 'truncate', params: {t: 0.33}}, 'ambo', 'dual',
+  ]}, 'Catalan'));
+  const registryCases = [
+    [{base: 'cube', ops: ['kis']}],
+    [{base: 'truncatedIcosahedron', ops: ['ambo',
+      {op: 'relax', params: {iter: 100}}, {op: 'truncate', params: {t: 0.01}},
+      {op: 'hankin', params: {angle: 59}}]}],
+    [{base: 'icosahedron_kis_gyro', ops: [{op: 'hankin', params: {angle: 54}}]},
+      {seed: 'icosahedron', ops: [{op: 'kis', param: 0, twist: 0}, {op: 'gyro', param: 0, twist: 0}]}],
+    [{base: 'truncatedTetrahedron', ops: ['kis', 'gyro']}],
+    [{base: 'truncatedCuboctahedron', ops: Array.from({length: 3}, () =>
+      ({op: 'truncate', params: {t: 0.33}}))}],
+  ];
+  for (const [item, baseRecipe] of registryCases) {
+    const [definitions, entry] = generateRegistryCpp(item, baseRecipe)
+      .split('// Append this Entry to islamic_registry.\n');
+    sources.push(`${definitions}inline constexpr Entry islamic_registry[] = {\n${entry}\n};`);
+  }
   for (const source of sources) {
     const checked = spawnSync(formatter,
       ['--dry-run', '--Werror', `--style=file:${engineRoot}/.clang-format`],

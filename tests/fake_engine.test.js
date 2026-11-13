@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  FakeChainEngine, ChainStatus, ParamSetResult, ChainSnapshotRestoreResult, unpinnedEngineMethods,
+  DEFAULT_CHAIN, FakeChainEngine, ChainStatus, ParamSetResult, ChainSnapshotRestoreResult, unpinnedEngineMethods,
 } from './helpers/fake_engine.js';
 
 function installModulatedChain(engine) {
@@ -9,12 +9,7 @@ function installModulatedChain(engine) {
   engine.bindings.setShaderChain([...engine.program, {instance: 'modulation', operator: 'color.modulate.v1'}]);
 }
 
-const CHAIN = [
-  { label: 'camera', operator: 'sphere.rotate.v2' },
-  { label: 'project', operator: 'project.stereographic.v2' },
-  { label: 'sample', operator: 'sample.grid.v4' },
-  { label: 'colorize', operator: 'colorize.generated-palette.v4' },
-];
+const CHAIN = DEFAULT_CHAIN.map(({instance: label, operator}) => ({label, operator}));
 
 test('FakeChainEngine mocks nothing outside the pinned engine surface', () => {
   const engine = new FakeChainEngine();

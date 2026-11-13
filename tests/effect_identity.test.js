@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import {EFFECT_IDENTITIES} from '../generated/engine_contract.mjs';
 import { canonicalEffectId, effectDisplayName } from '../src/effects/effect_identity.js';
 
 test('engine identity metadata resolves canonical IDs and display names to display labels', () => {
-  for (const [id, name] of [['comets', 'Comets'], ['alien-brain', 'AlienBrain'],
-    ['gs-reaction-diffusion', 'GSReactionDiffusion']]) {
+  for (const {id, display_name: name} of EFFECT_IDENTITIES) {
     assert.equal(canonicalEffectId(name), id);
     assert.equal(canonicalEffectId(id), id);
     assert.equal(effectDisplayName(name), name);

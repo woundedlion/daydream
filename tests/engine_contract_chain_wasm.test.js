@@ -13,7 +13,7 @@ import { deactivatedParameterIds, modulationValueLimits } from '../src/workbench
 
 import {chainSnapshot} from './helpers/effect_gui_harness.js';
 import {
-  FakeChainEngine, ChainSnapshotRestoreResult, ChainStatus, PALETTE_FADE_FRAMES, PALETTE_HUE_STEP,
+  DEFAULT_CHAIN, FakeChainEngine, ChainSnapshotRestoreResult, ChainStatus, PALETTE_FADE_FRAMES, PALETTE_HUE_STEP,
 } from './helpers/fake_engine.js';
 
 const sink = () => {};
@@ -186,13 +186,6 @@ test('adapter decode rejects nested authoring and deletion from getters', async 
     assert.equal(module.HS_MODULE_DEAD, true);
   }
 });
-
-const DEFAULT_CHAIN = [
-  { instance: 'camera', operator: 'sphere.rotate.v2' },
-  { instance: 'project', operator: 'project.stereographic.v2' },
-  { instance: 'sample', operator: 'sample.grid.v4' },
-  { instance: 'colorize', operator: 'colorize.generated-palette.v4' },
-];
 
 test('setShaderChain applies a chain, registers label.field params and bumps the generation', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
@@ -484,6 +477,11 @@ test('palette snapshot restores reject inconsistent fade state', () => {
     cycle.fadeActive = true;
     cycle.frame = 1;
   }
+  for (const target of [engine, fake]) {
+    assert.equal(chainCall(target, 'restoreSnapshot', advanced).value, ChainSnapshotRestoreResult.APPLIED.value);
+    assert.deepEqual(chainCall(target, 'getSnapshot').paletteBank, advanced.paletteBank);
+  }
+  advanced.paletteBank.cycles[0].frame = PALETTE_FADE_FRAMES - 1;
   for (const target of [engine, fake]) {
     assert.equal(chainCall(target, 'restoreSnapshot', advanced).value, ChainSnapshotRestoreResult.APPLIED.value);
     assert.deepEqual(chainCall(target, 'getSnapshot').paletteBank, advanced.paletteBank);

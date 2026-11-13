@@ -13,6 +13,14 @@ import { CLASS_METHODS } from '../../generated/engine_contract.mjs';
 export const PALETTE_FADE_FRAMES = 600;
 /** Base-hue advance per generated palette; mirror of `GeneratedPaletteBank::HUE_STEP`. */
 export const PALETTE_HUE_STEP = 159;
+/** Initial interpreter program. */
+export const DEFAULT_CHAIN = Object.freeze([
+  { instance: 'camera', operator: 'sphere.rotate.v2' },
+  { instance: 'project', operator: 'project.stereographic.v2' },
+  { instance: 'sample', operator: 'sample.grid.v4' },
+  { instance: 'colorize', operator: 'colorize.generated-palette.v4' },
+].map((entry) => Object.freeze(entry)));
+
 const RIPPLE_WAVE_COUNT = 16;
 
 const SHADER_CHAIN_BINDING_METHODS = CLASS_METHODS.ShaderChainBindings;
@@ -128,12 +136,7 @@ export class FakeChainEngine {
     this.definitions = [];
     this.generation += 1;
     if (canonicalEffectId(name) === canonicalEffectId('ShaderChain')) {
-      const result = this.#setShaderChain([
-        { instance: 'camera', operator: 'sphere.rotate.v2' },
-        { instance: 'project', operator: 'project.stereographic.v2' },
-        { instance: 'sample', operator: 'sample.grid.v4' },
-        { instance: 'colorize', operator: 'colorize.generated-palette.v4' },
-      ]);
+      const result = this.#setShaderChain(DEFAULT_CHAIN);
       this.chainCalls.pop();
       if (result.code !== 'APPLIED') throw new Error('default chain failed');
     }
