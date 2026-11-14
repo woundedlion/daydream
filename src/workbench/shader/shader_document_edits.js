@@ -227,7 +227,8 @@ function stageEditValues(parameterId, value, descriptor, presetValues) {
 }
 
 /** Creates stage-edit admission and engine-write routing.
- * @param {{state: import('./shader_documents.js').DocumentControllerState,
+ * @param {{state: import('./shader_document_state.js').EditorState,
+ * linkWriter: ReturnType<typeof import('./shader_deeplink.js').createShaderLinkWriter>,
  * parameterLive: (id: string) => boolean, getEngine: () => *, getModule: () => *,
  * getAnimationsPaused: () => boolean|null,
  * engineControlName: (id: string, definitions: ParameterDefinition[]) => {name: string|null, refusal: string|null},
@@ -236,7 +237,7 @@ function stageEditValues(parameterId, value, descriptor, presetValues) {
  * applyPreset: (preset: string) => boolean, showParityDropStatus: () => void,
  * showPreviewStatus: () => void, status: HTMLOutputElement,
  * markHalted: (error: unknown) => void, showError: (message: string) => void}} dependencies */
-export function createShaderStageEditor({state, parameterLive, getEngine, getModule,
+export function createShaderStageEditor({state, linkWriter, parameterLive, getEngine, getModule,
   getAnimationsPaused, engineControlName, restoreAnimationsPaused, invalidate, announce,
   syncParity, applyPreset, showParityDropStatus, showPreviewStatus, status, markHalted, showError}) {
   /** @param {{parameterId: string, value: *, values: Record<string, *>, presetValues: Readonly<Record<string, *>>, descriptor: *, compiledSide: boolean, addsDeclaration: boolean, coupled: boolean}} edit
@@ -310,7 +311,7 @@ export function createShaderStageEditor({state, parameterLive, getEngine, getMod
           : `"${parameterId}" was refused: ${diagnostic.message}`);
         return false;
       }
-      state.linkWriter.releaseOriginalLink();
+      linkWriter.releaseOriginalLink();
       let applied = true;
       if (addsDeclaration) {
         const dropped = syncParity();
@@ -323,7 +324,7 @@ export function createShaderStageEditor({state, parameterLive, getEngine, getMod
       if (Object.keys(values).length > 1) state.chainUi.strip.syncParameterValues(values);
       state.chainUi.strip.syncHistory();
       if (applied && status.dataset.status === 'error') showPreviewStatus();
-      state.linkWriter.schedule();
+      linkWriter.schedule();
       return true;
     } catch (error) {
       markHalted(error);

@@ -26,6 +26,7 @@ import {
 import {createShaderStageEditor, compiledControlFor, documentControlFor, applyFixedShaderDocument} from './shader_document_edits.js';
 import {CHAIN_EFFECT, SCRATCH_FILENAME, createShaderDocumentLoader, createShaderDocumentLinks, diagnosticText} from './shader_document_loader.js';
 import {createShaderDocumentPersistence} from './shader_document_persistence.js';
+import {createDocumentControllerState} from './shader_document_state.js';
 export {applyFixedShaderDocument};
 
 export { SHADER_LINK_DEBOUNCE_MS, SHADER_LINK_MAX_WAIT_MS } from './shader_deeplink.js';
@@ -38,11 +39,8 @@ const DIGEST_ABBREVIATION = 12;
 
 /** @typedef {import('./chain_apply.js').ParameterDefinition} ParameterDefinition */
 /** @typedef {import('./chain_apply.js').CompiledDocument} CompiledDocument */
-/** @typedef {{effectId: string, descriptorDigest?: string, presetIds: string[]}} OfficialDocument */
-/** @typedef {{active: ActiveDocument|null, chainUi: {store: import('./chain_document_store.js').ChainStore, strip: *}|null,
- * compiler: *, operatorCatalog: *, sourceCatalog: Map<string, *>, cachedDocumentDefinitions: *|null,
- * rebuildAfterParameterCommit: boolean, linkWriter: ReturnType<typeof import('./shader_deeplink.js').createShaderLinkWriter>}} DocumentControllerState */
-/** @typedef {{compiled: CompiledDocument, filename: string, official: OfficialDocument|null, compiledSide: boolean, presetId: string|null, referencePresetIds: string[], savedDocument?: string|null}} ActiveDocument */
+/** @typedef {import('./shader_document_state.js').OfficialDocument} OfficialDocument */
+/** @typedef {import('./shader_document_state.js').ActiveDocument} ActiveDocument */
 
 /** @param {Document} doc @param {string} filename @param {string} source */
 function defaultDownload(doc, filename, source) {
@@ -128,39 +126,10 @@ export function createShaderDocumentController({
       || !fileInput || !status) return null;
   const stripMount = doc.getElementById('chain-strip');
 
-  /** @type {*} */
-  let compiler;
-  /** @type {ActiveDocument|null} */
-  let active = null;
+  const state = createDocumentControllerState();
   let selectedSource = '';
-  /** @type {Map<string, *>} */
-  let sourceCatalog = new Map();
-  /** @type {*|null} */
-  let operatorCatalog = null;
   /** @type {Set<string>} The catalog's topology fields, once it has loaded. */
   let bakedFields = new Set();
-  /** @type {{store: import('./chain_document_store.js').ChainStore, strip: *}|null} */
-  let chainUi = null;
-  let rebuildAfterParameterCommit = false;
-
-  /** @type {DocumentControllerState} */
-  const controllerState = {
-    get active() { return active; },
-    set active(value) { active = value; },
-    get chainUi() { return chainUi; },
-    set chainUi(value) { chainUi = value; },
-    get compiler() { return compiler; },
-    set compiler(value) { compiler = value; },
-    get operatorCatalog() { return operatorCatalog; },
-    set operatorCatalog(value) { operatorCatalog = value; },
-    get sourceCatalog() { return sourceCatalog; },
-    set sourceCatalog(value) { sourceCatalog = value; },
-    get cachedDocumentDefinitions() { return cachedDocumentDefinitions; },
-    set cachedDocumentDefinitions(value) { cachedDocumentDefinitions = value; },
-    get rebuildAfterParameterCommit() { return rebuildAfterParameterCommit; },
-    set rebuildAfterParameterCommit(value) { rebuildAfterParameterCommit = value; },
-    get linkWriter() { return linkWriter; },
-  };
 
   /** @param {string} message @param {boolean} error */
   const writeStatus = (message, error) => {
@@ -189,9 +158,9 @@ export function createShaderDocumentController({
    * once the editor is live, else the load-time compile.
    * @returns {string|undefined} The digest.
    */
-  const liveDigest = () => chainUi
-    ? chainUi.store.compile().descriptor_digest
-    : active?.compiled.descriptor_digest;
+  const liveDigest = () => state.chainUi
+    ? state.chainUi.store.compile().descriptor_digest
+    : state.active?.compiled.descriptor_digest;
 
   /**
    * Whether the loaded chain still digests to the promoted effect it opened as.
@@ -199,8 +168,8 @@ export function createShaderDocumentController({
    * @returns {boolean} Whether the parity toggle is armed.
    */
   const parityArmed = () =>
-    active?.official != null
-    && liveDigest() === active.official.descriptorDigest;
+    state.active?.official != null
+    && liveDigest() === state.active.official.descriptorDigest;
 
   /**
    * Repaints the parity toggle and, once a descriptor edit has broken the
@@ -210,14 +179,14 @@ export function createShaderDocumentController({
    */
   const syncParity = () => {
     const armed = parityArmed();
-    const dropped = !armed && active?.compiledSide === true;
-    if (dropped && active) {
-      active.compiledSide = false;
+    const dropped = !armed && state.active?.compiledSide === true;
+    if (dropped && state.active) {
+      state.active.compiledSide = false;
       selectEffect(CHAIN_EFFECT);
     }
     if (parityToggle) {
       parityToggle.disabled = !armed;
-      parityToggle.setAttribute('aria-pressed', String(active?.compiledSide === true));
+      parityToggle.setAttribute('aria-pressed', String(state.active?.compiledSide === true));
     }
     return dropped;
   };
@@ -255,12 +224,12 @@ export function createShaderDocumentController({
   };
 
   const showPreviewStatus = () => {
-    if (!active) return;
-    const title = active.compiled.document.effect_metadata?.display_name
-      ?? active.compiled.document.document_id;
-    const preset = presetSelect.selectedOptions[0]?.textContent ?? active.presetId;
+    if (!state.active) return;
+    const title = state.active.compiled.document.effect_metadata?.display_name
+      ?? state.active.compiled.document.document_id;
+    const preset = presetSelect.selectedOptions[0]?.textContent ?? state.active.presetId;
     const side = !parityArmed() ? ''
-      : active.compiledSide ? ' · compiled build' : ' · interpreter';
+      : state.active.compiledSide ? ' · compiled build' : ' · interpreter';
     showStatus(`${title} · ${preset}${side}`);
   };
 
@@ -278,27 +247,27 @@ export function createShaderDocumentController({
     try {
       const engine = getEngine();
       const module = getModule();
-      if (!engine || !module || !active) {
+      if (!engine || !module || !state.active) {
         showError('The preview engine is not ready.');
         return false;
       }
       // With the editor live, the store's document is authoritative and its
       // program shape carries the session bypasses.
-      const store = chainUi?.store ?? null;
+      const store = state.chainUi?.store ?? null;
       const paused = getAnimationsPaused();
-      cachedDocumentDefinitions = null;
-      const refusal = active.compiledSide
+      state.cachedDocumentDefinitions = null;
+      const refusal = state.active.compiledSide
         ? applyFixedShaderDocument(
-          engine, module, store ? { document: store.document() } : active.compiled,
-          presetId, active.referencePresetIds, bakedFields, compiler.fixedDerivedBinding, operatorCatalog)
+          engine, module, store ? { document: store.document() } : state.active.compiled,
+          presetId, state.active.referencePresetIds, bakedFields, state.compiler.fixedDerivedBinding, state.operatorCatalog)
         : applyChainDocument({
           engine, module,
-          compiled: store ? { document: store.document() } : active.compiled,
+          compiled: store ? { document: store.document() } : state.active.compiled,
           programShape: store ? store.programShape() : null,
           presetId, syncEffectGui, invalidate,
         });
       restoreAnimationsPaused(paused);
-      if (active.compiledSide) {
+      if (state.active.compiledSide) {
         syncEffectGui();
         invalidate();
       }
@@ -306,8 +275,8 @@ export function createShaderDocumentController({
         showError(`Preset "${presetId}" could not be applied: ${refusal}`);
         return false;
       }
-      active.presetId = presetId;
-      chainUi?.strip.syncParameterRows();
+      state.active.presetId = presetId;
+      state.chainUi?.strip.syncParameterRows();
       showPreviewStatus();
       showDigest();
       linkWriter.schedule();
@@ -320,10 +289,10 @@ export function createShaderDocumentController({
   };
 
   const teardownChainUi = () => {
-    if (chainUi === null) return;
-    chainUi.strip.destroy();
-    chainUi = null;
-    rebuildAfterParameterCommit = false;
+    if (state.chainUi === null) return;
+    state.chainUi.strip.destroy();
+    state.chainUi = null;
+    state.rebuildAfterParameterCommit = false;
     setParamFilter(null);
   };
 
@@ -335,11 +304,11 @@ export function createShaderDocumentController({
    */
   const engineControlName = (parameterId, definitions) => {
     const label = labelOf(parameterId);
-    if (active?.compiledSide !== true) {
-      return { name: chainUi?.store.bypassedLabels().includes(label) ? null : parameterId,
+    if (state.active?.compiledSide !== true) {
+      return { name: state.chainUi?.store.bypassedLabels().includes(label) ? null : parameterId,
         refusal: null };
     }
-    return compiledControlFor(parameterId, definitions, bakedFields, active.compiled.document.descriptor, operatorCatalog);
+    return compiledControlFor(parameterId, definitions, bakedFields, state.active.compiled.document.descriptor, state.operatorCatalog);
   };
 
   /** @type {ReturnType<typeof getEngine>} */
@@ -348,8 +317,6 @@ export function createShaderDocumentController({
   let definitionGeneration;
   /** @type {ParameterDefinition[]} */
   let cachedDefinitions = [];
-  /** @type {ReturnType<NonNullable<ReturnType<typeof getEngine>>['getDocumentParameterDefinitions']>|null} */
-  let cachedDocumentDefinitions = null;
   const liveDefinitions = () => {
     const engine = getEngine();
     const generation = engine?.getParamGeneration?.();
@@ -357,31 +324,26 @@ export function createShaderDocumentController({
       definitionEngine = engine;
       definitionGeneration = generation;
       cachedDefinitions = engine?.getParameterDefinitions() ?? [];
-      cachedDocumentDefinitions = null;
+      state.cachedDocumentDefinitions = null;
     }
     return cachedDefinitions;
   };
 
   /** @param {string} parameterId @returns {boolean} */
   const parameterLive = (parameterId) => {
-    if (active?.compiledSide !== true) return true;
-    const descriptor = { chain: chainUi?.store.chainView()
-      ?? active?.compiled.document.descriptor.chain ?? [] };
+    if (state.active?.compiledSide !== true) return true;
+    const descriptor = { chain: state.chainUi?.store.chainView()
+      ?? state.active?.compiled.document.descriptor.chain ?? [] };
     const control = engineControlName(parameterId, liveDefinitions());
     if (control.name !== null) return true;
     if (control.refusal) {
       const definition = documentControlFor(descriptor, parameterId,
-        cachedDocumentDefinitions ??= definitionEngine?.getDocumentParameterDefinitions?.() ?? []);
+        state.cachedDocumentDefinitions ??= definitionEngine?.getDocumentParameterDefinitions?.() ?? []);
       if (definition) return !definition.readonly;
     }
     return !BAKED_CONSTANT_IDS.has(parameterId) && !bakedFields.has(fieldSegment(parameterId))
-      && !compiler.fixedDerivedBinding?.(descriptor, parameterId, {});
+      && !state.compiler.fixedDerivedBinding?.(descriptor, parameterId, {});
   };
-
-  const {writeStageEdit} = createShaderStageEditor({state: controllerState,
-    parameterLive, getEngine, getModule, getAnimationsPaused, engineControlName,
-    restoreAnimationsPaused, invalidate, announce, syncParity, applyPreset,
-    showParityDropStatus, showPreviewStatus, status, markHalted, showError});
 
   /**
    * Builds the pipeline strip over one document store, wiring structural
@@ -392,36 +354,36 @@ export function createShaderDocumentController({
    */
   const buildChainUi = async (document, container) => {
     const store = await createChainDocumentStore({
-      document, catalog: operatorCatalog, importCompiler,
+      document, catalog: state.operatorCatalog, importCompiler,
     });
     const strip = createChainStrip({
       doc,
       container,
       store,
-      catalog: operatorCatalog,
+      catalog: state.operatorCatalog,
       announce,
       onApply: () => {
         linkWriter.releaseOriginalLink();
         const dropped = syncParity();
-        const applied = applyPreset(active?.presetId ?? presetSelect.value);
+        const applied = applyPreset(state.active?.presetId ?? presetSelect.value);
         if (dropped) {
-          chainUi?.strip.render();
+          state.chainUi?.strip.render();
           if (applied) showParityDropStatus();
         }
       },
-      presetId: () => active?.presetId ?? null,
+      presetId: () => state.active?.presetId ?? null,
       onEditParameter: writeStageEdit,
       parameterLive,
-      parameterRanges: () => chainUi?.store === store && active?.compiledSide !== true
+      parameterRanges: () => state.chainUi?.store === store && state.active?.compiledSide !== true
         ? callWorkbenchBinding(getEngine(), 'getShaderChainParameterRanges', [], []) : [],
       onCommitParameter: () => {
-        if (rebuildAfterParameterCommit) {
-          rebuildAfterParameterCommit = false;
-          chainUi?.strip.render();
+        if (state.rebuildAfterParameterCommit) {
+          state.rebuildAfterParameterCommit = false;
+          state.chainUi?.strip.render();
         }
         void flushDeepLink();
       },
-      bypassAvailable: () => active?.compiledSide !== true,
+      bypassAvailable: () => state.active?.compiledSide !== true,
     });
     setParamFilter({ external: true });
     return { store, strip };
@@ -432,31 +394,36 @@ export function createShaderDocumentController({
    * load-time compile.
    * @returns {*} An isolated copy.
    */
-  const currentDocument = () => chainUi
-    ? chainUi.store.document()
-    : structuredClone((/** @type {ActiveDocument} */ (active)).compiled.document);
+  const currentDocument = () => state.chainUi
+    ? state.chainUi.store.document()
+    : structuredClone((/** @type {ActiveDocument} */ (state.active)).compiled.document);
 
   /**
    * The document Save writes: the current one without its disabled stages.
    * @returns {*} An isolated copy.
    * @throws {Error} If the document without those stages fails validation.
    */
-  const exportableDocument = () => chainUi
-    ? chainUi.store.exportDocument()
-    : structuredClone((/** @type {ActiveDocument} */ (active)).compiled.document);
+  const exportableDocument = () => state.chainUi
+    ? state.chainUi.store.exportDocument()
+    : structuredClone((/** @type {ActiveDocument} */ (state.active)).compiled.document);
 
-  const {linkWriter, flushDeepLink} = createShaderDocumentLinks({state: controllerState,
+  const {linkWriter, flushDeepLink} = createShaderDocumentLinks({state,
     currentDocument, getEngine, getAnimationsPaused, win, showError, onOriginalLinkReleased});
 
+  const {writeStageEdit} = createShaderStageEditor({state, linkWriter,
+    parameterLive, getEngine, getModule, getAnimationsPaused, engineControlName,
+    restoreAnimationsPaused, invalidate, announce, syncParity, applyPreset,
+    showParityDropStatus, showPreviewStatus, status, markHalted, showError});
+
   const {loadSource, loadLinkedSource} = createShaderDocumentLoader({
-    state: controllerState, doc, stripMount, presetSelect, saveButton, saveAsButton,
+    state, linkWriter, doc, stripMount, presetSelect, saveButton, saveAsButton,
     status, importCompiler, flushDeepLink, getEngine, getModule, selectEffect,
     teardownChainUi, setParamFilter, populatePresets, showDigest, syncParity,
     applyPreset, buildChainUi, showError, setAnimationsPaused, showAnimationState,
     syncEffectGui, invalidate, currentDocument,
     selectLoadedSource: (effect, filename, kind) => selectLoadedSource(effect, filename, kind),
   });
-  const {save, saveAs} = createShaderDocumentPersistence({state: controllerState,
+  const {save, saveAs} = createShaderDocumentPersistence({state,
     win, flushDeepLink, currentDocument, exportableDocument, download, showStatus, showError});
 
   /**
@@ -464,7 +431,7 @@ export function createShaderDocumentController({
    * @returns {Promise<boolean>} Whether the scratch document is on screen.
    */
   const loadScratch = () =>
-    loadSource(scratchChainDocument(operatorCatalog), SCRATCH_FILENAME);
+    loadSource(scratchChainDocument(state.operatorCatalog), SCRATCH_FILENAME);
 
   /** @type {HTMLOptionElement | null} */
   let loadedSourceOption = null;
@@ -495,7 +462,7 @@ export function createShaderDocumentController({
   const importChainSnapshot = async (chainText) => {
     try {
       const snapshot = JSON.parse(chainText);
-      const imported = documentFromChainSnapshot(snapshot, operatorCatalog);
+      const imported = documentFromChainSnapshot(snapshot, state.operatorCatalog);
       const previous = getChainSnapshot(getEngine());
       if (!await loadSource(imported, 'imported.shader.json'))
         return status.textContent || 'the imported chain could not be adopted';
@@ -521,18 +488,18 @@ export function createShaderDocumentController({
 
   const init = async () => {
     try {
-      compiler = await importCompiler();
-      operatorCatalog = JSON.parse(await fetchText(CATALOG_URL));
+      state.compiler = await importCompiler();
+      state.operatorCatalog = JSON.parse(await fetchText(CATALOG_URL));
       const runningCatalog = JSON.parse(shaderChainCatalog(getModule()));
-      if (JSON.stringify(operatorCatalog) !== JSON.stringify(runningCatalog))
+      if (JSON.stringify(state.operatorCatalog) !== JSON.stringify(runningCatalog))
         throw new Error('Operator catalog does not match the loaded engine');
-      bakedFields = bakedTopologyFields(operatorCatalog);
+      bakedFields = bakedTopologyFields(state.operatorCatalog);
       const patternCatalog = JSON.parse(await fetchText(PATTERN_CATALOG_URL));
       const entries = await Promise.all(Object.entries(patternCatalog.source_documents)
         .map(async ([effectId, filename]) => {
           const source = await fetchText(`../../../generated/shader/patterns/${filename}`);
-          const compiled = compiler.compileShaderDocument(source,
-            { catalog: operatorCatalog });
+          const compiled = state.compiler.compileShaderDocument(source,
+            { catalog: state.operatorCatalog });
           if (compiled.status !== 'VALID')
             throw new Error(`${filename}: ${diagnosticText(compiled)}`);
           return {
@@ -545,7 +512,7 @@ export function createShaderDocumentController({
               (/** @type {*} */ preset) => preset.preset_id),
           };
         }));
-      sourceCatalog = new Map(entries.map((entry) => [entry.effectId, entry]));
+      state.sourceCatalog = new Map(entries.map((entry) => [entry.effectId, entry]));
       for (const { effectId } of entries) {
         const option = doc.createElement('option');
         option.value = effectId;
@@ -580,8 +547,8 @@ export function createShaderDocumentController({
       if (!linkError) return true;
       linkWriter.refuseLink();
     }
-    const requested = sourceCatalog.get(canonicalEffectId(initialEffect ?? ''))
-      ?? sourceCatalog.get(initialEffect ?? '');
+    const requested = state.sourceCatalog.get(canonicalEffectId(initialEffect ?? ''))
+      ?? state.sourceCatalog.get(initialEffect ?? '');
     let loaded;
     if (requested === undefined) loaded = await loadScratch();
     else {
@@ -602,8 +569,8 @@ export function createShaderDocumentController({
   };
 
   const allowSourceChange = () => {
-    chainUi?.strip.flushParameterEdit();
-    return !active || JSON.stringify(currentDocument()) === active.savedDocument
+    state.chainUi?.strip.flushParameterEdit();
+    return !state.active || JSON.stringify(currentDocument()) === state.active.savedDocument
       || win.confirm('Discard unsaved shader edits?');
   };
 
@@ -622,7 +589,7 @@ export function createShaderDocumentController({
         await adoptLoadedSource('', SCRATCH_FILENAME, '');
         return;
       }
-      const entry = sourceCatalog.get(option.value);
+      const entry = state.sourceCatalog.get(option.value);
       if (!entry) {
         showError(`The source catalog carries no document for "${option.value}".`);
         return;
@@ -639,14 +606,14 @@ export function createShaderDocumentController({
   const onPresetChange = () => {
     if (!applyPreset(presetSelect.value)) {
       const refusal = status.textContent ?? 'The preset could not be applied.';
-      presetSelect.value = active?.presetId ?? '';
-      if (active) applyPreset(/** @type {string} */ (active.presetId));
+      presetSelect.value = state.active?.presetId ?? '';
+      if (state.active) applyPreset(/** @type {string} */ (state.active.presetId));
       showError(refusal);
       return;
     }
     linkWriter.releaseOriginalLink();
     linkWriter.schedule();
-    chainUi?.strip.render();
+    state.chainUi?.strip.render();
     void flushDeepLink();
   };
   const onOpen = () => fileInput.click();
@@ -654,8 +621,8 @@ export function createShaderDocumentController({
     try {
       const file = fileInput.files?.[0];
       if (!file) return;
-      compiler ??= await importCompiler();
-      if (file.size > compiler.DEFAULT_LIMITS.bytes) {
+      state.compiler ??= await importCompiler();
+      if (file.size > state.compiler.DEFAULT_LIMITS.bytes) {
         showError('The document byte limit was exceeded.');
         return;
       }
@@ -678,19 +645,19 @@ export function createShaderDocumentController({
     linkWriter.schedule();
   };
   const onParityToggle = () => {
-    if (active === null || !parityArmed()) return;
+    if (state.active === null || !parityArmed()) return;
     try {
-      const official = /** @type {OfficialDocument} */ (active.official);
-      const compiledSide = !active.compiledSide;
+      const official = /** @type {OfficialDocument} */ (state.active.official);
+      const compiledSide = !state.active.compiledSide;
       const effect = compiledSide ? official.effectId : CHAIN_EFFECT;
       if (!selectEffect(effect)) {
         announce(`The preview engine rejected effect "${effectDisplayName(effect)}".`);
         return;
       }
-      active.compiledSide = compiledSide;
+      state.active.compiledSide = compiledSide;
       syncParity();
-      chainUi?.strip.render();
-      const presetId = active.presetId ?? presetSelect.value;
+      state.chainUi?.strip.render();
+      const presetId = state.active.presetId ?? presetSelect.value;
       if (!applyPreset(presetId)) {
         const refusal = status.textContent ?? 'The preset could not be applied.';
         const previousEffect = compiledSide ? CHAIN_EFFECT : official.effectId;
@@ -698,9 +665,9 @@ export function createShaderDocumentController({
           announce(`The preview engine rejected effect "${effectDisplayName(previousEffect)}".`);
           return;
         }
-        active.compiledSide = !compiledSide;
+        state.active.compiledSide = !compiledSide;
         syncParity();
-        chainUi?.strip.render();
+        state.chainUi?.strip.render();
         applyPreset(presetId);
         showError(refusal);
       }
@@ -744,7 +711,7 @@ export function createShaderDocumentController({
   digestButton?.addEventListener('click', onDigest);
 
   const dispose = () => {
-    chainUi?.strip.flushParameterEdit();
+    state.chainUi?.strip.flushParameterEdit();
     const finalLinkWrite = linkWriter.dispose();
     win.removeEventListener?.('hashchange', onHashChange);
     sourceSelect.removeEventListener('change', onSourceChange);

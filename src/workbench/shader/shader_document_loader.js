@@ -10,7 +10,7 @@ import {createShaderLinkWriter, replaceShaderStateHash} from './shader_deeplink.
 import {scratchChainDocument} from './chain_document_store.js';
 import {snapshotValueEqual} from './shader_document_edits.js';
 /** @typedef {import('./chain_apply.js').CompiledDocument} CompiledDocument */
-/** @typedef {import('./shader_documents.js').ActiveDocument} ActiveDocument */
+/** @typedef {import('./shader_document_state.js').ActiveDocument} ActiveDocument */
 export const CHAIN_EFFECT = canonicalEffectId('ShaderChain');
 export const SCRATCH_FILENAME = 'scratch.shader.json';
 
@@ -27,7 +27,8 @@ export function diagnosticText(compiled) {
 }
 
 /** Creates serialized document loads and linked-session adoption.
- * @param {{state: import('./shader_documents.js').DocumentControllerState,
+ * @param {{state: import('./shader_document_state.js').LoaderState,
+ * linkWriter: ReturnType<typeof import('./shader_deeplink.js').createShaderLinkWriter>,
  * doc: Document, stripMount: HTMLElement|null, presetSelect: HTMLSelectElement,
  * saveButton: HTMLButtonElement, saveAsButton: HTMLButtonElement|null, status: HTMLOutputElement,
  * importCompiler: () => Promise<*>, flushDeepLink: () => Promise<*>, getEngine: () => *, getModule: () => *,
@@ -38,7 +39,7 @@ export function diagnosticText(compiled) {
  * showError: (message: string) => void, setAnimationsPaused: (paused: boolean) => void,
  * showAnimationState: () => void, syncEffectGui: () => void, invalidate: () => void,
  * currentDocument: () => *, selectLoadedSource: (effect: string|null, filename: string, kind: string) => void}} dependencies */
-export function createShaderDocumentLoader({state, doc, stripMount, presetSelect,
+export function createShaderDocumentLoader({state, linkWriter, doc, stripMount, presetSelect,
   saveButton, saveAsButton, status, importCompiler, flushDeepLink, getEngine, getModule,
   selectEffect, teardownChainUi, setParamFilter, populatePresets, showDigest, syncParity,
   applyPreset, buildChainUi, showError, setAnimationsPaused, showAnimationState,
@@ -53,7 +54,7 @@ export function createShaderDocumentLoader({state, doc, stripMount, presetSelect
   const loadSourceNow = async (source, filename = 'import.shader.json',
     precompiled = null, session = null) => {
     await flushDeepLink();
-    state.linkWriter.invalidate();
+    linkWriter.invalidate();
     state.compiler ??= await importCompiler();
     let compiled = precompiled;
     if (compiled === null) {
@@ -224,7 +225,7 @@ export function createShaderDocumentLoader({state, doc, stripMount, presetSelect
 }
 
 /** Creates link serialization and flushes pending stage edits before writing.
- * @param {{state: import('./shader_documents.js').DocumentControllerState,
+ * @param {{state: import('./shader_document_state.js').LinkState,
  * currentDocument: () => *, getEngine: () => *, getAnimationsPaused: () => boolean|null,
  * win: *, showError: (message: string) => void, onOriginalLinkReleased: () => void}} dependencies */
 export function createShaderDocumentLinks({state, currentDocument, getEngine,

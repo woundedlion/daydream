@@ -106,6 +106,7 @@
     "src/shared/pointer_drag.js",
     "src/workbench/shader/shader_deeplink.js",
     "src/workbench/shader/shader_documents.js",
+    "src/workbench/shader/shader_document_state.js",
     "src/shared/slider.js",
     "src/shared/module_load_guard.js",
     "src/workbench/solids/solid_build.js",

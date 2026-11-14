@@ -4,10 +4,10 @@
  */
 
 import {errorDetail} from '../../shared/banner.js';
-/** @typedef {import('./shader_documents.js').ActiveDocument} ActiveDocument */
+/** @typedef {import('./shader_document_state.js').ActiveDocument} ActiveDocument */
 
 /** Creates Save and Save As over the current editor document.
- * @param {{state: import('./shader_documents.js').DocumentControllerState,
+ * @param {{state: import('./shader_document_state.js').PersistenceState,
  * win: *, flushDeepLink: () => Promise<*>, currentDocument: () => *, exportableDocument: () => *,
  * download: (filename: string, source: string) => void,
  * showStatus: (message: string) => void, showError: (message: string) => void}} dependencies */

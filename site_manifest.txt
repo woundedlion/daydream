@@ -119,6 +119,7 @@ tools/shader.html
 tools/shader.css
 src/workbench/shader/shader_deeplink.js
 src/workbench/shader/shader_documents.js
+src/workbench/shader/shader_document_state.js
 tools/solids.html
 tools/solids.css
 tools/tools.css
