@@ -50,10 +50,11 @@ export function reorderPreviewShift(fromIndex, slot, index) {
 
 /**
  * Returns a copy of an op chain with the op at `from` moved to index `to`.
- * @param {Array<Object>} ops - The op chain.
+ * @template T
+ * @param {Array<T>} ops - The op chain.
  * @param {number} from - Index of the op to move.
  * @param {number} to - Destination index, in post-removal coordinates.
- * @returns {Array<Object>} A deep copy of the chain in the new order.
+ * @returns {Array<T>} A deep copy of the chain in the new order.
  */
 export function movedOps(ops, from, to) {
   const next = structuredClone(ops);

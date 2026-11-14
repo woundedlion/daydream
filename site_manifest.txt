@@ -5,7 +5,6 @@
 # REQUIRED_PATHS lists those it must carry.
 # Tests and development scripts are excluded. Third-party libraries load
 # through vendor-importmap.js.
-
 # Simulator page and its module graph.
 index.html
 favicon.svg
@@ -72,7 +71,6 @@ src/ui/sidebar.js
 src/ui/sidebar_logic.js
 src/app/state.js
 src/segments/worker_protocol.js
-
 src/renderer/driver_capture.js
 src/renderer/driver_context.js
 src/renderer/driver_dots.js
@@ -99,13 +97,11 @@ src/app/app_teardown.js
 src/effects/effect_apply_helpers.js
 src/renderer/driver_pov.js
 src/ui/effect_action_feedback.js
-
 # Engine browser modules and runtime binary.
 generated/holosphere_wasm.js
 generated/holosphere_wasm.wasm
 generated/engine_contract.mjs
 generated/segment_geometry.js
-
 # Tool pages and their shared modules.
 tools/lissajous.html
 tools/mobius.html
@@ -169,7 +165,6 @@ src/workbench/solids/solid_op_rows.js
 src/workbench/solids/solid_registry_codegen.js
 src/workbench/solids/solid_render.js
 src/workbench/solids/solids_page.js
-
 src/workbench/shader/chain_chip_drag.js
 src/workbench/shader/chain_selection.js
 src/workbench/shader/chain_viewport.js
@@ -182,7 +177,6 @@ src/workbench/shader/chain_document_legality.js
 src/workbench/shader/shader_document_edits.js
 src/workbench/shader/shader_document_loader.js
 src/workbench/shader/shader_document_persistence.js
-
 # Shader workbench: the compiler and catalogs.
 # Deployment includes the verified bundle patterns.
 generated/shader/sha256.mjs
@@ -190,10 +184,16 @@ generated/shader/shader_workbench.mjs
 generated/shader/composed_effect_roster.mjs
 generated/shader/engine_catalog.json
 generated/shader/patterns/catalog.json
-
 # The project license and third-party notices.
 LICENSE.txt
-
 # Documentation supplied by the verified engine bundle.
 README.md
 docs/screenshots/IslamicStars.png
+src/workbench/solids/solids_state.js
+src/workbench/solids/solids_engine.js
+src/workbench/solids/solids_scene.js
+src/workbench/solids/solids_ops_controller.js
+src/workbench/solids/solids_row_drag.js
+src/workbench/solids/solids_op_gate_view.js
+src/workbench/solids/solids_saved_controller.js
+src/workbench/solids/solids_base_picker.js

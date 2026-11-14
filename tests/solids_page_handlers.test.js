@@ -3,7 +3,6 @@ import { buildSavedCard } from '../src/workbench/solids/solid_saved_cards.js';
 import { mergeSavedSolids, persistSavedSolids } from '../src/workbench/solids/solid_saved_store.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pageHandlers } from './helpers/page_handlers.js';
 import { MAX_RECIPE_STEPS, savedChainShapeError } from '../src/workbench/solids/solid_validation.js';
 import { authoredParamRange, opTopologyKey, OP_DEFS, seedOpParams, snapToStep } from '../src/workbench/solids/solid_op_params.js';
 import { generateFuncAndRecipe } from '../src/workbench/solids/solid_codegen.js';
@@ -12,13 +11,94 @@ import { meshCounts } from '../src/workbench/solids/solid_render.js';
 import { createPointerDrag } from '../src/shared/pointer_drag.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
-const extractHandler = pageHandlers(new URL('../src/workbench/solids/solids_page.js', import.meta.url));
-const handler = (name, context) => {
-  Object.assign(context, {page: context});
-  if (name === 'wireRowDrag') context.moveRowDragPreview = extractHandler('moveRowDragPreview', context);
-  return extractHandler(name, context);
-};
+import {createSolidsEngine} from '../src/workbench/solids/solids_engine.js';
+import {createSolidsScene} from '../src/workbench/solids/solids_scene.js';
+import {createSolidsOpsController} from '../src/workbench/solids/solids_ops_controller.js';
+import {createSolidsRowDrag} from '../src/workbench/solids/solids_row_drag.js';
+import {createSolidsOpGateView} from '../src/workbench/solids/solids_op_gate_view.js';
+import {createSolidsSavedController} from '../src/workbench/solids/solids_saved_controller.js';
+import {createSolidsBasePicker} from '../src/workbench/solids/solids_base_picker.js';
+import {createSolidsPage, setOps} from '../src/workbench/solids/solids_state.js';
 
+function fakePage(context) {
+  const page = createSolidsPage(undefined);
+  for (const [group, fields] of Object.entries({
+    "engine": [
+      "wasmModule",
+      "meshOpsWasm",
+      "createHolosphereModule",
+      "arenaMetricsTimer",
+      "validator",
+      "opGate"
+    ],
+    "mesh": [
+      "currentMesh",
+      "currentMeshIsCurrent",
+      "currentFaceClasses",
+      "currentClassifyFailure"
+    ],
+    "scene": [
+      "camera",
+      "scene",
+      "renderer",
+      "controls",
+      "meshRenderer",
+      "labelsContainer",
+      "labelsNeedReproject"
+    ],
+    "registry": [
+      "baseThumbnails",
+      "simpleSolids",
+      "islamicStarPatterns",
+      "registrySolidNames"
+    ],
+    "doc": [
+      "opsRevision",
+      "dropSlotChecks",
+      "dropSlotGen",
+      "parameterEdits",
+      "savedStore",
+      "savedStorage",
+      "savedSolids",
+      "savedStorageStatus"
+    ],
+    "view": [
+      "gateMsgTimer",
+      "reducedMotion"
+    ]
+  })) {
+    for (const key of fields) Object.defineProperty(page[group], key, {
+      configurable: true, get: () => key in context ? context[key] : undefined,
+      set: value => { context[key] = value; },
+    });
+  }
+  page.doc.parameterEdits ??= new Map();
+  for (const key of ['base', 'ops']) Object.defineProperty(page.doc, key, {
+    get: () => context.state?.[key], set: value => { context.state[key] = value; },
+  });
+  for (const key of Object.keys(page.view).filter(key => !['gateMsgTimer','reducedMotion'].includes(key)))
+    Object.defineProperty(page.view, key, {
+      get: () => context.state?.[key], set: value => { context.state[key] = value; },
+    });
+  return page;
+}
+
+function factoryHandlers(factory, context) {
+  const page = fakePage(context);
+  let methods;
+  const actions = new Proxy({}, { get: (target, key) => key in context ? context[key] : methods?.[key] });
+  const dependencies = Object.fromEntries(Object.entries(context).map(([key, value]) =>
+    [key, typeof value === 'function' ? (...args) => context[key](...args) : value]));
+  methods = factory(page, actions, dependencies);
+  return methods;
+}
+const engine = context => factoryHandlers(createSolidsEngine, context);
+const scene = context => factoryHandlers(createSolidsScene, context);
+const ops = context => factoryHandlers(createSolidsOpsController, context);
+const rowDrag = context => factoryHandlers(createSolidsRowDrag, context);
+const gate = context => factoryHandlers(createSolidsOpGateView, context);
+const saved = context => factoryHandlers(createSolidsSavedController, context);
+const bases = context => factoryHandlers(createSolidsBasePicker, context);
 
 test('solids view toggles share the state used to render and publish them', () => {
   const state = { autoRotate: false, showNormals: false, showIndices: true };
@@ -32,9 +112,9 @@ test('solids view toggles share the state used to render and publish them', () =
     renderMesh: () => views.push({ ...state }),
     controls: { autoRotate: false },
   };
-  context.updateToggles = handler('updateToggles', context);
-  context.setAutoRotate = handler('setAutoRotate', context);
-  handler('wireViewToggles', context)();
+  context.updateToggles = scene(context).updateToggles;
+  context.setAutoRotate = scene(context).setAutoRotate;
+  scene(context).wireViewToggles();
   context.updateToggles();
 
   for (const id of ['toggleNormals', 'toggleIndices', 'toggleRotate']) buttons.get(id).dispatch('click');
@@ -56,7 +136,7 @@ test('queued topology edits validate the live result of earlier commits', async 
   const queued = [];
   const checked = [];
   const messages = [];
-  const updateOpParam = handler('updateOpParam', {
+  const updateOpParam = ops({
     state, opsRevision: 1, parameterEdits: new Map(), OP_DEFS,
     opTopologyKey, authoredParamRange, snapToStep, structuredClone,
     document: {getElementById: () => ({children: []})},
@@ -67,7 +147,7 @@ test('queued topology edits validate the live result of earlier commits', async 
         message: 'combined topology exceeds the limit'};
     },
     showGateMsg: message => messages.push(message), renderOps() {}, update() {},
-  });
+  }).updateOpParam;
   updateOpParam(0, 't', '0.25', 1);
   updateOpParam(1, 't', '0.25', 1);
   assert.equal(queued.length, 2);
@@ -95,7 +175,7 @@ for (const action of ['addOp', 'removeOp', 'resetOps', 'reorderOp', 'updateOpPar
       syncSweepWarning() {},
       opTopologyKey, scheduleUpdate: {cancel() {}},
     };
-    const call = handler(action, context);
+    const call = ops(context)[action];
     if (action === 'addOp') call('kis');
     else if (action === 'removeOp') call(0, 1);
     else if (action === 'reorderOp') call(0, 1, 1);
@@ -113,9 +193,9 @@ test('storage changes reload saved solids without restoring removed cards', () =
   const savedStorageStatus = {textContent: ''};
   let entries = [{name: 'other-tab'}];
   let renders = 0;
-  const reload = handler('reloadSavedSolids', {SAVED_SOLIDS_KEY: 'saved', savedSolids,
+  const reload = saved({SAVED_SOLIDS_KEY: 'saved', savedSolids,
     savedStorage, savedStorageStatus, savedStore: {storage: {}, notice: ''}, loadSavedSolids: () => ({entries,
-      rejected: ['invalid'], notice: 'rejected'}), renderSavedList: () => { renders += 1; }});
+      rejected: ['invalid'], notice: 'rejected'}), renderSavedList: () => { renders += 1; }}).reloadSavedSolids;
   reload({key: 'unrelated'});
   assert.equal(renders, 0);
   reload({key: 'saved'});
@@ -130,9 +210,9 @@ test('storage changes reload saved solids without restoring removed cards', () =
 
 test('star thumbnails are load buttons while base solids retain radio selection', () => {
   const state = { base: 'cube' };
-  const configure = handler('configureBaseSolidThumbnail', {
+  const configure = bases({
     state, islamicStarPatterns: ['cube_hankin'], handleBaseSolidKeyDown() {}, selectBaseSolid() {},
-  });
+  }).configureBaseSolidThumbnail;
   const cube = fakeElement('button');
   const tetrahedron = fakeElement('button');
   const star = fakeElement('button');
@@ -146,12 +226,12 @@ test('star thumbnails are load buttons while base solids retain radio selection'
   assert.equal(star.getAttribute('aria-checked'), null);
   assert.equal(star.tabIndex, 0);
   state.base = 'tetrahedron';
-  handler('highlightBaseSolid', {
+  bases({
     state, document: { querySelectorAll(selector) {
       assert.equal(selector, '.thumb-btn[role="radio"]');
       return [cube, tetrahedron];
     } },
-  })();
+  }).highlightBaseSolid();
   assert.equal(cube.getAttribute('aria-checked'), 'false');
   assert.equal(tetrahedron.getAttribute('aria-checked'), 'true');
   assert.equal(star.getAttribute('aria-checked'), null);
@@ -165,9 +245,9 @@ test('a base with no radio leaves the first radio as the group tab stop', () => 
     radio.tabIndex = -1;
     return radio;
   });
-  handler('highlightBaseSolid', {
+  bases({
     state, document: { querySelectorAll: () => radios },
-  })();
+  }).highlightBaseSolid();
   assert.deepEqual(radios.map(radio => radio.tabIndex), [0, -1]);
   assert.deepEqual(radios.map(radio => radio.getAttribute('aria-checked')), ['false', 'false']);
 });
@@ -176,7 +256,7 @@ test('status messages retain failures and clear confirmations', () => {
   const status = { innerText: '' };
   const timers = new Map();
   let nextTimer = 0;
-  const showGateMsg = handler('showGateMsg', {
+  const showGateMsg = gate({
     gateMsgTimer: null,
     document: { getElementById: id => id === 'opGateMsg' ? status : null },
     setTimeout: (callback, delay) => {
@@ -185,7 +265,7 @@ test('status messages retain failures and clear confirmations', () => {
       return nextTimer;
     },
     clearTimeout: id => timers.delete(id),
-  });
+  }).showGateMsg;
 
   showGateMsg('moved op', { persist: false });
   assert.equal(timers.size, 1);
@@ -201,7 +281,11 @@ test('status messages retain failures and clear confirmations', () => {
 
 test('parameter changes from removed or reordered rows cannot edit the replacement', () => {
   const state = { ops: [] };
-  const updateOpParam = handler('updateOpParam', { state, opsRevision: 2 });
+  const updateOpParam = ops({ state, opsRevision: 2,
+    document: {getElementById: () => ({children: []})},
+    scheduleUpdate: {cancel() {}},
+    queueCommit: () => assert.fail('queued an edit from a stale row'),
+  }).updateOpParam;
   assert.doesNotThrow(() => updateOpParam(3, 't', '0.5', 1));
   state.ops.push({ op: 'truncate', params: { t: 0.1 } });
   updateOpParam(0, 't', '0.5', 1);
@@ -221,7 +305,7 @@ test('arena polling retries ordinary failures and stops cleanly on an engine hal
     console: { warn: (...args) => warnings.push(args) },
     setTimeout: (callback, delay) => { scheduled.push([callback, delay]); return 6; },
   };
-  const poll = handler('updateArenaMetrics', context);
+  const poll = engine(context).updateArenaMetrics;
   assert.doesNotThrow(poll);
   assert.equal(scheduled.length, 1);
   assert.ok(scheduled[0][1] > 0);
@@ -238,7 +322,7 @@ test('registry copy hands pending validation to the clipboard during the click',
   let pending;
   const copied = [];
   let notice = 'export failed: previous attempt';
-  const copyCode = handler('copyCode', {
+  const copyCode = saved({
     savedSolids: [{ base: 'cube', ops: [] }],
     savedChainShapeError: () => null,
     registrySolidNames: new Set(['cube']), islamicStarPatterns: [], CATALAN_BASES: new Set(),
@@ -247,7 +331,7 @@ test('registry copy hands pending validation to the clipboard during the click',
     copyWithFeedback: async text => { pending = text; copied.push(await text); return true; },
     showCopyFailure: () => assert.fail('unexpected failure'),
     showGateMsg: message => { notice = message; },
-  });
+  }).copyCode;
   const copying = copyCode(0, 'registry', {});
   assert.ok(pending && typeof pending.then === 'function');
   assert.deepEqual(copied, []);
@@ -260,7 +344,7 @@ test('registry copy hands pending validation to the clipboard during the click',
 test('registry validation failures retain export diagnostics without copying', async () => {
   const error = new Error('faces exceed registry limits');
   const failures = [];
-  const copyCode = handler('copyCode', {
+  const copyCode = saved({
     savedSolids: [{ base: 'cube', ops: [] }],
     savedChainShapeError: () => null,
     registrySolidNames: new Set(['cube']), islamicStarPatterns: [], CATALAN_BASES: new Set(),
@@ -269,7 +353,7 @@ test('registry validation failures retain export diagnostics without copying', a
     copyWithFeedback: async text => { await text; assert.fail('unchecked copy'); },
     engineTrapped: caught => { assert.equal(caught, error); return false; },
     showCopyFailure: (button, message) => failures.push(message),
-  });
+  }).copyCode;
   await copyCode(0, 'registry', {});
   assert.deepEqual(failures, ['export failed: faces exceed registry limits']);
 });
@@ -279,7 +363,7 @@ test('copying a star recipe contains bridge errors and reports engine halts', as
   const failures = [];
   const traps = [];
   let halted = false;
-  const copyCode = handler('copyCode', {
+  const copyCode = saved({
     savedSolids: [{ base: 'star' }],
     savedChainShapeError: () => null,
     registrySolidNames: new Set(['star']),
@@ -287,7 +371,7 @@ test('copying a star recipe contains bridge errors and reports engine halts', as
     meshOpsWasm: { getRecipe() { throw error; } },
     engineTrapped: (caught) => { traps.push(caught); return halted; },
     showCopyFailure: (button, message) => failures.push(message),
-  });
+  }).copyCode;
   await copyCode(0, 'registry', {});
   assert.deepEqual(failures, ['export failed: recipe unavailable']);
   assert.deepEqual(traps, [error]);
@@ -302,7 +386,7 @@ test('recipe copy refuses a star-pattern base before generating or copying code'
   const copied = [];
   let generated = 0;
   const button = {};
-  const copyCode = handler('copyCode', {
+  const copyCode = saved({
     savedSolids: [{base: 'dodecahedron_hk62_ambo_hk62', ops: [{op: 'dual', params: {}}]}],
     savedChainShapeError,
     registrySolidNames: new Set(['dodecahedron_hk62_ambo_hk62']),
@@ -310,7 +394,7 @@ test('recipe copy refuses a star-pattern base before generating or copying code'
     generateRecipeCpp() { generated++; return 'invalid generator'; },
     copyWithFeedback: (code) => { copied.push(code); return true; },
     showCopyFailure: (target, message) => failures.push([target, message]),
-  });
+  }).copyCode;
   await copyCode(0, 'recipe_cpp', button);
   assert.equal(generated, 0);
   assert.deepEqual(copied, []);
@@ -330,7 +414,7 @@ for (const [count, index, expected] of [[3, 1, 1], [3, 2, 1], [1, 0, 'add']]) {
         return { focus: () => { focused = i; } };
       },
     }));
-    const removeOp = handler('removeOp', {
+    const removeOp = ops({
       state, opsRevision: 1, queueCommit: (fn) => { pending = fn(); },
       chainIsValid: async () => ({ ok: true }), setOps: (ops) => { state.ops = ops; },
       renderOps() {}, update() {}, showGateMsg() {},
@@ -344,7 +428,7 @@ for (const [count, index, expected] of [[3, 1, 1], [3, 2, 1], [1, 0, 'add']]) {
           return { focus: () => { focused = 'add'; } };
         },
       },
-    });
+    }).removeOp;
     removeOp(index, 1);
     await pending;
     assert.equal(state.ops.length, count - 1);
@@ -356,7 +440,7 @@ test('deleting saved solids preserves focus in reverse display order or on save'
   const savedSolids = [{}, {}, {}];
   let notice = 'rejected: the saved list is full';
   let focused;
-  const deleteSolid = handler('deleteSolid', {
+  const deleteSolid = saved({
     savedSolids, persistSavedSolids() {}, renderSavedList() {},
     showGateMsg: message => { notice = message; },
     document: { getElementById: (id) => {
@@ -369,7 +453,7 @@ test('deleting saved solids preserves focus in reverse display order or on save'
         },
       })) };
     } },
-  });
+  }).deleteSolid;
   deleteSolid(2);
   assert.equal(notice, '');
   assert.equal(focused, 0);
@@ -396,12 +480,12 @@ for (const [from, to, direction] of [[0, 1, 'down'], [2, 1, 'up'], [1, 2, 'up'],
       }
       return row;
     });
-    const reorder = handler('reorderOp', {
+    const reorder = ops({
       state, opsRevision: 1, movedOps, queueCommit: fn => { queued = fn; },
       chainIsValid: async () => ({ok: true}), setOps: ops => { state.ops = ops; },
       renderOps() {}, update() {}, showGateMsg() {},
       document: {getElementById: () => ({children: rows()})},
-    });
+    }).reorderOp;
     reorder(from, to, 1);
     await queued();
     assert.equal(state.ops[to].op, moved);
@@ -430,26 +514,26 @@ for (const op of ['ambo', 'meta']) test(`${op} gate preserves authored descripti
     opGate: { refresh: async () => ({ blocked: new Set([op]), complete: true }) },
     showGateMsg: (message) => messages.push(message), addOp: (op) => added.push(op),
   };
-  context.setOpBlocked = handler('setOpBlocked', context);
-  await handler('refreshOpGating', context)();
+  context.setOpBlocked = gate(context).setOpBlocked;
+  await gate(context).refreshOpGating();
   assert.equal(button.disabled, false);
   assert.equal(attributes.get('aria-disabled'), 'true');
   assert.equal(button.title, reason);
   assert.equal(attributes.get('aria-describedby'), [authored, 'opBlockedReason'].filter(Boolean).join(' '));
-  handler('activateAddOp', context)({ target: { closest: () => button } });
+  ops(context).activateAddOp({ target: { closest: () => button } });
   assert.equal(added.length, 0);
   assert.match(messages[0], /exceed an engine mesh limit/);
-  handler('openOpGate', context)('validator unavailable');
+  gate(context).openOpGate('validator unavailable');
   assert.equal(attributes.has('aria-disabled'), false);
   assert.equal(attributes.get('aria-describedby') ?? '', authored);
-  handler('activateAddOp', context)({ target: { closest: () => button } });
+  ops(context).activateAddOp({ target: { closest: () => button } });
   assert.deepEqual(added, [op]);
 });
 
 test('thumbnail build errors stay in the thumbnail status area', () => {
   const status = { textContent: '' };
-  const show = handler('showThumbnailError', { console: { error() {} },
-    document: { getElementById: (id) => { assert.equal(id, 'thumbnailStatus'); return status; } } });
+  const show = engine({ console: { error() {} },
+    document: { getElementById: (id) => { assert.equal(id, 'thumbnailStatus'); return status; } } }).showThumbnailError;
   show('Thumbnail for cube failed');
   assert.equal(status.textContent, 'Thumbnail for cube failed');
 });
@@ -460,8 +544,8 @@ test('index cap notice changes only on entry and exit without touching gate feed
   const notice = { get textContent() { return value; },
     set textContent(text) { writes.push(text); value = text; } };
   const cap = 1000;
-  const update = handler('updateIndexLabelNotice', { MAX_INDEX_LABELS: cap,
-    document: { getElementById: (id) => { assert.equal(id, 'indexLabelNotice'); return notice; } } });
+  const update = scene({ MAX_INDEX_LABELS: cap,
+    document: { getElementById: (id) => { assert.equal(id, 'indexLabelNotice'); return notice; } } }).updateIndexLabelNotice;
   update(true);
   update(true);
   update(false);
@@ -473,9 +557,9 @@ test('index cap notice changes only on entry and exit without touching gate feed
 test('persistence failure is reported and clears after a later successful write', () => {
   const status = { textContent: '' };
   let failing = true;
-  const persist = handler('persistSavedSolids', { savedSolids: [], savedStorage: { rejected: [], notice: '' }, SAVED_SOLIDS_KEY: 'saved',
+  const persist = saved({ savedSolids: [], savedStorage: { rejected: [], notice: '' }, SAVED_SOLIDS_KEY: 'saved',
     persistSavedStore: persistSavedSolids, document: { getElementById: () => status },
-    savedStore: {storage: { setItem() { if (failing) throw new Error('quota'); } }} });
+    savedStore: {storage: { setItem() { if (failing) throw new Error('quota'); } }} }).persistSavedSolids;
   persist();
   assert.match(status.textContent, /Changes apply to this session only/);
   failing = false;
@@ -487,8 +571,8 @@ test('canvas tap cancels interrupted gestures and detaches on teardown', () => {
   const canvas = fakeElement('canvas');
   let teardown;
   let toggles = 0;
-  handler('wireCanvasTap', { createPointerDrag, state: { autoRotate: false },
-    setAutoRotate: () => toggles++, onPageTeardown: (fn) => { teardown = fn; } })(canvas);
+  scene({ createPointerDrag, state: { autoRotate: false },
+    setAutoRotate: () => toggles++, onPageTeardown: (fn) => { teardown = fn; } }).wireCanvasTap(canvas);
   const pointer = { pointerId: 1, isPrimary: true, button: 0, clientX: 10, clientY: 10 };
   canvas.dispatch('pointerdown', pointer);
   canvas.dispatch('pointercancel', pointer);
@@ -509,9 +593,9 @@ test('clearing saved solids requires confirmation and preserves cancelled cards'
   const savedSolids = [{ title: 'one' }, { title: 'two' }];
   let confirmed = false;
   const calls = [];
-  const clear = handler('clearSavedSolids', { savedSolids,
+  const clear = saved({ savedSolids,
     window: { confirm: (message) => { calls.push(message); return confirmed; } },
-    persistSavedSolids: () => calls.push('persist'), renderSavedList: () => calls.push('render') });
+    persistSavedSolids: () => calls.push('persist'), renderSavedList: () => calls.push('render') }).clearSavedSolids;
   clear();
   assert.equal(savedSolids.length, 2);
   assert.equal(calls.length, 1);
@@ -532,14 +616,14 @@ test('loading a star pattern over several ops requires confirmation', async () =
   let confirmed = false;
   const prompts = [];
   let queued;
-  const select = handler('selectBaseSolid', {
+  const select = bases({
     state, islamicStarPatterns: ['cube_hankin'], queueCommit: (fn) => { queued = fn; },
     window: { confirm: (message) => { prompts.push(message); return confirmed; } },
     meshOpsWasm: { getRecipe: () => ({ seed: 'icosahedron', ops: [] }) },
     formatSolidName: (key) => key, opsFromRecipe: () => [],
     chainIsValid: async () => ({ ok: true }), setOps: (next) => { state.ops = next; },
     showGateMsg() {}, renderOps() {}, update() {}, renderBaseSolid() {}, highlightBaseSolid() {},
-  });
+  }).selectBaseSolid;
   select('cube_hankin', {});
   await queued();
   assert.equal(prompts.length, 1);
@@ -564,7 +648,7 @@ test('a refused topology tick repaints the restored chain', async () => {
     chainIsValid: async () => ({ ok: false, message: 'too large' }),
     showGateMsg() {}, renderOps() {}, update: () => painted.push(state.ops[0].params.t),
   };
-  handler('updateOpParam', context)(0, 't', '0.5', 1);
+  ops(context).updateOpParam(0, 't', '0.5', 1);
   assert.equal(state.ops[0].params.t, 0.4, 'pending topology never reaches live state');
   await queued();
   assert.equal(state.ops[0].params.t, 0.4);
@@ -574,11 +658,11 @@ test('a refused topology tick repaints the restored chain', async () => {
 test('typed operation parameters snap and clamp before scheduling the render', () => {
   const state = {base: 'cube', ops: [{op: 'truncate', params: {t: 0.3}}]};
   let schedules = 0;
-  const update = handler('updateOpParam', {state, opsRevision: 1, OP_DEFS,
+  const update = ops({state, opsRevision: 1, OP_DEFS,
     authoredParamRange, snapToStep, parameterEdits: new Map(),
     document: {getElementById: () => ({children: []})},
     opTopologyKey: () => 'same', scheduleUpdate: () => { schedules += 1; },
-  });
+  }).updateOpParam;
   update(0, 't', '1000', 1);
   assert.equal(state.ops[0].params.t, OP_DEFS.truncate.params.t.max);
   assert.equal(schedules, 1);
@@ -606,7 +690,7 @@ test('an accepted topology tick keeps the focused input and publishes after vali
     },
     showGateMsg() {}, renderOps() { assert.fail('accepted parameter edits must retain the control nodes'); }, update: () => painted.push(state.ops[0].params.t),
   };
-  handler('updateOpParam', context)(0, 't', '0.5', 1);
+  ops(context).updateOpParam(0, 't', '0.5', 1);
   const pending = queued();
   context.update();
   assert.deepEqual(painted, [0.4]);
@@ -628,7 +712,7 @@ test('a topology commit cannot overwrite an edit returning to the same value', a
     chainIsValid: () => new Promise((resolve) => { resolveCheck = resolve; }),
     showGateMsg() {}, renderOps() {}, update() {},
   };
-  const edit = handler('updateOpParam', context);
+  const edit = ops(context).updateOpParam;
   edit(0, 't', '0.5', 1);
   const pending = queued();
   edit(0, 't', '0.49', 1);
@@ -647,10 +731,10 @@ test('a failed rebuild invalidates cached mesh metadata and prevents saving', ()
     buildContext: () => ({}), buildChainMesh: () => null,
     showGateMsg: message => messages.push(message),
   };
-  handler('update', context)();
+  engine(context).update();
   assert.equal(context.currentMeshIsCurrent, false);
   assert.equal(context.currentMesh, previous);
-  handler('saveSolid', context)();
+  saved(context).saveSolid();
   assert.match(messages[0], /no successful preview/);
 });
 
@@ -677,8 +761,8 @@ test('view-only renders preserve a classification failure until the mesh is rebu
     formatSolidName: String,
   };
   let failure = 'Face classification failed: invalid topology';
-  context.renderMesh = handler('renderMesh', context);
-  const update = handler('update', context);
+  context.renderMesh = scene(context).renderMesh;
+  const update = engine(context).update;
 
   update();
   assert.equal(stats.textContent, failure);
@@ -694,13 +778,13 @@ test('view-only renders preserve a classification failure until the mesh is rebu
 
 test('saved code export refuses off-grid parameters before generating code', async () => {
   const failures = [];
-  const copyCode = handler('copyCode', {
+  const copyCode = saved({
     savedSolids: [{ base: 'cube', ops: [{ op: 'truncate', params: { t: 0.334 } }] }],
     savedChainShapeError,
     showCopyFailure: (button, message) => failures.push(message),
     registrySolidNames: new Set(['cube']),
     generateRecipeCpp: () => assert.fail('generated before the shape gate'),
-  });
+  }).copyCode;
   await copyCode(0, 'recipe_cpp', {});
   assert.equal(failures.length, 1);
   assert.match(failures[0], /export failed:.*grid/);
@@ -725,7 +809,7 @@ test('a refused topology tick restores focus to the same parameter input', async
       scheduleUpdate: {cancel() {}}, queueCommit: (fn) => { queued = fn; },
       chainIsValid: async () => ({ok: false, message: 'refused'}), showGateMsg() {}, update() {},
       renderOps() { rows = [{dataset: {key: 't'}, querySelector(selector) { assert.equal(selector, `input[type="${type}"]`); return newInput; }}]; }};
-    handler('updateOpParam', context)(0, 't', '0.5', 1);
+    ops(context).updateOpParam(0, 't', '0.5', 1);
     await queued();
     assert.ok(focused, type);
     assert.equal(state.ops[0].params.t, 0.4);
@@ -747,7 +831,7 @@ test('a row drag retains its grab offset across scrolling and clears on cancella
   const rect = { top: 120, left: 20 };
   const list = { children: [row, neighbor], scrollTop: 0, scrollLeft: 0,
     getBoundingClientRect: () => rect };
-  handler('wireRowDrag', context)(grip, 0, row, list, 1);
+  rowDrag(context).wireRowDrag(grip, 0, row, list, 1);
   drag.onStart({ clientX: 30, clientY: 160 });
   drag.onMove({ clientX: 35, clientY: 170 });
   assert.equal(row.style.transform, 'translate(5px, 10px)');
@@ -784,7 +868,7 @@ test('dropping a row snaps back then uses the shared reorder action', () => {
   const row = fakeElement('div');
   const list = {children: [row], scrollTop: 0, scrollLeft: 0,
     getBoundingClientRect: () => ({top: 0, left: 0})};
-  handler('wireRowDrag', context)(fakeElement('button'), 0, row, list, 7);
+  rowDrag(context).wireRowDrag(fakeElement('button'), 0, row, list, 7);
   drag.onStart({clientX: 0, clientY: 0});
   drag.onMove({clientX: 0, clientY: 20});
   drag.onEnd({clientX: 0, clientY: 20});
@@ -804,7 +888,7 @@ test('a row drag cannot rebuild controls after the engine stands down', () => {
   row.offsetHeight = 10;
   const list = {children: [row], scrollTop: 0, scrollLeft: 0,
     getBoundingClientRect: () => ({top: 0, left: 0})};
-  handler('wireRowDrag', context)(grip, 0, row, list, 1);
+  rowDrag(context).wireRowDrag(grip, 0, row, list, 1);
   drag.onStart({clientY: 0});
   drag.onMove({clientY: 10});
   context.wasmModule = null;
@@ -821,9 +905,9 @@ test('saved-solid imports name invalid entries and the first refusal reason', ()
   for (const [entries, reason] of [[ [null, {}], /not a saved-solid object/ ],
     [ [{base: 'cube', ops: [{op: 'truncate', params: {t: 50}}]}], /out-of-range/ ]]) {
     const messages = [];
-    handler('importSavedSolids', { savedSolids: [], mergeSavedSolids,
+    saved({ savedSolids: [], mergeSavedSolids,
       showGateMsg: (message) => messages.push(message),
-    })(JSON.stringify(entries));
+    }).importSavedSolids(JSON.stringify(entries));
     assert.match(messages[0], /invalid entr(y|ies)/);
     assert.match(messages[0], reason);
     assert.doesNotMatch(messages[0], /op table does not recognize/);
@@ -835,10 +919,10 @@ test('saved-solid imports reject bare seeds while accepting an exportable recipe
   const savedSolids = [];
   const messages = [];
   const persistence = [];
-  const importSavedSolids = handler('importSavedSolids', { savedSolids, mergeSavedSolids,
+  const importSavedSolids = saved({ savedSolids, mergeSavedSolids,
     persistSavedSolids() {}, renderSavedList() {},
     showGateMsg: (message, options) => { messages.push(message); persistence.push(options.persist); },
-  });
+  }).importSavedSolids;
   importSavedSolids(JSON.stringify([{ base: 'cube', ops: [] },
     { base: 'cube', ops: [{ op: 'dual', params: {} }] }]));
   assert.equal(savedSolids.length, 1);
@@ -867,7 +951,7 @@ test('queued hankin seeds its angle from the preceding committed mesh', async ()
     update: () => { context.currentMesh = triangle; },
     showGateMsg: (message) => assert.equal(message, ''),
   };
-  const addOp = handler('addOp', context);
+  const addOp = ops(context).addOp;
   addOp('kis');
   addOp('hankin');
   assert.equal(state.ops.length, 0);
@@ -880,13 +964,13 @@ test('two adds queued at one below the op cap commit only the first', async () =
   const queued = [];
   const messages = [];
   let validations = 0;
-  const addOp = handler('addOp', {
+  const addOp = ops({
     state, MAX_RECIPE_STEPS, currentMeshIsCurrent: false, currentMesh: null,
     seedOpParams: () => ({}), queueCommit: (fn) => queued.push(fn),
     chainIsValid: async () => { validations++; return { ok: true }; },
     setOps: (ops) => { state.ops = ops; }, renderOps() {}, update() {},
     showGateMsg: (message) => messages.push(message),
-  });
+  }).addOp;
   addOp('dual');
   addOp('dual');
   assert.equal(queued.length, 2);
@@ -901,12 +985,12 @@ test('saving refuses a chain that restore would refuse', () => {
   const messages = [];
   const savedSolids = [];
   const ops = Array.from({ length: MAX_RECIPE_STEPS + 1 }, () => ({ op: 'dual', params: {} }));
-  handler('saveSolid', {
+  saved({
     currentMesh: { vertices: [], faces: [] }, currentMeshIsCurrent: true,
     state: { base: 'cube', ops }, savedSolids, savedChainShapeError,
     captureSavedSolidThumbnail: () => assert.fail('captured an unrestorable card'),
     showGateMsg: (message) => messages.push(message),
-  })();
+  }).saveSolid();
   assert.equal(savedSolids.length, 0);
   assert.equal(messages.length, 1);
   assert.ok(messages[0].startsWith('rejected:'), messages[0]);
@@ -939,7 +1023,7 @@ test('a simple base keeps the op stack and clears an earlier rejection', async (
   const { context, calls, run } = baseSelectContext();
   let highlights = 0;
   context.highlightBaseSolid = () => { highlights++; };
-  const select = handler('selectBaseSolid', context);
+  const select = bases(context).selectBaseSolid;
   context.chainIsValid = async () => ({ ok: false, message: 'overflow' });
   select('tetrahedron', {});
   await run();
@@ -960,7 +1044,7 @@ test('a star pattern replaces the base and op stack with its authored chain', as
   const { context, calls, run } = baseSelectContext();
   const validated = [];
   context.chainIsValid = async (base, ops) => { validated.push([base, ops]); return { ok: true }; };
-  handler('selectBaseSolid', context)('star', {});
+  bases(context).selectBaseSolid('star', {});
   await run();
   assert.equal(context.state.base, 'dodecahedron');
   assert.deepEqual(context.state.ops, [{ op: 'hankin', params: { angle: 57 } }]);
@@ -970,7 +1054,7 @@ test('a star pattern replaces the base and op stack with its authored chain', as
 
 test('a star pattern without a recipe leaves the chain alone', async () => {
   const { context, calls, run } = baseSelectContext({ meshOpsWasm: { getRecipe: () => null } });
-  handler('selectBaseSolid', context)('star', {});
+  bases(context).selectBaseSolid('star', {});
   await run();
   assert.equal(context.state.base, 'cube');
   assert.match(calls.at(-1)[1], /no authored chain/);
@@ -984,9 +1068,9 @@ test('base-solid arrows focus and select the next radio', () => {
   let focused;
   let selected;
   let prevented = 0;
-  const keydown = handler('handleBaseSolidKeyDown', {
+  const keydown = bases({
     document: { querySelectorAll: () => choices },
-  });
+  }).handleBaseSolidKeyDown;
   keydown({ key: 'ArrowLeft', currentTarget: choices[0], preventDefault() { prevented++; } });
   assert.equal(focused, 'star');
   assert.equal(selected, 'star');
@@ -1015,14 +1099,14 @@ function saveSolidRig() {
     showGateMsg: (message) => messages.push(message), persistSavedSolids() {},
     document: { getElementById: () => list, createElement: fakeElement },
   };
-  context.savedFuncName = handler('savedFuncName', context);
-  context.renderSavedList = handler('renderSavedList', context);
+  context.savedFuncName = saved(context).savedFuncName;
+  context.renderSavedList = saved(context).renderSavedList;
   return {context, messages, list};
 }
 
 test('saving flags engine registry name clashes', () => {
   const {context, messages, list} = saveSolidRig();
-  handler('saveSolid', context)();
+  saved(context).saveSolid();
   assert.equal(context.savedSolids.length, 1);
   assert.equal(messages[0], '');
   assert.match(messages.at(-1), /already in the engine registry/);
@@ -1042,7 +1126,17 @@ test('saving clears an earlier saved-list refusal', () => {
   context.registrySolidNames.clear();
   messages.length = 0;
   context.showGateMsg('rejected: the saved list is full');
-  handler('saveSolid', context)();
+  saved(context).saveSolid();
   assert.equal(context.savedSolids.length, 1);
   assert.deepEqual(messages, ['rejected: the saved list is full', '']);
+});
+
+test('replacing the op list invalidates row revisions and pending parameter edits', () => {
+  const page = createSolidsPage(undefined);
+  page.doc.parameterEdits.set('tick', Symbol());
+  const next = [{op: 'dual', params: {}}];
+  setOps(page, next);
+  assert.equal(page.doc.ops, next);
+  assert.equal(page.doc.opsRevision, 1);
+  assert.equal(page.doc.parameterEdits.size, 0);
 });

@@ -313,3 +313,16 @@ open the authoring page. Simulator shares for those documents include
 `view=simulator`; the dedicated `tools/shader.html` route accepts either name
 form and removes simulator context when constructing an authoring URL.
 Parameter keys remain in the `fx` namespace.
+
+## Module inventory additions
+
+| Module | Responsibility |
+| --- | --- |
+| `src/workbench/solids/solids_state.js` | Typed page state, operation revisions, validator and commit queue |
+| `src/workbench/solids/solids_engine.js` | Engine lifecycle, arena metrics and mesh recomputation |
+| `src/workbench/solids/solids_scene.js` | Preview materials, scene lifecycle, view toggles and label projection |
+| `src/workbench/solids/solids_ops_controller.js` | Queued operation edits, parameter changes and row rendering |
+| `src/workbench/solids/solids_row_drag.js` | Operation drag gestures, drop validation and insertion preview |
+| `src/workbench/solids/solids_op_gate_view.js` | Operation availability and status feedback |
+| `src/workbench/solids/solids_saved_controller.js` | Saved-solid cards, storage, restore and code export |
+| `src/workbench/solids/solids_base_picker.js` | Base-solid thumbnails, keyboard navigation and selection |

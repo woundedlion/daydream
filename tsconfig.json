@@ -166,6 +166,15 @@
     "src/workbench/shader/chain_document_legality.js",
     "src/workbench/shader/shader_document_edits.js",
     "src/workbench/shader/shader_document_loader.js",
-    "src/workbench/shader/shader_document_persistence.js"
+    "src/workbench/shader/shader_document_persistence.js",
+    "src/workbench/solids/solids_page.js",
+    "src/workbench/solids/solids_state.js",
+    "src/workbench/solids/solids_engine.js",
+    "src/workbench/solids/solids_scene.js",
+    "src/workbench/solids/solids_ops_controller.js",
+    "src/workbench/solids/solids_row_drag.js",
+    "src/workbench/solids/solids_op_gate_view.js",
+    "src/workbench/solids/solids_saved_controller.js",
+    "src/workbench/solids/solids_base_picker.js"
   ]
 }
