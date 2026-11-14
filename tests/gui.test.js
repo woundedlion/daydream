@@ -77,7 +77,8 @@ class StubGUI {
    */
   constructor() {
     this.domElement = fakeElement('div');
-    this._closed = false;
+    this.$title = fakeElement('div');
+    this.$title.setAttribute('aria-expanded', 'true');
     this.$children = fakeElement('div');
     this.destroyed = false;
   }
@@ -104,9 +105,9 @@ class StubGUI {
    */
   addFolder() { return new StubGUI(); }
   /** @param {boolean} [open=true] Whether the panel is expanded. */
-  open(open = true) { this._closed = !open; }
+  open(open = true) { this.$title.setAttribute('aria-expanded', String(open)); }
   /** @returns {void} Closes the panel. */
-  close() { this._closed = true; }
+  close() { this.$title.setAttribute('aria-expanded', 'false'); }
   /**
    * Records that the wrapper tore this panel down.
    * @returns {void}

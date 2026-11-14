@@ -8,6 +8,7 @@ import { parseUrlNumber } from '../app/state.js';
 import { getUrlParams, makeUrlParamWriter } from './url_params.js';
 import { hydrate as hydrateValue, optionValues, hydrationWarnings } from './url_hydration.js';
 import { KeyPath } from './deep_link_keys.js';
+import { isClosed } from './lil_gui_adapter.js';
 export { makeUrlParamWriter, resetGUI } from './url_params.js';
 
 /** @typedef {import('lil-gui').Controller & {acceptUrlValue?: (value: unknown) => import('lil-gui').Controller}} UrlController */
@@ -297,7 +298,7 @@ class DeepLinkGUI {
   }
 
   /** @returns {boolean} Whether the wrapped GUI panel is collapsed. */
-  get closed() { return Boolean(this.gui._closed); }
+  get closed() { return isClosed(this.gui); }
   /**
    * Sets the wrapped GUI panel's open state.
    * @param {boolean} [open=true] - Whether the panel is expanded.
