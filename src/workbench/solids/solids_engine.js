@@ -11,7 +11,7 @@ import { buildChainMesh } from './solid_build.js';
 
 /** Supplies browser and engine dependencies. */
 function defaultDependencies() {
-  return {console, showFatalError, setTimeout, document: globalThis.document,
+  return {console, showFatalError, setTimeout: setTimeout.bind(globalThis), document: globalThis.document,
     formatKB, standDownIfHalted, THREE, buildChainMesh};
 }
 

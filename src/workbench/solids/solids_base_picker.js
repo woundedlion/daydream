@@ -15,7 +15,7 @@ import { createMeshRenderer } from './solid_render.js';
 /** Supplies browser and thumbnail dependencies. */
 function defaultDependencies() {
   return {document: globalThis.document, THREE, createMeshRenderer, buildBaseMesh,
-    formatSolidName, setTimeout, window: globalThis.window, opsFromRecipe};
+    formatSolidName, setTimeout: setTimeout.bind(globalThis), window: globalThis.window, opsFromRecipe};
 }
 
 /** Creates base selection and thumbnail handlers.

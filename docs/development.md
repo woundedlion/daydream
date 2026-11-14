@@ -335,3 +335,4 @@ Parameter keys remain in the `fx` namespace.
 | `src/ui/deep_link_keys.js` | Deep-link namespaces and stable folder key segments |
 | `tests/url_hydration.test.js` | Table tests for numeric, boolean and enum hydration |
 | `tests/deep_link_keys.test.js` | Table tests for namespaces and duplicate folder paths |
+| `tests/solids_scene.test.js` | Scene teardown, label projection, thumbnail lifecycle and engine halt tests |

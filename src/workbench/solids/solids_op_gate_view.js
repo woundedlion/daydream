@@ -14,7 +14,7 @@
  * @returns {SolidsOpGateView} Gate rendering actions.
  */
 export function createSolidsOpGateView(page, actions, dependencies = {}) {
-  const env = { document: globalThis.document, clearTimeout, setTimeout, ...dependencies };
+  const env = { document: globalThis.document, clearTimeout: globalThis.clearTimeout.bind(globalThis), setTimeout: globalThis.setTimeout.bind(globalThis), ...dependencies };
   /** Shows validation status. @param {string} text @param {{persist?: boolean}} [options] @returns {void} */
   function showGateMsg(text, { persist = true } = {}) {
     const el = env.document.getElementById('opGateMsg');

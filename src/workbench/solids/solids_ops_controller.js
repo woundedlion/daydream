@@ -15,7 +15,7 @@ import { syncSweepWarning } from './solid_op_rows.js';
 
 /** Supplies operation and browser services. */
 function defaultDependencies() {
-  return { movedOps, document: globalThis.document, buildOpRow, OP_DEFS, syncSweepWarning, opTopologyKey, snapToStep, authoredParamRange, formatParamValue, structuredClone, MAX_RECIPE_STEPS, seedOpParams, window: globalThis.window };
+  return { movedOps, document: globalThis.document, buildOpRow, OP_DEFS, syncSweepWarning, opTopologyKey, snapToStep, authoredParamRange, formatParamValue, structuredClone: globalThis.structuredClone.bind(globalThis), MAX_RECIPE_STEPS, seedOpParams, window: globalThis.window };
 }
 
 /** @param {import('./solids_state.js').SolidsPage} page

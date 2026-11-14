@@ -40,7 +40,7 @@ function savedDependencies() {
     SAVED_SOLIDS_KEY, SAVED_SOLIDS_MAX, SAVED_THUMB_SIZE, CATALAN_BASES,
     loadSavedSolids, persistSavedStore, downloadBlob, mergeSavedSolids,
     savedChainShapeError, captureSavedSolidThumbnail, formatSolidName, meshCounts,
-    structuredClone, registryDisplayName, generateFuncAndRecipe, buildSavedCard,
+    structuredClone: globalThis.structuredClone.bind(globalThis), registryDisplayName, generateFuncAndRecipe, buildSavedCard,
     generateRecipeCpp, generateRegistryCpp, validateRegistryFaces,
     copyWithFeedback, showCopyFeedback, queueSavedSolidRestore,
   };

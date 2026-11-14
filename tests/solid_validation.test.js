@@ -5,6 +5,8 @@ import {
   MAX_RECIPE_STEPS, meshOpFailure, requireMeshResult, unsweepableReason,
 } from '../src/workbench/solids/solid_validation.js';
 import { readFileSync } from 'node:fs';
+import { createSolidsPage, initializeSolidsState } from '../src/workbench/solids/solids_state.js';
+import { installDocument, stashGlobals } from './helpers/fake_dom.js';
 import { fakeModule, stubMesh } from './helpers/fake_meshops.js';
 import { LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
 import { queueSavedSolidRestore } from '../src/workbench/solids/solid_saved_store.js';
@@ -82,7 +84,9 @@ test('a chain change during a probe frees the stale standing mesh before the nex
   assert.equal(state.cleared, 2);
 });
 
-const SOLIDS_PAGE = readFileSync(new URL('../src/workbench/solids/solids_page.js', import.meta.url), 'utf8');
+const SOLIDS_GATES = ['solids_ops_controller.js', 'solids_saved_controller.js',
+  'solids_base_picker.js', 'solids_row_drag.js'].map((file) =>
+  readFileSync(new URL(`../src/workbench/solids/${file}`, import.meta.url), 'utf8')).join('\n');
 const CANDIDATES = ['kis', 'ambo', 'dual'];
 
 /** Verifies queued commits run one at a time, in order, each seeing its predecessor's writes. */
@@ -118,37 +122,42 @@ test('createCommitQueue survives a rejected commit', async () => {
 
 
 test('solids validator resolves the module factory after async initialization', async () => {
-  const match = SOLIDS_PAGE.match(/\bcreateChainValidator\((.+)\);/);
-  assert.ok(match);
-  const instantiate = Function('createChainValidator', 'Mod', `
-    const page = {createHolosphereModule: null};
-    const validator = createChainValidator(${match[1]});
-    page.createHolosphereModule = async () => Mod;
-    return validator.acquire();
-  `);
-  const { Mod } = fakeModule();
-  assert.equal(await instantiate(createChainValidator, Mod), Mod);
+  const restore = stashGlobals('document');
+  installDocument({ getElementById: () => null });
+  try {
+    const page = createSolidsPage(undefined);
+    initializeSolidsState(page, {});
+    const { Mod } = fakeModule();
+    let calls = 0;
+    await Promise.resolve();
+    page.engine.createHolosphereModule = async () => { calls++; return Mod; };
+    assert.equal(calls, 0);
+    assert.equal(await page.engine.validator.acquire(), Mod);
+    assert.equal(calls, 1);
+  } finally {
+    restore();
+  }
 });
 
 
 /** Verifies page gates test the verdict's ok field. */
 test('the solids page gates on each chainIsValid verdict field', () => {
-  const calls = [...SOLIDS_PAGE.matchAll(/\bchainIsValid\(/g)].length;
+  const calls = [...SOLIDS_GATES.matchAll(/\bchainIsValid\(/g)].length;
   assert.ok(calls >= 7, `expected the page's gates to call chainIsValid, found ${calls}`);
-  assert.equal([...SOLIDS_PAGE.matchAll(/const \w+ = await chainIsValid\(/g)].length, calls,
+  assert.equal([...SOLIDS_GATES.matchAll(/const \w+ = await actions\.chainIsValid\(/g)].length, calls,
     'every call must bind its verdict; an unbound one is truthy and gates nothing');
-  assert.doesNotMatch(SOLIDS_PAGE, /!\s*\(?await chainIsValid\(/,
+  assert.doesNotMatch(SOLIDS_GATES, /!\s*\(?await actions\.chainIsValid\(/,
     'a negated call tests the verdict object, not its ok field');
-  const bindings = [...SOLIDS_PAGE.matchAll(/const (\w+) = await chainIsValid\(/g)];
+  const bindings = [...SOLIDS_GATES.matchAll(/const (\w+) = await actions\.chainIsValid\(/g)];
   for (const [index, binding] of bindings.entries()) {
     const verdict = binding[1];
-    const scope = SOLIDS_PAGE.slice(binding.index, bindings[index + 1]?.index);
+    const scope = SOLIDS_GATES.slice(binding.index, bindings[index + 1]?.index);
     assert.ok(new RegExp(`\\b${verdict}\\.ok\\b`).test(scope)
       || scope.includes(`dropSlotChecks.set(target, ${verdict})`),
     `${verdict} must read ok or hand its verdict to the drop-slot map`);
     assert.doesNotMatch(scope, new RegExp(`if\\s*\\(\\s*!?\\s*${verdict}\\s*(?:\\)|\\|\\||&&)`));
   }
-  assert.match(SOLIDS_PAGE, /slotCheck && !slotCheck\.ok/);
+  assert.match(SOLIDS_GATES, /slotCheck && !slotCheck\.ok/);
 });
 
 

@@ -140,7 +140,6 @@ test('every not-checked module has a declaration file on the roster', () => {
 const TOOL_PAGE_EXEMPTIONS = {
   'src/workbench/lissajous/lissajous_page.js': 'Imports Three.js and builds a dynamic DOM controller without declared element types.',
   'src/workbench/mobius/mobius_page.js': 'Imports Three.js and builds a dynamic DOM controller without declared element types.',
-  'src/workbench/solids/solids_page.js': 'Imports Three.js and builds dynamic mesh-editing controls without declared element types.',
 };
 
 test('the typecheck roster stays inside its stated scope', () => {
