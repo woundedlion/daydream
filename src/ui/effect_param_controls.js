@@ -13,7 +13,7 @@ import { focusWidget } from './effect_panel_view.js';
 import { stageControlLabel } from "../effects/shader_stages.js";
 import { float32Decimal } from '../shared/cpp_format.js';
 import { describeBy } from '../shared/aria_description.js';
-import { updateReadonlyNumber } from './readonly_number_adapter.js';
+import { forceNumberDisplay } from './lil_gui_adapter.js';
 export { stageGrouping } from "../effects/shader_stages.js";
 
 /** Engine toggles omit the range fields.
@@ -91,9 +91,11 @@ export function addParamControl(
     controller = add(state, p.name, enumChoices(p.options ?? [], p.optionValues));
   } else if (kind === 'integer') {
     controller = add(state, p.name, p.min, p.max, 1).decimals(0);
+    controller.displayDecimals = 0;
   } else {
-    controller = add(state, p.name, p.min, p.max)
-      .decimals(sliderDecimals(/** @type {number} */ (p.min), /** @type {number} */ (p.max)));
+    const decimals = sliderDecimals(/** @type {number} */ (p.min), /** @type {number} */ (p.max));
+    controller = add(state, p.name, p.min, p.max).decimals(decimals);
+    controller.displayDecimals = decimals;
   }
   controller.isBoolean = (kind === 'boolean');
   controller.isEnum = (kind === 'enum');
@@ -133,7 +135,7 @@ export function addParamControl(
 export function presentReadonlyParam(controller) {
   controller.isReadonly = true;
   if (controller.isContinuous) {
-    updateReadonlyNumber(controller);
+    forceNumberDisplay(controller, controller.displayDecimals);
   }
   controller.domElement.classList.add('param-readonly');
   for (const type of ['mousedown', 'touchstart', 'wheel']) {

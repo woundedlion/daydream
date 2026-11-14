@@ -88,7 +88,7 @@ src/renderer/label_pool.js
 src/shared/aria_description.js
 src/shared/dom.js
 src/ui/effect_param_controllers.js
-src/ui/readonly_number_adapter.js
+src/ui/lil_gui_adapter.js
 src/app/app_boot.js
 src/app/app_context.js
 src/app/app_controls.js

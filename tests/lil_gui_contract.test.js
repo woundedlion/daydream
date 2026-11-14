@@ -9,6 +9,7 @@ import { GUI as DeepLinkGUI } from '../src/ui/gui.js';
 import { createEffectGui } from '../src/ui/effect_gui.js';
 import { addParamControl, presentReadonlyParam } from '../src/ui/effect_param_controls.js';
 import { syncParamAdvisories } from '../src/ui/effect_param_advisories.js';
+import { forceNumberDisplay, isClosed } from '../src/ui/lil_gui_adapter.js';
 import { installConsoleCapture } from './helpers/fake_console.js';
 import { fakePanelGui } from './helpers/fake_gui.js';
 import { test } from 'node:test';
@@ -252,7 +253,7 @@ test('options() on a dropdown updates it in place and returns the same controlle
     assert.equal(gui.controllers.length, 1, 'no replacement is appended');
     assert.deepEqual(narrowed.$select.children.map((o) => o.textContent), ['Hi'],
       'the offered rows are the narrowed list');
-    assert.equal(narrowed._name, 'Resolution', 'the name survives');
+    assert.equal(narrowed.$name.textContent, 'Resolution', 'the name survives');
 
     narrowed.setValue('Hi');
     assert.deepEqual(changes, ['Hi'],
@@ -271,32 +272,45 @@ test('options() on a non-dropdown destroys the receiver and appends a replacemen
     assert.notEqual(replacement, plain,
       'the base Controller.options() cannot convert a controller in place');
     assert.equal(replacement.constructor.name, 'OptionController');
-    assert.equal(replacement._name, 'Count', 'the name is copied over');
+    assert.equal(replacement.$name.textContent, 'Count', 'the name is copied over');
     assert.equal(gui.controllers.at(-1), replacement,
       'the replacement lands at the end of the panel, not in the old slot');
     assert.equal(gui.controllers.includes(plain), false, 'the receiver is destroyed');
   });
 
-// lil-gui offers no public getter for the collapse state; its own docs spell
-// the toggle `gui.open( gui._closed )`.
-test('_closed tracks the collapse state open() and close() set', async () => {
+test('isClosed tracks the collapse state open() and close() set', async () => {
   const gui = await realGUI();
   const folder = gui.addFolder('Shape');
 
-  assert.equal(gui._closed, false, 'a panel starts open');
-  assert.equal(folder._closed, false, 'a folder starts open');
+  assert.equal(isClosed(gui), false, 'a panel starts open');
+  assert.equal(isClosed(folder), false, 'a folder starts open');
 
   gui.close();
-  assert.equal(gui._closed, true, 'close() did not record the collapse');
-  assert.equal(folder._closed, false, 'a folder tracks its own state, not the parent panel');
+  assert.equal(isClosed(gui), true, 'close() did not record the collapse');
+  assert.equal(isClosed(folder), false, 'a folder tracks its own state, not the parent panel');
 
   gui.open();
-  assert.equal(gui._closed, false, 'open() did not record the expansion');
+  assert.equal(isClosed(gui), false, 'open() did not record the expansion');
 
   folder.open(false);
-  assert.equal(folder._closed, true, 'open(false) is the collapsing spelling');
+  assert.equal(isClosed(folder), true, 'open(false) is the collapsing spelling');
   folder.open();
-  assert.equal(folder._closed, false);
+  assert.equal(isClosed(folder), false);
+});
+
+test('forceNumberDisplay repaints a focused number box and marks it read-only', async () => {
+  const gui = await realGUI();
+  const state = { frames: 12 };
+  const controller = gui.add(state, 'frames', 0, 100, 1).decimals(0);
+  controller.$input.dispatch('focus', {});
+  state.frames = 27;
+  controller.updateDisplay();
+  assert.equal(controller.$input.value, '12', 'lil-gui leaves a focused number box alone');
+
+  forceNumberDisplay(controller, 0);
+  controller.updateDisplay();
+  assert.equal(controller.$input.value, '27');
+  assert.equal(controller.$input.readOnly, true);
 });
 
 test('the panel classes the scroll restore and the stylesheet select on hold',

@@ -142,7 +142,7 @@
     "src/shared/aria_description.js",
     "src/shared/dom.js",
     "src/ui/effect_param_controllers.js",
-    "src/ui/readonly_number_adapter.js",
+    "src/ui/lil_gui_adapter.js",
     "src/workbench/shader/chain_chip_drag.js",
     "src/workbench/shader/chain_selection.js",
     "src/workbench/shader/chain_viewport.js",
