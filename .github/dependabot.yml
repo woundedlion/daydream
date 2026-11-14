@@ -1,5 +1,5 @@
-# Automated bump paths for the SHA-pinned actions and the locked Node
-# dependencies.
+# Automated bump paths for the SHA-pinned actions, the locked Node
+# dependencies, and the pinned Python tools.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -37,3 +37,7 @@ updates:
       shellcheck:
         patterns:
           - "shellcheck-py"
+      # A bump also needs the release URL and checksum in js-unit-suite.yml.
+      actionlint:
+        patterns:
+          - "actionlint-py"

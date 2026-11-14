@@ -381,3 +381,21 @@ test('the JS unit suite arms engine-parity, formatter and hook cases', () => {
   assert.match(source, /run: pip install --require-hashes -r engine\/requirements\/clang-format\.txt/);
   assert.match(step, /^\s+run: npm test$/m);
 });
+
+test('the installed actionlint release is the one Dependabot tracks', () => {
+  const pin = (name) => {
+    const found = readFileSync(resolve(REPO, 'requirements', name), 'utf8')
+      .match(/^actionlint-py==(\d+\.\d+\.\d+)\.\d+\b/m);
+    assert.ok(found, `requirements/${name} pins actionlint-py`);
+    return found[1];
+  };
+  const release = pin('actionlint.in');
+  assert.equal(pin('actionlint.txt'), release);
+  const install = stepScript('js-unit-suite.yml', 'Install actionlint');
+  const versions = [...install.matchAll(/\/v(\d+\.\d+\.\d+)\/|actionlint_(\d+\.\d+\.\d+)_linux/g)]
+    .map((match) => match[1] ?? match[2]);
+  assert.equal(versions.length, 2);
+  assert.deepEqual(new Set(versions), new Set([release]));
+  assert.match(readFileSync(resolve(REPO, '.github/dependabot.yml'), 'utf8'),
+    /package-ecosystem: pip\n\s+directory: \/requirements\n[\s\S]*- "actionlint-py"/);
+});
