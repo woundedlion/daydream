@@ -41,20 +41,28 @@ export function compiledControlFor(parameterId, definitions, baked, descriptor, 
   return { name: null, refusal: `no engine parameter matches "${parameterId}"` };
 }
 
+/** Topology fields whose selected value lets `fixedDerivedBinding` fix another parameter. */
+export const DERIVED_BINDING_SELECTORS = Object.freeze(['modulation-source', 'coverage-mode']);
+
 /**
+ * Whether a derived parameter stays live on the compiled build: its own control
+ * resolves, or the build keeps a selector that fixes it writable.
  * @param {string} id @param {*} control @param {ParameterDefinition[]} definitions
  * @param {{unregistered?: true}} binding - An `unregistered` binding is live wherever a control resolves.
+ * @param {*} descriptor - Chain descriptor naming the parameter's stage.
+ * @param {*} catalog - Operator catalog the selector control names resolve against.
+ * @returns {boolean} Whether the compiled build keeps the parameter live.
  */
-function liveDerivedControl(id, control, definitions, binding) {
+export function liveDerivedControl(id, control, definitions, binding, descriptor, catalog) {
   if (control.name === null) return false;
   if (binding.unregistered) return true;
+  if (control.name === fieldSegment(id) || control.name.endsWith('.' + fieldSegment(id))) return true;
   const label = labelOf(id);
   const resource = control.name.slice(0, control.name.lastIndexOf('.'));
-  return control.name === fieldSegment(id) || control.name.endsWith('.' + fieldSegment(id))
-    || definitions.some((definition) => !definition.readonly
-      && [label + '.modulation-source', resource + '.modulation-source', 'modulation-source',
-        label + '.coverage-mode', resource + '.coverage-mode', 'coverage-mode']
-        .includes(definition.name));
+  const selectors = new Set(DERIVED_BINDING_SELECTORS.flatMap((field) => [
+    `${resource}.${field}`,
+    ...promotedControlNames(`${label}.${field}`, descriptor, catalog)]));
+  return definitions.some((definition) => !definition.readonly && selectors.has(definition.name));
 }
 
 /** @param {*} engine @param {*} module @param {Array<{name: string, stored: number}>} writes */
@@ -168,7 +176,8 @@ export function applyFixedShaderDocument(engine, module, compiled, presetId,
     const binding = deriveBinding(compiled.document.descriptor, parameterId, values);
     if (!binding) continue;
     const control = compiledControlFor(parameterId, definitions, baked, compiled.document.descriptor, catalog);
-    if (liveDerivedControl(parameterId, control, definitions, binding)) continue;
+    if (liveDerivedControl(parameterId, control, definitions, binding,
+      compiled.document.descriptor, catalog)) continue;
     if (!binding.valid)
       return `"${parameterId}" must match the fixed build's derived value ${binding.expected}`;
     derived.add(parameterId);
@@ -255,7 +264,8 @@ export function createShaderStageEditor({state, parameterLive, getEngine, getMod
           (id) => engineControlName(id, definitions),
           (id, control) => {
             const binding = state.compiler.fixedDerivedBinding?.(descriptor, id, {...presetValues, ...values});
-            return Boolean(binding && !liveDerivedControl(id, control, definitions, binding));
+            return Boolean(binding && !liveDerivedControl(id, control, definitions, binding,
+              descriptor, state.operatorCatalog));
           });
         refusal = resolved.refusal ?? performEngineWrites(engine, module, resolved.writes)
               ?? performDocumentWrites(engine, module, resolved.documentWrites);

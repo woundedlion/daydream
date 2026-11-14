@@ -3,6 +3,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 
 import {applyFixedShaderDocument} from '../src/workbench/shader/shader_documents.js';
+import {DERIVED_BINDING_SELECTORS, liveDerivedControl} from '../src/workbench/shader/shader_document_edits.js';
 import {ParamSetResult} from './helpers/fake_engine.js';
 
 import {
@@ -367,4 +368,23 @@ test('fixed Twist presets use label identities', () => {
     assert.equal(applyFixed(engine, compiled, 'noon', ['noon']), null);
     assert.deepEqual(engine.writes, fields.map(([, name, value]) => [prefix + name, value]));
   }
+});
+
+test('derived-binding selectors are catalog topology fields', () => {
+  const fields = JSON.parse(ENGINE_CATALOG).operators.flatMap((operator) => operator.params ?? []);
+  for (const selector of DERIVED_BINDING_SELECTORS)
+    assert.ok(fields.some((field) => field.id === selector && field.topology === true), selector);
+});
+
+test('a writable selector under its catalog-resolved name keeps a derived parameter live', () => {
+  const descriptor = {chain: [{label: 'sample', operator: 'sample.grid.v4'}]};
+  const catalog = JSON.parse(ENGINE_CATALOG);
+  const control = {name: 'Edge Width', refusal: null};
+  const binding = {expected: 0.1, valid: true};
+  const live = (definitions) =>
+    liveDerivedControl('sample.edge-width', control, definitions, binding, descriptor, catalog);
+  assert.equal(live([{name: 'source.coverage-mode'}]), true);
+  assert.equal(live([{name: 'Coverage Mode'}]), true);
+  assert.equal(live([{name: 'Coverage Mode', readonly: true}]), false);
+  assert.equal(live([{name: 'Weight Mode'}]), false);
 });
