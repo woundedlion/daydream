@@ -7,9 +7,10 @@
 
 import { raceDeadline } from '../shared/deadline.js';
 import { errorDetail } from '../shared/banner.js';
-import { displayAliasesDiverged, repointDisplayAliases } from '../engine/display_aliases.js';
+import { repointDisplayAliases } from '../engine/display_aliases.js';
 
 /** @typedef {import('../engine/display_aliases.js').DisplayDriver} DisplayDriver */
+/** @typedef {import('../engine/display_aliases.js').AliasGuard} AliasGuard */
 /** @typedef {import('../../generated/holosphere_wasm.js').ArenaMetrics} ArenaMetrics */
 
 /**
@@ -25,8 +26,8 @@ import { displayAliasesDiverged, repointDisplayAliases } from '../engine/display
  *   tick: () => void, updateStats: () => void}} deps.segments - The SegmentController.
  * @param {(advanced: boolean) => void} deps.syncEffectGui - Mirrors engine params
  *   into the panel, told whether the simulation stepped this frame.
- * @param {(message: string) => void} [deps.logError] - Console sink for the
- *   once-per-page alias divergence report.
+ * @param {AliasGuard} deps.aliasGuard - Heals display aliases that diverge
+ *   from the view after a single-engine frame.
  * @returns {{drawFrame: () => void, sync: (advanced: boolean) => void,
  *   getArenaMetrics: () => ArenaMetrics|null, captureReady: (advanced?: boolean) => boolean,
  *   refreshPixelView: () => void, retainsDisplay: () => boolean}} The adapter.
@@ -36,9 +37,8 @@ export function createRenderAdapter({
   driver,
   segments,
   syncEffectGui,
-  logError = (message) => console.error(message),
+  aliasGuard,
 }) {
-  let aliasDivergenceLogged = false;
   return {
     /** Whether the worker pool owns the display while awaiting a published frame. */
     retainsDisplay() {
@@ -66,16 +66,7 @@ export function createRenderAdapter({
         host.engine.drawFrame();
         host.refresh();
         const view = host.view();
-        if (view === null) return;
-        if (displayAliasesDiverged(driver, view)) {
-          if (!aliasDivergenceLogged) {
-            logError(
-              "drawFrame: display-buffer alias diverged after host.refresh() — " +
-              "re-pointing driver.pixels / instanceColor.array at the WASM view");
-            aliasDivergenceLogged = true;
-          }
-          repointDisplayAliases(driver, view);
-        }
+        if (view !== null) aliasGuard.heal(view);
       }
     },
     /**

@@ -7,8 +7,7 @@ function fixture() {
   const faults = [];
   const compositor = new SegmentCompositor({
     driver: { W: 4, H: 4 }, refreshPixelView: () => false,
-    getMemoryView: () => pixels, repointDisplayAliases: () => {},
-    displayAliasesDiverged: () => false,
+    getMemoryView: () => pixels, aliasGuard: { heal: () => false, reset() {} },
     onFault: (segment, message) => faults.push({ segment, message }),
   });
   const bands = compositor.segmentBands(2, 4, 4);

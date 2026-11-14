@@ -6,7 +6,7 @@
 import {SegmentController} from '../segments/segment_controller.js';
 import {SegmentStatsView} from '../ui/segment_stats_view.js';
 import {resolutionPresets} from '../effects/effect_roster.js';
-import {displayAliasesDiverged, repointDisplayAliases} from '../engine/display_aliases.js';
+import {createDriverAliasGuard} from '../engine/display_aliases.js';
 
 /** @param {import('./app_context.js').AppContext} deps */
 export function createAppSegments({doc, appState, host, display}) {
@@ -17,8 +17,7 @@ export function createAppSegments({doc, appState, host, display}) {
     getWasmEngine: () => host.engine,
     refreshPixelView: () => host.refresh(),
     getMemoryView: () => host.view(),
-    repointDisplayAliases: (view) => repointDisplayAliases(display, view),
-    displayAliasesDiverged: (view) => displayAliasesDiverged(display, view),
+    aliasGuard: createDriverAliasGuard(display, 'SegmentCompositor.composite'),
     statsView: new SegmentStatsView(doc),
     onFault: () => host.recorder?.abort(
       'the segmented rendering engine failed.'),

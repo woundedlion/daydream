@@ -8,6 +8,7 @@ import {VideoRecorder} from '../recording/recorder.js';
 import {applyInitialState} from '../effects/effect_sequencing.js';
 import {reportBootFailure} from './bootstrap.js';
 import {errorDetail} from '../shared/banner.js';
+import {createDriverAliasGuard} from '../engine/display_aliases.js';
 /** @typedef {import('./app_context.js').HolosphereModule} HolosphereModule */
 const WORKBENCH_NOTICE = 'workbench';
 
@@ -68,6 +69,7 @@ export function createAppBoot({doc, win, host, loaded, daydream, display, segmen
         driver: display,
         segments,
         syncEffectGui: (advanced) => effectGui.sync(advanced),
+        aliasGuard: createDriverAliasGuard(display, 'drawFrame'),
       });
       host.adapter = renderAdapter;
 

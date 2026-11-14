@@ -500,36 +500,19 @@ test('the controller publishes statistics through its injected view', () => {
   }]);
 });
 
-test('a controller cannot be built without a two-alias display repointer', () => {
-  assert.throws(
-    () => new SegmentController({
-      resolutionPresets: { lo: { w: 4, h: 4 } },
-      appState: { get: () => 'lo' },
-      driver,
-      getWasmEngine: () => null,
-      refreshPixelView: () => {},
-      getMemoryView: () => driver.pixels,
-      displayAliasesDiverged: () => false,
-    }),
-    /repointDisplayAliases is required/,
-    'an omitted repointer would heal only half the alias pair',
-  );
-});
-
-test('a controller cannot be built without an alias-divergence detector', () => {
-  assert.throws(
-    () => new SegmentController({
-      resolutionPresets: { lo: { w: 4, h: 4 } },
-      appState: { get: () => 'lo' },
-      driver,
-      getWasmEngine: () => null,
-      refreshPixelView: () => {},
-      getMemoryView: () => driver.pixels,
-      repointDisplayAliases: (view) => repointDisplayAliases(driver, view),
-    }),
-    /displayAliasesDiverged is required/,
-    'the detector and the heal are one contract; half of it cannot be reached for',
-  );
+test('a controller cannot be built without a complete alias guard', () => {
+  const build = (aliasGuard) => () => new SegmentController({
+    resolutionPresets: { lo: { w: 4, h: 4 } },
+    appState: { get: () => 'lo' },
+    driver,
+    getWasmEngine: () => null,
+    refreshPixelView: () => {},
+    getMemoryView: () => driver.pixels,
+    aliasGuard,
+  });
+  assert.throws(build(undefined), /aliasGuard is required/);
+  assert.throws(build({ heal: () => false }), /aliasGuard is required/);
+  assert.throws(build({ reset() {} }), /aliasGuard is required/);
 });
 
 // ---------------------------------------------------------------------------

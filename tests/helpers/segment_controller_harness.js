@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { installDocument, stashGlobals } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 import { FakeWorker } from './fake_worker.js';
-import { displayAliasesDiverged, repointDisplayAliases } from '../../src/engine/display_aliases.js';
+import { createDriverAliasGuard } from '../../src/engine/display_aliases.js';
 import { SegmentStatsView } from '../../src/ui/segment_stats_view.js';
 import { SegmentController } from '../../src/segments/segment_controller.js';
 import { pageWarmer } from '../fixtures/module_warmer_fixture.js';
@@ -147,8 +147,7 @@ export function makeController({ resolution = 'lo', effect = 'TestEffect',
     getWasmEngine: () => null,
     refreshPixelView: () => {},
     getMemoryView: () => renderDriver.pixels,
-    repointDisplayAliases: (view) => repointDisplayAliases(renderDriver, view),
-    displayAliasesDiverged: (view) => displayAliasesDiverged(renderDriver, view),
+    aliasGuard: createDriverAliasGuard(renderDriver, 'SegmentCompositor.composite'),
   });
 }
 

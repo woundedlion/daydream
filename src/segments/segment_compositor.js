@@ -18,9 +18,6 @@ import { errorDetail } from '../shared/banner.js';
 
 /** Display-buffer composition; worker lifetime and publication stay with the controller. */
 export class SegmentCompositor {
-  /** Throttle for the composite alias-divergence warning. */
-  #aliasDivergenceLogged = false;
-
   // Boundary-overlay seam coordinates, cached per band table.
   /** @type {number[]} */
   #boundaryYs = [];
@@ -46,23 +43,21 @@ export class SegmentCompositor {
    * @param {{W:number, H:number}} deps.driver - Current display dimensions.
    * @param {() => unknown} deps.refreshPixelView
    * @param {() => Uint16Array|null} deps.getMemoryView
-   * @param {(view:Uint16Array) => void} deps.repointDisplayAliases
-   * @param {(view:Uint16Array) => boolean} deps.displayAliasesDiverged
+   * @param {import('../engine/display_aliases.js').AliasGuard} deps.aliasGuard - Heals
+   *   display aliases that diverge from the composite target.
    * @param {(segment:number, message:string) => void} deps.onFault
    */
-  constructor({ driver, refreshPixelView, getMemoryView, repointDisplayAliases,
-    displayAliasesDiverged, onFault }) {
+  constructor({ driver, refreshPixelView, getMemoryView, aliasGuard, onFault }) {
     this.driver = driver;
     this.refreshPixelView = refreshPixelView;
     this.getMemoryView = getMemoryView;
-    this.repointDisplayAliases = repointDisplayAliases;
-    this.displayAliasesDiverged = displayAliasesDiverged;
+    this.aliasGuard = aliasGuard;
     this.onFault = onFault;
   }
 
-  /** Clears the alias-divergence diagnostic latch. */
+  /** Re-arms the alias-divergence report. */
   reset() {
-    this.#aliasDivergenceLogged = false;
+    this.aliasGuard.reset();
   }
 
   /**
@@ -99,17 +94,7 @@ export class SegmentCompositor {
     // A refreshed view missed Daydream.stepSimulation()'s per-tick clear.
     if (refreshed) dst.fill(0);
 
-    // Self-heal an alias divergence: re-point both display aliases at dst.
-    if (this.displayAliasesDiverged(dst)) {
-      if (!this.#aliasDivergenceLogged) {
-        console.error(
-          "SegmentCompositor.composite: display-buffer alias diverged " +
-          "from getMemoryView() — re-pointing the display aliases at the " +
-          "composite target");
-        this.#aliasDivergenceLogged = true;
-      }
-      this.repointDisplayAliases(dst);
-    }
+    this.aliasGuard.heal(dst);
 
     // The configured segment count, not results.length.
     const n = count;

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { fakeElement } from './helpers/fake_dom.js';
 import { pageHandlers } from './helpers/page_handlers.js';
 import { fakeAliasDriver } from './helpers/fake_three.js';
-import { repointDisplayAliases } from '../src/engine/display_aliases.js';
+import { createDriverAliasGuard, repointDisplayAliases } from '../src/engine/display_aliases.js';
 import {
   createRenderAdapter,
   createAppTeardown,
@@ -62,7 +62,7 @@ function makeAdapter({ ownsDisplay = false, active = false,
     driver,
     segments,
     syncEffectGui: (advanced) => calls.push(['effectGui.sync', advanced]),
-    logError: (message) => errors.push(message),
+    aliasGuard: createDriverAliasGuard(driver, 'drawFrame', (message) => errors.push(message)),
   });
   return { adapter, calls, errors, driver, host, view, segments };
 }

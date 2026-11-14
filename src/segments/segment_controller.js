@@ -157,31 +157,25 @@ export class SegmentController {
    * @param {() => (import('../../generated/holosphere_wasm.js').HolosphereEngine|null)} deps.getWasmEngine - Returns the current main-thread HolosphereEngine, or null when none is bound.
    * @param {() => unknown} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view, reporting `true` when it fetched a fresh one.
    * @param {() => (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
-   * @param {(view: Uint16Array) => void} deps.repointDisplayAliases - Re-points BOTH display aliases (Three.js instanceColor.array + driver.pixels) at the given view.
-   * @param {(view: Uint16Array) => boolean} deps.displayAliasesDiverged - Reports whether either display alias has stopped referencing the given view.
+   * @param {import('../engine/display_aliases.js').AliasGuard} deps.aliasGuard - Heals both display aliases (Three.js instanceColor.array + driver.pixels) when either stops referencing the composite target.
    * @param {(message: string) => void} [deps.onFault] - Reports the first fault since the pool was (re)built.
    * @param {{update: (state: SegmentStatsState) => void}} [deps.statsView] - Synchronously renders published pool statistics.
    * @param {import('./module_warmer.js').ModuleWarmer} [deps.moduleWarmer] - Warmer whose held compilation spawned workers reuse; defaults to the page's.
-   * @throws {TypeError} When repointDisplayAliases or displayAliasesDiverged is
-   *   not a function.
+   * @throws {TypeError} When aliasGuard lacks heal() or reset().
    */
   constructor({ resolutionPresets, appState, driver, getWasmEngine, refreshPixelView,
-                getMemoryView, repointDisplayAliases, displayAliasesDiverged,
+                getMemoryView, aliasGuard,
                 statsView = { update() {} }, moduleWarmer = pageWarmer, onFault = () => {} }) {
-    if (typeof repointDisplayAliases !== 'function') {
-      throw new TypeError('SegmentController: repointDisplayAliases is required '
-        + 'and must be a function that re-points both display aliases');
-    }
-    if (typeof displayAliasesDiverged !== 'function') {
-      throw new TypeError('SegmentController: displayAliasesDiverged is required '
-        + 'and must be a function that reports on both display aliases');
+    if (typeof aliasGuard?.heal !== 'function' || typeof aliasGuard.reset !== 'function') {
+      throw new TypeError('SegmentController: aliasGuard is required '
+        + 'and must heal both display aliases');
     }
     this.resolutionPresets = resolutionPresets;
     this.appState = appState;
     this.driver = driver;
     this.getWasmEngine = getWasmEngine;
     this.compositor = new SegmentCompositor({
-      driver, refreshPixelView, getMemoryView, repointDisplayAliases, displayAliasesDiverged,
+      driver, refreshPixelView, getMemoryView, aliasGuard,
       onFault: (segment, message) => this.onWorkerFault(segment, message),
     });
     this.moduleWarmer = moduleWarmer;
