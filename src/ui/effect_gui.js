@@ -215,8 +215,9 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   /** @type {string|undefined} */
   let rebuildFailureGeneration;
   const persistence = createEffectPersistence({
-    getParameterDefinitions, setEngineParam, usesChainSnapshot, getSnapshot, restoreSnapshot, chainSnapshotRestoreResults, showConfigImportNotice, logWarn
-  });
+    getParameterDefinitions, setParam: setEngineParam, usesChainSnapshot, getSnapshot,
+    restoreSnapshot, restoreResults: chainSnapshotRestoreResults,
+  }, { showImportNotice: showConfigImportNotice, logWarn });
   const view = createEffectPanelView({ focusedElement, guiContainer, isMobile });
   const valueSync = createParamValueSync({
     liveParamValues, segmentsOwnDisplay, getParameterDefinitions, focusedElement, logWarn,

@@ -19,7 +19,7 @@ export { stageGrouping } from "../effects/shader_stages.js";
 /** Engine toggles omit the range fields.
  * @typedef {{name: string, group?: {name: string, title: string, order: number}, value: number|boolean, min?: number, max?: number, animated?: boolean, readonly?: boolean, warning?: string, options?: string[], optionValues?: number[], step?: number, acceptedValue?: number|boolean, requestedValue?: number|boolean, preset?: boolean, exportOptions?: string[]}} ParameterDefinition */
 /** @typedef {import("./effect_panel_view.js").PanelController & Record<string, any>} GuiController */
-/** @typedef {import("./effect_panel_view.js").PanelFolder & Record<string, any>} Gui */
+/** @typedef {import("./effect_panel_view.js").PanelFolder & import("../effects/effect_persistence.js").PersistenceGui & Record<string, any>} Gui */
 
 /**
  * The id one parameter's warning text is published under, for the control's

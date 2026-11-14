@@ -7,13 +7,60 @@ import { acceptedParamValue, engineParamValue, enumConstantName } from './param_
 
 export const CHAIN_SNAPSHOT_STORAGE_KEY = '__chainSnapshot';
 
+/** @typedef {import('../../generated/holosphere_wasm.js').ChainSnapshot} ChainSnapshot */
+
+/**
+ * The fields persistence reads from an engine parameter definition.
+ * @typedef {Pick<import('../../generated/holosphere_wasm.js').ParameterDefinitionBase, 'name'>
+ *   & {readonly?: boolean, value: number|boolean, acceptedValue?: number|boolean,
+ *   requestedValue?: number|boolean}} PersistedParameter
+ */
+
+/**
+ * The engine surface effect state is captured from and replayed into.
+ * @typedef {Object} PersistenceEngine
+ * @property {() => ReadonlyArray<PersistedParameter>} getParameterDefinitions - The
+ *   active effect's parameter definitions.
+ * @property {(name: string, value: number) => boolean} setParam - Writes one
+ *   parameter; false when the engine refused it.
+ * @property {() => boolean} usesChainSnapshot - Whether the active effect persists
+ *   through the chain snapshot instead of per-parameter accepted values.
+ * @property {() => ChainSnapshot|null} getSnapshot - Captures the active chain.
+ * @property {(snapshot: ChainSnapshot) => unknown} restoreSnapshot - Atomically
+ *   restores a chain, returning one ChainSnapshotRestoreResult value.
+ * @property {() => Readonly<Record<string, unknown>>} restoreResults - The
+ *   ChainSnapshotRestoreResult enum the outcome is judged against by identity.
+ */
+
+/**
+ * The page surface persistence reports through.
+ * @typedef {Object} PersistenceUi
+ * @property {(message: string|null) => void} showImportNotice - Shows or clears
+ *   the snapshot import notice.
+ * @property {(message: string, error?: unknown) => void} logWarn - Console sink.
+ */
+
+/**
+ * The effect GUI's URL companion storage.
+ * @typedef {Object} PersistenceGui
+ * @property {(prop: string) => number|undefined} readStoredNumber
+ * @property {(prop: string) => string|undefined} readStoredString
+ * @property {(prop: string, value: string|number|boolean|null|undefined) => void} writeStoredValue
+ */
+
 /**
  * URL storage and replay of engine-accepted effect state.
- * @param {{getParameterDefinitions: () => Array<{name: string, readonly?: boolean, value: *, acceptedValue?: *, requestedValue?: *}>, setEngineParam: (name: string, value: number) => *, usesChainSnapshot: () => boolean, getSnapshot: () => *, restoreSnapshot: (snapshot: *) => *, chainSnapshotRestoreResults: () => *, showConfigImportNotice: (message: string|null) => void, logWarn: (...args: *) => void}} dependencies
+ * @param {PersistenceEngine} engine - Engine state source and sink.
+ * @param {PersistenceUi} ui - Notice and console sinks.
+ * @returns {{persist: (gui: PersistenceGui, options?: {edited?: {name: string, accepted: number|boolean}, existingOnly?: boolean}) => void,
+ *   restore: (gui: PersistenceGui) => void}} The persistence pair.
  */
-export function createEffectPersistence({
-  getParameterDefinitions, setEngineParam, usesChainSnapshot, getSnapshot, restoreSnapshot, chainSnapshotRestoreResults, showConfigImportNotice, logWarn
-}) {
+export function createEffectPersistence(engine, ui) {
+  const {
+    getParameterDefinitions, setParam: setEngineParam, usesChainSnapshot, getSnapshot,
+    restoreSnapshot, restoreResults: chainSnapshotRestoreResults,
+  } = engine;
+  const { showImportNotice: showConfigImportNotice, logWarn } = ui;
   /** @param {string} name @returns {string} */
   const acceptedStorageKey = (name) => `__accepted.${name}`;
   const restoredKeys = new Set();
@@ -21,9 +68,9 @@ export function createEffectPersistence({
 
   /**
    * Persist the active effect through its snapshot or accepted-value surface.
-   * @param {*} gui - The effect GUI holding the stored values.
+   * @param {PersistenceGui} gui - The effect GUI holding the stored values.
    * @param {Object} [options]
-   * @param {{name: string, accepted: *}} [options.edited] - The one parameter an
+   * @param {{name: string, accepted: number|boolean}} [options.edited] - The one parameter an
    *   edit moved, carrying the value the write settled on.
    * @param {boolean} [options.existingOnly=false] - Rewrite only restored companion keys.
    * @returns {void}
@@ -40,7 +87,7 @@ export function createEffectPersistence({
     gui.writeStoredValue(CHAIN_SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot));
   }
 
-  /** Replay a stored chain snapshot or accepted parameter values. @param {*} gui */
+  /** Replay a stored chain snapshot or accepted parameter values. @param {PersistenceGui} gui */
   function restoreEffectState(gui) {
     restoredKeys.clear();
     refusedSnapshot = false;
@@ -50,12 +97,14 @@ export function createEffectPersistence({
     }
     const text = gui.readStoredString(CHAIN_SNAPSHOT_STORAGE_KEY);
     if (text === undefined) return;
+    /** @type {ChainSnapshot} */
     let snapshot;
     try {
-      snapshot = JSON.parse(text);
-      if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
         throw new TypeError('snapshot must be an object');
       }
+      snapshot = parsed;
     } catch (error) {
       refusedSnapshot = true;
       showConfigImportNotice('The chain snapshot is invalid. Its original text remains preserved.');
@@ -74,14 +123,14 @@ export function createEffectPersistence({
     showConfigImportNotice(null);
   }
 
-  /** Store one accepted numeric value for URL canonicalization. @param {*} gui @param {string} name @param {*} accepted */
+  /** Store one accepted numeric value for URL canonicalization. @param {PersistenceGui} gui @param {string} name @param {number|boolean} accepted */
   function persistAcceptedParam(gui, name, accepted) {
     gui.writeStoredValue(acceptedStorageKey(name), engineParamValue(accepted));
   }
 
   /**
    * Store writable accepted parameters.
-   * @param {*} gui
+   * @param {PersistenceGui} gui
    * @param {{existingOnly: boolean}} options - Rewrite only restored companion keys.
    */
   function persistAcceptedParams(gui, { existingOnly }) {
@@ -95,7 +144,7 @@ export function createEffectPersistence({
   /**
    * Replay stored accepted values, rereading the schema after every write and
    * retrying refused writes while some retry applies.
-   * @param {*} gui
+   * @param {PersistenceGui} gui
    * @returns {void}
    */
   function restoreAcceptedParams(gui) {
@@ -111,19 +160,18 @@ export function createEffectPersistence({
     };
     for (;;) {
       const writable = getParameterDefinitions().filter((candidate) => !candidate.readonly);
-      let parameter;
-      let value;
+      /** @type {{name: string, value: number}|undefined} */
+      let found;
       for (const candidate of writable) {
         if (probed.has(candidate.name)) continue;
         probed.add(candidate.name);
         const stored = gui.readStoredNumber(acceptedStorageKey(candidate.name));
         if (stored === undefined) continue;
-        parameter = candidate;
-        value = stored;
+        found = { name: candidate.name, value: stored };
         break;
       }
-      if (parameter) {
-        if (!apply(parameter.name, value)) refused.set(parameter.name, value);
+      if (found) {
+        if (!apply(found.name, found.value)) refused.set(found.name, found.value);
         continue;
       }
       const names = new Set(writable.map((candidate) => candidate.name));
