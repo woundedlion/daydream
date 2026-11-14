@@ -8,27 +8,17 @@
   --sidebar-width: 240px;
 }
 
+/* Sizes the tools.css .tool-stage / .tool-panel shell above the controls panel. */
 #canvasContainer {
-  position: fixed;
-  top: 0;
-  left: 0;
   width: calc(100vw - var(--sidebar-width));
   height: calc(100vh - var(--panel-height));
-  z-index: 10;
 }
 
 #presetSidebar {
-  position: fixed;
-  top: 0;
-  right: 0;
-  padding: 1.5rem;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  overflow-y: auto;
-  border-left: 1px solid var(--slate-700);
   width: var(--sidebar-width);
   height: calc(100vh - var(--panel-height));
   background-color: color-mix(in srgb, var(--slate-900) 80%, transparent);
+  box-shadow: none;
   z-index: 15;
 }
 
