@@ -544,6 +544,8 @@ const CONTRAST_EXEMPT = {
     '.license-link': 'translucent text over the live canvas',
     '.license-link:hover': 'text over the live canvas',
     '.rec-duration': 'text over the live canvas',
+    '.viewport-reset': 'an SVG icon, not text; SC 1.4.3 is a text criterion',
+    '.viewport-reset:hover, .viewport-reset:focus-visible': 'an SVG icon, not text; SC 1.4.3 is a text criterion',
     '.effect-button.active': 'text over a gradient fill',
     '.effect-button.active .effect-size': 'text over a gradient fill',
     '.scroll-arrow': 'translucent text over a gradient fill',
