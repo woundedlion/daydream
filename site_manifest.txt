@@ -197,3 +197,7 @@ src/workbench/solids/solids_row_drag.js
 src/workbench/solids/solids_op_gate_view.js
 src/workbench/solids/solids_saved_controller.js
 src/workbench/solids/solids_base_picker.js
+src/workbench/shader/chain_strip_context.js
+src/workbench/shader/chain_strip_commands.js
+src/workbench/shader/chain_chip_element.js
+src/workbench/shader/chain_strip_history.js

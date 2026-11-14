@@ -326,3 +326,7 @@ Parameter keys remain in the `fx` namespace.
 | `src/workbench/solids/solids_op_gate_view.js` | Operation availability and status feedback |
 | `src/workbench/solids/solids_saved_controller.js` | Saved-solid cards, storage, restore and code export |
 | `src/workbench/solids/solids_base_picker.js` | Base-solid thumbnails, keyboard navigation and selection |
+| `src/workbench/shader/chain_strip_context.js` | Shared strip collaborators and view state |
+| `src/workbench/shader/chain_strip_commands.js` | DOM-free strip commands and parameter edit commits |
+| `src/workbench/shader/chain_chip_element.js` | Stage chips, keyboard controls and band add buttons |
+| `src/workbench/shader/chain_strip_history.js` | Strip undo/redo actions and history controls |

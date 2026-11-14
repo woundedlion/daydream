@@ -335,6 +335,8 @@ const CLASS_EXEMPTIONS = new Set([
 // creates the chain strip only in the shader-workbench mode.
 const NON_RENDERING_CLASS_SOURCES = new Map([
   ['index.html', new Set(['src/workbench/shader/chain_strip.js',
+    'src/workbench/shader/chain_chip_element.js',
+    'src/workbench/shader/chain_strip_commands.js', 'src/workbench/shader/chain_strip_history.js',
     'src/workbench/shader/chain_palette.js', 'src/workbench/shader/chain_param_rows.js',
     'src/workbench/shader/chain_chip_drag.js', 'src/workbench/shader/chain_viewport.js',
     'src/workbench/shader/chain_row_controls.js'])],

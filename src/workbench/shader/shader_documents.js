@@ -394,7 +394,7 @@ export function createShaderDocumentController({
     const store = await createChainDocumentStore({
       document, catalog: operatorCatalog, importCompiler,
     });
-    const strip = /** @type {*} */ (createChainStrip({
+    const strip = createChainStrip({
       doc,
       container,
       store,
@@ -422,7 +422,7 @@ export function createShaderDocumentController({
         void flushDeepLink();
       },
       bypassAvailable: () => active?.compiledSide !== true,
-    }));
+    });
     setParamFilter({ external: true });
     return { store, strip };
   };
