@@ -20,13 +20,31 @@ test('generated solid recipes pass clang-format', {skip: engineSkip}, (t) => {
   assert.ok(expectedVersion, 'the engine must declare its clang-format pin');
   assert.equal(version.stdout.match(/\bversion ([\d.]+)\b/)?.[1], expectedVersion,
     'clang-format must match the engine requirements pin');
-  const sources = [generateRecipeCpp({base: 'cube', ops: ['kis']}, 'Archimedean')];
-  sources.push(generateRecipeCpp({base: 'truncatedIcosahedron', ops: [
-    {op: 'hankin', params: {angle: 58}}, {op: 'chamfer', params: {t: 0.63}},
-  ]}, 'Archimedean'));
-  sources.push(generateRecipeCpp({base: 'pentagonalHexecontahedron', ops: [
-    {op: 'truncate', params: {t: 0.33}}, 'ambo', 'dual',
-  ]}, 'Catalan'));
+  // One recipe per signature shape signatureCpp emits.
+  const sources = [
+    // Return type leading, both parameters on one line.
+    generateRecipeCpp({base: 'cube', ops: ['kis']}, 'Archimedean'),
+    // Return type leading, second parameter aligned.
+    generateRecipeCpp({base: 'truncatedIcosahedron', ops: [
+      {op: 'hankin', params: {angle: 58}}, {op: 'chamfer', params: {t: 0.63}},
+    ]}, 'Archimedean'),
+    // Return type on its own line, both parameters on one line.
+    generateRecipeCpp({base: 'pentagonalHexecontahedron', ops: [
+      {op: 'truncate', params: {t: 0.33}}, 'ambo', 'dual',
+    ]}, 'Catalan'),
+    // Return type on its own line, second parameter aligned (62-character name).
+    generateRecipeCpp({base: 'truncatedIcosidodecahedron', ops: [
+      {op: 'truncate', params: {t: 0.33}}, {op: 'chamfer', params: {t: 0.5}},
+      {op: 'expand', params: {t: 0.5}}, {op: 'hankin', params: {angle: 54}},
+    ]}, 'Archimedean'),
+    // Bare declarator, both parameters indented below it (the widest name).
+    generateRecipeCpp({base: 'truncatedIcosidodecahedron', ops: [
+      {op: 'truncate', params: {t: 0.33}}, {op: 'chamfer', params: {t: 0.5}},
+      {op: 'expand', params: {t: 0.5}}, {op: 'hankin', params: {angle: 54}},
+      {op: 'relax', params: {iter: 100}}, {op: 'bevel', params: {t: 0.25}},
+      {op: 'snub', params: {t: 0.5, twist: 0.28}},
+    ]}, 'Archimedean'),
+  ];
   const registryCases = [
     [{base: 'cube', ops: ['kis']}],
     [{base: 'truncatedIcosahedron', ops: ['ambo',

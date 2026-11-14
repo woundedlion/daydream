@@ -501,7 +501,7 @@ test('strobeColumns and effect metadata return the shapes daydream consumes', ()
 test('the favorites rosters and the seeded default name installable effects', () => {
   const registered = new Set(Object.keys(engine.getEffectSizes()));
   assert.ok(registered.has(DEFAULT_EFFECT),
-    `daydream.js seeds ${DEFAULT_EFFECT}, which the engine does not register`);
+    `app_route_state.js seeds ${DEFAULT_EFFECT}, which the engine does not register`);
 
   const unregistered = [];
   const uninstallable = [];
@@ -934,10 +934,10 @@ test('meshOpFailure routes a real bridge reject by the reason the module records
   M.MeshOps.clearToolingMemory();
 });
 
-test('solid_codegen KNOWN_OPS matches the operators MeshOps binds', () => {
+test('solid_op_params KNOWN_OPS matches the operators MeshOps binds', () => {
   assert.deepEqual([...KNOWN_OPS].sort(), meshOpNames(),
     'the codegen op list and the ops bound by the WASM module must agree; ' +
-    'update src/workbench/solids/solid_codegen.js KNOWN_OPS to match the engine');
+    'update src/workbench/solids/solid_op_params.js KNOWN_OPS to match the engine');
 });
 
 // One case per OP_DEFS slider endpoint: the named param at that edge, every
@@ -981,7 +981,7 @@ test('every OP_DEFS bound sits inside the engine domain the WASM bridge enforces
     `${clamped.length} OP_DEFS endpoints made the WASM bridge log on a ${seed}; ` +
     'the range reaches outside the engine domain for that operator, so the ' +
     'preview silently clamps while the generated C++ carries the authored value ' +
-    'into an engine assert. Narrow the range in src/workbench/solids/solid_codegen.js');
+    'into an engine assert. Narrow the range in src/workbench/solids/solid_op_params.js');
 });
 
 test('the seed lists name registered Simple solids and do not overlap', () => {
@@ -994,8 +994,8 @@ test('the seed lists name registered Simple solids and do not overlap', () => {
   const unregistered = [...SIMPLE_SEEDS, ...CATALAN_BASES]
     .filter((name) => !simple.has(name));
   assert.deepEqual(unregistered.slice(0, 5), [],
-    `solid_codegen.js lists ${unregistered.length} names the engine registers no ` +
-    'Simple solid for; update src/workbench/solids/solid_codegen.js to match solids.h');
+    `solid_op_params.js lists ${unregistered.length} names the engine registers no ` +
+    'Simple solid for; update src/workbench/solids/solid_op_params.js to match solids.h');
   const inBoth = SIMPLE_SEEDS.filter((name) => CATALAN_BASES.has(name));
   assert.deepEqual(inBoth.slice(0, 5), [],
     `${inBoth.length} names are in both seed lists; the namespace qualifier ` +
