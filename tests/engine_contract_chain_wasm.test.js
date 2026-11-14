@@ -12,6 +12,7 @@ import {resolutionPresets} from '../src/effects/effect_roster.js';
 import { deactivatedParameterIds, modulationValueLimits } from '../src/workbench/shader/chain_presentation.js';
 
 import {chainSnapshot} from './helpers/effect_gui_harness.js';
+import { RETIRED_OPERATORS } from './helpers/retired_operators.js';
 import {
   DEFAULT_CHAIN, FakeChainEngine, ChainSnapshotRestoreResult, ChainStatus, PALETTE_FADE_FRAMES, PALETTE_HUE_STEP,
 } from './helpers/fake_engine.js';
@@ -687,12 +688,7 @@ test('retired chain operators are absent and refuse without changing the live pr
   assert.equal(chainCall(engine, 'setShaderChain', DEFAULT_CHAIN).code, 'APPLIED');
   const before = chainCall(engine, 'getSnapshot');
   const catalog = JSON.parse(M.ShaderChainBindings.getShaderChainCatalog());
-  for (const operator of [
-    'colorize.generated-palette.v2', 'project.airocean.v2', 'project.bonne.v2',
-    'project.peirce-square-fast.v2', 'project.peirce.v2', 'sample.grid.v2',
-    'sample.twin-wave.v2', 'warp.affine.v2', 'warp.affine.v3',
-    'warp.affine-periodic.v1', 'sphere.lens.mobius.v2',
-  ]) {
+  for (const operator of RETIRED_OPERATORS) {
     assert.equal(catalog.operators.some((entry) => entry.id === operator), false);
     const result = chainCall(engine, 'setShaderChain', [{instance: 'retired', operator}]);
     assert.equal(result.status, M.ChainStatus.UNKNOWN_OPERATOR);

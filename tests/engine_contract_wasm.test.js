@@ -19,6 +19,7 @@ import { DEFAULT_EFFECT, resolutionPresets } from '../src/effects/effect_roster.
 import { paletteControlsFromRecipe, paletteRecipeFromControls, PaletteV4 } from '../src/workbench/palettes/palette_controls.js';
 import { paletteAdjustmentSummary } from '../src/workbench/palettes/palette_math.js';
 import { stageGrouping } from '../src/effects/shader_stages.js';
+import { RETIRED_OPERATORS } from './helpers/retired_operators.js';
 
 // Capture the bridge's diagnostics for clamped MeshOps arguments.
 const moduleLogs = [];
@@ -424,7 +425,7 @@ test('Symmetric snapshot restore requires current controls and rotation state in
     assert.equal(bindings.restoreSnapshot(withoutClock), M.ChainSnapshotRestoreResult.INVALID_VALUE);
     assert.deepEqual(bindings.getSnapshot(), current);
     const retired = structuredClone(current);
-    retired.chain[0].operator = 'sphere.displace.symmetric.v1';
+    retired.chain[0].operator = RETIRED_OPERATORS[0];
     assert.equal(bindings.restoreSnapshot(retired), M.ChainSnapshotRestoreResult.INVALID_CHAIN);
     assert.deepEqual(bindings.getSnapshot(), current);
   } finally { bindings.delete(); }

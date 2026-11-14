@@ -7,6 +7,7 @@ import { decodeShaderStateHash, encodeShaderStateHash, CHAIN_SNAPSHOT_SCHEMA_VER
 import { documentFromChainSnapshot, scratchChainDocument }
   from '../src/workbench/shader/chain_document_store.js';
 import { compileShaderDocument } from '../generated/shader/shader_workbench.mjs';
+import { RETIRED_OPERATORS } from './helpers/retired_operators.js';
 
 const CATALOG = JSON.parse(readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
 const document = scratchChainDocument(CATALOG);
@@ -37,8 +38,7 @@ for (const schemaVersion of [3, 4]) {
   });
 }
 
-for (const operator of ['sphere.lens.mobius.v2', 'sphere.displace.symmetric.v1',
-  'colorize.generated-palette.v3', 'modulate.field.v1', 'modulate.hue-shift.v1']) {
+for (const operator of RETIRED_OPERATORS) {
   test(`retired operator ${operator} is refused without conversion`, () => {
     const retired = structuredClone(document);
     retired.descriptor.chain[0].operator = operator;
