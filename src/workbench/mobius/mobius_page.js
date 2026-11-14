@@ -266,7 +266,7 @@ function createComplexPlaneElements(id, maxExtent) {
   const dotElement = makeDiv('complex-plane-dot', dotId);
   inner.append(makeDiv('axis-h'), makeDiv('axis-v'), dotElement);
 
-  const axisKeyShortcuts = 'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Home';
+  const axisKeyShortcuts = 'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Home End 0';
   const reElement = makeAxis(reId, `Parameter ${id} real part`,
     axisKeyShortcuts, false);
   const imElement = makeAxis(imId, `Parameter ${id} imaginary part`,
@@ -367,29 +367,26 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
 
   // Keyboard equivalent of dragging the dot: a handle's arrows nudge its own
   // part, decreasing on Left/Down and increasing on Right/Up (Shift for a
-  // coarser step); Home recenters to the origin.
+  // coarser step); Home and End move its part to the minimum and maximum, and
+  // 0 recenters both parts to the origin.
   const onAxisKeyDown = (axis) => (e) => {
     const step = e.shiftKey ? 0.2 : 0.05;
-    let delta = 0;
+    const current = axis === 're' ? paramObj.re : paramObj.im;
+    let value;
     switch (e.key) {
-      case 'ArrowLeft': case 'ArrowDown': delta = -step; break;
-      case 'ArrowRight': case 'ArrowUp': delta = step; break;
-      case 'Home': break; // handled below as recenter
+      case 'ArrowLeft': case 'ArrowDown': value = clampSnap(current - step, step / 4); break;
+      case 'ArrowRight': case 'ArrowUp': value = clampSnap(current + step, step / 4); break;
+      case 'Home': value = -maxExtent; break;
+      case 'End': value = maxExtent; break;
+      case '0':
+        e.preventDefault();
+        commit(0, 0);
+        return;
       default: return;
     }
     e.preventDefault();
-    const home = e.key === 'Home';
-    let re = paramObj.re;
-    let im = paramObj.im;
-    if (home) {
-      re = 0;
-      im = 0;
-    } else if (axis === 're') {
-      re = clampSnap(re + delta, step / 4);
-    } else {
-      im = clampSnap(im + delta, step / 4);
-    }
-    commit(re, im);
+    if (axis === 're') commit(value, paramObj.im);
+    else commit(paramObj.re, value);
   };
 
   const reKeyDown = onAxisKeyDown('re');
