@@ -26,7 +26,7 @@ export class EngineHost {
     this.module = null;
     /** @type {HolosphereEngine|null} */
     this.engine = null;
-    /** @type {ReturnType<typeof import('../app/app_lifecycle.js').createRenderAdapter>|null} */
+    /** @type {import('../app/render_adapter.js').RenderAdapter|null} */
     this.adapter = null;
     /** @type {import('../recording/recorder.js').VideoRecorder|null} */
     this.recorder = null;

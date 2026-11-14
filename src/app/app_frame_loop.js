@@ -3,11 +3,11 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-import {createFrameLoopGuard} from './app_lifecycle.js';
+import {createFrameLoopGuard} from './frame_loop_guard.js';
 import {showFatalError, clearFatalError} from '../shared/banner.js';
 
 /** @param {import('./app_context.js').BootContext & {
- * getTeardown: () => ReturnType<typeof import('./app_lifecycle.js').createAppTeardown>|null}} deps */
+ * getTeardown: () => import('./app_teardown.js').AppTeardown|null}} deps */
 export function startAppFrameLoop({daydream, host, recording, getTeardown}) {
   daydream.startFrameLoop(createFrameLoopGuard({
     frame: () => {

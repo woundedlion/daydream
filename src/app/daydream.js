@@ -9,7 +9,7 @@ import createHolosphereModule from '../../generated/holosphere_wasm.js';
 import {Daydream} from '../renderer/driver.js';
 import {GUI} from '../ui/gui.js';
 import {createApplyNotice} from '../ui/apply_notice.js';
-import {loadWithDeadline} from './app_lifecycle.js';
+import {loadWithDeadline} from './module_load.js';
 import {SEGMENT_CONTROLLER_API_VERSION} from '../segments/segment_controller.js';
 import {StaleModuleError} from './bootstrap.js';
 import {canonicalEffectId} from '../effects/effect_identity.js';
@@ -63,7 +63,7 @@ function workbenchRedirectEffect(requested, view) {
   return SHADER_DOCUMENT_EFFECTS.includes(canonical) ? canonical : null;
 }
 
-/** @typedef {ReturnType<typeof import('./app_lifecycle.js').createAppTeardown> & {ready: Promise<unknown>}} AppHandle */
+/** @typedef {import('./app_teardown.js').AppTeardown & {ready: Promise<unknown>}} AppHandle */
 
 /**
  * Builds the simulator: driver, engine host, state, GUI, sidebar, apply
@@ -120,7 +120,7 @@ export function start({
   const controls = createAppControls(effectContext);
   effects.connectViewDisplay(controls.viewDisplay);
   const context = {...effectContext, ...controls, shaderDocuments};
-  /** @type {ReturnType<typeof import('./app_lifecycle.js').createAppTeardown>|null} */
+  /** @type {import('./app_teardown.js').AppTeardown|null} */
   let appTeardown = null;
   const getTeardown = () => appTeardown;
   const moduleLoad = createAppBoot({...context, getTeardown});

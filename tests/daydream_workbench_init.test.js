@@ -5,7 +5,7 @@ import { restoreDocumentAfterEach } from './helpers/fake_dom.js';
 import { installConsoleCapture } from './helpers/fake_console.js';
 import { getActiveURLSync, URL_FLUSH_DEBOUNCE_MS } from '../src/app/state.js';
 import { canonicalEffectId } from '../src/effects/effect_identity.js';
-import { MODULE_TRAP_NOTICE } from '../src/app/app_lifecycle.js';
+import { MODULE_TRAP_NOTICE } from '../src/app/frame_loop_guard.js';
 
 let initFailure = null;
 let initResult = null;

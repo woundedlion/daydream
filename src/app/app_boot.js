@@ -3,7 +3,9 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-import {createModuleLoadHandlers, createRenderAdapter, MODULE_TRAP_NOTICE} from './app_lifecycle.js';
+import {createModuleLoadHandlers} from './module_load.js';
+import {createRenderAdapter} from './render_adapter.js';
+import {MODULE_TRAP_NOTICE} from './frame_loop_guard.js';
 import {VideoRecorder} from '../recording/recorder.js';
 import {applyInitialState} from '../effects/effect_sequencing.js';
 import {reportBootFailure} from './bootstrap.js';
@@ -13,7 +15,7 @@ import {createDriverAliasGuard} from '../engine/display_aliases.js';
 const WORKBENCH_NOTICE = 'workbench';
 
 /** @param {import('./app_context.js').BootContext & {shaderDocuments: ReturnType<typeof import('./app_shader_documents.js').createAppShaderDocuments>,
- * getTeardown: () => ReturnType<typeof import('./app_lifecycle.js').createAppTeardown>|null}} deps */
+ * getTeardown: () => import('./app_teardown.js').AppTeardown|null}} deps */
 export function createAppBoot({doc, win, host, loaded, daydream, display, segments, applyNotice,
   shell, switches, effectGui, viewDisplay, recording, apply, shaderDocuments,
   releaseWorkbenchUrl, testAllTicker, testAllController, getTeardown}) {

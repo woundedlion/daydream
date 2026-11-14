@@ -7,7 +7,7 @@ import { unpinnedEngineMethods } from './helpers/fake_engine.js';
 import { fakeColorAttribute } from './helpers/fake_three.js';
 import { FakeWorker } from './helpers/fake_worker.js';
 import { Daydream } from '../src/renderer/driver.js';
-import { createRenderAdapter } from '../src/app/app_lifecycle.js';
+import { createRenderAdapter } from '../src/app/render_adapter.js';
 import {
   BOOT_WATCHDOG_MS,
   INIT_WATCHDOG_MS,

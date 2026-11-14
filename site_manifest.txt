@@ -28,7 +28,9 @@ vendor-importmap.js
 src/app/main.js
 src/shared/module_load_guard.js
 src/app/bootstrap.js
-src/app/app_lifecycle.js
+src/app/render_adapter.js
+src/app/frame_loop_guard.js
+src/app/module_load.js
 src/ui/apply_notice.js
 src/engine/display_aliases.js
 src/renderer/pole_lod.js
