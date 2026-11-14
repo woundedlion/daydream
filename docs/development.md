@@ -330,3 +330,8 @@ Parameter keys remain in the `fx` namespace.
 | `src/workbench/shader/chain_strip_commands.js` | DOM-free strip commands and parameter edit commits |
 | `src/workbench/shader/chain_chip_element.js` | Stage chips, keyboard controls and band add buttons |
 | `src/workbench/shader/chain_strip_history.js` | Strip undo/redo actions and history controls |
+| `src/ui/url_params.js` | URL parameter reads, debounced writes and reset |
+| `src/ui/url_hydration.js` | Pure URL control hydration, numeric snapping and enum resolution |
+| `src/ui/deep_link_keys.js` | Deep-link namespaces and stable folder key segments |
+| `tests/url_hydration.test.js` | Table tests for numeric, boolean and enum hydration |
+| `tests/deep_link_keys.test.js` | Table tests for namespaces and duplicate folder paths |

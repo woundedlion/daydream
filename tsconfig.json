@@ -179,6 +179,9 @@
     "src/workbench/shader/chain_strip_context.js",
     "src/workbench/shader/chain_strip_commands.js",
     "src/workbench/shader/chain_chip_element.js",
-    "src/workbench/shader/chain_strip_history.js"
+    "src/workbench/shader/chain_strip_history.js",
+    "src/ui/url_params.js",
+    "src/ui/url_hydration.js",
+    "src/ui/deep_link_keys.js"
   ]
 }

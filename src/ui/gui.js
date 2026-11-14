@@ -4,104 +4,14 @@
  */
 
 import { GUI as LilGUI } from "lil-gui";
-import {
-  getActiveURLSync,
-  overlayUrlParam,
-  parseUrlBoolean,
-  parseUrlNumber,
-  URL_FLUSH_DEBOUNCE_MS,
-  writeUrl,
-} from "../app/state.js";
+import { parseUrlNumber } from '../app/state.js';
+import { getUrlParams, makeUrlParamWriter } from './url_params.js';
+import { hydrate as hydrateValue, optionValues, hydrationWarnings } from './url_hydration.js';
+import { KeyPath } from './deep_link_keys.js';
+export { makeUrlParamWriter, resetGUI } from './url_params.js';
 
 /** @typedef {import('lil-gui').Controller & {acceptUrlValue?: (value: unknown) => import('lil-gui').Controller}} UrlController */
-/** @typedef {((key: string, value: string|number|boolean|null|undefined) => void) & {cancel: () => void}} UrlWriter */
-
-/**
- * The last query string parsed per window. Repeated reads clone the cached
- * entries without decoding the query string again.
- * @type {WeakMap<Window, {search: string, params: URLSearchParams}>}
- */
-const parsedSearchCache = new WeakMap();
-
-/**
- * Reads the current URL query string into a parsed params object, then applies
- * what the URL writer has decided but not yet flushed: the keys a scheduled
- * reset will drop, and the buffered writes that will replace their query-string
- * values.
- * @param {Window} [win] - The window whose location is read.
- * @returns {URLSearchParams} The query parameters of the current location.
- */
-const getUrlParams = (win = window) => {
-  const search = win.location.search;
-  let cached = parsedSearchCache.get(win);
-  if (cached?.search !== search) {
-    cached = { search, params: new URLSearchParams(search) };
-    parsedSearchCache.set(win, cached);
-  }
-  const params = new URLSearchParams(cached.params);
-  const sync = getActiveURLSync();
-  sync?.applyPendingReset(params);
-  sync?.overlayPending(params);
-  return params;
-};
-
-/**
- * Extracts the set of values lil-gui will accept for an enumerated control
- * (`add(obj, prop, $1)`): an array of choices, or an object whose values are the
- * choices. Anything else ($1 a number meaning a slider's min, or absent) is not
- * enumerated.
- * @param {(unknown[]|Object|number|undefined)} options - The third argument passed to lil-gui's add().
- * @returns {(unknown[]|null)} The list of allowed choices, or null when not enumerated.
- */
-const optionValues = (options) => {
-  if (Array.isArray(options)) return options;
-  if (options && typeof options === 'object') return Object.values(options);
-  return null;
-};
-
-/**
- * Builds a debounced URL-param writer with its own pending-writes buffer and
- * timer, one per DeepLinkGUI subtree. Writes go through the app's URLSync when
- * present, else a fallback writer; they accumulate per key and merge in one
- * flush.
- * @param {Window|null} [win] - The window this writer reads and rewrites; the
- *   ambient one when omitted.
- * @returns {UrlWriter}
- *   A writer; `value` null/undefined deletes the key.
- */
-const makeUrlParamWriter = (win = null) => {
-  /** @type {number|undefined} */
-  let urlTimer;
-  const pendingUrlWrites = new Map(); // key -> value (null/undefined => delete)
-  const commit = () => {
-    const target = win ?? window;
-    const params = getUrlParams(target);
-    for (const [k, v] of pendingUrlWrites) overlayUrlParam(params, k, v);
-    pendingUrlWrites.clear();
-    writeUrl(params, target);
-  };
-  /** @type {UrlWriter} */
-  const writer = (key, value) => {
-    const sync = getActiveURLSync();
-    if (sync) {
-      if (pendingUrlWrites.size) {
-        (win ?? window).clearTimeout(urlTimer);
-        urlTimer = undefined;
-        for (const [k, v] of pendingUrlWrites) sync.setParam(k, v);
-        pendingUrlWrites.clear();
-      }
-      sync.setParam(key, value);
-      return;
-    }
-    pendingUrlWrites.set(key, value);
-    (win ?? window).clearTimeout(urlTimer);
-    urlTimer = (win ?? window).setTimeout(commit, URL_FLUSH_DEBOUNCE_MS);
-  };
-  writer.cancel = () => { (win ?? window).clearTimeout(urlTimer); urlTimer = undefined; pendingUrlWrites.clear(); };
-  return writer;
-};
-
-export { makeUrlParamWriter };
+/** @typedef {import('./url_params.js').UrlWriter} UrlWriter */
 
 /** @param {unknown} value @returns {value is LilGUI} */
 function isGui(value) {
@@ -136,9 +46,7 @@ class DeepLinkGUI {
     }
     this.rootNamespace = rootNamespace;
     this.parent = parent;
-    this.folderIndex = 0;
-    /** @type {string|null} */
-    this.keySegment = null;
+    this.keyPath = new KeyPath(rootNamespace, parent?.keyPath ?? null);
     /** @type {Set<string>} */
     this.urlKeys = new Set();
     /** @type {DeepLinkGUI[]} */
@@ -186,15 +94,7 @@ class DeepLinkGUI {
    * @returns {string} The dot-joined param key.
    */
   getKey(prop) {
-    const keys = [prop];
-    /** @type {DeepLinkGUI} */
-    let curr = this;
-    while (curr.parent) {
-      if (curr.keySegment) keys.unshift(curr.keySegment);
-      curr = curr.parent;
-    }
-    if (curr.rootNamespace) keys.unshift(curr.rootNamespace);
-    return keys.join('.');
+    return this.keyPath.key(prop);
   }
 
   /**
@@ -323,69 +223,11 @@ class DeepLinkGUI {
     const isFunction = typeof object[prop] === 'function';
 
     const params = this.urlParams();
-    let urlApplied = false;
-    let valClamped = false;
-    if (hydrate && !isFunction && params.has(key)) {
-      /** @type {unknown} */
-      let val = params.get(key);
-      const currentVal = object[prop];
-      urlApplied = true;
-      if (typeof currentVal === 'number') {
-        const num = parseUrlNumber(params.get(key) ?? '');
-        if (num === null) {
-          console.warn(`DeepLinkGUI: ignoring non-numeric URL value "${params.get(key)}" for "${key}"`);
-          val = currentVal;
-          urlApplied = false;
-          valClamped = true;
-        } else {
-          let numeric = num;
-          // lil-gui numeric add() signature is add(obj, prop, min, max, step).
-          const min = args[0], max = args[1], step = args[2];
-          const raw = num;
-          if (typeof min === 'number' && numeric < min) numeric = min;
-          if (typeof max === 'number' && numeric > max) numeric = max;
-          // The URL path bypasses lil-gui's step snapping, so snap to a step multiple.
-          if (Number.isFinite(step) && step > 0) {
-            const anchor = typeof min === 'number' ? min : 0;
-            numeric = anchor + Math.round((numeric - anchor) / step) * step;
-            if (typeof min === 'number' && numeric < min) numeric = min;
-            if (typeof max === 'number' && numeric > max) numeric = max;
-          }
-          // Ignore multiplication noise on values already aligned to the step.
-          const snapTol = Number.isFinite(step) && step > 0 ? Math.abs(step) * 1e-6 : 0;
-          valClamped = Math.abs(numeric - raw) > snapTol;
-          val = numeric;
-        }
-      } else if (typeof currentVal === 'boolean') {
-        const flag = parseUrlBoolean(params.get(key) ?? '');
-        if (flag === null) {
-          console.warn(`DeepLinkGUI: ignoring unrecognized boolean URL value "${params.get(key)}" for "${key}"`);
-          val = currentVal;
-          urlApplied = false;
-          valClamped = true;
-        } else {
-          val = flag;
-        }
-      }
-      const allowed = optionValues(args[0]);
-      if (allowed) {
-        const hasDuplicateValues = new Set(allowed.map(String)).size !== allowed.length;
-        if (hasDuplicateValues) {
-          console.warn(`DeepLinkGUI: enum "${key}" has options sharing a value; the deep link may restore a different label.`);
-        }
-        let idx = allowed.indexOf(val);
-        if (idx < 0) idx = allowed.findIndex((opt) => String(opt) === String(val));
-        if (idx < 0) {
-          console.warn(`DeepLinkGUI: ignoring out-of-range URL value "${params.get(key)}" for "${key}"`);
-          urlApplied = false;
-          valClamped = true;
-        } else {
-          object[prop] = /** @type {T[K]} */ (allowed[idx]);
-        }
-      } else {
-        object[prop] = /** @type {T[K]} */ (val);
-      }
-    }
+    const result = hydrateValue({ raw: hydrate ? params.get(key) : null, current: object[prop], args });
+    for (const warning of hydrationWarnings(result, key)) console.warn(warning);
+    if (result.kind === 'applied' || result.kind === 'fallback') object[prop] = /** @type {T[K]} */ (result.value);
+    const urlApplied = result.kind === 'applied';
+    const valClamped = result.rewrite;
 
     const controller = this.gui.add(object, prop, ...args);
     if (!controller) {
@@ -436,12 +278,7 @@ class DeepLinkGUI {
   addFolder(name) {
     const folder = this.gui.addFolder(name);
     const wrapped = new DeepLinkGUI(folder, null, this);
-    wrapped.folderIndex = this.children.length;
-    // Folder segments remain stable after later siblings are added.
-    const duplicate = this.children.some((c) => c.keySegment === name);
-    wrapped.keySegment = name
-      ? (duplicate ? `${name}#${wrapped.folderIndex}` : name)
-      : `#${wrapped.folderIndex}`;
+    wrapped.keyPath = this.keyPath.folder(name);
     this.children.push(wrapped);
     return wrapped;
   }
@@ -454,8 +291,7 @@ class DeepLinkGUI {
   addDisplayFolder(name) {
     const folder = this.gui.addFolder(name);
     const wrapped = new DeepLinkGUI(folder, null, this);
-    wrapped.folderIndex = this.children.length;
-    wrapped.keySegment = null;
+    wrapped.keyPath = this.keyPath.folder(name, true);
     this.children.push(wrapped);
     return wrapped;
   }
@@ -483,27 +319,5 @@ class DeepLinkGUI {
     if (this.gui.destroy) this.gui.destroy();
   }
 }
-
-/**
- * Removes deep-link URL params, preserving the given keys. Delegates to the
- * app's URLSync when present, else rewrites the query string directly.
- * @param {Array<string>} [excludedKeys=[]] - Param keys to preserve.
- * @param {Window} [win] - The window whose query string is rewritten.
- * @returns {void}
- */
-export const resetGUI = (excludedKeys = [], win = window) => {
-  const sync = getActiveURLSync();
-  if (sync) {
-    sync.reset(excludedKeys);
-    return;
-  }
-  const params = getUrlParams(win);
-  for (const key of Array.from(params.keys())) {
-    if (!excludedKeys.includes(key)) {
-      params.delete(key);
-    }
-  }
-  writeUrl(params, win);
-};
 
 export { DeepLinkGUI as GUI };
