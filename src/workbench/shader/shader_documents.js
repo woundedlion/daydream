@@ -176,6 +176,9 @@ export function createShaderDocumentController({
     + 'interpreter and the parity toggle is disarmed.');
   /** @param {string} message */
   const showError = (message) => writeStatus(message, true);
+  /** @param {string} detail Refusal text, with or without its closing period. */
+  const showLinkError = (detail) =>
+    showError(`The shader link could not be restored: ${detail.replace(/\.$/, '')}.`);
 
   // An empty message clears both announcements.
   /** @param {string} message */
@@ -484,6 +487,38 @@ export function createShaderDocumentController({
     selectedSource = sourceSelect.value;
   };
 
+  /**
+   * Adopt a chain snapshot from the page query, rolling the engine back on refusal.
+   * @param {string} chainText JSON chain snapshot.
+   * @returns {Promise<string>} Empty on success, else the refusal detail.
+   */
+  const importChainSnapshot = async (chainText) => {
+    try {
+      const snapshot = JSON.parse(chainText);
+      const imported = documentFromChainSnapshot(snapshot, operatorCatalog);
+      const previous = getChainSnapshot(getEngine());
+      if (!await loadSource(imported, 'imported.shader.json'))
+        return status.textContent || 'the imported chain could not be adopted';
+      const outcome = restoreChainSnapshot(getEngine(), getModule(), snapshot);
+      if (outcome !== getModule().ChainSnapshotRestoreResult.APPLIED) {
+        if (previous) restoreChainSnapshot(getEngine(), getModule(), previous);
+        return 'the imported chain snapshot was rejected';
+      }
+      const paused = getAnimationsPaused();
+      if (paused !== null) setAnimationsPaused(paused);
+      showAnimationState();
+      selectLoadedSource(null, 'imported.shader.json', 'Imported');
+      syncEffectGui();
+      invalidate();
+      linkWriter.schedule();
+      await flushDeepLink();
+      showStatus('Restored the chain snapshot.');
+      return '';
+    } catch (error) {
+      return errorDetail(error);
+    }
+  };
+
   const init = async () => {
     try {
       compiler = await importCompiler();
@@ -541,31 +576,9 @@ export function createShaderDocumentController({
     const query = new URLSearchParams(win.location?.search ?? '');
     const chainText = query.get(`fx.${CHAIN_SNAPSHOT_STORAGE_KEY}`);
     if (!linked && !linkError && chainText !== null) {
-      try {
-        const snapshot = JSON.parse(chainText);
-        const imported = documentFromChainSnapshot(snapshot, operatorCatalog);
-        const previous = getChainSnapshot(getEngine());
-        if (!await loadSource(imported, 'imported.shader.json'))
-          throw new Error(status.textContent || 'the imported chain could not be adopted');
-        const outcome = restoreChainSnapshot(getEngine(), getModule(), snapshot);
-        if (outcome !== getModule().ChainSnapshotRestoreResult.APPLIED) {
-          if (previous) restoreChainSnapshot(getEngine(), getModule(), previous);
-          throw new Error('the imported chain snapshot was rejected');
-        }
-        const paused = getAnimationsPaused();
-        if (paused !== null) setAnimationsPaused(paused);
-        showAnimationState();
-        selectLoadedSource(null, 'imported.shader.json', 'Imported');
-        syncEffectGui();
-        invalidate();
-        linkWriter.schedule();
-        await flushDeepLink();
-        showStatus('Restored the chain snapshot.');
-        return true;
-      } catch (error) {
-        linkError = errorDetail(error);
-        linkWriter.refuseLink();
-      }
+      linkError = await importChainSnapshot(chainText);
+      if (!linkError) return true;
+      linkWriter.refuseLink();
     }
     const requested = sourceCatalog.get(canonicalEffectId(initialEffect ?? ''))
       ?? sourceCatalog.get(initialEffect ?? '');
@@ -576,7 +589,7 @@ export function createShaderDocumentController({
       if (loaded) sourceSelect.value = requested.effectId;
     }
     selectedSource = sourceSelect.value;
-    if (linkError) showError(`The shader link could not be restored: ${linkError}.`);
+    if (linkError) showLinkError(linkError);
     return loaded;
   };
 
@@ -713,9 +726,9 @@ export function createShaderDocumentController({
         return;
       }
       if (!await loadLinkedSource(linked))
-        throw new Error(status.textContent || 'the linked state was refused');
+        showLinkError(status.textContent || 'the linked state was refused');
     } catch (error) {
-      showError(`The shader link could not be restored: ${errorDetail(error)}.`);
+      showLinkError(errorDetail(error));
     }
   };
   win.addEventListener?.('hashchange', onHashChange);

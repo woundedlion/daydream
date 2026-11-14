@@ -606,8 +606,9 @@ test('a refused shader link leaves the source select on the scratch chain', asyn
     { source: null, hash, patternCatalog: STUDY_PATTERN_CATALOG });
 
   assert.equal(harness.elements.get('shader-document-select').value, '');
-  assert.match(harness.elements.get('shader-document-status').textContent,
-    /shader link could not be restored/);
+  const message = harness.elements.get('shader-document-status').textContent;
+  assert.match(message, /shader link could not be restored: .*no-such-preset/);
+  assert.doesNotMatch(message, /\.\.$|Error: The/);
   await harness.controller.flushDeepLink();
   assert.equal(harness.win.location.hash, hash);
 });
