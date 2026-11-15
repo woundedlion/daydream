@@ -16,6 +16,32 @@ test('index provides every stats cell the view resolves', () => {
       assert.match(html, new RegExp(`id=["']${id}["']`), `${row}: ${id}`);
 });
 
+test('global stats inherit single-line headers and values at both viewport sizes', () => {
+  const css = readFileSync(new URL('../styles/index.css', import.meta.url), 'utf8');
+  const table = css.match(/\.global-stats\s*\{([^}]+)\}/)?.[1];
+  assert.ok(table, 'shared table styles exist');
+  assert.match(table, /white-space:\s*nowrap\s*;/);
+});
+
+test('both stats bars expose horizontal overflow to pointer and keyboard scrolling', () => {
+  const css = readFileSync(new URL('../styles/index.css', import.meta.url), 'utf8');
+  const bars = css.match(/#global-stats-desktop,\s*\.stats-bar\s*\{([^}]+)\}/)?.[1];
+  assert.ok(bars, 'shared scroll container styles exist');
+  assert.match(bars, /min-width:\s*0\s*;/);
+  assert.match(bars, /overflow-x:\s*auto\s*;/);
+  assert.match(bars, /scrollbar-width:\s*none\s*;/);
+  assert.match(css, /#global-stats-desktop\s*\{\s*flex:\s*1\s*;\s*\}/);
+
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  for (const id of ['global-stats-desktop', 'stats-bar']) {
+    const bar = html.match(new RegExp(`<div\\b[^>]*\\bid="${id}"[^>]*>`))?.[0];
+    assert.ok(bar, id);
+    assert.match(bar, /\btabindex="0"/);
+    assert.match(bar, /\brole="region"/);
+    assert.match(bar, /\baria-label="[^"]+"/);
+  }
+});
+
 /**
  * Document stand-in holding one element per stats cell id, counting the lookups
  * so the latch is observable.

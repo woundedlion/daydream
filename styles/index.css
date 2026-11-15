@@ -258,6 +258,15 @@
   text-align: center;
 }
 
+#global-stats-desktop,
+.stats-bar {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+#global-stats-desktop { flex: 1; }
+
 /* Global engine memory/compute stats tables, shared by the desktop header
    readout and the mobile stats-bar. */
 .global-stats {
@@ -267,12 +276,13 @@
   border-collapse: collapse;
   line-height: 1.2;
   display: inline-table;
+  white-space: nowrap;
 }
 .global-stats--desktop { font-size: 12px; margin-left: 10px; }
 .global-stats--mobile { font-size: 10px; }
 .global-stats .stats-head { color: var(--stats-head-text); }
 .global-stats th { font-weight: normal; padding: 0 4px; }
-.global-stats td { padding: 0 4px; white-space: nowrap; }
+.global-stats td { padding: 0 4px; }
 .global-stats--desktop td { padding: 0 8px; }
 .global-stats .perf-time { color: var(--muted-text); }
 .global-stats .perf-time.slow { color: var(--error-text); font-weight: 700; }
