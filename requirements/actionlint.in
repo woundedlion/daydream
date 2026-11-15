@@ -1,2 +1,2 @@
 # Dependabot tracks this pin; CI installs the matching actionlint release by checksum.
-actionlint-py==1.7.12.24
+actionlint-py==1.7.12.25
