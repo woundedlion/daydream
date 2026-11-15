@@ -23,7 +23,7 @@ const enginePin = readFileSync(new URL('../generated/holosphere_wasm.sha', impor
 
 const STEREO_H = 'core/math/stereographic.h';
 const MOBIUS_H = 'core/math/mobius.h';
-const MATH_H = 'core/math/3dmath.h';
+const MATH_CONSTANTS_H = 'core/math/math_constants.h';
 const PALETTE_RECIPE_H = 'core/color/palette_recipe.h';
 const SOLIDS_H = 'core/mesh/solids.h';
 const ISLAMIC_STARS_H = 'effects/IslamicStars.h';
@@ -239,7 +239,7 @@ test('stereo and projectDiv match their engine projection and Mobius headers', {
   const constants = stereoConstants();
   const radial_scale = transpileEngineComplex(
     src, 'radial_scale', ['direction', 'length', 'radius'], {});
-  const lift = engineConstant(header(MATH_H), 'COMPLEX_UNDERFLOW_LIFT', MATH_H);
+  const lift = engineConstant(header(MATH_CONSTANTS_H), 'COMPLEX_UNDERFLOW_LIFT', MATH_CONSTANTS_H);
   assert.equal(MB.STEREO_UNDERFLOW_LIFT, lift);
   const bindings = { ...constants, radial_scale, COMPLEX_UNDERFLOW_LIFT: lift };
   const engineStereo = transpileEngineComplex(src, 'stereo', ['v'], bindings);
