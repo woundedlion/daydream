@@ -12,6 +12,7 @@ import {resolutionPresets} from '../src/effects/effect_roster.js';
 import { deactivatedParameterIds, modulationValueLimits } from '../src/workbench/shader/chain_presentation.js';
 
 import {chainSnapshot} from './helpers/effect_gui_harness.js';
+import {BAKED_MODULATION_SCALE_MAX} from '../src/workbench/shader/chain_presentation.js';
 import { RETIRED_OPERATORS } from './helpers/retired_operators.js';
 import {
   DEFAULT_CHAIN, FakeChainEngine, ChainSnapshotRestoreResult, ChainStatus, PALETTE_FADE_FRAMES, PALETTE_HUE_STEP,
@@ -696,3 +697,78 @@ test('retired chain operators are absent and refuse without changing the live pr
     assert.deepEqual(chainCall(engine, 'getSnapshot'), before);
   }
 });
+
+
+const DIFFERENTIAL_CHAIN = [
+  ...DEFAULT_CHAIN.slice(0, 3),
+  {instance: 'coverage', operator: 'field.coverage.probability.v1'},
+  DEFAULT_CHAIN[3],
+  {instance: 'modulation', operator: 'color.modulate.v1'},
+];
+
+function snapshotDifferential(edit, expected, {recipeOnly = false} = {}) {
+  const real = engine;
+  const fake = new FakeChainEngine();
+  for (const target of [real, fake]) {
+    target.setEffect('ShaderChain');
+    assert.equal(chainCall(target, 'setShaderChain', DIFFERENTIAL_CHAIN).code, 'APPLIED');
+  }
+  const candidate = chainCall(real, 'getSnapshot');
+  if (recipeOnly) delete candidate.runtime;
+  edit(candidate);
+  const results = [real, fake].map((target) => {
+    const before = chainCall(target, 'getSnapshot');
+    const result = chainCall(target, 'restoreSnapshot', structuredClone(candidate));
+    assert.equal(result.value, M.ChainSnapshotRestoreResult[expected].value);
+    const after = chainCall(target, 'getSnapshot');
+    if (expected !== 'APPLIED') assert.deepEqual(after, before);
+    else if (recipeOnly) assert.deepEqual(after.modulation, candidate.modulation);
+    else assert.deepEqual(after.runtime, candidate.runtime);
+    return result.value;
+  });
+  assert.equal(results[0], results[1]);
+}
+
+const probabilityState = (snapshot) => snapshot.runtime
+  .find(({instance}) => instance === 'coverage').state;
+for (const [name, edit, expected] of [
+  ['probability state round-trip', (s) => Object.assign(probabilityState(s), {seed: 17, frame: 23}), 'APPLIED'],
+  ['probability uint32 endpoints', (s) => Object.assign(probabilityState(s), {seed: 0, frame: 0xffffffff}), 'APPLIED'],
+  ['probability maximum seed', (s) => Object.assign(probabilityState(s), {seed: 0xffffffff, frame: 0}), 'APPLIED'],
+  ['negative probability frame', (s) => { probabilityState(s).frame = -1; }, 'INVALID_VALUE'],
+  ['fractional probability seed', (s) => { probabilityState(s).seed = 0.5; }, 'INVALID_VALUE'],
+  ['overflow probability seed', (s) => { probabilityState(s).seed = 0x100000000; }, 'INVALID_VALUE'],
+  ['missing probability frame', (s) => { delete probabilityState(s).frame; }, 'INVALID_VALUE'],
+  ['negative probability seed', (s) => { probabilityState(s).seed = -1; }, 'INVALID_VALUE'],
+  ['fractional probability frame', (s) => { probabilityState(s).frame = 0.5; }, 'INVALID_VALUE'],
+  ['overflow probability frame', (s) => { probabilityState(s).frame = 0x100000000; }, 'INVALID_VALUE'],
+  ['missing probability seed', (s) => { delete probabilityState(s).seed; }, 'INVALID_VALUE'],
+  ['wrong probability runtime kind', (s) => {
+    Object.assign(s.runtime.find(({instance}) => instance === 'coverage'),
+      {kind: 'phase-clock-v1', state: {phase: 0}});
+  }, 'INVALID_VALUE'],
+]) {
+  test(`real/fake snapshot differential: ${name}`, () => snapshotDifferential(edit, expected));
+}
+
+for (const [name, edit, expected] of [
+  ['default recipe', () => {}, 'APPLIED'],
+  ['direct sine recipe', (r) => { r.source = 1; r.evaluation = 0; }, 'APPLIED'],
+  ['direct interference recipe', (r) => { r.source = 2; r.evaluation = 0; }, 'APPLIED'],
+  ['direct grid recipe', (r) => { r.source = 3; r.evaluation = 0; }, 'APPLIED'],
+  ['direct displacement recipe', (r) => { r.source = 4; r.evaluation = 0; }, 'APPLIED'],
+  ['unsupported recipe version', (r) => { r.version = 2; }, 'INVALID_VALUE'],
+  ['fractional recipe seed', (r) => { r.seed = 0.5; }, 'INVALID_VALUE'],
+  ['unknown recipe source', (r) => { r.source = 5; }, 'INVALID_VALUE'],
+  ['nonboolean enabled flag', (r) => { r.enabled = 1; }, 'INVALID_VALUE'],
+  ['negative noise scale', (r) => { r.noise.scale = -1; }, 'INVALID_VALUE'],
+  ['nonfinite noise speed', (r) => { r.noise.speed = Infinity; }, 'INVALID_VALUE'],
+  ['configured noise with octave contrast', (r) => { r.noise.contrast = 1; }, 'INVALID_VALUE'],
+  ['baked sine recipe', (r) => { r.source = 1; }, 'INVALID_VALUE'],
+  ['baked noise over scale limit', (r) => { r.noise.scale = BAKED_MODULATION_SCALE_MAX + 1; }, 'INVALID_VALUE'],
+  ['zero active sine axis', (r) => { r.source = 1; r.evaluation = 0; r.sine.axis = [0, 0, 0]; }, 'INVALID_VALUE'],
+  ['missing grid axis', (r) => { delete r.grid.axis; }, 'INVALID_VALUE'],
+]) {
+  test(`real/fake recipe differential: ${name}`, () => snapshotDifferential(
+    (s) => edit(s.modulation[0].recipe), expected, {recipeOnly: true}));
+}

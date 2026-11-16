@@ -195,6 +195,9 @@ export class FakeChainEngine {
         kind = 'spatial-walk-v2';
         state = { noiseSeed: 1337, walkTime: 0, position: [0, 1, 0], direction: [1, 0, 0],
           wander: [1, 0, 0, 0], angularVelocity: 0, spinPhase: 0 };
+      } else if (operator === 'field.coverage.probability.v1') {
+        kind = 'probability-clock-v1';
+        state = {seed: 1337, frame: 0};
       } else if (operator.startsWith('colorize.')) {
         kind = 'color-clock-v3';
         state = { oscillationPhase: 0 };
@@ -281,6 +284,8 @@ export class FakeChainEngine {
           if (!entry || typeof entry.instance !== 'string' || typeof entry.kind !== 'string'
               || !entry.state || Array.isArray(entry.state)) return true;
           if (entry.kind === 'spatial-walk-v2') return !spatial(entry.state);
+          if (entry.kind === 'probability-clock-v1')
+            return !unsigned(entry.state.seed) || !unsigned(entry.state.frame);
           if (entry.kind === 'ripple-burst-v1')
             return !Number.isFinite(entry.state.phase) || !unsigned(entry.state.seed)
               || !unsigned(entry.state.burstCount) || !unsigned(entry.state.frames)
