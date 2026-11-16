@@ -4,15 +4,15 @@
  */
 
 import * as THREE from "three";
-import { Daydream } from "./driver.js";
 
 /**
  * Give the canvas a keyboard route to the orbit controls, which OrbitControls
  * itself exposes only to pointer input: arrow keys rotate about the orbit
  * target, +/- dolly in and out.
  * @param {import('./driver.js').Daydream} driver - Display state.
+ * @param {{KEY_ORBIT_STEP:number, KEY_ZOOM_STEP:number}} config - Orbit increments.
  */
-export function setupKeyboardOrbit(driver) {
+export function setupKeyboardOrbit(driver, config) {
   const offset = new THREE.Vector3();
   const spherical = new THREE.Spherical();
 
@@ -37,12 +37,12 @@ export function setupKeyboardOrbit(driver) {
     let dPhi = 0;
     let dolly = 1;
     switch (e.key) {
-      case "ArrowLeft": dTheta = -Daydream.KEY_ORBIT_STEP; break;
-      case "ArrowRight": dTheta = Daydream.KEY_ORBIT_STEP; break;
-      case "ArrowUp": dPhi = -Daydream.KEY_ORBIT_STEP; break;
-      case "ArrowDown": dPhi = Daydream.KEY_ORBIT_STEP; break;
-      case "+": case "=": dolly = 1 / Daydream.KEY_ZOOM_STEP; break;
-      case "-": case "_": dolly = Daydream.KEY_ZOOM_STEP; break;
+      case "ArrowLeft": dTheta = -config.KEY_ORBIT_STEP; break;
+      case "ArrowRight": dTheta = config.KEY_ORBIT_STEP; break;
+      case "ArrowUp": dPhi = -config.KEY_ORBIT_STEP; break;
+      case "ArrowDown": dPhi = config.KEY_ORBIT_STEP; break;
+      case "+": case "=": dolly = 1 / config.KEY_ZOOM_STEP; break;
+      case "-": case "_": dolly = config.KEY_ZOOM_STEP; break;
       default: return;
     }
 
@@ -93,15 +93,16 @@ export function setupViewReset(driver) {
 
 /** Return to the default orientation and center while preserving zoom.
  * @param {import('./driver.js').Daydream} driver - Display state.
+ * @param {{VIEW_RESET_MS:number}} config - Reset animation duration.
  */
-export function resetView(driver) {
+export function resetView(driver, config) {
   driver.cancelViewReset();
   const target = driver.controls.target.clone();
   const orbit = new THREE.Spherical().setFromVector3(
     driver.camera.position.clone().sub(target));
   const started = driver.win.performance.now();
   const duration = driver.win.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ? 0 : Daydream.VIEW_RESET_MS;
+    ? 0 : config.VIEW_RESET_MS;
   const offset = new THREE.Vector3();
   const spherical = new THREE.Spherical();
   const animate = (/** @type {number} */ now) => {

@@ -2401,6 +2401,20 @@ test('stepOnce always queues at least one frame', () => {
 // roster are read out of the source.
 const DRIVER_SOURCE = readFileSync(new URL('../src/renderer/driver.js', import.meta.url), 'utf8');
 
+test('driver collaborators have no runtime dependency on the driver facade', () => {
+  const facade = new URL('../src/renderer/driver.js', import.meta.url);
+  const imports = (source) => parse(source, { ecmaVersion: 'latest', sourceType: 'module' })
+    .body.filter((node) => node.source).map((node) => node.source.value);
+  const facadeImports = imports(DRIVER_SOURCE);
+  for (const file of ['./driver_dots.js', './driver_input.js', './driver_labels.js']) {
+    assert.ok(facadeImports.includes(file), `driver facade does not import ${file}`);
+    const url = new URL(file, facade);
+    const source = readFileSync(url, 'utf8');
+    assert.equal(imports(source).some((specifier) => new URL(specifier, url).href === facade.href),
+      false, `${file} imports the driver facade at runtime`);
+  }
+});
+
 /**
  * The driver reads no globals of its own, so every collaborator that defaults
  * its document to the global is handed the driver's.

@@ -4,7 +4,7 @@
  */
 
 import * as THREE from "three";
-import { dotDetailFor } from "./driver.js";
+import { dotDetailFor } from "./dot_detail.js";
 
 /** @typedef {import('./driver.js').RgbMesh} RgbMesh */
 

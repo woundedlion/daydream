@@ -25,6 +25,7 @@ import { MOBILE_BREAKPOINT_PX } from "../shared/layout.js";
 /** @typedef {import('../../generated/holosphere_wasm.js').ArenaMetrics} ArenaMetrics */
 
 export { LabelPool } from "./label_pool.js";
+export { dotDetailFor, MAX_DOT_SEGMENTS, MIN_DOT_SEGMENTS } from './dot_detail.js';
 
 /**
  * Browser-side simulator: drives the three.js scene that renders the LED
@@ -284,7 +285,7 @@ export class Daydream {
    * target, +/- dolly in and out.
    */
   setupKeyboardOrbit() {
-    setupKeyboardOrbit(this);
+    setupKeyboardOrbit(this, Daydream);
   }
 
   /** Bind the viewport reset button, double-click, and interruption listeners. */
@@ -294,7 +295,7 @@ export class Daydream {
 
   /** Return to the default orientation and center while preserving zoom. */
   resetView() {
-    resetView(this);
+    resetView(this, Daydream);
   }
 
   /** Cancel an in-flight return to the default orientation. */
@@ -529,7 +530,7 @@ export class Daydream {
    * the camera-facing hemisphere.
    */
   refreshLabels() {
-    refreshLabels(this);
+    refreshLabels(this, Daydream);
   }
 
   /**
@@ -793,26 +794,8 @@ export const initialAspect = (canvas) =>
 /** Fraction of the smaller viewport dimension the square PiP spans. */
 export const PIP_FRACTION = 0.3;
 
-/** Dot sphere segment count at zero pixels. */
-export const MAX_DOT_SEGMENTS = 30;
-
-/** Dot sphere segment floor. */
-export const MIN_DOT_SEGMENTS = 3;
-
 /** Fraction of the smaller view dimension the fitted sphere fills. */
 export const SPHERE_FIT_COVERAGE = 0.85;
-
-/** Per-dot sphere LOD: segment count decays exponentially as pixel count rises
- *  so the triangle budget stays bounded.
- * @param {number} totalPixels - Instance count of the dot mesh (W*H).
- * @returns {number} Sphere width/height segment count, floored at `MIN_DOT_SEGMENTS`.
- */
-export const dotDetailFor = (totalPixels) => {
-  const LOD_DECAY_PIXELS = 30000;
-  return Math.max(
-    MIN_DOT_SEGMENTS,
-    Math.round(MAX_DOT_SEGMENTS * Math.exp(-totalPixels / LOD_DECAY_PIXELS)));
-};
 
 /**
  * Orbit radius at which the sphere fills `SPHERE_FIT_COVERAGE` of the smaller

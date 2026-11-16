@@ -78,6 +78,7 @@ src/ui/sidebar_logic.js
 src/app/state.js
 src/segments/worker_protocol.js
 
+src/renderer/dot_detail.js
 src/renderer/driver_capture.js
 src/renderer/driver_context.js
 src/renderer/driver_dots.js
