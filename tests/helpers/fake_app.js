@@ -122,13 +122,15 @@ export function fakeWasmModule({
     caps,
     params,
     HolosphereEngine: class {
-      constructor() { built++; this.paused = false; this.effectInstalled = false; module.engine = this; }
+      constructor() { built++; this.paused = false; this.effectInstalled = true; module.engine = this; }
       static isLive() { return false; }
       static getSupportedResolutions() { return resolutions; }
       setResolution(w, h) {
         if (w === refusedWidth) return ResolutionSetResult.UNSUPPORTED;
+        if (w === activeWidth && h === activeHeight) return ResolutionSetResult.ALREADY_ACTIVE;
         activeWidth = w;
         activeHeight = h;
+        this.effectInstalled = false;
         return ResolutionSetResult.RESIZED;
       }
       setEffect() { this.effectInstalled = true; return EffectSetResult.INSTALLED; }
