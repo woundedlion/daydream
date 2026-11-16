@@ -387,14 +387,17 @@ export function createChainValidator(createModule) {
    * @param {string} base - Registry name of the seed solid.
    * @param {ChainOp[]} ops - The candidate op chain.
    * @returns {Promise<{ok: boolean, message: string}>} Whether the whole chain is safe for the live module, and why it is not when it is not.
-   * @details A missing validator (module failed to spawn) resolves ok: true.
+   * @details A failed module spawn refuses the edit; the next call retries.
    * Test `.ok`: the result object is always truthy. A chain is also refused when
    * the engine saturated one of its arguments (getLastAdjusted).
    */
   function chainIsValid(base, ops) {
     const candidate = structuredClone(ops);
     return withValidator((Mod) => {
-      if (!Mod) return { ok: true, message: '' };
+      if (!Mod) return {
+        ok: false,
+        message: 'Validator unavailable; this change was not applied. Retry the change to reconnect.',
+      };
       const Ops = Mod.MeshOps;
       /** @type {?MeshWrapper} */
       let mesh = null;

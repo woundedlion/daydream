@@ -3,13 +3,14 @@ import { buildSavedCard } from '../src/workbench/solids/solid_saved_cards.js';
 import { mergeSavedSolids, persistSavedSolids } from '../src/workbench/solids/solid_saved_store.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MAX_RECIPE_STEPS, savedChainShapeError } from '../src/workbench/solids/solid_validation.js';
+import { createChainValidator, MAX_RECIPE_STEPS, savedChainShapeError } from '../src/workbench/solids/solid_validation.js';
 import { authoredParamRange, opTopologyKey, OP_DEFS, seedOpParams, snapToStep } from '../src/workbench/solids/solid_op_params.js';
 import { generateFuncAndRecipe } from '../src/workbench/solids/solid_codegen.js';
 import { registryDisplayName } from '../src/workbench/solids/solid_registry_codegen.js';
 import { meshCounts } from '../src/workbench/solids/solid_render.js';
 import { createPointerDrag } from '../src/shared/pointer_drag.js';
 import { fakeElement } from './helpers/fake_dom.js';
+import { fakeModule } from './helpers/fake_meshops.js';
 
 import {createSolidsEngine} from '../src/workbench/solids/solids_engine.js';
 import {createSolidsScene} from '../src/workbench/solids/solids_scene.js';
@@ -634,6 +635,37 @@ test('loading a star pattern over several ops requires confirmation', async () =
   await queued();
   assert.deepEqual(state.ops, []);
   assert.equal(state.base, 'icosahedron');
+});
+
+test('an unavailable validator preserves the chain and accepts an explicit retry after recovery', async () => {
+  let queued;
+  let spawns = 0;
+  let updates = 0;
+  const state = {base: 'cube', ops: []};
+  const messages = [];
+  const {Mod} = fakeModule();
+  const validator = createChainValidator(async () => {
+    if (spawns++ === 0) throw new Error('no wasm');
+    return Mod;
+  });
+  const actions = ops({state, MAX_RECIPE_STEPS, seedOpParams,
+    queueCommit: (fn) => { queued = fn; }, chainIsValid: validator.chainIsValid,
+    setOps: (next) => { state.ops = next; }, renderOps() {},
+    showGateMsg: (message) => messages.push(message), update: () => { updates++; },
+  });
+
+  actions.addOp('dual');
+  await queued();
+  assert.deepEqual(state.ops, []);
+  assert.equal(updates, 0);
+  assert.match(messages.at(-1), /Validator unavailable.*not applied.*Retry/);
+
+  actions.addOp('dual');
+  await queued();
+  assert.deepEqual(state.ops, [{op: 'dual', params: {}}]);
+  assert.equal(updates, 1);
+  assert.equal(messages.at(-1), '');
+  assert.equal(spawns, 2);
 });
 
 test('a refused topology tick repaints the restored chain', async () => {

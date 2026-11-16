@@ -307,26 +307,26 @@ test('createChainValidator reuses a healthy instance', async () => {
 });
 
 
-/** Verifies a module that fails to spawn degrades to permissive rather than blocking the tool. */
-test('createChainValidator accepts everything when the module cannot spawn', async () => {
+test('createChainValidator refuses edits with a retry message when its module cannot spawn', async () => {
   const validator = createChainValidator(async () => { throw new Error('no wasm'); });
-  assert.equal((await validator.chainIsValid('cube', ['kis'])).ok, true);
+  const verdict = await validator.chainIsValid('cube', ['kis']);
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /Validator unavailable.*not applied.*Retry/);
   assert.equal(await validator.withValidator((Mod) => Mod), null);
 });
 
 
-/** Verifies a transient spawn failure is retried rather than disabling validation for good. */
 test('createChainValidator retries after a failed spawn', async () => {
   let spawns = 0;
-  const { Mod } = fakeModule({ onOp: (op) => {
-    if (op === 'kis') throw new Error('op refused');
-  } });
+  const { Mod, state } = fakeModule();
   const validator = createChainValidator(async () => {
     if (spawns++ === 0) throw new Error('no wasm');
     return Mod;
   });
-  assert.equal((await validator.chainIsValid('cube', ['kis'])).ok, true);
   assert.equal((await validator.chainIsValid('cube', ['kis'])).ok, false);
+  assert.deepEqual(state.calls, []);
+  assert.deepEqual(await validator.chainIsValid('cube', ['kis']), {ok: true, message: ''});
+  assert.deepEqual(state.calls, ['base:cube', 'kis', 'classifyFaces']);
   assert.equal(spawns, 2);
 });
 
