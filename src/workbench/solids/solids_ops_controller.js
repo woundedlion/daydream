@@ -4,14 +4,8 @@
  */
 import { movedOps } from './solid_op_order.js';
 import { MAX_RECIPE_STEPS } from './solid_validation.js';
-import { OP_DEFS } from './solid_op_params.js';
-import { authoredParamRange } from './solid_op_params.js';
-import { snapToStep } from './solid_op_params.js';
-import { seedOpParams } from './solid_op_params.js';
-import { opTopologyKey } from './solid_op_params.js';
-import { buildOpRow } from './solid_op_rows.js';
-import { formatParamValue } from './solid_op_rows.js';
-import { syncSweepWarning } from './solid_op_rows.js';
+import { OP_DEFS, authoredParamRange, opTopologyKey, seedOpParams, snapToStep } from './solid_op_params.js';
+import { buildOpRow, formatParamValue, syncSweepWarning } from './solid_op_rows.js';
 
 /** Supplies operation and browser services. */
 function defaultDependencies() {

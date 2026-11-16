@@ -228,7 +228,7 @@ export function createChainStrip({
     const actions = history.render();
 
     const strip = el('div', 'chain-strip');
-    const view = { selected, bypassed, tabLabel };
+    const pass = { selected, bypassed, tabLabel };
     for (const band of layout) {
       const title = titleCase(band.carrier);
       const element = el('div', 'chain-band');
@@ -241,14 +241,14 @@ export function createChainStrip({
       element.appendChild(heading);
       for (const chip of band.chips) {
         element.appendChild(buildChip(chip, chain[chip],
-          { crossing: false, ...view }));
+          { crossing: false, ...pass }));
       }
       const add = bandAddButton(band);
       if (add !== null) element.appendChild(add);
       strip.appendChild(element);
       if (band.socket !== null) {
         strip.appendChild(buildChip(band.socket, chain[band.socket],
-          { crossing: true, ...view }));
+          { crossing: true, ...pass }));
       }
     }
 
@@ -293,8 +293,8 @@ export function createChainStrip({
   render();
   container.addEventListener('keydown', history.keydown);
   doc.addEventListener('pointerdown', pointerDown, true);
-  const view = doc.defaultView;
-  view?.addEventListener('resize', closePalette);
+  const win = doc.defaultView;
+  win?.addEventListener('resize', closePalette);
 
   return {
     render,
@@ -314,7 +314,7 @@ export function createChainStrip({
       parameterRows.destroy();
       container.removeEventListener('keydown', history.keydown);
       doc.removeEventListener('pointerdown', pointerDown, true);
-      view?.removeEventListener('resize', closePalette);
+      win?.removeEventListener('resize', closePalette);
       for (const drag of drags) drag.remove();
       drags.length = 0;
       container.replaceChildren();

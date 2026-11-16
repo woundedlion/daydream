@@ -25,13 +25,13 @@ const SOCKET_FUNCTIONS = {
 /** @type {Record<string, string>} */
 const SOURCE_GROUP_NAMES = { sphere: 'Spherical sources', plane: 'Planar sources' };
 
-  /** @param {ReturnType<typeof import('./chain_presentation.js').createChainPresentation>} presentation @param {ChainEntry} entry @param {boolean} bypassed @returns {string} Accessible chip name. */
-  export const chipLabel = (presentation, entry, bypassed) => {
-    const op = presentation.opOf(entry);
-    return `${op.name} · ${entry.label}`
-      + (op.input !== op.output ? `, ${op.input} to ${op.output}` : '')
-      + (bypassed ? ', bypassed' : '');
-  };
+/** @param {ReturnType<typeof import('./chain_presentation.js').createChainPresentation>} presentation @param {ChainEntry} entry @param {boolean} bypassed @returns {string} Accessible chip name. */
+export const chipLabel = (presentation, entry, bypassed) => {
+  const op = presentation.opOf(entry);
+  return `${op.name} · ${entry.label}`
+    + (op.input !== op.output ? `, ${op.input} to ${op.output}` : '')
+    + (bypassed ? ', bypassed' : '');
+};
 
 /**
  * Creates chips and band insertion controls.
@@ -109,11 +109,11 @@ export function createChipElements({
   /**
    * @param {number} index - The entry's chain index.
    * @param {ChainEntry} entry - The chain entry.
-   * @param {Object} view - Render-pass state.
-   * @param {boolean} view.crossing - Whether the operator crosses carriers.
-   * @param {string|null} view.selected - The selected label.
-   * @param {Set<string>} view.bypassed - The bypassed labels.
-   * @param {string|null} view.tabLabel - The roving-tabindex label.
+   * @param {Object} pass - Render-pass state.
+   * @param {boolean} pass.crossing - Whether the operator crosses carriers.
+   * @param {string|null} pass.selected - The selected label.
+   * @param {Set<string>} pass.bypassed - The bypassed labels.
+   * @param {string|null} pass.tabLabel - The roving-tabindex label.
    * @returns {HTMLElement} The chip element.
    */
   const buildChip = (index, entry, {

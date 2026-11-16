@@ -44,13 +44,13 @@ export function createShaderDocumentLoader({state, linkWriter, doc, stripMount, 
   selectEffect, teardownChainUi, setParamFilter, populatePresets, showDigest, syncParity,
   applyPreset, buildChainUi, showError, setAnimationsPaused, showAnimationState,
   syncEffectGui, invalidate, currentDocument, selectLoadedSource}) {
-/**
- * @param {string|*} source - Document JSON, or the document itself.
- * @param {string} [filename]
- * @param {*} [precompiled] - The catalog's already-compiled document, when the
- *   source is a catalog entry rather than an imported study.
- * @param {*|null} [session] - Deep-linked preset, bypass, and pause state.
- */
+  /**
+   * @param {string|*} source - Document JSON, or the document itself.
+   * @param {string} [filename]
+   * @param {*} [precompiled] - The catalog's already-compiled document, when the
+   *   source is a catalog entry rather than an imported study.
+   * @param {*|null} [session] - Deep-linked preset, bypass, and pause state.
+   */
   const loadSourceNow = async (source, filename = 'import.shader.json',
     precompiled = null, session = null) => {
     await flushDeepLink();
