@@ -44,6 +44,10 @@ function stepScript(workflowName, stepName) {
 
 const workflow = workflowText('ci.yml');
 
+test('package engines pins exactly the .nvmrc version', () => {
+  assert.equal(packageJson().engines.node, readFileSync(resolve(REPO, '.nvmrc'), 'utf8').trim());
+});
+
 // The prepare script is the only thing that points git at .githooks, and a
 // hook the index holds without its executable bit is never run.
 test('npm install points git at the tracked hooks, every one executable', () => {
