@@ -66,11 +66,10 @@ export function createViewDisplayControls({gui, driver, host, segments, syncEffe
     getEngine: () => host.engine,
     onChange: () => driver.invalidate(),
   });
-  gui.add(poleLod.state, 'poleLod', 0, 2, 0.05).name('Pole LOD')
+  gui.add(poleLod.state, 'poleLod', 0, 2, 0.05).name('Pole LOD (next frame)')
     .onChange((/** @type {number} */ value) => {
       poleLod.apply(value);
       segments.setPoleLod(value);
-      if (driver.paused && !segments.ownsDisplay) driver.stepOnce();
     });
 
   const displayCaps = createDisplayCapsBinding({

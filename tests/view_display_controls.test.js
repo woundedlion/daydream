@@ -59,6 +59,30 @@ test('display replay applies queued caps and pole LOD after the engine arrives',
   assert.equal(controls.replay(), false);
 });
 
+test('pole LOD applies on the next effect frame without advancing a paused simulation', () => {
+  for (const paused of [false, true]) {
+    for (const ownsDisplay of [false, true]) {
+      const {gui, driver, host, segments, writes} = fixture();
+      driver.paused = paused;
+      driver.steps = 0;
+      driver.invalidated = false;
+      segments.ownsDisplay = ownsDisplay;
+      host.engine = {setPoleLod: (value) => writes.push(['engine-pole', value])};
+      host.adapter = {drawFrame: () => assert.fail('LOD must not render another effect frame')};
+      const pole = gui.controllers.find((control) => control.property === 'poleLod');
+
+      pole.setValue(1.5);
+
+      assert.equal(pole.label, 'Pole LOD (next frame)');
+      assert.ok(writes.some(([operation, value]) => operation === 'engine-pole' && value === 1.5));
+      assert.ok(writes.some(([operation, value]) => operation === 'pole' && value === 1.5));
+      assert.equal(driver.steps, 0);
+      assert.equal(driver.paused, paused);
+      assert.equal(driver.invalidated, true);
+    }
+  }
+});
+
 test('a fidelity edit repaints the paused main preview unless the pool owns it', () => {
   const {gui, driver, host, segments, writes} = fixture();
   driver.paused = true;
