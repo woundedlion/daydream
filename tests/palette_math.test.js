@@ -318,7 +318,7 @@ test('GenerativePalette reports compiler failures', () => {
   const ops = mockPaletteOps({ compileAndBakeV4: () => ({ status: { code: paletteEnums.PaletteCompileCode.NON_FINITE, field: paletteEnums.PaletteRecipeField.BASE_TURNS } }) });
   withPaletteOps(ops, () => {
     assert.throws(() => new GenerativePalette(defaultPaletteRecipe()),
-      /Palette recipe error NON_FINITE \(2\) at field BASE_TURNS \(7\)/);
+      {message: `Palette recipe error NON_FINITE (${paletteEnums.PaletteCompileCode.NON_FINITE.value}) at field BASE_TURNS (7)`});
   });
 });
 
@@ -330,9 +330,9 @@ test('GenerativePalette reports compiler failures', () => {
 test('paletteCompileError names the engine enumerators', () => {
   setPaletteOps(null, paletteEnums);
   assert.equal(paletteCompileError({ code: paletteEnums.PaletteCompileCode.NON_INTEGER_LOOP_SWEEP, field: paletteEnums.PaletteRecipeField.SWEEP_TURNS }),
-    'Palette recipe error NON_INTEGER_LOOP_SWEEP (5) at field SWEEP_TURNS (9)');
+    `Palette recipe error NON_INTEGER_LOOP_SWEEP (${paletteEnums.PaletteCompileCode.NON_INTEGER_LOOP_SWEEP.value}) at field SWEEP_TURNS (9)`);
   assert.equal(paletteCompileError({ code: paletteEnums.PaletteCompileCode.INVALID_ENUM, field: paletteEnums.PaletteRecipeField.NONE }),
-    'Palette recipe error INVALID_ENUM (3) at field NONE (0)');
+    `Palette recipe error INVALID_ENUM (${paletteEnums.PaletteCompileCode.INVALID_ENUM.value}) at field NONE (0)`);
   assert.equal(paletteCompileError({ code: { value: 99 }, field: { value: 200 } }),
     'Palette recipe error unnamed 99 at field unnamed 200');
 });

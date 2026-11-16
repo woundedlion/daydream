@@ -37,6 +37,11 @@ test('the toolchain record describes a release module', () => {
     text('generated/holosphere_wasm.toolchain').trim().split(/\r?\n/).map((line) => line.split(/\s+/, 2)),
   );
   assert.match(fields.emsdk, /^\d+\.\d+\.\d+$/);
+  const license = text('LICENSE.txt');
+  assert.equal(license.match(/^## Emscripten (\S+) runtime$/m)?.[1], fields.emsdk);
+  const runtimeLinks = [...license.matchAll(/emscripten\/blob\/([^/]+)\//g)];
+  assert.ok(runtimeLinks.length > 0);
+  for (const [, version] of runtimeLinks) assert.equal(version, fields.emsdk);
   assert.equal(fields.build_type, 'Release');
   assert.equal(fields.dev_bindings, 'OFF');
 });

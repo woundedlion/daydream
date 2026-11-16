@@ -407,6 +407,7 @@ test('every source module that builds an element can render on a served page', (
 
 test('tailwind.css keeps the upstream license banner of the pinned Tailwind', () => {
   const version = JSON.parse(read('package.json')).devDependencies.tailwindcss;
+  assert.ok(read('LICENSE.txt').includes(`## Tailwind CSS ${version}\n`));
   assert.ok(read('tools', 'tailwind.css').includes(`! tailwindcss v${version} | MIT License`),
     `tools/tailwind.css is not the tailwindcss ${version} build`);
 });

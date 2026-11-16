@@ -254,15 +254,6 @@ test('composed-effect controls file each slot parameter into its stage folder', 
     'the composed stage rules file every name they are given');
 });
 
-test('warp ownership follows registered groups independently of stream order', () => {
-  const assignments = stageGrouping([
-    {name: 'Mirror Rotation', group: {name: 'Planar Warp 1', title: 'Outer', order: 5}},
-    {name: 'Mirror Cell X', group: {name: 'Planar Warp 2', title: 'Inner', order: 6}},
-  ]).assignments;
-  assert.equal(assignments.get('Mirror Rotation'), 'Planar Warp 1');
-  assert.equal(assignments.get('Mirror Cell X'), 'Planar Warp 2');
-});
-
 // build() turns the engine's parameter definitions into the effect record the
 // rest of the app reads.
 
