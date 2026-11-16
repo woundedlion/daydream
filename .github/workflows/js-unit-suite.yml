@@ -70,7 +70,7 @@ jobs:
       - name: Verify committed import map
         run: |
           npm run importmap
-          git diff --exit-code -- vendor-importmap.js
+          git diff --exit-code -- vendor-importmap.js '*.html'
       - name: Verify generated Tailwind styles
         run: |
           npm run generate:tailwind

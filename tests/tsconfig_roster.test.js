@@ -168,7 +168,7 @@ const SOURCE_EXEMPTIONS = {
   'scripts/solids-probe.mjs': 'Browser probe callbacks require DOM element narrowing.',
   'scripts/vendor-imports.mjs': 'Import parser helpers require AST node types.',
   'scripts/workbench-probe.mjs': 'Browser probe callbacks require DOM element narrowing.',
-  'vendor-importmap.js': 'Generated script-tag IIFE; its source and generated variants are checked by vendor-importmap.test.js.',
+  'vendor-importmap.js': 'Offline import-map model; its source and generated variants are evaluated by sandbox tests.',
 };
 
 test('every source module is typechecked or has a written exemption', () => {

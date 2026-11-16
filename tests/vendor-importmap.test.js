@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { servedPages } from './helpers/site_pages.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = readFileSync(join(REPO, 'vendor-importmap.js'), 'utf8');
@@ -21,6 +22,7 @@ after(() => rmSync(FIXTURE, { recursive: true, force: true }));
  * @returns {string} The rewritten source, with a locally-resolved VENDOR block.
  */
 const generateLocalSrc = () => {
+  execFileSync('git', ['init', '-q'], { cwd: FIXTURE });
   copyFileSync(join(REPO, 'package.json'), join(FIXTURE, 'package.json'));
   copyFileSync(join(REPO, 'vendor-importmap.js'), join(FIXTURE, 'vendor-importmap.js'));
   // --local resolves a library locally only where its vendored entry point exists.
@@ -36,7 +38,7 @@ const generateLocalSrc = () => {
 const LOCAL_SRC = generateLocalSrc();
 
 /**
- * Evaluates the runtime importmap IIFE against a stubbed DOM and returns the
+ * Evaluates the offline importmap model against a stubbed DOM and returns the
  * whole importmap it injects, from either the committed CDN source or the
  * generated 'local' one.
  * @param {{vendor?: 'cdn'|'local', selfSrc?: string}} [opts]
@@ -117,4 +119,17 @@ test('local variant emits no integrity map', () => {
   const map = evalImportmapJson({ vendor: 'local' });
   assert.equal(map.integrity, undefined,
     'same-origin vendored modules gain nothing from SRI');
+});
+
+test('static page import maps match the generated CDN model', () => {
+  const expected = evalImportmapJson();
+  let maps = 0;
+  for (const page of servedPages()) {
+    const source = readFileSync(join(REPO, page), 'utf8');
+    const body = /<script type="importmap">([^<]+)<\/script>/.exec(source)?.[1];
+    if (!body) continue;
+    assert.deepEqual(JSON.parse(body), expected, page);
+    ++maps;
+  }
+  assert.equal(maps, 5);
 });

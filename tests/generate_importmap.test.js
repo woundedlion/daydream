@@ -281,3 +281,20 @@ test('a missing GENERATED block fails without rewriting the source', () => {
   assert.match(error, /GENERATED VENDOR block not found/);
   assert.equal(readFileSync(join(root, 'vendor-importmap.js'), 'utf8'), source);
 });
+
+test('static page regeneration updates the import map and exact CSP hash together', () => {
+  installModules();
+  const page = '<html><head><meta http-equiv="Content-Security-Policy" ' +
+    'content="default-src \'self\'; script-src \'self\' \'unsafe-inline\' https://cdn.jsdelivr.net">' +
+    '<script src="./vendor-importmap.js"></script></head></html>\n';
+  writeFileSync(join(root, 'index.html'), page);
+  execFileSync('git', ['add', 'index.html'], { cwd: root, env });
+  run();
+  const output = readFileSync(join(root, 'index.html'), 'utf8');
+  const body = output.match(/<script type="importmap">([^<]+)<\/script>/)[1];
+  assert.equal(JSON.parse(body).imports.three,
+    'https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.module.js');
+  assert.ok(output.includes(`'sha256-${createHash('sha256').update(body).digest('base64')}'`));
+  assert.ok(!output.includes("'unsafe-inline'"));
+  assert.ok(!output.includes('src="./vendor-importmap.js"'));
+});

@@ -1,11 +1,12 @@
 /*
  * Generates the local/CDN decisions, package.json version pins and sha384 hashes
- * in vendor-importmap.js's GENERATED block; page-relative resolution is unchanged.
+ * in the offline vendor-importmap.js model and static page import maps/CSP hashes.
  * Hashes require matching pinned packages installed in node_modules.
  *
  *   node scripts/generate-importmap.mjs            # all-CDN (default)
  *   node scripts/generate-importmap.mjs --local    # local entry points present, else CDN
- *   node scripts/generate-importmap.mjs --out F    # alternate output
+ *   node scripts/generate-importmap.mjs --out F    # alternate model output
+ *   node scripts/generate-importmap.mjs --pages-root D  # alternate page output root
  *   node scripts/generate-importmap.mjs --vendor-root D  # vendored entry-point probe root
  *   node scripts/generate-importmap.mjs --root D   # package and tracked-import source root
  */
@@ -13,7 +14,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve, posix } from 'node:path';
+import { dirname, resolve, relative, posix } from 'node:path';
 import { parse } from 'espree';
 import { vendorAddonsFromSource } from './vendor-imports.mjs';
 
@@ -38,6 +39,13 @@ const vendorIndex = process.argv.indexOf('--vendor-root');
 const VENDOR_ROOT = vendorIndex === -1 ? ROOT : process.argv[vendorIndex + 1];
 if (VENDOR_ROOT === undefined || VENDOR_ROOT.startsWith('--')) {
   console.error('generate-importmap: --vendor-root requires a path');
+  process.exit(1);
+}
+
+const pagesIndex = process.argv.indexOf('--pages-root');
+const PAGES_ROOT = pagesIndex === -1 ? ROOT : process.argv[pagesIndex + 1];
+if (PAGES_ROOT === undefined || PAGES_ROOT.startsWith('--')) {
+  console.error('generate-importmap: --pages-root requires a path');
   process.exit(1);
 }
 
@@ -215,3 +223,61 @@ const hashed = (integrity.three ? 1 : 0) + (integrity.lilGui ? 1 : 0)
 console.log(`vendor-importmap.js: three=${vendor.three}, lilGui=${vendor.lilGui}, ` +
   `${hashed} integrity hashes` +
   (local ? ' (local mode — do NOT commit a local block)' : ''));
+
+/**
+ * Writes a page's static import map and its exact CSP hash.
+ * @param {string} sourcePath Source page under ROOT.
+ * @returns {void}
+ */
+function writePageImportmap(sourcePath) {
+  const page = relative(ROOT, sourcePath).replaceAll('\\', '/');
+  const target = resolve(PAGES_ROOT, page);
+  const source = readFileSync(sourcePath, 'utf8');
+  const loader = /<script\b[^>]*\bsrc=["'][^"']*vendor-importmap\.js["'][^>]*><\/script>/;
+  const embedded = /<script\b[^>]*\btype=["']importmap["'][^>]*>[\s\S]*?<\/script>/;
+  if (!loader.test(source) && !embedded.test(source)) return;
+  const prefix = (posix.relative(posix.dirname(page), '.') || '.') + '/';
+  const cdn = 'https://cdn.jsdelivr.net/npm';
+  const threeBase = vendor.three === 'local'
+    ? `${prefix}three.js/` : `${cdn}/three@${versions.three}/`;
+  const gui = vendor.lilGui === 'local'
+    ? `${prefix}node_modules/lil-gui/dist/lil-gui.esm.min.js`
+    : `${cdn}/lil-gui@${versions.lilGui}/dist/lil-gui.esm.min.js`;
+  const imports = {
+    three: `${threeBase}build/three.module.js`,
+    'three/addons/': `${threeBase}examples/jsm/`,
+    'lil-gui': gui,
+  };
+  const hashes = {};
+  if (vendor.three === 'cdn') {
+    hashes[imports.three] = integrity.three;
+    for (const [path, hash] of Object.entries(integrity.threeAddons))
+      hashes[`${threeBase}examples/jsm/${path}`] = hash;
+    for (const [path, hash] of Object.entries(integrity.threeFiles))
+      hashes[`${threeBase}${path}`] = hash;
+  }
+  if (vendor.lilGui === 'cdn') hashes[gui] = integrity.lilGui;
+  const map = Object.keys(hashes).length ? { imports, integrity: hashes } : { imports };
+  const body = JSON.stringify(map);
+  const hash = `'sha256-${createHash('sha256').update(body).digest('base64')}'`;
+  let output = source.replace(loader.test(source) ? loader : embedded,
+    () => `<script type="importmap">${body}</script>`);
+  const policy = /(<meta http-equiv="Content-Security-Policy" content=")([^"]*)(")/;
+  if (!policy.test(output)) fail(`${page} has no Content-Security-Policy`);
+  output = output.replace(policy, (_, before, content, after) => {
+    const directives = content.split(';');
+    const scriptIndex = directives.findIndex(value => /^\s*script-src\s/.test(value));
+    if (scriptIndex < 0) fail(`${page} has no script-src directive`);
+    const tokens = directives[scriptIndex].trim().split(/\s+/)
+      .filter(value => value !== "'unsafe-inline'" && !value.startsWith("'sha256-"));
+    tokens.push(hash);
+    directives[scriptIndex] = ' ' + tokens.join(' ');
+    return before + directives.join(';') + after;
+  });
+  writeFileSync(target, output.replaceAll('\r\n', '\n'));
+}
+
+if (outIndex === -1 || pagesIndex !== -1) {
+  for (const page of collectSources().filter(path => path.endsWith('.html')))
+    writePageImportmap(page);
+}

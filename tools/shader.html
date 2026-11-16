@@ -9,7 +9,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google" content="notranslate">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net 'sha256-CMjIDHfEvsHEdG6q28X5mVbm2VF1hS6cwHAPpRp3xtY='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <title>Shader Workbench — Holosphere</title>
   <link href="../favicon.svg" rel="icon" type="image/svg+xml">
   <link rel="stylesheet" href="../styles/fonts.css">
@@ -17,7 +17,7 @@
   <link href="../styles/index.css" rel="stylesheet">
   <link href="shader.css" rel="stylesheet">
   <link href="tailwind.css" rel="stylesheet">
-  <script src="../vendor-importmap.js"></script>
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.183.1/examples/jsm/","lil-gui":"https://cdn.jsdelivr.net/npm/lil-gui@0.21.0/dist/lil-gui.esm.min.js"},"integrity":{"https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.module.js":"sha384-tDnOBR4yGB9V87jI7t3/bA2vGgtDUaOU+poekPUUnV7O3yEhLb4f+gRAXEd6eoCN","https://cdn.jsdelivr.net/npm/three@0.183.1/examples/jsm/controls/OrbitControls.js":"sha384-qwbKZfqvfut7iKUj5OTm9S0ZtyKO8qwf6tgArWhWhvjzpRG9qEN88IL6J8gVOZOx","https://cdn.jsdelivr.net/npm/three@0.183.1/examples/jsm/renderers/CSS2DRenderer.js":"sha384-z6mvHHI+Qnu2M3bcgZ/iybgTVGXzWGHgPkH8lSvg0AYfVzzQm62z5G1K00co2ncK","https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.core.js":"sha384-T0d5qlOvyPT92JVj73IjXSVeqEuJIXH7hs2dZzcsSyRv/ugCdA1BDA07IZZ1QryO","https://cdn.jsdelivr.net/npm/lil-gui@0.21.0/dist/lil-gui.esm.min.js":"sha384-6d+WSm8Yon/yBd0igp6VIN3j2vn1gYETuplvJw4ARkxsNorY87Y3rVaTkuebZ17j"}}</script>
 </head>
 
 <body>

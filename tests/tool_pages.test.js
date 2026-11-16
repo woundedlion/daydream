@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -90,15 +91,15 @@ const SERVED_PAGES = servedPages().map((page) => ({
 }));
 
 const SCRIPT_SRC = {
-  'tools/lissajous.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
-  'tools/mobius.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+  'tools/lissajous.html': ["'self'", 'https://cdn.jsdelivr.net'],
+  'tools/mobius.html': ["'self'", 'https://cdn.jsdelivr.net'],
   'tools/palettes.html': ["'self'", "'wasm-unsafe-eval'"],
   'tools/shader.html':
-    ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
+    ["'self'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
   'tools/solids.html':
-    ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
+    ["'self'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
   'index.html':
-    ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
+    ["'self'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
 };
 
 /**
@@ -285,7 +286,11 @@ test('every served page\'s script-src is exactly its committed token list', () =
   assert.deepEqual(Object.keys(SCRIPT_SRC).sort(), SERVED_PAGES.map(({ page }) => page).sort(),
     'the committed script-src lists and the served set have drifted apart');
   for (const { page } of SERVED_PAGES) {
-    const want = SCRIPT_SRC[page];
+    const want = [...SCRIPT_SRC[page]];
+    const body = /<script\b[^>]*type="importmap"[^>]*>([\s\S]*?)<\/script>/
+      .exec(read(page))?.[1];
+    if (body) want.push(`'sha256-${createHash('sha256').update(body).digest('base64')}'`);
+    assert.doesNotMatch(read(page), /<script\b[^>]*src="[^"]*vendor-importmap\.js"/);
     assert.ok(want, `${page} has no committed script-src token list`);
     const tokens = directive(cspOf(page), 'script-src');
     assert.ok(tokens, `${page} CSP declares no script-src of its own`);

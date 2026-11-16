@@ -35,6 +35,12 @@ push hook checks source lint, types, import-map freshness, Tailwind output fresh
 runtime compatibility gate. `npm test` and the browser probe scripts remain
 available for local validation after installing an engine package.
 
+Vendor import maps are static JSON in the HTML pages. `npm run importmap`
+updates their package URLs, integrity entries and exact `script-src` hashes;
+commit the regenerated pages with vendor bumps. Browser probes rewrite copies
+of those pages for local vendoring. `vendor-importmap.js` is an offline model
+for generation and integrity tests and is excluded from publication.
+
 Pages deployments are serialized. Immediately before publishing, the workflow
 checks that both selected commits are still master. A superseded pair is skipped
 and a later trigger reconciles the new pair. The deployed site includes

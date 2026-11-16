@@ -1,8 +1,8 @@
 /*
  * Stages the publication manifest into a scratch site with three.js and lil-gui
  * from node_modules for the headless probes.
- * Manifest files are hard-linked; generate the local import map into a separate
- * inode so writing it cannot change the committed map.
+ * HTML pages are copied before their static import maps and CSP hashes change.
+ * Other manifest files are hard-linked.
  */
 import { execFileSync } from 'node:child_process';
 import {
@@ -72,10 +72,12 @@ export function stageProbeSite() {
   try {
     entries = manifestEntries();
     for (const entry of entries) {
-      if (entry === IMPORTMAP) continue;
       const from = join(REPO, entry);
       if (!existsSync(from)) throw new Error(`site manifest entry is missing: ${entry}`);
-      linkInto(from, join(root, entry));
+      if (entry.endsWith('.html')) {
+        mkdirSync(dirname(join(root, entry)), { recursive: true });
+        copyFileSync(from, join(root, entry));
+      } else linkInto(from, join(root, entry));
     }
     for (const [from, to] of VENDORED) {
       const source = join(REPO, from);
@@ -88,7 +90,7 @@ export function stageProbeSite() {
     execFileSync(
       process.execPath,
       [GENERATOR, ...(process.env.HS_CDN_SMOKE === '1' ? [] : ['--local']),
-        '--vendor-root', root, '--out', join(root, IMPORTMAP)],
+        '--vendor-root', root, '--pages-root', root, '--out', join(root, IMPORTMAP)],
       { stdio: ['ignore', 'ignore', 'inherit'] },
     );
   } catch (error) {

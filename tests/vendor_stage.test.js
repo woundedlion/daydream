@@ -4,6 +4,7 @@
 // hard-linked file would break.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs, { existsSync, readFileSync, rmSync } from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 import { Server } from 'node:http';
@@ -20,16 +21,16 @@ after(() => rmSync(staged.root, { recursive: true, force: true }));
 const stagedFile = (path) => readFileSync(join(staged.root, path), 'utf8');
 
 test('the staged import map resolves both libraries locally', () => {
-  const map = stagedFile('vendor-importmap.js');
-  assert.match(map, /const VENDOR = \{ three: 'local', lilGui: 'local' \};/);
-  assert.doesNotMatch(map.split('// === END GENERATED ===')[0], /jsdelivr/,
+  const map = stagedFile('index.html').match(/<script type="importmap">([^<]+)<\/script>/)[1];
+  assert.equal(JSON.parse(map).imports.three, './three.js/build/three.module.js');
+  assert.doesNotMatch(map, /jsdelivr/,
     'a staged library still pinned to the CDN would red the gate on an outage');
 });
 
 test('the committed import map is untouched by staging', () => {
   const committed = readFileSync(new URL('../vendor-importmap.js', import.meta.url), 'utf8');
   assert.match(committed, /const VENDOR = \{ three: 'cdn', lilGui: 'cdn' \};/,
-    'the deploy serves this file; a local block would 404 on Pages');
+    'the offline generation model retains its deploy-safe defaults');
 });
 
 test('the vendored entry points are staged where the local map looks', () => {
@@ -62,9 +63,11 @@ test('the staged site serves the libraries, and drops its tree on close', async 
   try {
     assert.ok(existsSync(site.root), 'the served staging directory exists');
     assert.notEqual(site.root, staged.root, 'each staging operation owns its directory');
-    const map = await request(site.origin, '/vendor-importmap.js');
-    assert.equal(map.status, 200);
-    assert.match(map.body, /three: 'local'/);
+    const page = await request(site.origin, '/index.html');
+    assert.equal(page.status, 200);
+    assert.match(page.body, /"three":"\.\/three\.js\/build\/three\.module\.js"/);
+    const model = await request(site.origin, '/vendor-importmap.js');
+    assert.equal(model.status, 404, 'the offline model is not published');
 
     const three = await request(site.origin, '/three.js/build/three.module.js');
     assert.equal(three.status, 200, 'three must not have to come from the CDN');
@@ -85,7 +88,7 @@ test('the staged site serves the libraries, and drops its tree on close', async 
 
 
 test('staging copies files when hard links cross filesystem boundaries', (t) => {
-  const source = fileURLToPath(new URL('../index.html', import.meta.url));
+  const source = fileURLToPath(new URL('../styles/index.css', import.meta.url));
   const original = readFileSync(source, 'utf8');
   const link = fs.linkSync;
   let refused = 0;
@@ -101,7 +104,7 @@ test('staging copies files when hard links cross filesystem boundaries', (t) => 
 
   const copy = stageProbeSite();
   t.after(() => rmSync(copy.root, { recursive: true, force: true }));
-  const target = join(copy.root, 'index.html');
+  const target = join(copy.root, 'styles/index.css');
   assert.equal(refused, 1);
   assert.equal(readFileSync(target, 'utf8'), original);
   fs.writeFileSync(target, 'changed staged content');
@@ -127,7 +130,7 @@ test('staging reports a missing dependency and removes its partial tree', (t) =>
   assert.equal(exists(dependency), true);
 });
 
-test('CDN smoke stages an external import map without changing the committed map', (t) => {
+test('CDN smoke stages a static CDN import map without changing the committed map', (t) => {
   const previous = process.env.HS_CDN_SMOKE;
   t.after(() => {
     if (previous === undefined) delete process.env.HS_CDN_SMOKE;
@@ -136,8 +139,8 @@ test('CDN smoke stages an external import map without changing the committed map
   process.env.HS_CDN_SMOKE = '1';
   const site = stageProbeSite();
   t.after(() => rmSync(site.root, { recursive: true, force: true }));
-  const map = readFileSync(join(site.root, 'vendor-importmap.js'), 'utf8');
-  assert.match(map, /const VENDOR = \{ three: 'cdn', lilGui: 'cdn' \};/);
+  const map = readFileSync(join(site.root, 'index.html'), 'utf8')
+    .match(/<script type="importmap">([^<]+)<\/script>/)[1];
   assert.match(map, /https:\/\/cdn\.jsdelivr\.net/);
   assert.equal(existsSync(join(site.root, 'index.html')), true);
   assert.match(readFileSync(new URL('../vendor-importmap.js', import.meta.url), 'utf8'),
@@ -161,4 +164,16 @@ test('a server bind failure removes its staged tree and preserves other sites', 
   assert.ok(partial);
   assert.equal(existsSync(partial), false);
   assert.equal(existsSync(staged.root), true);
+});
+
+test('staged tool maps resolve from their own page and retain exact CSP hashes', () => {
+  const page = stagedFile('tools/mobius.html');
+  const body = page.match(/<script type="importmap">([^<]+)<\/script>/)[1];
+  assert.equal(JSON.parse(body).imports.three, '../three.js/build/three.module.js');
+  const policy = page.match(/Content-Security-Policy" content="([^"]+)"/)[1];
+  const scripts = policy.split(';').find(value => value.trim().startsWith('script-src '));
+  assert.ok(scripts.includes(`'sha256-${createHash('sha256').update(body).digest('base64')}'`));
+  assert.ok(!scripts.includes("'unsafe-inline'"));
+  assert.match(readFileSync(new URL('../tools/mobius.html', import.meta.url), 'utf8'),
+    /"three":"https:\/\/cdn\.jsdelivr\.net\//);
 });
