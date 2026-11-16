@@ -165,6 +165,31 @@ export function applyOp(mesh, o) {
 }
 
 /**
+ * Replays operations while transferring ownership to each new mesh.
+ * @param {{mesh: MeshWrapper|null}} cursor - Current owned mesh, updated after every step.
+ * @param {ChainOp[]} ops - Operations in replay order.
+ * @param {{before?: (mesh: MeshWrapper, op: ChainOp, index: number) => void,
+ *   apply?: (mesh: MeshWrapper, op: ChainOp, index: number) => MeshWrapper,
+ *   applied?: () => void,
+ *   after?: (mesh: MeshWrapper, op: ChainOp, index: number) => (boolean|void)}} [hooks] - Per-step policy.
+ * @returns {boolean} False when the after-step policy stops the replay.
+ * @throws {Error} When an operation fails; the cursor retains the live mesh for cleanup.
+ */
+export function replayMeshOps(cursor, ops, hooks = {}) {
+  for (const [index, op] of ops.entries()) {
+    const mesh = cursor.mesh;
+    if (!mesh) throw new Error('Mesh replay requires a seed');
+    hooks.before?.(mesh, op, index);
+    const next = (hooks.apply ?? applyOp)(mesh, op, index);
+    hooks.applied?.();
+    mesh.delete();
+    cursor.mesh = next;
+    if (hooks.after?.(next, op, index) === false) return false;
+  }
+  return true;
+}
+
+/**
  * Calls the bound method for one op.
  * @param {MeshWrapper} mesh - A live WASM MeshOps mesh wrapper.
  * @param {ChainOp} o - The op to apply.
@@ -399,8 +424,8 @@ export function createChainValidator(createModule) {
         message: 'Validator unavailable; this change was not applied. Retry the change to reconnect.',
       };
       const Ops = Mod.MeshOps;
-      /** @type {?MeshWrapper} */
-      let mesh = null;
+      /** @type {{mesh: MeshWrapper|null}} */
+      const replay = { mesh: null };
       // What the replay was building, named in whatever failure it hits.
       let what = `Base solid "${base}"`;
       // Reads the recorded reason before freeing the mesh and the arenas.
@@ -411,12 +436,12 @@ export function createChainValidator(createModule) {
         const message = failure.reason === 'OK' && e
           ? `${what} failed: ${e.message || e}`
           : failure.message;
-        try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch { /* best effort */ }
+        try { if (replay.mesh) replay.mesh.delete(); Ops.clearToolingMemory(); } catch { /* best effort */ }
         return { ok: false, message };
       };
       // A saturated argument: the engine drew a clamped value, not the chain's.
       const saturated = () => {
-        try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch { /* best effort */ }
+        try { if (replay.mesh) replay.mesh.delete(); Ops.clearToolingMemory(); } catch { /* best effort */ }
         return {
           ok: false,
           message: `${what} failed: an argument sat outside its op domain and the `
@@ -424,23 +449,19 @@ export function createChainValidator(createModule) {
         };
       };
       try {
-        mesh = Ops.fromSolidName(base);
-        if (!mesh) return rejected();
-        for (const o of candidate) {
-          what = `Op "${chainOpName(o)}"`;
-          const next = applyOp(mesh, o);
-          // Read before another checked mesh call clears the flag; getVertices
-          // also resets it before reading back the mesh.
-          const adjusted = Ops.getLastAdjusted();
-          mesh.delete();
-          mesh = next;
-          if (adjusted) return saturated();
-        }
+        replay.mesh = Ops.fromSolidName(base);
+        if (!replay.mesh) return rejected();
+        let adjusted = false;
+        if (!replayMeshOps(replay, candidate, {
+          before: (_mesh, op) => { what = `Op "${chainOpName(op)}"`; },
+          applied: () => { adjusted = Ops.getLastAdjusted(); },
+          after: () => !adjusted,
+        })) return saturated();
         what = 'Face classification';
-        const classes = mesh.classifyFaces();
+        const classes = replay.mesh.classifyFaces();
         if (classes == null) return rejected();
-        mesh.delete();
-        mesh = null;
+        replay.mesh.delete();
+        replay.mesh = null;
         Ops.clearToolingMemory();
         return { ok: true, message: '' };
       } catch (e) {
@@ -502,25 +523,21 @@ export function createOpGate(validator, retries = 3) {
        *   halted, the mesh the op was applied to and the arenas are freed first.
        */
       const build = (M) => {
-        let mesh = M.MeshOps.fromSolidName(base);
-        if (!mesh) {
+        const replay = { mesh: M.MeshOps.fromSolidName(base) };
+        if (!replay.mesh) {
           const failure = meshOpFailure(M, `Base solid "${base}"`);
           if (failure.flush) M.MeshOps.clearToolingMemory();
           throw new Error(failure.message);
         }
         try {
-          for (const o of ops) {
-            const next = applyOp(mesh, o);
-            mesh.delete();
-            mesh = next;
-          }
+          replayMeshOps(replay, ops);
         } catch (e) {
           if (!engineHalted(e, M)) {
-            try { mesh.delete(); M.MeshOps.clearToolingMemory(); } catch { /* best effort */ }
+            try { replay.mesh.delete(); M.MeshOps.clearToolingMemory(); } catch { /* best effort */ }
           }
           throw e;
         }
-        return mesh;
+        return replay.mesh;
       };
       /** @type {MeshWrapper} */
       let mesh;

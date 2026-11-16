@@ -10,7 +10,7 @@
  */
 
 import {
-  applyOp, meshOpFailure, requireParams, unsweepableReason,
+  applyOp, meshOpFailure, replayMeshOps, requireParams, unsweepableReason,
 } from './solid_validation.js';
 import {
   chainOpName, CATALAN_BASES, DEFINED_SEED_CONSTANTS, OP_DEFS, KNOWN_OPS,
@@ -61,14 +61,14 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
       ...opsFromRecipe(baseRecipe?.ops ?? []),
       ...item.ops,
     ];
-    /** @type {import('./solid_validation.js').MeshWrapper|null} */
-    let mesh = null;
+    /** @type {{mesh: import('./solid_validation.js').MeshWrapper|null}} */
+    const replay = { mesh: null };
     let halted = false;
     try {
-      mesh = mod.MeshOps.fromSolidName(baseRecipe?.seed ?? item.base);
+      replay.mesh = mod.MeshOps.fromSolidName(baseRecipe?.seed ?? item.base);
       const check = () => {
-        if (!mesh) throw new Error(meshOpFailure(mod, 'Registry mesh').message);
-        const result = mesh.getFaces();
+        if (!replay.mesh) throw new Error(meshOpFailure(mod, 'Registry mesh').message);
+        const result = replay.mesh.getFaces();
         if (!result) throw new Error(meshOpFailure(mod, 'Registry faces').message);
         const faces = result.counts.length;
         if (faces > MAX_BUILD_FACES)
@@ -81,35 +81,38 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
       });
       const swept = primitives.every((primitive) => !unsweepableReason(primitive));
       let previousName = '';
-      for (const [index, primitive] of primitives.entries()) {
-        const name = chainOpName(primitive);
-        if (!mesh) throw new Error(meshOpFailure(mod, 'Registry mesh').message);
-        let bridgeFaces = 0;
-        if (name === 'dual' || (name === 'kis' && previousName !== 'dual')) {
-          const faces = mesh.getFaces();
-          if (!faces) throw new Error(meshOpFailure(mod, 'Registry faces').message);
-          let indices = 0;
-          for (const count of faces.counts) indices += count;
-          const edges = indices / 2;
-          const next = primitives[index + 1];
-          const nextName = chainOpName(next);
-          // Closed genus-zero meshes: ambo has E+2 faces; truncate has 3E edges.
-          bridgeFaces = name === 'dual' && nextName !== 'kis' ? edges + 2 : 3 * edges + 2;
-        }
-        let next;
-        try {
-          next = applyOp(mesh, primitive);
-        } catch (error) {
-          if (engineHalted(error, mod)) throw error;
-          throw new Error(meshOpFailure(mod, `Op "${name}"`).message, { cause: error });
-        }
-        mesh.delete();
-        mesh = next;
-        check();
-        if (swept && bridgeFaces > MAX_BUILD_FACES)
-          throw new Error(`Registry bridge has ${bridgeFaces} faces; maximum is ${MAX_BUILD_FACES}`);
-        previousName = name;
-      }
+      let currentName = '';
+      let bridgeFaces = 0;
+      replayMeshOps(replay, primitives, {
+        before: (mesh, primitive, index) => {
+          currentName = chainOpName(primitive);
+          bridgeFaces = 0;
+          if (currentName === 'dual' || (currentName === 'kis' && previousName !== 'dual')) {
+            const faces = mesh.getFaces();
+            if (!faces) throw new Error(meshOpFailure(mod, 'Registry faces').message);
+            let indices = 0;
+            for (const count of faces.counts) indices += count;
+            const edges = indices / 2;
+            const nextName = chainOpName(primitives[index + 1]);
+            // Closed genus-zero meshes: ambo has E+2 faces; truncate has 3E edges.
+            bridgeFaces = currentName === 'dual' && nextName !== 'kis' ? edges + 2 : 3 * edges + 2;
+          }
+        },
+        apply: (mesh, primitive) => {
+          try {
+            return applyOp(mesh, primitive);
+          } catch (error) {
+            if (engineHalted(error, mod)) throw error;
+            throw new Error(meshOpFailure(mod, `Op "${currentName}"`).message, { cause: error });
+          }
+        },
+        after: () => {
+          check();
+          if (swept && bridgeFaces > MAX_BUILD_FACES)
+            throw new Error(`Registry bridge has ${bridgeFaces} faces; maximum is ${MAX_BUILD_FACES}`);
+          previousName = currentName;
+        },
+      });
     } catch (error) {
       halted = engineHalted(error, mod);
       validator.noteDeath(error);
@@ -118,7 +121,7 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
       throw error;
     } finally {
       if (!halted) {
-        try { mesh?.delete(); mod.MeshOps.clearToolingMemory(); } catch { /* cleanup failure */ }
+        try { replay.mesh?.delete(); mod.MeshOps.clearToolingMemory(); } catch { /* cleanup failure */ }
       }
     }
   });
