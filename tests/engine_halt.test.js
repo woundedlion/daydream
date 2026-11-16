@@ -1,7 +1,8 @@
 // The halted-engine predicate gating later bridge calls.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { engineHalted, standDownIfHalted } from '../src/shared/engine_halt.js';
+import { engineHalted, MODULE_TRAP_NOTICE, standDownIfHalted } from '../src/shared/engine_halt.js';
+import { MODULE_TRAP_NOTICE as FRAME_TRAP_NOTICE } from '../src/app/frame_loop_guard.js';
 
 test('the caller that was on the stack sees the trap as a RuntimeError', () => {
   assert.equal(engineHalted(new WebAssembly.RuntimeError('unreachable')), true);
@@ -32,7 +33,8 @@ test('a halt stands the page down with the shared notice', () => {
   let seen = null;
   assert.equal(standDownIfHalted(
     new WebAssembly.RuntimeError('unreachable'), {}, (m) => { seen = m; }), true);
-  assert.match(seen, /^The WASM engine hit an internal invariant and is halted/);
+  assert.equal(seen, MODULE_TRAP_NOTICE);
+  assert.equal(FRAME_TRAP_NOTICE, MODULE_TRAP_NOTICE);
   assert.doesNotMatch(seen, /slipped past validation/);
 });
 
@@ -40,7 +42,7 @@ test('a page detail is appended after the shared notice', () => {
   let seen = null;
   standDownIfHalted(null, { HS_MODULE_DEAD: true }, (m) => { seen = m; },
     '(The op that caused this slipped past validation; please report the chain.)');
-  assert.match(seen, /halted — reload the page\. \(The op that caused this/);
+  assert.equal(seen, `${MODULE_TRAP_NOTICE} (The op that caused this slipped past validation; please report the chain.)`);
 });
 
 test('liveness checks tolerate an absent WebAssembly global', () => {

@@ -25,8 +25,9 @@ export function engineHalted(error, module = null) {
 }
 
 /** Banner sentence for a halted engine. */
-const HALT_NOTICE = 'The WASM engine hit an internal invariant and is halted — '
-  + 'reload the page.';
+export const MODULE_TRAP_NOTICE = 'The rendering engine hit an unrecoverable'
+  + ' internal error and has been shut down. Reload the page to start it again.'
+  + ' See the browser console for details.';
 
 /**
  * Reports whether an error halted the engine and, if so, stands the page down.
@@ -38,6 +39,6 @@ const HALT_NOTICE = 'The WASM engine hit an internal invariant and is halted —
  */
 export function standDownIfHalted(error, module, standDown, detail = '') {
   if (!engineHalted(error, module)) return false;
-  standDown(detail ? `${HALT_NOTICE} ${detail}` : HALT_NOTICE);
+  standDown(detail ? `${MODULE_TRAP_NOTICE} ${detail}` : MODULE_TRAP_NOTICE);
   return true;
 }

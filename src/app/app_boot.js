@@ -5,7 +5,7 @@
 
 import {createModuleLoadHandlers} from './module_load.js';
 import {createRenderAdapter} from './render_adapter.js';
-import {MODULE_TRAP_NOTICE} from './frame_loop_guard.js';
+import {MODULE_TRAP_NOTICE} from '../shared/engine_halt.js';
 import {VideoRecorder} from '../recording/recorder.js';
 import {applyInitialState} from '../effects/effect_sequencing.js';
 import {reportBootFailure} from './bootstrap.js';
