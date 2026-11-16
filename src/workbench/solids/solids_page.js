@@ -1,6 +1,8 @@
 /*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
+ *
+ * Page module for tools/solids.html.
  */
 import {bootstrapTool} from '../shared.js';
 import {createFrameScheduler, onPageTeardown} from '../../shared/page_lifecycle.js';

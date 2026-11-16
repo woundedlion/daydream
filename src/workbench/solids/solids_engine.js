@@ -2,7 +2,7 @@
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  *
- * Page module for tools/solids.html.
+ * Engine lifecycle and mesh builds for the solids workbench.
  */
 import * as THREE from 'three';
 import { showFatalError, formatKB } from '../shared.js';

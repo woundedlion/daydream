@@ -809,11 +809,6 @@ test('a session retains only non-empty chunks', (t) => {
     'only the non-empty chunk is retained');
 });
 
-/**
- * The core stop->start race: a fast restart installs a new session on this.*
- * before the old recorder's async onstop fires. The stale handler must download
- * ITS OWN chunks and must NOT tear down the newer active session.
- */
 test('a stale empty session does not notify the session that replaced it', (t) => {
   t.after(installRecorderEnv());
   t.mock.method(console, 'warn', () => {});
@@ -831,6 +826,7 @@ test('a stale empty session does not notify the session that replaced it', (t) =
   assert.equal(rec.isRecording, true);
 });
 
+/** A stale stop handler downloads its session's chunks and preserves its replacement. */
 test('a stale onstop does not clobber the session that replaced it', (t) => {
   t.after(installRecorderEnv());
   const rec = new VideoRecorder(recordableCanvas());
