@@ -325,6 +325,24 @@ export const installSavePath = () => {
   return spy;
 };
 
+/**
+ * Installs recorder capture and buffered-save globals under one cleanup owner.
+ * @returns {ReturnType<typeof installSavePath>} Save spies and a reverse-order restore.
+ */
+export const installRecorderSaveEnv = () => {
+  const restoreRecorder = installRecorderEnv();
+  const save = installSavePath();
+  const restoreSave = save.restore;
+  save.restore = () => {
+    try {
+      restoreSave();
+    } finally {
+      restoreRecorder();
+    }
+  };
+  return save;
+};
+
 // ---------------------------------------------------------------------------
 // start() aborts: every path that gives up before a session exists must leave no
 // live capture behind.

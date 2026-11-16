@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { installConsoleCapture } from ".././helpers/fake_console.js";
 import { VideoRecorder } from "../../src/recording/recorder.js";
-import { SAVE_CLOCK, recordableCanvas, FakeMediaRecorder, installRecorderEnv, drainSink, trackSinkFinish, installSavePath } from "./fixture.js";
+import { SAVE_CLOCK, recordableCanvas, FakeMediaRecorder, installRecorderEnv, drainSink, trackSinkFinish, installSavePath, installRecorderSaveEnv } from "./fixture.js";
 
 /**
  * Without the File System Access API a stopped session buffers its chunks, packs
@@ -11,8 +11,7 @@ import { SAVE_CLOCK, recordableCanvas, FakeMediaRecorder, installRecorderEnv, dr
  * revoked once the click has consumed it.
  */
 test('the buffered save path downloads one blob through an anchor click', (t) => {
-  t.after(installRecorderEnv());
-  const save = installSavePath();
+  const save = installRecorderSaveEnv();
   t.after(save.restore);
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: SAVE_CLOCK });
   const rec = new VideoRecorder(recordableCanvas());
@@ -45,8 +44,7 @@ test('the buffered save path downloads one blob through an anchor click', (t) =>
 
 for (const mode of ['buffered', 'picker-fallback']) {
   test(`a throwing ${mode} download reports once and releases its capture session`, async (t) => {
-    t.after(installRecorderEnv());
-    const save = installSavePath();
+    const save = installRecorderSaveEnv();
     t.after(save.restore);
     const captured = installConsoleCapture('error', 'warn');
     t.after(captured.restore);
