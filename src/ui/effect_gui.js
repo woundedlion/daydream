@@ -128,7 +128,7 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  * @param {() => number} deps.engine.getPresetCount - Number of presets on the
  *   live effect.
  * @param {() => number} deps.engine.getPresetIndex - Selected preset on the live
- *   effect.
+ *   effect, or -1 when no effect is installed.
  * @param {(index: number) => boolean} deps.engine.synchronizePreset - Mirrors a
  *   live worker preset into the engine that owns GUI parameter definitions.
  * @param {(index: number) => boolean} deps.engine.selectPreset - Selects one
@@ -288,6 +288,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   function followPreset(fx) {
     const hasPresets = fx.actions.hasPresets();
     const presetIndex = hasPresets ? getPresetIndex() : null;
+    if (presetIndex !== null && presetIndex < 0)
+      return {presetAdvanced: false, presetSynced: false};
     const presetAdvanced = hasPresets
       && fx.actions.displayedPresetIndex() !== presetIndex;
     const presetSynced = !hasPresets || synchronizePreset(/** @type {number} */ (presetIndex));

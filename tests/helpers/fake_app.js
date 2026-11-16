@@ -122,7 +122,7 @@ export function fakeWasmModule({
     caps,
     params,
     HolosphereEngine: class {
-      constructor() { built++; this.paused = false; module.engine = this; }
+      constructor() { built++; this.paused = false; this.effectInstalled = false; module.engine = this; }
       static isLive() { return false; }
       static getSupportedResolutions() { return resolutions; }
       setResolution(w, h) {
@@ -131,7 +131,7 @@ export function fakeWasmModule({
         activeHeight = h;
         return ResolutionSetResult.RESIZED;
       }
-      setEffect() { return EffectSetResult.INSTALLED; }
+      setEffect() { this.effectInstalled = true; return EffectSetResult.INSTALLED; }
       setParameter(name, value) {
         params.push([name, value]);
         if (definitions.find((definition) => definition.name === name)?.animated) this.paused = true;
@@ -145,7 +145,7 @@ export function fakeWasmModule({
       setAnimationsPaused(paused) { this.paused = paused; }
       getAnimationsPaused() { return this.paused; }
       getPresetCount() { return 0; }
-      getPresetIndex() { return this.presetIndex ?? 0; }
+      getPresetIndex() { return this.effectInstalled ? this.presetIndex ?? 0 : -1; }
       selectPreset(index) {
         if (index < 0 || index >= this.getPresetCount()) return false;
         this.presetIndex = index;

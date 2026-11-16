@@ -381,7 +381,8 @@ export class SegmentController {
   }
 
   /**
-   * The preset the pool is currently on, mirrored from segment 0's frames
+   * The preset the pool is currently on (-1 without an effect), mirrored from
+   * segment 0's frames
    * (seeded from the main engine at pool creation), or null when no engine has
    * reported one.
    * @returns {number | null}

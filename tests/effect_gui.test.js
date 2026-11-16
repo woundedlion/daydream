@@ -648,6 +648,25 @@ test('the panel offers the pause toggle whenever canPausePresets allows it', () 
 
 });
 
+test('a missing-effect preset index is not synchronized or displayed as a selection', () => {
+  const h = makeHarness({presetCount: 3, presetIndex: 1});
+  h.panel.build();
+  const selector = h.gui().ctrl('presetIndex');
+  h.writes.length = 0;
+  h.state.presetIndex = -1;
+  h.state.presetCount = 0;
+
+  h.panel.sync();
+
+  assert.equal(selector.getValue(), 1);
+  assert.deepEqual(h.writes, []);
+  h.state.presetCount = 3;
+  h.state.presetIndex = 2;
+  h.panel.sync();
+  assert.equal(selector.getValue(), 2);
+  assert.ok(h.writes.includes('syncPreset:2'));
+});
+
 test('selecting a preset pauses advancement and the toggle resumes it', () => {
   const staticPresets = makeHarness({presetCount: 2});
   staticPresets.panel.build();

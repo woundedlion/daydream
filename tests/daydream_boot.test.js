@@ -516,6 +516,15 @@ test('the segment-count slider carries the device cap as its own maximum', () =>
     + 'GUI showing a count the slider cannot represent');
 });
 
+test('the application engine fake reports no preset until an effect is installed', () => {
+  const module = fakeWasmModule();
+  const engine = new module.HolosphereEngine();
+  assert.equal(engine.getPresetIndex(), -1);
+  assert.equal(engine.setEffect('KaleidoscopeMelt'), module.EffectSetResult.INSTALLED);
+  assert.equal(engine.getPresetIndex(), 0);
+  engine.delete();
+});
+
 test('the late-bound engine controls are re-applied once the engine exists', async () => {
   const module = fakeWasmModule();
   let deliver;

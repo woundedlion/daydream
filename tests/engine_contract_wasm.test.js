@@ -33,6 +33,7 @@ const { w: W, h: H } = resolutionPresets['Holosphere (96x20)'];
 assert.equal(M.HolosphereEngine.isLive(), false);
 const engine = new M.HolosphereEngine();
 assert.equal(M.HolosphereEngine.isLive(), true);
+const initialPresetState = {count: engine.getPresetCount(), index: engine.getPresetIndex()};
 const initialDisplayAngles = [engine.getDisplayNorthPhi(), engine.getDisplaySouthPhi()];
 const initialPoleLod = engine.getPoleLod();
 
@@ -137,6 +138,10 @@ function assertDeclaredShape(name, value) {
 }
 
 // Return-value shapes for the engine binding methods.
+test('an engine without an effect reports no selected preset', () => {
+  assert.deepEqual(initialPresetState, {count: 0, index: -1});
+});
+
 test(`${DTS_PATH} declares the object shapes the engine returns`, () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 

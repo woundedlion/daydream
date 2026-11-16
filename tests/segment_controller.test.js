@@ -344,6 +344,20 @@ test('refreshPresetState replaces outgoing preset metadata from the main engine'
   assert.equal(c.getPresetIndex(), 0);
 });
 
+test('preset metadata preserves the no-effect sentinel from the main engine and worker', async () => {
+  const c = makeController();
+  c.getWasmEngine = () => fakeEngine([], 0, -1);
+  c.refreshPresetState();
+  assert.equal(c.getPresetCount(), 0);
+  assert.equal(c.getPresetIndex(), -1);
+  c.create(2);
+  const done = c.renderParallel();
+  deliverFrame(c, 0, {presetCount: 0, presetIndex: -1});
+  deliverFrame(c, 1);
+  await done;
+  assert.equal(c.getPresetIndex(), -1);
+});
+
 test('a frame from a non-zero segment never publishes param values', async () => {
   const c = makeController();
   c.create(2);
