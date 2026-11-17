@@ -283,16 +283,6 @@ export class Daydream {
       durationMs: Daydream.VIEW_RESET_MS});
   }
 
-  /** Return to the default orientation and center while preserving zoom. */
-  resetView() {
-    this.viewReset?.reset();
-  }
-
-  /** Cancel an in-flight return to the default orientation. */
-  cancelViewReset() {
-    this.viewReset?.cancel();
-  }
-
   /** Handle playback and preset keys.
    * @param {KeyboardEvent} e - Key event.
    * @param {(delta: number) => boolean} [movePreset] - Preset selector. */
