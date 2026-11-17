@@ -34,6 +34,11 @@ export function createAppEffects({doc, win, host, loaded, segments, display, app
   const clearEffectParamUrl = () => resetGUI(
     ['resolution', 'effect', 'view', ...guiInstance.collectUrlKeys()], win);
 
+  const snapshotChain = () => getChainSnapshot(host.engine);
+  const restoreChain = (/** @type {*} */ snapshot) => restoreChainSnapshot(host.engine, loaded.module, snapshot);
+  const restoreChainApplied = (/** @type {*} */ snapshot) => restoreChain(snapshot)
+    === loaded.module.ChainSnapshotRestoreResult.APPLIED;
+
   const effectGui = createEffectGui({
     moduleDead: (error) => host.moduleDead(error),
     engine: {
@@ -63,8 +68,8 @@ export function createAppEffects({doc, win, host, loaded, segments, display, app
     },
     config: {
       inUse: usesChainSnapshot,
-      snapshot: () => getChainSnapshot(host.engine),
-      restore: (snapshot) => restoreChainSnapshot(host.engine, loaded.module, snapshot),
+      snapshot: snapshotChain,
+      restore: restoreChain,
       restoreResults: () => loaded.module.ChainSnapshotRestoreResult,
       showImportNotice: (message) => applyNotice.show(message, CONFIG_NOTICE),
     },
@@ -93,9 +98,8 @@ export function createAppEffects({doc, win, host, loaded, segments, display, app
     appState,
     getEngine: () => host.engine,
     getModule: () => loaded.module,
-    getChainSnapshot: () => getChainSnapshot(host.engine),
-    restoreChainSnapshot: (snapshot) => restoreChainSnapshot(host.engine, loaded.module, snapshot)
-      === loaded.module.ChainSnapshotRestoreResult.APPLIED,
+    getChainSnapshot: snapshotChain,
+    restoreChainSnapshot: restoreChainApplied,
     invalidateEngineView: () => host.invalidateView(),
     presets: resolutionPresets,
     availableEffects,
@@ -129,9 +133,8 @@ export function createAppEffects({doc, win, host, loaded, segments, display, app
     showFatal: showFatalError,
     moduleDead: (error) => host.moduleDead(error),
     usesChainSnapshot,
-    getChainSnapshot: () => getChainSnapshot(host.engine),
-    restoreChainSnapshot: (snapshot) => restoreChainSnapshot(host.engine, loaded.module, snapshot)
-      === loaded.module.ChainSnapshotRestoreResult.APPLIED,
+    getChainSnapshot: snapshotChain,
+    restoreChainSnapshot: restoreChainApplied,
   });
 
   reset.apply = () => apply.applyEffect();
