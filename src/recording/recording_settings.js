@@ -17,8 +17,8 @@
  * @param {Object} deps - Injected app collaborators.
  * @param {() => T|null} deps.getRecorder - Reads the live
  *   recorder, null until the module load resolves.
- * @param {(message: string) => void} [deps.warn] - Sink for the mid-recording
- *   notice.
+ * @param {(message: string, gesture: object) => void} [deps.warn] - Sink for the
+ *   mid-recording notice with a stable token for each setting.
  * @returns {{settings: Record<string, any>, define: (prop: string, initial: *, label: string,
  *   push: (recorder: T, value: *) => void) => void, replay: () => void}}
  *   The GUI-bound settings object, the per-setting definer, and the post-load
@@ -36,6 +36,7 @@ export function createRecordingSettings({
     settings,
     define(prop, initial, label, push) {
       let value = initial;
+      const gesture = {};
       Object.defineProperty(settings, prop, {
         enumerable: true,
         get: () => value,
@@ -45,7 +46,7 @@ export function createRecordingSettings({
           if (recorder) push(recorder, v);
           if (recorder?.isRecording) {
             warn(`Recording: ${label} change applies to the next recording `
-              + '(the current one is already running).');
+              + '(the current one is already running).', gesture);
           }
         },
       });

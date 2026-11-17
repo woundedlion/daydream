@@ -141,7 +141,7 @@ export function createAppControls({doc, win, nav, host, daydream, display, segme
     driver: display,
     getRecorder: () => host.recorder,
     getEffect: () => appState.get('effect'),
-    showNotice: (message) => applyNotice.show(message, RECORD_NOTICE),
+    showNotice: (message, gesture) => applyNotice.show(message, RECORD_NOTICE, gesture),
   });
   const onKeyDown = createGlobalKeydownHandler({
     dispatch: (e) => daydream.keydown(e, (delta) => !shaderWorkbench && effectGui.movePreset(delta)),

@@ -36,8 +36,8 @@ function recorderReason(err) {
  * @param {() => import("./recorder.js").VideoRecorder|null} deps.getRecorder - Reads the live recorder, null until
  *   the module load resolves.
  * @param {() => string} deps.getEffect - Names the effect a session records.
- * @param {(message: string) => void} deps.showNotice - Owner-tagged sink for the
- *   session and fault reports.
+ * @param {(message: string, gesture?: object) => void} deps.showNotice -
+ *   Owner-tagged sink for session, setting and fault notices.
  * @returns {{attach: (recorder: import("./recorder.js").VideoRecorder) => void, tick: () => void,
  *   removeOverlay: () => void}} The post-load hookup, the per-frame duration
  *   readout, and the overlay release.

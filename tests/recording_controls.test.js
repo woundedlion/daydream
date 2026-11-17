@@ -2,7 +2,9 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {fakeElement} from './helpers/fake_dom.js';
 import {fakeGui} from './helpers/fake_gui.js';
+import {fakeScheduler} from './helpers/fake_timers.js';
 import {createRecordingControls} from '../src/recording/recording_controls.js';
+import {createApplyNotice} from '../src/ui/apply_notice.js';
 
 /**
  * A MediaRecorder stand-in as VideoRecorder presents one: a toggle that flips
@@ -31,10 +33,11 @@ function fakeRecorder(refusedAs = null, deferStart = false) {
 
 /**
  * The recording controls over fakes, with the pieces a case drives and reads.
- * @param {{labelAxes?: boolean}} [options] - Driver state the notice reads.
+ * @param {{labelAxes?: boolean, showNotice?: (message: string, gesture?: object) => void}}
+ *   [options] - Driver label state and optional notice sink.
  * @returns {Object} The controls, the attach step, and the surfaces they write.
  */
-function recordingRig({ labelAxes = false } = {}) {
+function recordingRig({ labelAxes = false, showNotice } = {}) {
   const canvasEl = fakeElement('div');
   const doc = {
     createElement: (tag) => fakeElement(tag),
@@ -54,7 +57,7 @@ function recordingRig({ labelAxes = false } = {}) {
     driver,
     getRecorder: () => recorder,
     getEffect: () => 'IslamicStars',
-    showNotice: (message) => notices.push(message),
+    showNotice: showNotice ?? ((message) => notices.push(message)),
   });
   const folder = gui.folders.find((f) => f.namespace === 'Recording');
   return {
@@ -272,6 +275,40 @@ test('recorder notices name only typed causes', () => {
   rig.button.object.record();
   recorder.onError(new DOMException('disk full', 'QuotaExceededError'));
   assert.equal(rig.notices.at(-1), 'Recording stopped: QuotaExceededError: disk full');
+});
+
+test('repeated edits to a recording setting keep the live-region text stable until expiry', () => {
+  const body = fakeElement('div');
+  body.matches = () => false;
+  const text = fakeElement('span');
+  body.append(text);
+  const timer = fakeScheduler();
+  const notice = createApplyNotice({
+    doc: {
+      getElementById: (id) => ({ 'apply-notice-body': body, 'apply-notice-text': text })[id],
+    },
+    schedule: timer.schedule,
+    cancel: timer.cancel,
+  });
+  const rig = recordingRig({ showNotice: (message, gesture) => notice.show(message, 'record', gesture) });
+  const recorder = rig.attach(fakeRecorder());
+  rig.button.object.record();
+
+  rig.settings.recQuality = 17;
+  const bitrateNotice = text.textContent;
+  assert.match(bitrateNotice, /bitrate change applies to the next recording/);
+  rig.settings.recQuality = 18;
+  assert.equal(text.textContent, bitrateNotice);
+  rig.settings.recQuality = 19;
+  assert.equal(recorder.bitrateMbps, 19);
+  assert.equal(text.textContent, bitrateNotice);
+
+  timer.fire();
+  assert.equal(text.textContent, '');
+  rig.settings.recQuality = 20;
+  assert.equal(text.textContent, bitrateNotice);
+  rig.settings.recFormat = 'MP4';
+  assert.match(text.textContent, /format change applies to the next recording/);
 });
 
 test('recording memory notices follow the selected bitrate', () => {
