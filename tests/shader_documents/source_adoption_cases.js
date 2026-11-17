@@ -1,4 +1,4 @@
-import { ownedEditors, MODULE, workbench, onChange, CHAIN_STUDY, STUDY_PATTERN_CATALOG, editorWorkbench, sampleFrequencySlider, stageEditor, savedValues } from ".././helpers/shader_document_harness.js";
+import { ownedEditors, MODULE, workbench, onChange, CHAIN_STUDY, STUDY_PATTERN_CATALOG, editorWorkbench, sampleFrequencySlider, stageEditor, savedValues } from "../helpers/shader_document_harness.js";
 import { DEFAULT_LIMITS } from "../../generated/shader/shader_workbench.mjs";
 import { mock, test } from "node:test";
 import assert from "node:assert/strict";

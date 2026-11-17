@@ -291,7 +291,6 @@ test('every served page\'s script-src is exactly its committed token list', () =
       .exec(read(page))?.[1];
     if (body) want.push(`'sha256-${createHash('sha256').update(body).digest('base64')}'`);
     assert.doesNotMatch(read(page), /<script\b[^>]*src="[^"]*vendor-importmap\.js"/);
-    assert.ok(want, `${page} has no committed script-src token list`);
     const tokens = directive(cspOf(page), 'script-src');
     assert.ok(tokens, `${page} CSP declares no script-src of its own`);
     assert.deepEqual([...tokens].sort(), [...want].sort(),

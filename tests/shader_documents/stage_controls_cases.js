@@ -1,8 +1,8 @@
-import { paramRow, SCRATCH, promotedDocument, editorWorkbench, stripChips, displayedParameter, stageEditor, savedValues } from ".././helpers/shader_document_harness.js";
+import { paramRow, SCRATCH, promotedDocument, editorWorkbench, stripChips, displayedParameter, stageEditor, savedValues } from "../helpers/shader_document_harness.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { decodeShaderStateHash } from "../../src/workbench/shader/shader_deeplink.js";
-import { ParamSetResult } from ".././helpers/fake_engine.js";
+import { ParamSetResult } from "../helpers/fake_engine.js";
 import { BAKED_MODULATION_SCALE_MAX, MODULATION_OPERATOR, PALETTE_OPERATOR, UNIT_MODULATION_AMOUNT_MAX } from "../../src/workbench/shader/chain_presentation.js";
 import { STUDY_CHAIN, optionIndex } from "./fixture.js";
 

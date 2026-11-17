@@ -1,6 +1,6 @@
-import { fakeElement } from ".././helpers/fake_dom.js";
-import { CATALOG, chipByLabel, bandFor, paramsOf } from ".././helpers/chain_strip_harness.js";
-import { STUDY_CHAIN } from ".././helpers/chain_study.js";
+import { fakeElement } from "../helpers/fake_dom.js";
+import { CATALOG, chipByLabel, bandFor, paramsOf } from "../helpers/chain_strip_harness.js";
+import { STUDY_CHAIN } from "../helpers/chain_study.js";
 
 export const PROJECT = STUDY_CHAIN.findIndex((entry) => entry.label === 'project');
 

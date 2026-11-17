@@ -1,10 +1,10 @@
-import { paramRow, SCRATCH, workbench, onChange, chooseCatalogSource, CHAIN_STUDY, KALEIDOSCOPE_STAINED_GLASS, STUDY_PATTERN_CATALOG, editorWorkbench, clickPlaneBandEntry, stripChips, sampleFrequencySlider } from ".././helpers/shader_document_harness.js";
+import { paramRow, SCRATCH, workbench, onChange, chooseCatalogSource, CHAIN_STUDY, KALEIDOSCOPE_STAINED_GLASS, STUDY_PATTERN_CATALOG, editorWorkbench, clickPlaneBandEntry, stripChips, sampleFrequencySlider } from "../helpers/shader_document_harness.js";
 import { mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { gzipSync } from "node:zlib";
 import { decodeShaderStateHash, encodeShaderStateHash } from "../../src/workbench/shader/shader_deeplink.js";
 import { SHADER_LINK_DEBOUNCE_MS, SHADER_LINK_MAX_WAIT_MS } from "../../src/workbench/shader/shader_documents.js";
-import { ParamSetResult } from ".././helpers/fake_engine.js";
+import { ParamSetResult } from "../helpers/fake_engine.js";
 import { STUDY_CHAIN } from "./fixture.js";
 
 // The scratch source is a document like any other — returning to it

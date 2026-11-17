@@ -1,4 +1,4 @@
-import { ENGINE_CATALOG, onChange, CHAIN_STUDY, editorWorkbench, clickPlaneBandEntry, stripChips, expectStageAbsent } from ".././helpers/shader_document_harness.js";
+import { ENGINE_CATALOG, onChange, CHAIN_STUDY, editorWorkbench, clickPlaneBandEntry, stripChips, expectStageAbsent } from "../helpers/shader_document_harness.js";
 import { compileShaderDocument, exportShaderDocumentJson, validateShaderDocument } from "../../generated/shader/shader_workbench.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";

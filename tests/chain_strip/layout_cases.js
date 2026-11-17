@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { scratchChainDocument } from "../../src/workbench/shader/chain_document_store.js";
-import { CATALOG, BASE, makeStrip, chips, chipByLabel, bandFor } from ".././helpers/chain_strip_harness.js";
-import { STUDY_CHAIN } from ".././helpers/chain_study.js";
+import { CATALOG, BASE, makeStrip, chips, chipByLabel, bandFor } from "../helpers/chain_strip_harness.js";
+import { STUDY_CHAIN } from "../helpers/chain_study.js";
 import { compileShaderDocument } from "../../generated/shader/shader_workbench.mjs";
 import { PROJECT, operatorName } from "./fixture.js";
 

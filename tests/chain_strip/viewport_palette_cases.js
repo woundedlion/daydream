@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fakeElement } from ".././helpers/fake_dom.js";
-import { CATALOG, BASE, makeStrip, chipByLabel, bandFor, paletteOf, paletteEntries, labels } from ".././helpers/chain_strip_harness.js";
+import { fakeElement } from "../helpers/fake_dom.js";
+import { CATALOG, BASE, makeStrip, chipByLabel, bandFor, paletteOf, paletteEntries, labels } from "../helpers/chain_strip_harness.js";
 import { PROJECT, measureNewElements, measureNewHeights } from "./fixture.js";
 
 test('pipeline arrows, wheel and background arrow keys scroll the viewport', async () => {

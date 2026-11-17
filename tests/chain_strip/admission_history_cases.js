@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { scratchChainDocument } from "../../src/workbench/shader/chain_document_store.js";
 import { deactivatedParameterIds } from "../../src/workbench/shader/chain_presentation.js";
-import { CATALOG, BASE, runFrame, makeStrip, chipByLabel, paletteOf, lastAnnounced, paramsOf, rowsOf, rowFor, controlIn } from ".././helpers/chain_strip_harness.js";
+import { CATALOG, BASE, runFrame, makeStrip, chipByLabel, paletteOf, lastAnnounced, paramsOf, rowsOf, rowFor, controlIn } from "../helpers/chain_strip_harness.js";
 
 test('syncHistory repaints Undo and Redo without rebuilding the strip', async () => {
   const h = await makeStrip();

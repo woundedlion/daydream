@@ -1,6 +1,6 @@
-import { ENGINE_CATALOG, CHAIN_STUDY } from ".././helpers/shader_document_harness.js";
+import { ENGINE_CATALOG } from "../helpers/shader_document_harness.js";
 
-export const STUDY_CHAIN = JSON.parse(CHAIN_STUDY).descriptor.chain;
+export { STUDY_CHAIN } from '../helpers/chain_study.js';
 
 /** @param {string} operator @param {string} param @param {string} option @returns {number} */
 export const optionIndex = (operator, param, option) => JSON.parse(ENGINE_CATALOG).operators

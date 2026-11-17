@@ -1,4 +1,4 @@
-import { singlePatternCatalog, paramRow, ownedEditors, ENGINE_CATALOG, SCRATCH, MODULE, promotedDocument, onChange, withoutEmbeddedModulation, CHAIN_STUDY, editorWorkbench, stageEditor, savedValues, affineLatticeStudy } from ".././helpers/shader_document_harness.js";
+import { singlePatternCatalog, paramRow, ownedEditors, ENGINE_CATALOG, SCRATCH, MODULE, promotedDocument, onChange, withoutEmbeddedModulation, CHAIN_STUDY, editorWorkbench, stageEditor, savedValues, affineLatticeStudy } from "../helpers/shader_document_harness.js";
 import { compileShaderDocument } from "../../generated/shader/shader_workbench.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -7,7 +7,7 @@ import { applyChainDocument } from "../../src/workbench/shader/chain_apply.js";
 import { callWorkbenchBinding } from "../../src/engine/workbench_bindings.js";
 import { scratchChainDocument } from "../../src/workbench/shader/chain_document_store.js";
 import { CHAIN_SNAPSHOT_SCHEMA_VERSION, decodeShaderStateHash, encodeShaderStateHash } from "../../src/workbench/shader/shader_deeplink.js";
-import { FakeChainEngine, ParamSetResult, ChainSnapshotRestoreResult } from ".././helpers/fake_engine.js";
+import { FakeChainEngine, ParamSetResult, ChainSnapshotRestoreResult } from "../helpers/fake_engine.js";
 
 test('a chain snapshot restores its program and accepted parameters into the editor', async () => {
   const engine = new FakeChainEngine();

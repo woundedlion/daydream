@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { scratchChainDocument } from "../../src/workbench/shader/chain_document_store.js";
 import { formatNumericValue } from "../../src/workbench/shader/chain_presentation.js";
-import { CATALOG, BASE, runFrame, makeStrip, chipByLabel, bandFor, paletteEntries, lastAnnounced, labels, paramsOf, rowsOf, rowFor, controlIn, declarationsFor } from ".././helpers/chain_strip_harness.js";
-import { withPreset } from ".././helpers/chain_study.js";
+import { CATALOG, BASE, runFrame, makeStrip, chipByLabel, bandFor, paletteEntries, lastAnnounced, labels, paramsOf, rowsOf, rowFor, controlIn, declarationsFor } from "../helpers/chain_strip_harness.js";
+import { withPreset } from "../helpers/chain_study.js";
 import { operatorName, renameIn } from "./fixture.js";
 
 // ── Inline stage parameters ─────────────────────────────────────────────────

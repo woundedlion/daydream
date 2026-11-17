@@ -1,10 +1,10 @@
-import { singlePatternCatalog, ENGINE_CATALOG, SCRATCH, onChange, CHAIN_STUDY, KALEIDOSCOPE_STAINED_GLASS, STUDY_PATTERN_CATALOG, editorWorkbench, clickPlaneBandEntry, stripChips, displayedParameter, stageEditor, savedValues } from ".././helpers/shader_document_harness.js";
+import { singlePatternCatalog, ENGINE_CATALOG, SCRATCH, onChange, CHAIN_STUDY, KALEIDOSCOPE_STAINED_GLASS, STUDY_PATTERN_CATALOG, editorWorkbench, clickPlaneBandEntry, stripChips, displayedParameter, stageEditor, savedValues } from "../helpers/shader_document_harness.js";
 import { canonicalEffectId } from "../../src/effects/effect_identity.js";
 import { engineControlNames, compileShaderDocument } from "../../generated/shader/shader_workbench.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { scratchChainDocument } from "../../src/workbench/shader/chain_document_store.js";
-import { ParamSetResult } from ".././helpers/fake_engine.js";
+import { ParamSetResult } from "../helpers/fake_engine.js";
 import { STUDY_CHAIN } from "./fixture.js";
 
 test('a dynamic document builds the strip, and edits re-apply through the engine', async () => {

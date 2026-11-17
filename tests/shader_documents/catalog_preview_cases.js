@@ -1,4 +1,4 @@
-import { primaryName, INDEX, WORKBENCH, plainName, MODULE, fixedEngine, promotedDocument, PROMOTED, PATTERN_CATALOG, shaderDocument, workbenchEngine, patternFetch, workbench, onChange, SCRATCH_WRITES, chooseCatalogSource, KALEIDOSCOPE_STAINED_GLASS, compiledBuildEngine, editorWorkbench, stageEditor } from ".././helpers/shader_document_harness.js";
+import { primaryName, INDEX, WORKBENCH, plainName, MODULE, fixedEngine, promotedDocument, PROMOTED, PATTERN_CATALOG, shaderDocument, workbenchEngine, patternFetch, workbench, onChange, SCRATCH_WRITES, chooseCatalogSource, KALEIDOSCOPE_STAINED_GLASS, compiledBuildEngine, editorWorkbench, stageEditor } from "../helpers/shader_document_harness.js";
 import { canonicalEffectId } from "../../src/effects/effect_identity.js";
 import { BAKED_CONSTANT_IDS } from "../../generated/shader/shader_workbench.mjs";
 import { test } from "node:test";
@@ -6,8 +6,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { WORKBENCH_EFFECTS } from "../../src/effects/effect_roster.js";
 import { createShaderDocumentController } from "../../src/workbench/shader/shader_documents.js";
-import { unpinnedEngineMethods } from ".././helpers/fake_engine.js";
-import { fakeElement } from ".././helpers/fake_dom.js";
+import { unpinnedEngineMethods } from "../helpers/fake_engine.js";
+import { fakeElement } from "../helpers/fake_dom.js";
 
 test('simulator exposes Shader as a standalone tool', () => {
   assert.match(INDEX, /href="tools\/shader\.html"[^>]*>Shader/);

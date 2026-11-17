@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createChainDocumentStore, scratchChainDocument } from "../../src/workbench/shader/chain_document_store.js";
 import { createChainStrip } from "../../src/workbench/shader/chain_strip.js";
-import { documentEvents, fakeElement, installDocument } from ".././helpers/fake_dom.js";
-import { CATALOG, BASE, runFrame, makeStrip, chipByLabel, bandFor, paletteEntries, lastAnnounced, labels, rowFor, controlIn } from ".././helpers/chain_strip_harness.js";
+import { documentEvents, fakeElement, installDocument } from "../helpers/fake_dom.js";
+import { CATALOG, BASE, runFrame, makeStrip, chipByLabel, bandFor, paletteEntries, lastAnnounced, labels, rowFor, controlIn } from "../helpers/chain_strip_harness.js";
 import { dragGeometry, dragPointer } from "./fixture.js";
 
 test('undo and redo revert and reapply whole edits through the same apply path', async () => {

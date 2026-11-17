@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { scratchChainDocument } from "../../src/workbench/shader/chain_document_store.js";
-import { CATALOG, makeStrip, chips, chipByLabel, bandFor, paletteOf, labels, paramsOf, rowFor, controlIn } from ".././helpers/chain_strip_harness.js";
+import { CATALOG, makeStrip, chips, chipByLabel, bandFor, paletteOf, labels, paramsOf, rowFor, controlIn } from "../helpers/chain_strip_harness.js";
 import { dragGeometry, dragPointer } from "./fixture.js";
 
 test('the Palette card keeps palette controls and Color stages own modulation controls', async () => {

@@ -1,21 +1,3 @@
-import "./helpers/shader_document_harness.js";
-import "../src/effects/effect_identity.js";
-import "../generated/shader/shader_workbench.mjs";
-import "node:test";
-import "node:assert/strict";
-import "node:fs";
-import "node:zlib";
-import "../src/app/daydream.js";
-import "../src/effects/effect_roster.js";
-import "../src/workbench/shader/chain_apply.js";
-import "../src/engine/workbench_bindings.js";
-import "../src/workbench/shader/chain_document_store.js";
-import "../src/workbench/shader/shader_deeplink.js";
-import "../src/workbench/shader/shader_documents.js";
-import "./helpers/fake_engine.js";
-import "./helpers/fake_dom.js";
-import "../src/workbench/shader/chain_presentation.js";
-
 import './shader_documents/catalog_preview_cases.js';
 import './shader_documents/loading_links_cases.js';
 import './shader_documents/compiled_edits_cases.js';
