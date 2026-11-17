@@ -220,3 +220,28 @@ test('a descriptor edit under the compiled build returns the preview to the inte
     'the edited chain is what renders');
   assert.match(status.textContent, /back on the interpreter/);
 });
+
+
+test('a refused compiled coupled edit restores the unchanged document preset', async () => {
+  const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
+  harness.elements.get('shader-parity-toggle').dispatch('click');
+  const engine = harness.compiledEngine;
+  engine.getParameterDefinitions().push({name: 'Modulation Mechanic',
+    options: ['hue-rotation', 'positive-lightness-lift', 'opacity']});
+  const before = savedValues(harness);
+  const selectionCount = engine.selected.length;
+  const write = engine.setParameter;
+  let refused = false;
+  engine.setParameter = (name, value) => {
+    if (!refused && name.includes('Modulation Amount')) {
+      refused = true;
+      return ParamSetResult.UNKNOWN_PARAM;
+    }
+    return write(name, value);
+  };
+  stageEditor(harness, 'modulation')('modulation.modulation-mechanic', 'opacity');
+  assert.equal(refused, true);
+  assert.equal(engine.selected.length, selectionCount + 1);
+  assert.match(harness.elements.get('shader-document-status').textContent, /was refused/);
+  assert.deepEqual(savedValues(harness), before);
+});

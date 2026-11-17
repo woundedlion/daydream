@@ -240,10 +240,10 @@ function stageEditValues(parameterId, value, descriptor, presetValues) {
 export function createShaderStageEditor({state, linkWriter, parameterLive, getEngine, getModule,
   getAnimationsPaused, engineControlName, restoreAnimationsPaused, invalidate, announce,
   syncParity, applyPreset, showParityDropStatus, showPreviewStatus, status, markHalted, showError}) {
-  /** @param {{parameterId: string, value: *, values: Record<string, *>, presetValues: Readonly<Record<string, *>>, descriptor: *, compiledSide: boolean, addsDeclaration: boolean, coupled: boolean}} edit
+  /** @param {{parameterId: string, value: *, values: Record<string, *>, presetValues: Readonly<Record<string, *>>, descriptor: *, compiledSide: boolean, addsDeclaration: boolean, coupled: boolean, onCompiledWrites: () => void}} edit
    * @returns {import('./chain_document_store.js').EditResult} */
   const admitStageValues = ({parameterId, value, values, presetValues, descriptor,
-    compiledSide, addsDeclaration, coupled}) => {
+    compiledSide, addsDeclaration, coupled, onCompiledWrites}) => {
     if (addsDeclaration && compiledSide) return { ok: true };
     const engine = getEngine();
     const module = getModule();
@@ -268,8 +268,12 @@ export function createShaderStageEditor({state, linkWriter, parameterLive, getEn
             return Boolean(binding && !liveDerivedControl(id, control, definitions, binding,
               descriptor, state.operatorCatalog));
           });
-        refusal = resolved.refusal ?? performEngineWrites(engine, module, resolved.writes)
-              ?? performDocumentWrites(engine, module, resolved.documentWrites);
+        refusal = resolved.refusal;
+        if (refusal === null) {
+          onCompiledWrites();
+          refusal = performEngineWrites(engine, module, resolved.writes)
+            ?? performDocumentWrites(engine, module, resolved.documentWrites);
+        }
       } else if (control.name !== null) {
         const write = resolveParameterWrite(definitions, control.name, value);
         refusal = typeof write === 'string' ? write : performEngineWrites(engine, module, [write]);
@@ -303,10 +307,14 @@ export function createShaderStageEditor({state, linkWriter, parameterLive, getEn
       const values = stageEditValues(parameterId, value, descriptor, presetValues);
       const addsDeclaration = Object.keys(values).some(id => !store.declares(id));
       const coupled = Object.keys(values).length > 1;
+      let compiledWritesStarted = false;
       const result = store.setPresetValues(presetId, values, () => admitStageValues({parameterId, value, values, presetValues, descriptor,
-        compiledSide, addsDeclaration, coupled}));
+        compiledSide, addsDeclaration, coupled,
+        onCompiledWrites: () => { compiledWritesStarted = true; }}));
       if (!result.ok) {
         const diagnostic = result.diagnostics[0];
+        if (compiledSide && compiledWritesStarted && diagnostic.code === 'ENGINE_REFUSAL')
+          applyPreset(presetId);
         announce(diagnostic.code === 'ENGINE_REFUSAL' ? diagnostic.message
           : `"${parameterId}" was refused: ${diagnostic.message}`);
         return false;
