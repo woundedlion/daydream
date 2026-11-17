@@ -13,8 +13,7 @@ export const operatorName = (label) => CATALOG.operators.find((operator) =>
  * @param {Object} h - A strip harness.
  * @param {number} width - Width every created element reports.
  * @returns {void}
- * @details Written as the box metrics the fake derives its whole rect from, so
- *   a measurement the module starts taking is answered rather than undefined.
+ * @details The fake's getBoundingClientRect derives its width from offsetWidth.
  */
 export const measureNewElements = (h, width) => {
   h.doc.documentElement = { clientWidth: 1280 };
@@ -33,9 +32,9 @@ export const measureNewElements = (h, width) => {
  * @returns {void}
  */
 export const measureNewHeights = (h, height) => {
+  const createElement = h.doc.createElement;
   h.doc.createElement = (/** @type {string} */ tag) => {
-    const node = fakeElement(tag);
-    node.offsetWidth = 208;
+    const node = createElement.call(h.doc, tag);
     Object.defineProperty(node, 'offsetHeight', {
       get: () => Math.min(height, Number.parseFloat(node.style.maxHeight) || height),
     });

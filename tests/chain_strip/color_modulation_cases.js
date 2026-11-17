@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { withPreset } from "../helpers/chain_study.js";
 import assert from "node:assert/strict";
 import { scratchChainDocument } from "../../src/workbench/shader/chain_document_store.js";
 import { CATALOG, makeStrip, chips, chipByLabel, bandFor, paletteOf, labels, paramsOf, rowFor, controlIn } from "../helpers/chain_strip_harness.js";
@@ -147,10 +148,7 @@ test('modulation strength follows the selected mechanic range', async () => {
 });
 
 test('the Color container adds, reorders, and removes modulation stages with undo', async () => {
-  const source = scratchChainDocument(CATALOG);
-  source.preset_bank.presets.push({...structuredClone(source.preset_bank.presets[0]), preset_id: 'second'});
-  source.preset_bank.choreography.generated_order.push('second');
-  source.preset_bank.choreography.dwell.second = 600;
+  const source = withPreset(scratchChainDocument(CATALOG), 'second');
   const h = await makeStrip({source});
   const stages = () => bandFor(h, 'color').querySelectorAll('.chain-chip');
   const add = () => {

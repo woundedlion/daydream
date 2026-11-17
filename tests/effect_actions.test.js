@@ -1,7 +1,7 @@
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakePanelGui } from './helpers/fake_gui.js';
-import { fakeCopyText } from './helpers/effect_gui_harness.js';
+import { exportName, fakeCopyText } from './helpers/effect_gui_harness.js';
 import {
   createEffectActions,
   EXPORT_COPIED,
@@ -11,9 +11,6 @@ import {
 } from '../src/ui/effect_actions.js';
 
 afterEach(() => { mock.timers.reset(); });
-
-/** @param {Object} ctrl @returns {string|null} The Export button's accessible name. */
-const exportName = (ctrl) => ctrl.$button.getAttribute('aria-label');
 
 /**
  * The action row over a fake GUI and fake deps.

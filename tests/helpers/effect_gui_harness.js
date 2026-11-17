@@ -140,6 +140,9 @@ export function fakeCopyText(outcome = true) {
   return copyText;
 }
 
+/** @param {Object} ctrl @returns {string|null} The Export button's accessible name. */
+export const exportName = (ctrl) => ctrl.$button.getAttribute('aria-label');
+
 /**
  * The live region the action row announces an Export outcome through.
  * @param {Object} h - A built harness.

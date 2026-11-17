@@ -1,4 +1,5 @@
-import { paramRow, SCRATCH, workbench, onChange, chooseCatalogSource, CHAIN_STUDY, KALEIDOSCOPE_STAINED_GLASS, STUDY_PATTERN_CATALOG, editorWorkbench, clickPlaneBandEntry, stripChips, sampleFrequencySlider } from "../helpers/shader_document_harness.js";
+import { paramRow, SCRATCH, workbench, onChange, chooseCatalogSource, CHAIN_STUDY, KALEIDOSCOPE_STAINED_GLASS, STUDY_PATTERN_CATALOG, editorWorkbench, clickPlaneBandEntry, stripChips, stripChip, sampleFrequencySlider } from "../helpers/shader_document_harness.js";
+import { withPreset } from "../helpers/chain_study.js";
 import { mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { gzipSync } from "node:zlib";
@@ -94,13 +95,7 @@ test('a link whose bypass the store refuses leaves the toolbar on the loaded doc
   const presets = harness.elements.get('shader-preset-select').options.map((o) => o.value);
   const programs = harness.engine.chainCalls.length;
 
-  const document = JSON.parse(CHAIN_STUDY);
-  const copy = structuredClone(document.preset_bank.presets[0]);
-  copy.preset_id = 'second';
-  document.preset_bank.presets.push(copy);
-  document.preset_bank.choreography.dwell.second =
-    document.preset_bank.choreography.dwell[document.preset_bank.presets[0].preset_id];
-  document.preset_bank.choreography.generated_order.push('second');
+  const document = withPreset(JSON.parse(CHAIN_STUDY), 'second');
 
   assert.equal(await harness.controller.loadSource(document, 'other.shader.json', null,
     { preset: 'second', bypassed: ['nosuchstage'], paused: false }), false);
@@ -193,7 +188,7 @@ test('a shader state link restores its document, preset, bypasses, and pause', a
     ([name, value]) => name === 'sample.pattern-freq' && value === 7.25));
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.instance),
     STUDY_CHAIN.map((entry) => entry.label).filter((label) => label !== 'camera'));
-  assert.equal(stripChips(harness).find((chip) => chip.dataset.label === 'camera')
+  assert.equal(stripChip(harness, 'camera')
     .querySelector('.chain-chip-bypass').getAttribute('aria-pressed'), 'true');
 });
 
@@ -217,7 +212,7 @@ test('a disabled modulation link restores a stage that its toggle can enable', a
   const hash = await encodeShaderStateHash({document, preset: preset.preset_id,
     bypassed: [], paused: false});
   const harness = await editorWorkbench({source: null, hash});
-  const chip = stripChips(harness).find((entry) => entry.dataset.label === 'modulation');
+  const chip = stripChip(harness, 'modulation');
   assert.equal(chip.classList.contains('chain-chip--bypassed'), true);
   assert.equal(chip.querySelector('.chain-modulation-enabled').getAttribute('aria-pressed'), 'true');
   chip.querySelector('.chain-modulation-enabled').dispatch('click');
@@ -225,7 +220,7 @@ test('a disabled modulation link restores a stage that its toggle can enable', a
   const restored = await decodeShaderStateHash(harness.win.location.hash);
   assert.equal(restored.document.preset_bank.presets[0].values['modulation.modulation-enabled'], 'enabled');
   assert.deepEqual(restored.bypassed, []);
-  const enabled = stripChips(harness).find((entry) => entry.dataset.label === 'modulation');
+  const enabled = stripChip(harness, 'modulation');
   assert.equal(enabled.classList.contains('chain-chip--bypassed'), false);
   assert.equal(enabled.querySelector('.chain-modulation-enabled').getAttribute('aria-pressed'), 'false');
 });
@@ -250,7 +245,7 @@ test('an oversized document clears the previous shader state hash', async () => 
 test('shader edits keep the full state hash current', async () => {
   const harness = await editorWorkbench({ source: null });
   clickPlaneBandEntry(harness, 'warp.affine.v4');
-  stripChips(harness).find((chip) => chip.dataset.label === 'rotate')
+  stripChip(harness, 'rotate')
     .querySelector('.chain-chip-bypass').dispatch('click');
   const value = paramRow(harness, 'sample', 'sample.pattern-freq')
     .querySelector('.chain-param-value');

@@ -10,6 +10,7 @@ import {
   chainSnapshotParams,
   kaleidoscopeMeltParams,
   fakeCopyText,
+  exportName,
   exportStatus,
   makeHarness,
   SPEED,
@@ -21,9 +22,6 @@ import {
 } from './helpers/effect_gui_harness.js';
 
 restoreDocumentAfterEach();
-
-/** @param {Object} ctrl @returns {string|null} The Export button's accessible name. */
-const exportName = (ctrl) => ctrl.$button.getAttribute('aria-label');
 
 // createEffectGui's Export, mount, drag latch, destroy and external-parameter
 // filter, driven over doubles for every injected collaborator.

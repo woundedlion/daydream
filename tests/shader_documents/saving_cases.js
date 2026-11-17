@@ -1,4 +1,4 @@
-import { ENGINE_CATALOG, onChange, CHAIN_STUDY, editorWorkbench, clickPlaneBandEntry, stripChips, expectStageAbsent } from "../helpers/shader_document_harness.js";
+import { ENGINE_CATALOG, onChange, CHAIN_STUDY, editorWorkbench, clickPlaneBandEntry, stripChip, expectStageAbsent } from "../helpers/shader_document_harness.js";
 import { compileShaderDocument, exportShaderDocumentJson, validateShaderDocument } from "../../generated/shader/shader_workbench.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -67,7 +67,7 @@ test('a Save As copy carries the edits made since the load', async () => {
 
 test('Save and Save As omit bypassed stages and keep them in the editor', async () => {
   const harness = await editorWorkbench();
-  const bypass = () => stripChips(harness).find((chip) => chip.dataset.label === 'lens')
+  const bypass = () => stripChip(harness, 'lens')
     .querySelector('.chain-chip-bypass').dispatch('click');
   bypass();
 
@@ -75,7 +75,7 @@ test('Save and Save As omit bypassed stages and keep them in the editor', async 
   expectStageAbsent(JSON.parse(harness.downloads.at(-1)[1]), 'lens');
   assert.equal(await harness.controller.saveAs(), true);
   expectStageAbsent(JSON.parse(harness.downloads.at(-1)[1]), 'lens');
-  assert.equal(stripChips(harness).find((chip) => chip.dataset.label === 'lens')
+  assert.equal(stripChip(harness, 'lens')
     .classList.contains('chain-chip--bypassed'), true);
 
   bypass();

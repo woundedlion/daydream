@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { scratchChainDocument } from "../../src/workbench/shader/chain_document_store.js";
 import { CATALOG, BASE, makeStrip, chips, chipByLabel, bandFor } from "../helpers/chain_strip_harness.js";
-import { STUDY_CHAIN } from "../helpers/chain_study.js";
+import { STUDY_CHAIN, withPreset } from "../helpers/chain_study.js";
 import { compileShaderDocument } from "../../generated/shader/shader_workbench.mjs";
 import { PROJECT, SAMPLE, operatorName } from "./fixture.js";
 
@@ -202,12 +202,7 @@ test('each card exposes a named reset control without expanding or selecting it'
 });
 
 test('a card reset restores only the active preset and is one undoable action', async () => {
-  const source = structuredClone(BASE.document);
-  const other = structuredClone(source.preset_bank.presets[0]);
-  other.preset_id = 'other';
-  source.preset_bank.presets.push(other);
-  source.preset_bank.choreography.generated_order.push('other');
-  delete source.preset_bank.choreography.dwell;
+  const source = withPreset(structuredClone(BASE.document), 'other');
   const h = await makeStrip({ source, presetId: 'other' });
   assert.equal(h.store.setPresetValues('other', {
     'camera.wander': 0.5, 'camera.spin-speed': 0.01, 'lens.symmetry': 'tetrahedral',

@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {scratchChainDocument} from '../src/workbench/shader/chain_document_store.js';
 import {POTENTIAL_PARAMETER_GROUPS} from '../src/workbench/shader/chain_presentation.js';
-import {CATALOG, BASE, makeStrip, paramsOf, rowFor, controlIn, chipByLabel, runFrame} from './helpers/chain_strip_harness.js';
+import {CATALOG, makeStrip, paramsOf, rowFor, controlIn, chipByLabel, runFrame} from './helpers/chain_strip_harness.js';
 
 function potentialDocument(values = {}, labels = ['potential']) {
   const source = scratchChainDocument(CATALOG, [
@@ -177,26 +177,6 @@ test('Potential Lens section choices belong to each operator instance', async ()
   h.strip.render();
   assert.equal(potentialFields(h, 2).hidden, false);
   assert.equal(potentialFields(h, 2, 'other').hidden, true);
-});
-
-test('enum admission metadata updates allowed choices at float32 integer boundaries', async () => {
-  const source = structuredClone(BASE.document);
-  source.preset_bank.presets[0].values['lens.symmetry'] = 'octahedral';
-  let minimum = 2.0000001;
-  let maximum = 5.0000001;
-  const h = await makeStrip({source,
-    parameterRanges: () => [{name: 'lens.symmetry', min: minimum, max: maximum}]});
-  const select = controlIn(rowFor(h, 'lens', 'lens.symmetry'));
-  assert.deepEqual(select.options.map((option) => option.disabled),
-    [true, true, false, false, false, false, true, true, true]);
-  assert.equal(select.value, 'octahedral');
-  minimum = 1;
-  maximum = 8;
-  h.strip.syncParameterRows();
-  assert.equal(controlIn(rowFor(h, 'lens', 'lens.symmetry')), select);
-  assert.deepEqual(select.options.map((option) => option.disabled),
-    [true, false, false, false, false, false, false, false, false]);
-  assert.deepEqual(h.edits, []);
 });
 
 test('Potential Lens prevents invalid Degree and Order selections without changing sibling values', async () => {

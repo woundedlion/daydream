@@ -482,6 +482,26 @@ test('an enum renders its declared values and edits by option id', async () => {
     'the document stores the option id, never an index');
 });
 
+test('enum admission metadata updates allowed choices at float32 integer boundaries', async () => {
+  const source = structuredClone(BASE.document);
+  source.preset_bank.presets[0].values['lens.symmetry'] = 'octahedral';
+  let minimum = 2.0000001;
+  let maximum = 5.0000001;
+  const h = await makeStrip({source,
+    parameterRanges: () => [{name: 'lens.symmetry', min: minimum, max: maximum}]});
+  const select = controlIn(rowFor(h, 'lens', 'lens.symmetry'));
+  assert.deepEqual(select.options.map((option) => option.disabled),
+    [true, true, false, false, false, false, true, true, true]);
+  assert.equal(select.value, 'octahedral');
+  minimum = 1;
+  maximum = 8;
+  h.strip.syncParameterRows();
+  assert.equal(controlIn(rowFor(h, 'lens', 'lens.symmetry')), select);
+  assert.deepEqual(select.options.map((option) => option.disabled),
+    [true, false, false, false, false, false, false, false, false]);
+  assert.deepEqual(h.edits, []);
+});
+
 // The page writes every inline edit under the control's coalesce key so a
 // slider drag undoes whole; a discrete control's change is a whole gesture.
 test('a chosen option and an entered value each close the coalesced value run', async () => {

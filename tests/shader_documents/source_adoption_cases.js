@@ -1,4 +1,4 @@
-import { ownedEditors, MODULE, workbench, onChange, CHAIN_STUDY, STUDY_PATTERN_CATALOG, editorWorkbench, sampleFrequencySlider, stageEditor, savedValues } from "../helpers/shader_document_harness.js";
+import { ownedEditors, MODULE, workbench, onChange, CHAIN_STUDY, STUDY_PATTERN_CATALOG, editorWorkbench, stripChips, paramControl, sampleFrequencySlider, stageEditor, savedValues } from "../helpers/shader_document_harness.js";
 import { DEFAULT_LIMITS } from "../../generated/shader/shader_workbench.mjs";
 import { mock, test } from "node:test";
 import assert from "node:assert/strict";
@@ -93,7 +93,7 @@ test('disposing a document controller flushes edits and releases its whole UI', 
     assert.equal(linked.document.preset_bank.presets[0].values['sample.pattern-freq'], 8);
     for (const [id, type] of events)
       assert.equal(harness.elements.get(id).listeners.filter((entry) => entry.type === type).length, 0, id);
-    assert.equal(harness.elements.get('chain-strip').querySelectorAll('.chain-chip').length, 0);
+    assert.equal(stripChips(harness).length, 0);
     assert.equal(harness.elements.get('chain-strip').children[0].listeners.length, 0);
     assert.equal(harness.filters.at(-1), null);
     lateAnimation();
@@ -172,9 +172,7 @@ test('a refused interpreter re-apply keeps the error after parity drops', async 
 
 test('a compiled slider declaration keeps its control through release and explains the parity drop', async () => {
   const harness = await editorWorkbench({patternCatalog: STUDY_PATTERN_CATALOG});
-  const mount = harness.elements.get('chain-strip');
-  const sliderFor = () => mount.querySelectorAll('.chain-param')
-    .find((row) => row.dataset.parameter === 'sample.edge-width').querySelector('.chain-param-control');
+  const sliderFor = () => paramControl(harness, 'sample', 'sample.edge-width');
   harness.elements.get('shader-parity-toggle').dispatch('click');
   const slider = sliderFor();
   for (const value of [0.25, 0.3]) {

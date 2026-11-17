@@ -4,7 +4,7 @@ import {
   createCommitQueue, createChainValidator, createOpGate, applyOp, savedChainShapeError,
   MAX_RECIPE_STEPS, meshOpFailure, requireMeshResult, unsweepableReason,
 } from '../src/workbench/solids/solid_validation.js';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createSolidsPage, initializeSolidsState } from '../src/workbench/solids/solids_state.js';
 import { installDocument, stashGlobals } from './helpers/fake_dom.js';
 import { fakeModule, stubMesh } from './helpers/fake_meshops.js';
@@ -84,9 +84,11 @@ test('a chain change during a probe frees the stale standing mesh before the nex
   assert.equal(state.cleared, 2);
 });
 
-const SOLIDS_GATES = ['solids_ops_controller.js', 'solids_saved_controller.js',
-  'solids_base_picker.js', 'solids_row_drag.js'].map((file) =>
-  readFileSync(new URL(`../src/workbench/solids/${file}`, import.meta.url), 'utf8')).join('\n');
+const SOLIDS_MODULE_DIR = new URL('../src/workbench/solids/', import.meta.url);
+const SOLIDS_GATES = readdirSync(SOLIDS_MODULE_DIR)
+  .filter((file) => /^solids_.*\.js$/.test(file))
+  .sort()
+  .map((file) => readFileSync(new URL(file, SOLIDS_MODULE_DIR), 'utf8')).join('\n');
 const CANDIDATES = ['kis', 'ambo', 'dual'];
 
 /** Verifies queued commits run one at a time, in order, each seeing its predecessor's writes. */

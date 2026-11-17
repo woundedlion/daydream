@@ -1,4 +1,4 @@
-import { paramRow, SCRATCH, promotedDocument, editorWorkbench, stripChips, displayedParameter, stageEditor, savedValues } from "../helpers/shader_document_harness.js";
+import { SCRATCH, promotedDocument, editorWorkbench, stripBand, stripChip, paramControl, displayedParameter, stageEditor, savedValues } from "../helpers/shader_document_harness.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { decodeShaderStateHash } from "../../src/workbench/shader/shader_deeplink.js";
@@ -8,12 +8,12 @@ import { STUDY_CHAIN, optionIndex } from "./fixture.js";
 
 test('each stage renders only its own rows and the source function is directly selectable', async () => {
   const harness = await editorWorkbench();
-  const lens = stripChips(harness).find((chip) => chip.dataset.label === 'lens');
+  const lens = stripChip(harness, 'lens');
   const lensRows = lens.querySelectorAll('.chain-param').map((row) => row.dataset.parameter);
   assert.ok(lensRows.length > 0, 'the lens chip carries its rows');
   assert.ok(lensRows.every((id) => id.startsWith('lens.')));
 
-  const source = stripChips(harness).find((chip) => chip.dataset.label === 'sample');
+  const source = stripChip(harness, 'sample');
   const select = source.querySelector('.chain-chip-replace');
   assert.equal(select.getAttribute('aria-label'), 'Source function');
   assert.equal(select.options.every((option) => option.value.startsWith('sample.')), true);
@@ -26,8 +26,7 @@ test('each stage renders only its own rows and the source function is directly s
 
 test('an add menu omits stages that are invalid at its gap', async () => {
   const harness = await editorWorkbench();
-  const plane = harness.elements.get('chain-strip').querySelectorAll('.chain-band')
-    .find((band) => band.dataset.carrier === 'plane');
+  const plane = stripBand(harness, 'plane');
   plane.querySelector('.chain-band-add').dispatch('click');
   const entries = harness.elements.get('chain-strip')
     .querySelectorAll('.chain-palette-entry');
@@ -41,7 +40,7 @@ test('an add menu omits stages that are invalid at its gap', async () => {
 test('a bypass reshapes the engine program and skips the bypassed parameters', async () => {
   const harness = await editorWorkbench();
   const writesBefore = harness.engine.writes.length;
-  stripChips(harness).find((chip) => chip.dataset.label === 'lens')
+  stripChip(harness, 'lens')
     .querySelector('.chain-chip-bypass').dispatch('click');
 
   const shape = harness.engine.chainCalls.at(-1);
@@ -62,7 +61,7 @@ test('a card reset applies defaults to the preview, Save and link with one undo'
   const original = SCRATCH.preset_bank.presets[0].values;
   harness.elements.get('shader-animation-toggle').dispatch('click');
   const mark = harness.engine.writes.length;
-  stripChips(harness).find((chip) => chip.dataset.label === 'sample')
+  stripChip(harness, 'sample')
     .querySelector('.chain-chip-reset').dispatch('click');
   const after = savedValues(harness);
   for (const [id, value] of Object.entries(original)) {
@@ -92,9 +91,9 @@ test('Grid Space switches modulation source and sampling atomically with one und
   };
   harness.engine.setParameter = () => ParamSetResult.INADMISSIBLE;
   const edit = stageEditor(harness, 'modulation');
-  const chip = stripChips(harness).find((chip) => chip.dataset.label === 'modulation');
+  const chip = stripChip(harness, 'modulation');
   edit('modulation.modulation-source', 'sphere-interference');
-  assert.ok(stripChips(harness).find((chip) => chip.dataset.label === 'modulation') === chip,
+  assert.ok(stripChip(harness, 'modulation') === chip,
     'the active Color stage stays mounted');
   assert.deepEqual(batches, [[
     { name: 'modulation.modulation-source',
@@ -105,10 +104,7 @@ test('Grid Space switches modulation source and sampling atomically with one und
   const values = savedValues(harness);
   assert.equal(values['modulation.modulation-source'], 'sphere-interference');
   assert.equal(values['modulation.modulation-evaluation'], 'direct');
-  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'modulation')
-    .querySelectorAll('.chain-param');
-  assert.equal(colorRows.find((row) => row.dataset.parameter === 'modulation.modulation-evaluation')
-    .querySelector('.chain-param-control').value, 'direct');
+  assert.equal(paramControl(harness, 'modulation', 'modulation.modulation-evaluation').value, 'direct');
   await harness.controller.flushDeepLink();
   const linked = await decodeShaderStateHash(harness.win.location.hash);
   assert.equal(linked.document.preset_bank.presets[0].values['modulation.modulation-source'],
@@ -124,11 +120,9 @@ test('a refused modulation source batch preserves both fields and the visible No
   stageEditor(harness, 'modulation')('modulation.modulation-source', 'sphere-interference');
   assert.match(harness.elements.get('shader-document-status').textContent, /INADMISSIBLE/);
   assert.deepEqual(savedValues(harness), original);
-  const colorRows = stripChips(harness).find((chip) => chip.dataset.label === 'modulation')
-    .querySelectorAll('.chain-param');
-  assert.equal(colorRows.find((row) => row.dataset.parameter === 'modulation.modulation-source')
-    .querySelector('.chain-param-control').value, original['modulation.modulation-source']);
-  const groups = stripChips(harness).find((chip) => chip.dataset.label === 'modulation')
+  assert.equal(paramControl(harness, 'modulation', 'modulation.modulation-source').value,
+    original['modulation.modulation-source']);
+  const groups = stripChip(harness, 'modulation')
     .querySelectorAll('.chain-param-group');
   assert.equal(groups.filter((group) => group.getAttribute('aria-label') === 'Noise').at(-1).hidden, false);
   assert.equal(groups.find((group) => group.getAttribute('aria-label') === 'Interference · wave A').hidden, true);
@@ -254,8 +248,7 @@ test('chip ranges remain fixed during edits and refresh on commit and undo', asy
       {name: 'sample.pattern-freq', min: 1, max: maximum},
     ];
   }});
-  const currentSlider = () => paramRow(harness, 'sample', 'sample.pattern-freq')
-    .querySelector('.chain-param-control');
+  const currentSlider = () => paramControl(harness, 'sample', 'sample.pattern-freq');
   assert.equal(Number(currentSlider().max), 6);
   const edit = stageEditor(harness, 'sample');
   const slider = currentSlider();
@@ -269,8 +262,7 @@ test('chip ranges remain fixed during edits and refresh on commit and undo', asy
   edit('sample.pattern-freq', 10);
   assert.equal(savedValues(harness)['sample.pattern-freq'], 10);
   harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
-  const restored = paramRow(harness, 'sample', 'sample.pattern-freq')
-    .querySelector('.chain-param-control');
+  const restored = paramControl(harness, 'sample', 'sample.pattern-freq');
   assert.equal(Number(restored.max), 12);
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
 });

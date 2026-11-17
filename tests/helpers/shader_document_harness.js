@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 
 import { scratchChainDocument } from '../../src/workbench/shader/chain_document_store.js';
 import { chainStudyDocument, withPreset } from './chain_study.js';
+import * as queries from './chain_strip_queries.js';
 
 import {applyFixedShaderDocument, createShaderDocumentController} from '../../src/workbench/shader/shader_documents.js';
 import {FakeChainEngine, ParamSetResult, ChainSnapshotRestoreResult} from './fake_engine.js';
@@ -481,27 +482,27 @@ async function editorWorkbench({
  * @returns {void}
  */
 function clickPlaneBandEntry(harness, operatorId) {
-  const mount = harness.elements.get('chain-strip');
-  mount.querySelectorAll('.chain-band')
-    .find((band) => band.dataset.carrier === 'plane')
-    .querySelector('.chain-band-add').dispatch('click');
+  const mount = stripRoot(harness);
+  queries.bandFor(mount, 'plane').querySelector('.chain-band-add').dispatch('click');
   mount.querySelectorAll('.chain-palette-entry')
     .find((entry) => entry.dataset.operator === operatorId)
     .dispatch('click');
 }
 
-const stripChips = (harness) =>
-  harness.elements.get('chain-strip').querySelectorAll('.chain-chip');
-
-export const paramRow = (harness, label, parameterId) => stripChips(harness)
-  .find(chip => chip.dataset.label === label).querySelectorAll('.chain-param')
-  .find(row => row.dataset.parameter === parameterId);
+const stripRoot = (harness) => harness.elements.get('chain-strip');
+const stripChips = (harness) => queries.chips(stripRoot(harness));
+export const stripChip = (harness, label) => queries.chipByLabel(stripRoot(harness), label);
+export const stripBand = (harness, carrier) => queries.bandFor(stripRoot(harness), carrier);
+export const paramRow = (harness, label, parameterId) =>
+  queries.rowFor(stripRoot(harness), label, parameterId);
+export const paramControl = (harness, label, parameterId) =>
+  queries.controlIn(paramRow(harness, label, parameterId));
 
 const displayedParameter = (harness, label, parameterId) =>
   paramRow(harness, label, parameterId).querySelector('.chain-param-value').value;
 
 const sampleFrequencySlider = harness =>
-  paramRow(harness, 'sample', 'sample.pattern-freq').querySelector('.chain-param-control');
+  paramControl(harness, 'sample', 'sample.pattern-freq');
 
 /** @param {*} document @param {string} label */
 const expectStageAbsent = (document, label) => {
@@ -523,10 +524,10 @@ const expectStageAbsent = (document, label) => {
  * @returns {(parameterId: string, value: *) => void} The control writer.
  */
 function stageEditor(harness, label) {
-  stripChips(harness).find((chip) => chip.dataset.label === label).dispatch('click');
+  stripChip(harness, label).dispatch('click');
   return (parameterId, value) => {
     const row = paramRow(harness, label, parameterId);
-    const control = row.querySelector('.chain-param-control');
+    const control = queries.controlIn(row);
     const readout = row.querySelector('.chain-param-value');
     control.value = String(control.type === 'range' && control.min !== readout.min
       ? Math.log2(Number(value)) : value);

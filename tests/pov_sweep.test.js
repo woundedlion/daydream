@@ -56,7 +56,7 @@ test('visual response matches independent quadrature of the sustained gamma dens
         for (const fraction of [0, 0.375, 0.8125]) {
           const expected = new Float64Array(48);
           const now = (epoch + fraction) * frameMs;
-          const tau = 4.94 * scale;
+          const tau = PovSweep.RESPONSE_TAU_MS * scale;
           for (let past = 0; past <= epoch; past++) {
             for (let column = 0; column < 4; column++) {
               const start = Math.max(past + column / 4, 0.375) * frameMs;
@@ -89,7 +89,8 @@ test('visual response matches independent quadrature of the sustained gamma dens
 });
 
 test('visual response preserves periodic mean and the gamma frequency gain and phase', () => {
-  const sweep = new PovSweep(8, 2, frame(10000));
+  const frameMs = 62.5;
+  const sweep = new PovSweep(8, 2, frame(10000), 0, frameMs);
   for (let i = 0; i < 10; i++) sweep.beginFrame(frame(10000));
   for (const scale of [0.5, 1, 2]) {
     const samples = 2048;
@@ -104,7 +105,7 @@ test('visual response preserves periodic mean and the gamma frequency gain and p
       minimum = Math.min(minimum, value);
       maximum = Math.max(maximum, value);
     }
-    const omegaTau = 2 * Math.PI * 16 * 0.00494 * scale;
+    const omegaTau = 2 * Math.PI * PovSweep.RESPONSE_TAU_MS * scale / frameMs;
     const gain = (1 + omegaTau ** 2) ** -4.5;
     const phase = -Math.PI / 4 - 9 * Math.atan(omegaTau);
     const amplitude = 2 * Math.sin(Math.PI / 4) / (Math.PI / 4) * gain;

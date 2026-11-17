@@ -1,4 +1,4 @@
-import { singlePatternCatalog, ENGINE_CATALOG, SCRATCH, onChange, CHAIN_STUDY, KALEIDOSCOPE_STAINED_GLASS, STUDY_PATTERN_CATALOG, editorWorkbench, clickPlaneBandEntry, stripChips, displayedParameter, stageEditor, savedValues } from "../helpers/shader_document_harness.js";
+import { singlePatternCatalog, ENGINE_CATALOG, SCRATCH, onChange, CHAIN_STUDY, KALEIDOSCOPE_STAINED_GLASS, STUDY_PATTERN_CATALOG, editorWorkbench, clickPlaneBandEntry, stripChips, stripChip, paramControl, displayedParameter, stageEditor, savedValues } from "../helpers/shader_document_harness.js";
 import { canonicalEffectId } from "../../src/effects/effect_identity.js";
 import { engineControlNames, compileShaderDocument } from "../../generated/shader/shader_workbench.mjs";
 import { test } from "node:test";
@@ -92,7 +92,7 @@ test('the parity toggle disarms on a descriptor edit, not on a bypass', async ()
   assert.deepEqual(harness.selections, [canonicalEffectId('shader-chain'), canonicalEffectId('shader-chain')],
     'a shipped pattern still previews through the interpreter');
 
-  stripChips(harness).find((chip) => chip.dataset.label === 'lens')
+  stripChip(harness, 'lens')
     .querySelector('.chain-chip-bypass').dispatch('click');
   assert.equal(toggle.disabled, false);
 
@@ -106,7 +106,7 @@ test('the parity toggle disarms on a descriptor edit, not on a bypass', async ()
 
 test('compiled stage edits reach stages bypassed in the interpreter', async () => {
   const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
-  stripChips(harness).find((chip) => chip.dataset.label === 'warp2')
+  stripChip(harness, 'warp2')
     .querySelector('.chain-chip-bypass').dispatch('click');
   harness.elements.get('shader-parity-toggle').dispatch('click');
   harness.compiledEngine.writes.length = 0;
@@ -180,9 +180,7 @@ test('compiled stage rows share one document-definition read and refresh it afte
   harness.elements.get('shader-parity-toggle').dispatch('click');
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
   assert.ok(reads <= 3, `parity render and preset used ${reads} document-definition reads`);
-  const control = () => stripChips(harness).find((chip) => chip.dataset.label === 'modulation')
-    .querySelectorAll('.chain-param').find((row) => row.dataset.parameter === parameterId)
-    .querySelector('.chain-param-control');
+  const control = () => paramControl(harness, 'modulation', parameterId);
   assert.equal(control().disabled, false);
 
   const write = engine.setParameter;

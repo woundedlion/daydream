@@ -1,4 +1,4 @@
-import { singlePatternCatalog, paramRow, ownedEditors, ENGINE_CATALOG, SCRATCH, MODULE, promotedDocument, onChange, withoutEmbeddedModulation, CHAIN_STUDY, editorWorkbench, stageEditor, savedValues, affineLatticeStudy } from "../helpers/shader_document_harness.js";
+import { singlePatternCatalog, paramRow, ownedEditors, ENGINE_CATALOG, SCRATCH, MODULE, promotedDocument, onChange, withoutEmbeddedModulation, CHAIN_STUDY, editorWorkbench, displayedParameter, stageEditor, savedValues, affineLatticeStudy } from "../helpers/shader_document_harness.js";
 import { compileShaderDocument } from "../../generated/shader/shader_workbench.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -217,10 +217,8 @@ test('compiled lattice edits keep the authored fallback period and reapply', asy
   const values = savedValues(harness);
   assert.equal(Math.fround(values['sample.cell-scale']), Math.fround(3.1));
   assert.equal(values['warp1.lattice-period'], original['warp1.lattice-period']);
-  const period = harness.elements.get('chain-strip').querySelectorAll('.chain-param')
-    .find((row) => row.dataset.parameter === 'warp1.lattice-period')
-    .querySelector('.chain-param-value');
-  assert.equal(Math.fround(Number(period.value)), values['warp1.lattice-period']);
+  const period = displayedParameter(harness, 'warp1', 'warp1.lattice-period');
+  assert.equal(Math.fround(Number(period)), values['warp1.lattice-period']);
   await onChange(harness.elements.get('shader-preset-select'))();
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
   harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');

@@ -5,6 +5,7 @@ import {createChainDocumentStore} from '../../src/workbench/shader/chain_documen
 import {createChainStrip} from '../../src/workbench/shader/chain_strip.js';
 import {compileShaderDocument} from '../../generated/shader/shader_workbench.mjs';
 import {chainStudyDocument} from './chain_study.js';
+import * as queries from './chain_strip_queries.js';
 import {documentEvents, fakeElement, installAnimationFrames, installDocument, restoreDocumentAfterEach} from './fake_dom.js';
 
 const CATALOG = JSON.parse(readFileSync(
@@ -76,26 +77,22 @@ async function makeStrip({
   };
 }
 
-const chips = (h) => h.container.querySelectorAll('.chain-chip');
-const chipByLabel = (h, label) =>
-  chips(h).find((chip) => chip.dataset.label === label);
-const bandFor = (h, carrier) => h.container.querySelectorAll('.chain-band')
-  .find((band) => band.dataset.carrier === carrier);
+const chips = (h) => queries.chips(h.container);
+const chipByLabel = (h, label) => queries.chipByLabel(h.container, label);
+const bandFor = (h, carrier) => queries.bandFor(h.container, carrier);
 const paletteOf = (h) => h.container.querySelector('.chain-palette');
 const paletteEntries = (h) => h.container.querySelectorAll('.chain-palette-entry');
 const lastAnnounced = (h) => h.announced.at(-1) ?? '';
 const labels = (h) => h.store.chain().map((entry) => entry.label);
 
-const paramsOf = (h, label) =>
-  chipByLabel(h, label).querySelector('.chain-chip-params');
-const rowsOf = (h, label) => paramsOf(h, label).querySelectorAll('.chain-param');
-const rowFor = (h, label, parameterId) =>
-  rowsOf(h, label).find((row) => row.dataset.parameter === parameterId);
-const controlIn = (row) => row.querySelector('.chain-param-control');
+const paramsOf = (h, label) => queries.paramsOf(h.container, label);
+const rowsOf = (h, label) => queries.rowsOf(h.container, label);
+const rowFor = (h, label, parameterId) => queries.rowFor(h.container, label, parameterId);
 const declarationsFor = (h, label) => h.store.document().descriptor.parameters
   .filter((parameter) => parameter.id.startsWith(`${label}.`));
 
 export {
   CATALOG, BASE, runFrame, makeStrip, chips, chipByLabel, bandFor, paletteOf, paletteEntries,
-  lastAnnounced, labels, paramsOf, rowsOf, rowFor, controlIn, declarationsFor,
+  lastAnnounced, labels, paramsOf, rowsOf, rowFor, declarationsFor,
 };
+export {controlIn} from './chain_strip_queries.js';
