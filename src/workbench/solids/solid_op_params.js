@@ -139,8 +139,8 @@ export function authoredParamRange(def, value) {
  */
 export function snapToStep(value, def) {
   const snapped = def.min + Math.round((value - def.min) / def.step) * def.step;
-  const decimals = Math.max(0, ...[def.min, def.step].map((value) => {
-    const [fraction, exponent = '0'] = String(value).toLowerCase().split('e');
+  const decimals = Math.max(0, ...[def.min, def.step].map((bound) => {
+    const [fraction, exponent = '0'] = String(bound).toLowerCase().split('e');
     return (fraction.split('.')[1]?.length ?? 0) - Number(exponent);
   }));
   return Math.min(def.max, Math.max(def.min, Number(snapped.toFixed(Math.min(100, decimals)))));
