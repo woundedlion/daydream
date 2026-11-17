@@ -95,7 +95,11 @@
                 </div>
                 <canvas id="canvas" tabindex="0" role="application"
                     aria-keyshortcuts="Space ArrowLeft ArrowRight ArrowUp ArrowDown Plus - Shift+ArrowRight"
-                    aria-label="Real-time 3D simulation of the LED sphere. Double-click to reset the view orientation. When the canvas is focused, arrow keys orbit the view; plus and minus zoom. Space pauses; while paused, Right steps one frame and Shift+Right orbits; while running, Left and Right change preset when focus is outside a control."></canvas>
+                    aria-label="LED sphere simulation" aria-describedby="canvas-help"></canvas>
+                <p id="canvas-help" class="visually-hidden">Use Reset viewport to reset the view orientation.
+                    When the canvas is focused, arrow keys orbit the view; plus and minus zoom.
+                    Space pauses; while paused, Right steps one frame and Shift+Right orbits.
+                    While running, Left and Right change preset when focus is outside a control.</p>
             </div>
         </main>
         <section id="gui-container" class="gui-container" aria-label="Controls"></section>
