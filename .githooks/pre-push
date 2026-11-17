@@ -55,14 +55,29 @@ npm run lint || exit 1
 npm run typecheck || exit 1
 
 tmp=$(mktemp ./vendor-importmap.XXXXXX) || exit 1
-trap 'rm -f "$tmp"' EXIT
+pages=$(mktemp -d) || { rm -f "$tmp"; exit 1; }
+trap 'rm -f "$tmp"; rm -rf "$pages"' EXIT
 trap 'exit 130' INT TERM
-npm run importmap -- --out "$tmp" || exit 1
+mkdir -p "$pages/tools" || exit 1
+npm run importmap -- --out "$tmp" --pages-root "$pages" || exit 1
 if ! git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -- vendor-importmap.js "$tmp"; then
   echo "pre-push: vendor-importmap.js is stale; regenerate and commit it." >&2
   exit 1
 fi
+if [ ! -f "$pages/index.html" ]; then
+  echo "pre-push: import-map generation produced no index.html." >&2
+  exit 1
+fi
+for generated in "$pages/index.html" "$pages"/tools/*.html; do
+  [ -f "$generated" ] || continue
+  page=${generated#"$pages"/}
+  if ! git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -- "$page" "$generated"; then
+    echo "pre-push: $page import map or CSP is stale; regenerate and commit it." >&2
+    exit 1
+  fi
+done
 rm -f "$tmp"
+rm -rf "$pages"
 
 tmp=$(mktemp ./tailwind.XXXXXX) || exit 1
 npm run generate:tailwind -- --output "$tmp" || exit 1

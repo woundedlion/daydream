@@ -12,8 +12,26 @@ import { hookUnderTest, isolatedGitEnv, scratchDir } from './helpers/fixture_rep
 const HERE = dirname(fileURLToPath(import.meta.url));
 const { hook: HOOK, sh: SH, skip: SKIP, missing: MISSING_SH } = hookUnderTest('pre-push');
 
-const SNAPSHOT_NPM_STEPS = 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
+const IMPORTMAP_NPM_STEP = `if [ "$2" = importmap ]; then
+  shift 3
+  pages_root=
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --out) map_output=$2; shift 2 ;;
+      --pages-root) pages_root=$2; shift 2 ;;
+      *) exit 87 ;;
+    esac
+  done
+  printf 'map\\n' > "$map_output"
+  if [ -n "$pages_root" ]; then
+    printf 'page\\n' > "$pages_root/index.html"
+    printf 'page\\n' > "$pages_root/tools/shader.html"
+  fi
+fi
+`;
+const SNAPSHOT_NPM_STEPS = IMPORTMAP_NPM_STEP
   + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n';
+const MKTEMP = 'if [ "$1" = -d ]; then echo ./pages.probe; else echo ./generated.probe; fi';
 
 /** @param {string} root @param {string} name @param {string} body @returns {void} */
 function writeTool(root, name, body) {
@@ -45,7 +63,8 @@ function runWithTools(root, tools, input = '') {
   assert.ok(SH, MISSING_SH);
   const bin = join(root, 'bin');
   mkdirSync(bin, { recursive: true });
-  for (const [name, body] of Object.entries(tools)) writeTool(root, name, body);
+  for (const [name, body] of Object.entries({ mkdir: 'exit 0', ...tools }))
+    writeTool(root, name, body);
   const env = isolatedGitEnv();
   delete env.NODE_TEST_CONTEXT;
   // MSYS reads PATH as POSIX, so a drive letter would split on its colon.
@@ -67,10 +86,10 @@ function posixPath(path) {
 /**
  * Create the committed snapshot checked by the push hook.
  * @param {import('node:test').TestContext} t - Case owning the fixture.
- * @param {{marker?: boolean, suiteFailure?: boolean}} [options] - Snapshot contents.
+ * @param {{marker?: boolean, suiteFailure?: boolean, stalePage?: string}} [options] - Snapshot contents.
  * @returns {{root: string, env: NodeJS.ProcessEnv, sha: string}} Fixture state.
  */
-function snapshotFixture(t, { marker = false, suiteFailure = false } = {}) {
+function snapshotFixture(t, { marker = false, suiteFailure = false, stalePage } = {}) {
   const root = scratchDir(t, 'pre-push-hook-');
   const env = isolatedGitEnv();
   delete env.NODE_TEST_CONTEXT;
@@ -88,6 +107,8 @@ function snapshotFixture(t, { marker = false, suiteFailure = false } = {}) {
   writeFileSync(join(root, 'package-lock.json'), '{}');
   writeFileSync(join(root, 'vendor-importmap.js'), 'map\n');
   writeFileSync(join(root, 'tools/tailwind.css'), 'css\n');
+  for (const page of ['index.html', 'tools/shader.html'])
+    writeFileSync(join(root, page), page === stalePage ? 'stale-page\n' : 'page\n');
   if (marker) writeFileSync(join(root, 'marker'), 'committed\n');
   for (const name of ['ci_workflow', 'deployment_pair', 'stage_site'])
     writeFileSync(join(root, `tests/${name}.test.js`),
@@ -95,7 +116,7 @@ function snapshotFixture(t, { marker = false, suiteFailure = false } = {}) {
   const git = (...args) => execFileSync('git', ['-C', root, ...args], { env, encoding: 'utf8' });
   git('init', '-q');
   git('add', '.githooks/pre-push', 'scripts', '.gitignore', 'tests', 'package.json', 'package-lock.json',
-    'vendor-importmap.js', 'tools/tailwind.css', ...(marker ? ['marker'] : []));
+    'vendor-importmap.js', 'index.html', 'tools/shader.html', 'tools/tailwind.css', ...(marker ? ['marker'] : []));
   git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
   return { root, env, sha: git('rev-parse', 'HEAD').trim() };
 }
@@ -107,7 +128,7 @@ test('pre-push runs the source checks successfully',
       node: 'exit 0',
       npm: 'exit 0',
       git: 'exit 0',
-      mktemp: 'f=./vendor-importmap.probe\n: > "$f"\necho "$f"',
+      mktemp: MKTEMP,
       rm: 'exit 0',
     });
 
@@ -121,9 +142,9 @@ test('pre-push refuses a stale working-tree import map', { skip: SKIP }, (t) => 
   assert.ok(git, 'git must resolve inside the shell');
   const run = runWithTools(root, {
     node: 'exit 0',
-    npm: 'if [ "$2" = importmap ]; then for last; do :; done; echo fresh > "$last"; fi',
+    npm: IMPORTMAP_NPM_STEP,
     git: `exec "${git}" "$@"`,
-    mktemp: 'f=./vendor-importmap.probe\n: > "$f"\necho "$f"',
+    mktemp: MKTEMP,
     rm: 'exit 0',
   });
   assert.notEqual(run.status, 0, `${run.stdout}${run.stderr}`);
@@ -136,7 +157,7 @@ test('pre-push refuses stale Tailwind styles', { skip: SKIP }, (t) => {
     node: 'exit 0',
     npm: 'exit 0',
     git: 'for arg; do if [ "$arg" = tools/tailwind.css ]; then exit 1; fi; done',
-    mktemp: 'echo ./generated.probe',
+    mktemp: MKTEMP,
     rm: 'exit 0',
   });
   assert.notEqual(run.status, 0);
@@ -150,7 +171,7 @@ test('pre-push refuses a failing source workflow suite',
       node: 'echo unit-suite-failed >&2; exit 7',
       npm: 'exit 0',
       git: 'exit 0',
-      mktemp: 'f=./vendor-importmap.probe\n: > "$f"\necho "$f"',
+      mktemp: MKTEMP,
       rm: 'exit 0',
     });
     assert.notEqual(run.status, 0, `${run.stdout}${run.stderr}`);
@@ -164,7 +185,7 @@ for (const step of ['lint', 'typecheck', 'importmap', 'generate:tailwind']) {
       node: 'echo unexpected-unit-suite >&2; exit 0',
       npm: `if [ "$2" = ${step} ]; then echo ${step}-failed >&2; exit 7; fi`,
       git: 'exit 0',
-      mktemp: 'echo ./vendor-importmap.probe',
+      mktemp: MKTEMP,
       rm: 'exit 0',
     });
     assert.notEqual(run.status, 0);
@@ -198,9 +219,24 @@ for (const failure of ['none', 'lint', 'suite']) {
 
 }
 
+for (const page of ['index.html', 'tools/shader.html']) {
+  test(`pre-push refuses a committed stale import map in ${page}`, { skip: SKIP }, (t) => {
+    const { root, env, sha } = snapshotFixture(t, { stalePage: page });
+    writeTool(root, 'node', `exec '${process.execPath.replace(/\\/g, '/')}' "$@"`);
+    writeTool(root, 'npm', SNAPSHOT_NPM_STEPS);
+    const result = runSnapshotHook(root, env,
+      `refs/heads/master ${sha} refs/heads/master ${'0'.repeat(40)}\n`);
+    assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.ok(result.stderr.includes(`${page} import map or CSP is stale`), result.stderr);
+    assert.equal(readFileSync(join(root, page), 'utf8'), 'stale-page\n');
+  });
+}
+
 function withInstalledModules(t) {
   const root = scratchDir(t, 'pre-push-hook-');
-  mkdirSync(join(root, 'node_modules'), {recursive: true});
+  for (const directory of ['node_modules', 'pages.probe/tools'])
+    mkdirSync(join(root, directory), {recursive: true});
+  writeFileSync(join(root, 'pages.probe/index.html'), 'page\n');
   writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}\n');
   return root;
 }
