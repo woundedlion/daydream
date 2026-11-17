@@ -650,15 +650,24 @@ export async function probeKeyboardEdits(tab) {
     container.id = 'keyboard-edit-probe';
     container.style.cssText = 'position:fixed;top:0;left:0;z-index:99999;background:black';
     document.body.appendChild(container);
-    const state = { value: 1, warning: '', warnOnWrite: false };
+    const state = { value: 1, warning: '', warnOnWrite: false, mode: 0, modeWarning: '' };
     const panel = createEffectGui({
       engine: {
-        getParameterDefinitions: () => [{ name: 'Probe', value: state.value,
-          min: 0, max: 10, warning: state.warning, animated: true }],
-        paramGeneration: () => 0, paramValues: () => [state.value],
+        getParameterDefinitions: () => [
+          { name: 'Probe', value: state.value,
+            min: 0, max: 10, warning: state.warning, animated: true },
+          { name: 'Mode', value: state.mode, options: ['One', 'Two', 'Three'],
+            warning: state.modeWarning },
+        ],
+        paramGeneration: () => 0, paramValues: () => [state.value, state.mode],
         setParam: (name, value) => {
-          state.value = value;
-          if (state.warnOnWrite) state.warning = 'Keyboard edit warning';
+          if (name === 'Mode') {
+            state.mode = value;
+            state.modeWarning = 'Popup selection warning';
+          } else {
+            state.value = value;
+            if (state.warnOnWrite) state.warning = 'Keyboard edit warning';
+          }
           return true;
         },
         setAnimationsPaused: () => {}, animationsPaused: () => false,
@@ -719,6 +728,46 @@ export async function probeKeyboardEdits(tab) {
     });
     check(!released.active && released.warning === 'Keyboard edit warning',
       'arrow release lets the deferred warning rebuild complete');
+    const select = '#keyboard-edit-probe select';
+    await tab.focus(select);
+    await tab.$eval(select, (widget) => {
+      window.keyboardEditProbe.selectEvents = [];
+      for (const type of ['keyup', 'blur', 'change']) {
+        widget.addEventListener(type, () => window.keyboardEditProbe.selectEvents.push(type));
+      }
+    });
+    await tab.keyboard.down('Alt');
+    await tab.keyboard.press('ArrowDown');
+    await tab.keyboard.up('Alt');
+    const popupOpen = await tab.$eval(select, (widget) => widget.matches(':open'));
+    check(popupOpen, 'Alt+ArrowDown opens the native select popup');
+    await tab.keyboard.press('ArrowDown');
+    const box = await (await tab.$(select)).boundingBox();
+    await tab.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    const selected = await tab.evaluate(() => {
+      const { panel, container, state, selectEvents } = window.keyboardEditProbe;
+      const widget = container.querySelector('select');
+      return { value: state.mode, active: panel.active().edits.active,
+        focused: document.activeElement === widget, open: widget.matches(':open'),
+        events: selectEvents };
+    });
+    check(selected.value === 1 && !selected.open && selected.focused,
+      'mouse selection commits the popup choice and keeps the select focused');
+    check(selected.events.includes('change') && !selected.events.includes('keyup')
+        && !selected.events.includes('blur'),
+    'native popup selection completes without delivering keyup or blur');
+    check(!selected.active, 'a committed native select choice releases the edit guard');
+    const completed = await tab.evaluate(async () => {
+      const { getActiveURLSync } = await import('./src/app/state.js');
+      const { panel, container } = window.keyboardEditProbe;
+      getActiveURLSync().flush();
+      panel.sync();
+      return { stored: new URLSearchParams(location.search).get('keyboard-probe.Mode'),
+        warning: [...container.querySelectorAll('.param-warning-note')]
+          .some((node) => node.textContent === 'Popup selection warning') };
+    });
+    check(completed.stored === '1', 'the popup choice reaches the shareable URL');
+    check(completed.warning, 'the popup choice refreshes its warning without moving focus away');
   } finally {
     await tab.evaluate(() => {
       const { panel, container } = window.keyboardEditProbe;
@@ -763,7 +812,7 @@ export async function probeNumericRange(tab) {
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'panel-probe',
-  minimumChecks: 63,
+  minimumChecks: 69,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'the effect panel restored what it captured, and the sidebar measured '

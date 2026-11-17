@@ -70,7 +70,7 @@ export class EffectPanelEdits {
    */
   trackKeyboard(controller) {
     const widget = focusWidget(controller);
-    if (!widget) return;
+    if (!widget || widget === controller.$select) return;
     widget.addEventListener('keydown', (/** @type {KeyboardEvent} */ event) => {
       if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
         this.activeKeyEdits.add(controller);

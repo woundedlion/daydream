@@ -70,3 +70,17 @@ test('a checkbox toggle does not hold the rebuild guard', () => {
   $input.dispatchEvent(new Event('input'));
   assert.equal(edits.active, false);
 });
+
+test('a select popup change completes without keyup or blur', () => {
+  const writes = [];
+  const edits = new EffectPanelEdits(new EventTarget(), value => writes.push(value));
+  const $select = new EventTarget();
+  const controller = { domElement: new EventTarget(), $select };
+  edits.trackKeyboard(controller);
+  $select.addEventListener('change', () => edits.persist(controller, { name: 'mode', accepted: 1 }));
+  $select.dispatchEvent(Object.assign(new Event('keydown'), { key: 'ArrowDown', altKey: true }));
+  $select.dispatchEvent(Object.assign(new Event('keydown'), { key: 'ArrowDown' }));
+  $select.dispatchEvent(new Event('change'));
+  assert.equal(edits.active, false);
+  assert.deepEqual(writes, [{ name: 'mode', accepted: 1 }]);
+});
