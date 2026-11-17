@@ -27,17 +27,8 @@ import {createStripHistory} from './chain_strip_history.js';
  * edit. Each chip carries its stage's controls inline.
  */
 
-/** @typedef {import('./chain_presentation.js').CatalogOperator} CatalogOperator */
 /** @typedef {import('./chain_presentation.js').OperatorCatalog} OperatorCatalog */
-/** @typedef {import('./chain_presentation.js').ChainEntry} ChainEntry */
-/** @typedef {import('./chain_presentation.js').LegalityEntry} LegalityEntry */
-/** @typedef {import('./chain_presentation.js').SequenceEntry} SequenceEntry */
-/** @typedef {import('./chain_presentation.js').SpanChoice} SpanChoice */
-/** @typedef {import('./chain_document_store.js').ParameterDeclaration} ParameterDeclaration */
 /** @typedef {{name: string, min: number, max: number}} ParameterRange */
-/** @typedef {import('./chain_presentation.js').BandLayout} BandLayout */
-
-/** @typedef {import('./chain_document_store.js').EditResult} EditResult */
 /** @typedef {import('./chain_document_store.js').ChainStore} ChainStore */
 /** @typedef {import('./chain_strip_context.js').RenderOptions} RenderOptions */
 /**
