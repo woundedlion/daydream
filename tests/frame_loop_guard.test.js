@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import {
   createFrameLoopGuard,
   FRAME_GUARD_REARM_FRAMES,
-  MODULE_TRAP_NOTICE,
 } from '../src/app/frame_loop_guard.js';
+import { MODULE_TRAP_NOTICE } from '../src/shared/engine_halt.js';
 
 // The render loop guard: a throw escaping the frame callback stops Three.js re-arming it.
 

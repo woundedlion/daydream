@@ -7,7 +7,6 @@
 
 import { errorDetail } from '../shared/banner.js';
 import { MODULE_TRAP_NOTICE } from '../shared/engine_halt.js';
-export { MODULE_TRAP_NOTICE } from '../shared/engine_halt.js';
 
 /**
  * Collaborators the frame loop guard wraps and reports through.
