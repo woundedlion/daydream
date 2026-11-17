@@ -6,11 +6,11 @@ import { ParamSetResult } from "../helpers/fake_engine.js";
 import { BAKED_MODULATION_SCALE_MAX, MODULATION_OPERATOR, PALETTE_OPERATOR, UNIT_MODULATION_AMOUNT_MAX } from "../../src/workbench/shader/chain_presentation.js";
 import { STUDY_CHAIN, optionIndex } from "./fixture.js";
 
-test('stage controls stay expanded and source function is directly selectable', async () => {
+test('each stage renders only its own rows and the source function is directly selectable', async () => {
   const harness = await editorWorkbench();
   const lens = stripChips(harness).find((chip) => chip.dataset.label === 'lens');
   const lensRows = lens.querySelectorAll('.chain-param').map((row) => row.dataset.parameter);
-  assert.ok(lensRows.length > 0, 'the lens chip renders its rows expanded');
+  assert.ok(lensRows.length > 0, 'the lens chip carries its rows');
   assert.ok(lensRows.every((id) => id.startsWith('lens.')));
 
   const source = stripChips(harness).find((chip) => chip.dataset.label === 'sample');

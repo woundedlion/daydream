@@ -146,30 +146,6 @@ test('HSV conversion keeps value, saturation, primaries and hue wrap (hsv_to_rgb
 });
 
 /**
- * Verifies the ProceduralPalette cosine formula matches the engine. The engine's
- * get() clamps the cosine to sRGB then quantizes through the interpolated linear
- * LUT; the JS port computes the same clamped sRGB cosine, so feeding it through
- * the engine's srgb_to_linear_interp must land on the engine's 16-bit linear
- * value (within one 16-bit linear LSB from float-versus-double rounding).
- */
-test('ProceduralPalette cosine parity (procedural_palette_linear)', () => {
-  const a = [0.5, 0.5, 0.5], b = [0.5, 0.5, 0.5], c = [1, 1, 1], d = [0, 0.33, 0.67];
-  const pal = new P.ProceduralPalette(a, b, c, d);
-  for (const t of [0, 0.15, 0.25, 0.5, 0.75, 1]) {
-    const w = M.procedural_palette_linear(
-      a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], d[0], d[1], d[2], t);
-    const wCh = [w.r, w.g, w.b];
-    for (let ch = 0; ch < 3; ch++) {
-      const srgb = Math.max(0, Math.min(1, pal.getChannelValues(t)[ch]));
-      const jsLinear = M.srgb_to_linear_interp(srgb);
-      // Within one 16-bit linear LSB for float-versus-double cosine rounding.
-      assert.ok(Math.abs(jsLinear - wCh[ch]) <= 1,
-        `palette t=${t} ch=${ch}: wasm=${wCh[ch]} js=${jsLinear}`);
-    }
-  }
-});
-
-/**
  * Checks procedural_palette_linear against the cosine formula
  * clamp(a + b cos(2π(c t + d)), 0, 1), evaluated in the test, for coefficient
  * sets that clamp at both ends, wrap the phase, flip the amplitude and run at
@@ -202,6 +178,21 @@ test('ProceduralPalette follows the clamped cosine formula (procedural_palette_l
     }
   }
   assert.ok(clamped.low > 0 && clamped.high > 0, 'the sets reach both clamps');
+});
+
+test('every named procedural palette evaluates within one linear LSB', () => {
+  for (const { name, a, b, c, d } of [{name: 'rainbow', a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5],
+    c: [1, 1, 1], d: [0, 0.33, 0.67]}, ...M.named_procedural_palettes()]) {
+    const palette = new P.ProceduralPalette(a, b, c, d);
+    for (const t of [-1, 0, 0.15, 0.25, 0.5, 0.75, 1, 2]) {
+      const color = M.procedural_palette_linear(...a, ...b, ...c, ...d, t);
+      for (const [channel, expected] of [color.r, color.g, color.b].entries()) {
+        const srgb = Math.max(0, Math.min(1, palette.getChannelValues(t)[channel]));
+        assert.ok(Math.abs(M.srgb_to_linear_interp(srgb) - expected) <= 1,
+          `${name} t=${t} channel=${channel}`);
+      }
+    }
+  }
 });
 
 test('the exported named procedural palettes are uniquely named, labelled and render a gradient', () => {
@@ -892,19 +883,5 @@ test('mobius golden images (absolute pin)', () => {
     const inv = M.mobius_transform(x, y, z, 0, 0, 1, 0, 1, 0, 0, 0);
     assertNear(inv, { x, y: -y, z: -z }, ['x', 'y', 'z'],
       `1/z mapped (${x},${y},${z}) to (${inv.x},${inv.y},${inv.z}), want (${x},${-y},${-z})`);
-  }
-});
-
-test('every named procedural palette evaluates within one linear LSB', () => {
-  for (const { name, a, b, c, d } of M.named_procedural_palettes()) {
-    const palette = new P.ProceduralPalette(a, b, c, d);
-    for (const t of [-1, 0, 0.25, 0.5, 0.75, 1, 2]) {
-      const color = M.procedural_palette_linear(...a, ...b, ...c, ...d, t);
-      for (const [channel, expected] of [color.r, color.g, color.b].entries()) {
-        const srgb = Math.max(0, Math.min(1, palette.getChannelValues(t)[channel]));
-        assert.ok(Math.abs(M.srgb_to_linear_interp(srgb) - expected) <= 1,
-          `${name} t=${t} channel=${channel}`);
-      }
-    }
   }
 });
