@@ -8,12 +8,15 @@ import { captureConsole } from './helpers/fake_console.js';
 import { SLOW_FRAME_MS } from '../src/renderer/frame_constants.js';
 import { GlobalStatsView, STATS_CELL_IDS } from '../src/ui/global_stats_view.js';
 
-// Pins the module's cell ids against the real markup.
-test('index provides every stats cell the view resolves', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  for (const [row, ids] of Object.entries(STATS_CELL_IDS))
-    for (const id of ids)
-      assert.match(html, new RegExp(`id=["']${id}["']`), `${row}: ${id}`);
+const STATS_PAGES = ['../index.html', '../tools/shader.html'];
+
+test('the simulator and shader pages provide every stats cell the view resolves', () => {
+  for (const page of STATS_PAGES) {
+    const html = readFileSync(new URL(page, import.meta.url), 'utf8');
+    for (const [row, ids] of Object.entries(STATS_CELL_IDS))
+      for (const id of ids)
+        assert.match(html, new RegExp(`id=["']${id}["']`), `${page} ${row}: ${id}`);
+  }
 });
 
 test('global stats inherit single-line headers and values at both viewport sizes', () => {
@@ -32,13 +35,16 @@ test('both stats bars expose horizontal overflow to pointer and keyboard scrolli
   assert.match(bars, /scrollbar-width:\s*none\s*;/);
   assert.match(css, /#global-stats-desktop\s*\{\s*flex:\s*1\s*;\s*\}/);
 
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  for (const id of ['global-stats-desktop', 'stats-bar']) {
-    const bar = html.match(new RegExp(`<div\\b[^>]*\\bid="${id}"[^>]*>`))?.[0];
-    assert.ok(bar, id);
-    assert.match(bar, /\btabindex="0"/);
-    assert.match(bar, /\brole="region"/);
-    assert.match(bar, /\baria-label="[^"]+"/);
+  for (const page of STATS_PAGES) {
+    const html = readFileSync(new URL(page, import.meta.url), 'utf8');
+    for (const id of ['global-stats-desktop', 'stats-bar']) {
+      const bar = html.match(new RegExp(`<div\\b[^>]*\\bid="${id}"[^>]*>`))?.[0];
+      const context = `${page} ${id}`;
+      assert.ok(bar, context);
+      assert.match(bar, /\btabindex="0"/, context);
+      assert.match(bar, /\brole="region"/, context);
+      assert.match(bar, /\baria-label="[^"]+"/, context);
+    }
   }
 });
 
