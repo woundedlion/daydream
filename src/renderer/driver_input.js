@@ -77,54 +77,56 @@ export function setupKeyboardOrbit(driver, config) {
   driver.canvas.addEventListener("blur", /** @type {EventListener} */ (driver.onCanvasBlur));
 }
 
-/** Bind the viewport reset button, double-click, and interruption listeners.
- * @param {import('./driver.js').Daydream} driver - Display state.
+/** Own the viewport reset animation and its listeners.
+ * @param {object} options - View dependencies.
+ * @param {Document} options.doc - Reset button document.
+ * @param {Window} options.win - Animation clock and reduced-motion preference.
+ * @param {HTMLCanvasElement} options.canvas - Input surface.
+ * @param {import('three/addons/controls/OrbitControls.js').OrbitControls} options.controls - Orbit target and events.
+ * @param {THREE.PerspectiveCamera} options.camera - View camera.
+ * @param {() => void} options.invalidate - Request a repaint.
+ * @param {number} options.durationMs - Reset duration.
+ * @returns {{reset: () => void, cancel: () => void, dispose: () => void}} Reset lifecycle.
  */
-export function setupViewReset(driver) {
-  driver.viewResetFrame = 0;
-  driver.resetViewButton = driver.doc.getElementById('reset-view');
-  driver.onResetView = () => driver.resetView();
-  driver.onCancelViewReset = () => driver.cancelViewReset();
-  driver.resetViewButton?.addEventListener('click', driver.onResetView);
-  driver.canvas.addEventListener('dblclick', driver.onResetView);
-  driver.canvas.addEventListener('keydown', driver.onCancelViewReset);
-  driver.controls.addEventListener('start', driver.onCancelViewReset);
-}
-
-/** Return to the default orientation and center while preserving zoom.
- * @param {import('./driver.js').Daydream} driver - Display state.
- * @param {{VIEW_RESET_MS:number}} config - Reset animation duration.
- */
-export function resetView(driver, config) {
-  driver.cancelViewReset();
-  const target = driver.controls.target.clone();
-  const orbit = new THREE.Spherical().setFromVector3(
-    driver.camera.position.clone().sub(target));
-  const started = driver.win.performance.now();
-  const duration = driver.win.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ? 0 : config.VIEW_RESET_MS;
-  const offset = new THREE.Vector3();
-  const spherical = new THREE.Spherical();
-  const animate = (/** @type {number} */ now) => {
-    const progress = duration === 0 ? 1 : THREE.MathUtils.clamp((now - started) / duration, 0, 1);
-    const remaining = (1 - progress) ** 3;
-    spherical.set(orbit.radius, Math.PI / 2 + (orbit.phi - Math.PI / 2) * remaining,
-      orbit.theta * remaining);
-    driver.controls.target.copy(target).multiplyScalar(remaining);
-    driver.camera.position.copy(driver.controls.target).add(offset.setFromSpherical(spherical));
-    driver.controls.update();
-    driver.needsRender = true;
-    driver.viewResetFrame = progress < 1 ? driver.win.requestAnimationFrame(animate) : 0;
+export function createViewReset({doc, win, canvas, controls, camera, invalidate, durationMs}) {
+  let frame = 0;
+  const button = doc.getElementById('reset-view');
+  const cancel = () => {
+    if (frame) win.cancelAnimationFrame(frame);
+    frame = 0;
   };
-  animate(started);
-}
-
-/** Cancel an in-flight return to the default orientation.
- * @param {import('./driver.js').Daydream} driver - Display state.
- */
-export function cancelViewReset(driver) {
-  if (driver.viewResetFrame) driver.win.cancelAnimationFrame(driver.viewResetFrame);
-  driver.viewResetFrame = 0;
+  const reset = () => {
+    cancel();
+    const target = controls.target.clone();
+    const orbit = new THREE.Spherical().setFromVector3(camera.position.clone().sub(target));
+    const started = win.performance.now();
+    const duration = win.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : durationMs;
+    const offset = new THREE.Vector3();
+    const spherical = new THREE.Spherical();
+    const animate = (/** @type {number} */ now) => {
+      const progress = duration === 0 ? 1 : THREE.MathUtils.clamp((now - started) / duration, 0, 1);
+      const remaining = (1 - progress) ** 3;
+      spherical.set(orbit.radius, Math.PI / 2 + (orbit.phi - Math.PI / 2) * remaining,
+        orbit.theta * remaining);
+      controls.target.copy(target).multiplyScalar(remaining);
+      camera.position.copy(controls.target).add(offset.setFromSpherical(spherical));
+      controls.update();
+      invalidate();
+      frame = progress < 1 ? win.requestAnimationFrame(animate) : 0;
+    };
+    animate(started);
+  };
+  button?.addEventListener('click', reset);
+  canvas.addEventListener('dblclick', reset);
+  canvas.addEventListener('keydown', cancel);
+  controls.addEventListener('start', cancel);
+  return {reset, cancel, dispose() {
+    cancel();
+    button?.removeEventListener('click', reset);
+    canvas.removeEventListener('dblclick', reset);
+    canvas.removeEventListener('keydown', cancel);
+    controls.removeEventListener('start', cancel);
+  }};
 }
 
 /**

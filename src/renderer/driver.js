@@ -13,7 +13,7 @@ import { LabelPool } from "./label_pool.js";
 import {ensurePovSweep, updatePovSweep, sweepFraction,
   resetPovNow, resetPovOnNextFrame, setStrobeColumns} from './driver_pov.js';
 import { setupContextLossHandling } from "./driver_context.js";
-import { setupKeyboardOrbit, setupViewReset, resetView, cancelViewReset, keydown } from "./driver_input.js";
+import { setupKeyboardOrbit, createViewReset, keydown } from "./driver_input.js";
 import { refreshLabels } from "./driver_labels.js";
 import { renderMainView, renderPip, renderDisplayViews } from "./driver_views.js";
 import { updateStats } from "./driver_capture.js";
@@ -50,14 +50,8 @@ export class Daydream {
   onCanvasBlur = () => {};
   /** @type {(event: KeyboardEvent) => void} */
   onCanvasKeyDown = () => {};
-  /** @type {number} */
-  viewResetFrame = 0;
-  /** @type {HTMLElement|null} */
-  resetViewButton = null;
-  /** @type {() => void} */
-  onResetView = () => {};
-  /** @type {() => void} */
-  onCancelViewReset = () => {};
+  /** @type {ReturnType<typeof createViewReset>|null} */
+  viewReset = null;
   /** @type {{uCameraPos: {value: THREE.Vector3}, uCullThreshold: {value: number}, uColumnFillArc: {value: number}}|null} */
   cullUniforms = null;
   /** @type {THREE.SphereGeometry|null} */
@@ -282,17 +276,19 @@ export class Daydream {
 
   /** Bind the viewport reset button, double-click, and interruption listeners. */
   setupViewReset() {
-    setupViewReset(this);
+    this.viewReset = createViewReset({doc: this.doc, win: this.win, canvas: this.canvas,
+      controls: this.controls, camera: this.camera, invalidate: () => this.invalidate(),
+      durationMs: Daydream.VIEW_RESET_MS});
   }
 
   /** Return to the default orientation and center while preserving zoom. */
   resetView() {
-    resetView(this, Daydream);
+    this.viewReset?.reset();
   }
 
   /** Cancel an in-flight return to the default orientation. */
   cancelViewReset() {
-    cancelViewReset(this);
+    this.viewReset?.cancel();
   }
 
   /** Handle playback and preset keys.
@@ -709,15 +705,7 @@ export class Daydream {
     }
     this.contextLostOverlay?.remove();
 
-    if (this.onResetView) {
-      this.cancelViewReset();
-      this.resetViewButton?.removeEventListener('click', this.onResetView);
-      this.canvas.removeEventListener('dblclick', this.onResetView);
-    }
-    if (this.onCancelViewReset) {
-      this.canvas.removeEventListener('keydown', this.onCancelViewReset);
-      this.controls.removeEventListener('start', this.onCancelViewReset);
-    }
+    this.viewReset?.dispose();
 
     if (this.onCanvasKeyDown) {
       this.canvas.removeEventListener("keydown", this.onCanvasKeyDown);
