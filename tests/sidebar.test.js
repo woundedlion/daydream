@@ -606,3 +606,15 @@ test('the effect list leaves browser chords unhandled', () => {
   }
   assert.deepEqual(selected, []);
 });
+
+
+test('setEffects omits unavailable preset counts', () => {
+  const {sidebar} = makeSidebar();
+  for (const counts of [null, undefined]) {
+    sidebar.setEffects(['A'], {}, counts);
+    const button = sidebar.buttons.get('A');
+    assert.equal(button.querySelector('.effect-name').textContent, 'A');
+    assert.equal(button.getAttribute('aria-label'), 'A');
+  }
+  sidebar.dispose();
+});

@@ -154,7 +154,7 @@ export class EffectSidebar {
    * @param {Array<string>} names - Effect names, one button per name.
    * @param {Record<string, number>|null} [effectSizes] - Map of effect name to size in bytes; missing or absent entries are treated as 0.
    * @param {Record<string, number>|null} [presetCounts] - Map of effect name to
-   *   authored preset count; the displayed count has a minimum of 1.
+   *   authored preset count; absent maps omit counts, and supplied entries have a minimum of 1.
    */
   setEffects(names, effectSizes, presetCounts) {
     const focused = /** @type {HTMLElement|null} */ (this.doc.activeElement);
@@ -172,8 +172,8 @@ export class EffectSidebar {
     names.forEach(name => {
       const label = effectDisplayName(name);
       const size = effectSizes ? (effectSizes[label] || effectSizes[name] || 0) : 0;
-      const presetCount = Math.max(1, presetCounts
-        ? (presetCounts[label] || presetCounts[name] || 0) : 0);
+      const presetCount = presetCounts == null ? null
+        : Math.max(1, presetCounts[label] || presetCounts[name] || 0);
       this.items.push({ name, size, label });
 
       const btn = this.doc.createElement('button');
@@ -183,12 +183,12 @@ export class EffectSidebar {
       btn.setAttribute('aria-selected', 'false');
       btn.tabIndex = -1; // roving tabindex
       btn.dataset.effect = name;
-      btn.setAttribute('aria-label', `${label}, ${presetCount} preset${presetCount === 1 ? '' : 's'}`
+      btn.setAttribute('aria-label', label + (presetCount === null ? '' : `, ${presetCount} preset${presetCount === 1 ? '' : 's'}`)
         + (size > 0 ? `, object size ${formatKB(size)} KiB` : ''));
 
       const nameSpan = this.doc.createElement('span');
       nameSpan.className = 'effect-name';
-      nameSpan.textContent = `${label} (${presetCount})`;
+      nameSpan.textContent = label + (presetCount === null ? '' : ` (${presetCount})`);
       btn.appendChild(nameSpan);
 
       if (size > 0) {
