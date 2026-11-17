@@ -3,8 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-import { wrapTurns, signedTurnDelta, equivalentTurnNear } from './math.js';
-import { axisEndpoints, axisFromEndpoints } from './view.js';
+import { wrapTurns, signedTurnDelta, equivalentTurnNear, axisEndpoints, axisFromEndpoints } from './math.js';
 import { PaletteV4 } from './model.js';
 
 /** @typedef {import('./model.js').PaletteAxis} PaletteAxis */

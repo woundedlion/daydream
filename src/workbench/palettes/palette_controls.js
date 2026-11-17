@@ -10,7 +10,7 @@
 /** @typedef {import('./palette_controls/view.js').PaletteViewport} PaletteViewport */
 /** @typedef {import('./palette_controls/recipe.js').PaletteControlReadings} PaletteControlReadings */
 
-export { wrapTurns, signedTurnDelta, equivalentTurnNear } from './palette_controls/math.js';
-export { paletteTabFromSearch, paletteTabUrl, tablistKeyTarget, createPaletteViewport, clampRecipeWindow, zoomRecipeWindow, STRIP_DRAG_THRESHOLD, stripDragIntent, paletteStripView, waveGraphLabel, axisEndpoints, axisFromEndpoints, PALETTE_CONTROL_IDS, PALETTE_AXIS_CONTROLS, axisControlState, lockedGroupMove } from './palette_controls/view.js';
+export { wrapTurns, signedTurnDelta, equivalentTurnNear, axisEndpoints, axisFromEndpoints } from './palette_controls/math.js';
+export { paletteTabFromSearch, paletteTabUrl, tablistKeyTarget, createPaletteViewport, clampRecipeWindow, zoomRecipeWindow, STRIP_DRAG_THRESHOLD, stripDragIntent, paletteStripView, waveGraphLabel, PALETTE_CONTROL_IDS, PALETTE_AXIS_CONTROLS, axisControlState, lockedGroupMove } from './palette_controls/view.js';
 export { PaletteV4 } from './palette_controls/model.js';
 export { harmonyBaseFromCustomKeys, hueKeyState, customHueKeyState, customHueSweepRepresentable, customHueTurns, movedHueKeyOffset, defaultPaletteRecipe, paletteEnumOrdinal, loopSweepTurns, paletteRecipeFromControls, applyPaletteControls, paletteEnumName, paletteControlsFromRecipe, paletteRecipeAvailability, PALETTE_RECIPE_PRESETS } from './palette_controls/recipe.js';

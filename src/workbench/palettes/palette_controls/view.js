@@ -202,34 +202,6 @@ export function waveGraphLabel({ start, end }) {
 }
 
 /**
- * The endpoints a lightness or chroma axis spans, for controls that edit its
- * ends rather than its center and width.
- * @param {{center:number, range:number}} axis - The recipe's axis values.
- * @returns {{minimum:number, maximum:number}} The endpoints, each clamped to [0, 1].
- */
-export function axisEndpoints({ center, range }) {
-  return {
-    minimum: clampUnit(center - range * 0.5),
-    maximum: clampUnit(center + range * 0.5),
-  };
-}
-
-/**
- * The center-and-range form of an axis the user edited by its endpoints.
- * @param {number} minimum - One endpoint.
- * @param {number} maximum - The other; the two may arrive in either order.
- * @param {{center:number, range:number}} [out] - Object the center and range are written into.
- * @returns {{center:number, range:number}} `out`, or a new axis value, with a non-negative range.
- */
-export function axisFromEndpoints(minimum, maximum, out = { center: 0, range: 0 }) {
-  const low = Math.min(minimum, maximum);
-  const high = Math.max(minimum, maximum);
-  out.center = (low + high) * 0.5;
-  out.range = high - low;
-  return out;
-}
-
-/**
  * The generative tab's control element ids, by the reading each one carries.
  * @type {Object<string, string>}
  */
