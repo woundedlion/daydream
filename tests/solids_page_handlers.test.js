@@ -1158,3 +1158,23 @@ test('off-band operation sliders retain their rendered range across edits', () =
   assert.equal(state.ops[0].params.t, 0.8);
   assert.equal(slider.value, '0.8');
 });
+
+
+for (const accepted of [false, true]) {
+  test(`restoring a saved chain ${accepted ? 'confirms' : 'cancels'} replacement of multiple operations`, async () => {
+    const state = {base: 'cube', ops: [{op: 'dual', params: {}}, {op: 'dual', params: {}}]};
+    const item = {base: 'cube', ops: [], title: 'Saved Cube'};
+    let queued;
+    let validations = 0;
+    let restores = 0;
+    saved({state, queueCommit: task => { queued = task; },
+      window: {confirm: message => { assert.match(message, /Replace all 2 operations.*Saved Cube/); return accepted; }},
+      chainIsValid: async () => { validations += 1; return {ok: true}; },
+      applyRestore: restored => { assert.equal(restored, item); restores += 1; },
+      showGateMsg() {},
+    }).restoreSolid(item);
+    await queued();
+    assert.equal(validations, Number(accepted));
+    assert.equal(restores, Number(accepted));
+  });
+}

@@ -332,6 +332,8 @@ export function createSolidsSavedController(page, actions, dependencies = {}) {
   /** Queues a validated saved-card restore. @param {SavedSolid} item @returns {void} */
   function restoreSolid(item) {
     const shapeError = env.queueSavedSolidRestore(item, () => actions.queueCommit(async () => {
+      if (page.doc.ops.length > 1 && !env.window.confirm(
+        `Replace all ${page.doc.ops.length} operations with the saved "${item.title || 'saved solid'}" chain?`)) return;
       const check = await actions.chainIsValid(item.base, item.ops);
       if (!check.ok) {
         actions.showGateMsg(`rejected: ${check.message}`);
