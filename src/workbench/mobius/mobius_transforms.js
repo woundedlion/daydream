@@ -226,6 +226,28 @@ export function snapCoefficientComponent(value, threshold = 0.05) {
   return v;
 }
 
+/**
+ * Maps an axis key to a snapped coefficient component.
+ * @param {string} key - Keyboard key.
+ * @param {number} current - Current component value.
+ * @param {boolean} shiftKey - Whether the coarse step is selected.
+ * @param {number} maxExtent - Symmetric component bound.
+ * @returns {number|'recenter'|null} Updated component, recenter action, or an unhandled key.
+ */
+export function axisKeyValue(key, current, shiftKey, maxExtent) {
+  const step = shiftKey ? 0.2 : 0.05;
+  let value;
+  switch (key) {
+    case 'ArrowLeft': case 'ArrowDown': value = current - step; break;
+    case 'ArrowRight': case 'ArrowUp': value = current + step; break;
+    case 'Home': return -maxExtent;
+    case 'End': return maxExtent;
+    case '0': return 'recenter';
+    default: return null;
+  }
+  return snapCoefficientComponent(Math.max(-maxExtent, Math.min(maxExtent, value)), step / 4);
+}
+
 // --- Preset coefficient generators ----------------------------------------
 
 /**

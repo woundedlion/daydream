@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { axisKeyValue } from '../src/workbench/mobius/mobius_transforms.js';
 import { pageHandlers } from './helpers/page_handlers.js';
 const handler = pageHandlers(new URL('../src/workbench/mobius/mobius_page.js', import.meta.url));
 
@@ -24,19 +25,20 @@ test('animated snippets throttle formatting and flush the final stopped value', 
   assert.equal(output.textContent, '3');
 });
 
-test('an axis key leaves the other coefficient component unchanged', () => {
-  const paramObj = { re: 0, im: 0.05 };
-  const context = {paramObj, activePreset: null, maxExtent: 4,
-    snapCoefficientComponent: (v, threshold) => Math.abs(v) < 2 * threshold ? 0 : v,
-    updateUI() {}, onChange() {}, stopAnimation() {}};
-  context.clampSnap = handler('clampSnap', context);
-  context.commit = handler('commit', context);
-  const keydown = handler('onAxisKeyDown', context);
-  keydown('re')({ key: 'ArrowRight', shiftKey: true, preventDefault() {} });
-  assert.ok(paramObj.re > 0);
-  assert.equal(paramObj.im, 0.05);
+test('axis arrows apply the real component snap, clamp and shift step', () => {
+  for (const key of ['ArrowRight', 'ArrowUp']) {
+    assert.equal(axisKeyValue(key, 0, false, 4), 0.05);
+    assert.equal(axisKeyValue(key, 0, true, 4), 0.2);
+    assert.equal(axisKeyValue(key, 0.96, false, 4), 1);
+    assert.equal(axisKeyValue(key, 3.99, true, 4), 4);
+  }
+  for (const key of ['ArrowLeft', 'ArrowDown']) {
+    assert.equal(axisKeyValue(key, 0, false, 4), -0.05);
+    assert.equal(axisKeyValue(key, 0, true, 4), -0.2);
+    assert.equal(axisKeyValue(key, 0.04, false, 4), 0);
+    assert.equal(axisKeyValue(key, -3.99, true, 4), -4);
+  }
 });
-
 
 test('identity reset copies fresh coefficients into the pad-owned objects', () => {
   const identity = handler('identityCoefficients', {});
@@ -50,45 +52,14 @@ test('identity reset copies fresh coefficients into the pad-owned objects', () =
   Object.values(config).forEach((value, i) => assert.equal(value, refs[i]));
 });
 
-/**
- * Builds the pad's axis keydown handler over one coefficient at the given value.
- * @param {number} re - Starting real part.
- * @param {number} im - Starting imaginary part.
- * @returns {{paramObj: {re: number, im: number}, press: (axis: string, key: string) => boolean}}
- *   The coefficient and a key press that reports whether it was consumed.
- */
-function axisPad(re, im) {
-  const paramObj = { re, im };
-  const context = {paramObj, activePreset: null, maxExtent: 4,
-    snapCoefficientComponent: (v) => v, updateUI() {}, onChange() {}, stopAnimation() {}};
-  context.clampSnap = handler('clampSnap', context);
-  context.commit = handler('commit', context);
-  const keydown = handler('onAxisKeyDown', context);
-  const press = (axis, key) => {
-    let prevented = false;
-    keydown(axis)({ key, shiftKey: false, preventDefault() { prevented = true; } });
-    return prevented;
-  };
-  return { paramObj, press };
-}
-
-test('Home and End move only the focused part to its slider bounds', () => {
-  const pad = axisPad(0.5, 0.25);
-  assert.equal(pad.press('re', 'Home'), true);
-  assert.deepEqual(pad.paramObj, { re: -4, im: 0.25 });
-  assert.equal(pad.press('im', 'End'), true);
-  assert.deepEqual(pad.paramObj, { re: -4, im: 4 });
-  pad.press('re', 'End');
-  pad.press('im', 'Home');
-  assert.deepEqual(pad.paramObj, { re: 4, im: -4 });
+test('Home and End map to the component bounds', () => {
+  assert.equal(axisKeyValue('Home', 0.5, false, 4), -4);
+  assert.equal(axisKeyValue('End', 0.25, false, 4), 4);
 });
 
-test('0 recenters both parts and other keys pass through', () => {
-  const pad = axisPad(0.5, 0.25);
-  assert.equal(pad.press('re', 'a'), false);
-  assert.deepEqual(pad.paramObj, { re: 0.5, im: 0.25 });
-  assert.equal(pad.press('im', '0'), true);
-  assert.deepEqual(pad.paramObj, { re: 0, im: 0 });
+test('0 recenters the coefficient and other keys pass through', () => {
+  assert.equal(axisKeyValue('0', 0.5, false, 4), 'recenter');
+  assert.equal(axisKeyValue('a', 0.25, false, 4), null);
 });
 
 test('the axis handles advertise Home, End and 0', () => {
