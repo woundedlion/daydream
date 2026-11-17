@@ -1,5 +1,5 @@
-// scripts/generate-importmap.mjs rewrites only the GENERATED VENDOR block of
-// vendor-importmap.js. Driven as a subprocess against a temp fixture so the
+// scripts/generate-importmap.mjs rewrites the GENERATED VENDOR block of
+// vendor-importmap.js and each tracked HTML page's static import map and CSP hash. Driven as a subprocess against a temp fixture so the
 // --root selects its package.json, vendor-importmap.js and tracked source files.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

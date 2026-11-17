@@ -46,7 +46,7 @@ import { paletteEnumName } from './palette_controls.js';
 const TWO_PI = 2 * Math.PI;
 
 /**
- * Mirror of the engine's fast_sinf (core/math/3dmath.h): a Bhaskara I sine
+ * Mirror of the engine's fast_sinf (core/math/rotation_interpolation.h): a Bhaskara I sine
  * approximation, range-reduced to [0, 2π).
  * @param {number} x - Angle in radians.
  * @returns {number} The approximated sine.

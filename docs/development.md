@@ -122,8 +122,10 @@ A local green run can include skipped checks. Engine source checks search
 `HOLOSPHERE_ENGINE_DIR` (also checkout-relative) for another location. They skip
 when no checkout exists unless `HOLOSPHERE_ENGINE_REQUIRED=1`. Hook tests can
 skip when no supported shell is available unless `DAYDREAM_HOOK_SH_REQUIRED=1`.
-CI sets both required flags and installs the selected engine bundle; inspect
-the test summary for skips when comparing a local run with CI.
+The generated-recipe format check skips when `clang-format` is unavailable unless
+`CLANG_FORMAT_REQUIRED=1`. CI sets all three required flags and installs the
+selected engine bundle. The test runner rejects any CI run with skipped or todo
+tests; inspect the summary when comparing a local run with CI.
 
 Run `node scripts/browser-smoke.mjs` to exercise the simulator and every tool
 page. The other `scripts/*-probe.mjs` commands exercise tool interactions and

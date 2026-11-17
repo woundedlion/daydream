@@ -1,5 +1,5 @@
-// Check the typecheck roster against pipeline imports, @ts-check files
-// and eligible src/ modules.
+// Check both typecheck rosters against reachable imports, @ts-check files,
+// and every root, src/ and scripts/ module.
 import { relativeImports, reachableModules } from './helpers/module_graph.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

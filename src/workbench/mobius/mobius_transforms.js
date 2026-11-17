@@ -69,7 +69,7 @@ export const glslComplexFunctions = `
 
 // --- Projection-domain conventions ----------------------------------------
 // Projection division: core/math/mobius.h; stereo constants: core/math/stereographic.h.
-// Underflow lift: core/math/3dmath.h.
+// Underflow lift: COMPLEX_UNDERFLOW_LIFT, core/math/math_constants.h.
 
 /** Conventional magnitude representing the point at infinity. */
 export const STEREO_INF = 1e4;
