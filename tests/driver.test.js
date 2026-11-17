@@ -2453,7 +2453,7 @@ test('the driver hands its own document to every collaborator that defaults to t
 
 // Keys a context carries that are not driver state: the sinks a test reads its
 // assertions out of.
-const CONTEXT_SINKS = new Set(['sized', 'handlers', 'classes', 'acquired']);
+const CONTEXT_SINKS = new Set(['sized', 'handlers', 'classes', 'acquired', 'invalidated']);
 
 /** Context keys that are neither driver state, a stand-in for a prototype
  *  method, nor a declared test sink.
@@ -2495,15 +2495,32 @@ test('ad-hoc contexts use fields assigned by the driver', () => {
   const source = readFileSync(new URL(import.meta.url), 'utf8');
   const tree = parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
   let checked = 0;
+  const checkProperties = (properties) => {
+    checked += 1;
+    const fields = Object.fromEntries(properties
+      .filter((property) => property.type === 'Property')
+      .map((property) => [property.key.name ?? property.key.value, null]));
+    assert.deepEqual(unpinnedContextFields(fields), []);
+  };
   const visit = (node) => {
     if (!node || typeof node !== 'object') return;
     if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && /^ctx/.test(node.id.name)
         && node.init?.type === 'ObjectExpression') {
+      checkProperties(node.init.properties);
+    }
+    if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression'
+        && !node.callee.computed && node.callee.object.name === 'Object'
+        && node.callee.property.name === 'assign'
+        && node.arguments[0]?.type === 'Identifier' && /^ctx/.test(node.arguments[0].name)) {
+      for (const argument of node.arguments.slice(1)) {
+        if (argument.type === 'ObjectExpression') checkProperties(argument.properties);
+      }
+    }
+    if (node.type === 'AssignmentExpression' && node.left.type === 'MemberExpression'
+        && !node.left.computed && node.left.object.type === 'Identifier'
+        && /^ctx/.test(node.left.object.name)) {
       checked += 1;
-      const fields = Object.fromEntries(node.init.properties
-        .filter((property) => property.type === 'Property')
-        .map((property) => [property.key.name ?? property.key.value, null]));
-      assert.deepEqual(unpinnedContextFields(fields), []);
+      assert.deepEqual(unpinnedContextFields({ [node.left.property.name]: null }), []);
     }
     for (const child of Object.values(node)) {
       if (Array.isArray(child)) child.forEach(visit);

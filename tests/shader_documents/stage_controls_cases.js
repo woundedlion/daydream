@@ -61,6 +61,7 @@ test('a card reset applies defaults to the preview, Save and link with one undo'
   const before = savedValues(harness);
   const original = SCRATCH.preset_bank.presets[0].values;
   harness.elements.get('shader-animation-toggle').dispatch('click');
+  const mark = harness.engine.writes.length;
   stripChips(harness).find((chip) => chip.dataset.label === 'sample')
     .querySelector('.chain-chip-reset').dispatch('click');
   const after = savedValues(harness);
@@ -70,7 +71,7 @@ test('a card reset applies defaults to the preview, Save and link with one undo'
   }
   assert.equal(after['colorize.palette-mapping'], 'reverse');
   assert.equal(harness.animationsPaused(), true);
-  assert.ok(harness.engine.writes.some(([name, value]) =>
+  assert.ok(harness.engine.writes.slice(mark).some(([name, value]) =>
     name === 'sample.pattern-freq' && value === original['sample.pattern-freq']));
   await harness.controller.flushDeepLink();
   const linked = await decodeShaderStateHash(harness.win.location.hash);

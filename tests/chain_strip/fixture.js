@@ -3,6 +3,7 @@ import { CATALOG, chipByLabel, bandFor, paramsOf } from "../helpers/chain_strip_
 import { STUDY_CHAIN } from "../helpers/chain_study.js";
 
 export const PROJECT = STUDY_CHAIN.findIndex((entry) => entry.label === 'project');
+export const SAMPLE = STUDY_CHAIN.findIndex((entry) => entry.label === 'sample');
 
 /** @param {string} label @returns {string} The catalog name of the study stage's operator. */
 export const operatorName = (label) => CATALOG.operators.find((operator) =>

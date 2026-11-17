@@ -5,7 +5,7 @@ import { scratchChainDocument } from "../../src/workbench/shader/chain_document_
 import { CATALOG, BASE, makeStrip, chips, chipByLabel, bandFor } from "../helpers/chain_strip_harness.js";
 import { STUDY_CHAIN } from "../helpers/chain_study.js";
 import { compileShaderDocument } from "../../generated/shader/shader_workbench.mjs";
-import { PROJECT, operatorName } from "./fixture.js";
+import { PROJECT, SAMPLE, operatorName } from "./fixture.js";
 
 test('the strip opens a shipped pattern with one chip per stage', async () => {
   const shipped = compileShaderDocument(readFileSync(
@@ -132,7 +132,7 @@ for (const operator of ['sample.spherical-noise.v1', 'sample.spherical-cells.v1'
     assert.deepEqual(h.store.chain().map((entry) => entry.operator), [
       ...before.descriptor.chain.slice(0, PROJECT).map((entry) => entry.operator),
       operator,
-      ...before.descriptor.chain.slice(5).map((entry) => entry.operator),
+      ...before.descriptor.chain.slice(SAMPLE + 1).map((entry) => entry.operator),
     ]);
     assert.deepEqual(h.container.querySelectorAll('.chain-band').map((band) => band.dataset.carrier),
       ['sphere', 'field', 'color']);
