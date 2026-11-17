@@ -778,6 +778,34 @@ test('a paused response-scale edit reuses the frozen sweep samples', () => {
   assert.deepEqual(h.ctx.povSweep.emissions.map(({ pixels }) => pixels), history);
 });
 
+test('paused POV camera repaints reuse the uploaded response and boundary overlay', () => {
+  const {h} = warmPresentationRig();
+  h.ctx.paused = true;
+  h.render();
+  const attribute = h.ctx.dotMesh.instanceColor;
+  const repaint = () => { h.ctx.needsRender = true; h.render(); };
+  const held = attribute.version;
+  repaint();
+  assert.equal(attribute.version, held);
+  h.ctx.showSweepBoundary = true;
+  repaint();
+  assert.equal(attribute.version, held + 1);
+  const boundary = h.ctx.povSweep.boundaryPixels;
+  const set = boundary.set.bind(boundary);
+  let copies = 0;
+  boundary.set = (...args) => { copies++; set(...args); };
+  repaint();
+  assert.equal(attribute.version, held + 1);
+  assert.equal(copies, 0);
+  h.ctx.povResponseScale = 2;
+  repaint();
+  assert.equal(attribute.version, held + 2);
+  assert.equal(copies, 1);
+  h.ctx.showSweepBoundary = false;
+  repaint();
+  assert.equal(attribute.version, held + 3);
+});
+
 test('disabling POV presentation restores the live engine colors', () => {
   const {h} = pausedPresentationRig();
   h.colors.fill(20000);

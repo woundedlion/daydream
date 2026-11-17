@@ -52,6 +52,8 @@ export class Daydream {
   onCanvasKeyDown = () => {};
   /** @type {ReturnType<typeof createViewReset>|null} */
   viewReset = null;
+  /** Last POV display version submitted to the color attribute. */
+  povColorVersion = -1;
   /** @type {{uCameraPos: {value: THREE.Vector3}, uCullThreshold: {value: number}, uColumnFillArc: {value: number}}|null} */
   cullUniforms = null;
   /** @type {THREE.SphereGeometry|null} */
@@ -429,7 +431,10 @@ export class Daydream {
       const fraction = sweepFraction(this.timeAccumulator, this.frameInterval);
       const pixels = this.povSweep.visualPixels(fraction, this.povResponseScale);
       colorAttribute.array = this.povSweep.displayPixels(this.showSweepBoundary, pixels);
-      colorAttribute.needsUpdate = true;
+      if (this.povColorVersion !== this.povSweep.version) {
+        colorAttribute.needsUpdate = true;
+        this.povColorVersion = this.povSweep.version;
+      }
     }
     try {
       renderDisplayViews(this, captureDue);

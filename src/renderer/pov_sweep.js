@@ -55,6 +55,10 @@ export class PovSweep {
     this.column = 0;
     this.responseFraction = NaN;
     this.responseTau = NaN;
+    this.version = 0;
+    this.showBoundary = false;
+    this.boundaryColumn = -1;
+    this.boundaryVersion = -1;
   }
 
   /**
@@ -63,7 +67,14 @@ export class PovSweep {
    * @returns {Uint16Array} Display pixels, with an optional boundary overlay.
    */
   displayPixels(showBoundary, pixels) {
+    if (showBoundary !== this.showBoundary
+        || (showBoundary && this.column !== this.boundaryColumn)) {
+      this.showBoundary = showBoundary;
+      this.version++;
+    }
     if (!showBoundary) return pixels;
+    if (pixels === this.responsePixels && this.boundaryVersion === this.version)
+      return /** @type {Uint16Array} */ (this.boundaryPixels);
     this.boundaryPixels ??= new Uint16Array(pixels.length);
     this.boundaryPixels.set(pixels);
     const half = this.width / 2;
@@ -76,6 +87,8 @@ export class PovSweep {
         this.boundaryPixels[index + 2] = 65535;
       }
     }
+    this.boundaryColumn = this.column;
+    this.boundaryVersion = this.version;
     return this.boundaryPixels;
   }
 
@@ -151,6 +164,7 @@ export class PovSweep {
         }
       }
     }
+    this.version++;
     return this.responsePixels;
   }
 

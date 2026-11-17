@@ -21,6 +21,7 @@ export function ensurePovSweep(driver) {
     driver.povSweep = new PovSweep(driver.W, driver.H, driver.pixels,
       sweepFraction(driver.timeAccumulator, driver.frameInterval),
       driver.frameInterval * 1000);
+    driver.povColorVersion = -1;
   } else if (!driver.povFidelity && driver.povSweep) {
     driver.povSweep = null;
     if (driver.dotMesh?.instanceColor) driver.dotMesh.instanceColor.needsUpdate = true;

@@ -5,6 +5,26 @@ import { PovSweep, sustainedSurvival } from '../src/renderer/pov_sweep.js';
 const frame = (value) => new Uint16Array(8 * 2 * 3).fill(value);
 const row = (pixels, y) => Array.from({ length: 8 }, (_, x) => pixels[(y * 8 + x) * 3]);
 
+test('display version changes with response, boundary visibility and boundary column', () => {
+  const sweep = new PovSweep(8, 2, frame(1000));
+  const pixels = sweep.visualPixels(0.25);
+  sweep.displayPixels(true, pixels);
+  const before = sweep.version;
+  sweep.displayPixels(true, pixels);
+  assert.equal(sweep.version, before);
+  sweep.advance(0.5);
+  sweep.displayPixels(true, pixels);
+  assert.ok(sweep.version > before);
+  const moved = sweep.version;
+  sweep.displayPixels(false, pixels);
+  assert.ok(sweep.version > moved);
+  const hidden = sweep.version;
+  sweep.visualPixels(0.25);
+  assert.equal(sweep.version, hidden);
+  sweep.visualPixels(0.5);
+  assert.ok(sweep.version > hidden);
+});
+
 test('effect replacement removes outgoing light from every hemisphere and history epoch', () => {
   const old = frame(0), incoming = frame(0);
   for (let i = 0; i < old.length; i += 3) {
