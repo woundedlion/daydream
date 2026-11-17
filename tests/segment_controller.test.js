@@ -5,6 +5,7 @@ import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { unpinnedEngineMethods } from './helpers/fake_engine.js';
 import { fakeColorAttribute } from './helpers/fake_three.js';
+import { fakeDriver } from './helpers/fake_app.js';
 import { FakeWorker } from './helpers/fake_worker.js';
 import { Daydream } from '../src/renderer/driver.js';
 import { createRenderAdapter } from '../src/app/render_adapter.js';
@@ -1003,23 +1004,15 @@ for (const povFidelity of [false, true]) test(`paused steps capture completed wo
   const pixels = new Uint16Array(4 * 2 * 3);
   const captured = [];
   let displayed = -1;
-  const renderer = {
-    W: 4, H: 2, pixels,
-    paused: true, stepFrames: 0, needsRender: false, heldCaptures: 0,
-    povFidelity, povResponseScale: 1, timeAccumulator: 31.25, frameInterval: 62.5,
-    win: { performance },
+  const renderer = Object.assign(fakeDriver(), {
+    W: 4, H: 2, pixels, paused: true, needsRender: false,
+    povFidelity, timeAccumulator: 31.25, frameInterval: 62.5,
     dotMesh: { instanceColor: fakeColorAttribute(pixels) },
     advanceFrameClock: () => false,
-    stepSimulation: Daydream.prototype.stepSimulation,
     invalidate: Daydream.prototype.invalidate,
-    controls: { update() {} },
-    xAxis: {}, yAxis: {}, zAxis: {},
-    labelPool: { activeCount: 0 },
-    renderer: { setScissorTest() {} },
-    updateStats() {}, updateCullUniforms() {}, refreshLabels() {}, renderPip() {},
     renderMainView() { displayed = pixels[0]; },
     recorder: { isRecording: true, captureFrame() { captured.push(displayed); } },
-  };
+  });
   const controller = readyController(2, { driver: renderer });
   t.after(() => controller.destroy());
   controller.active = true;
