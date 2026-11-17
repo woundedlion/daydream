@@ -21,6 +21,7 @@ import { engineHalted } from "../shared/engine_halt.js";
 /** @typedef {import('./segment_layout.js').SegRange} SegRange */
 /** @typedef {import('../../generated/holosphere_wasm.js').HolosphereModule} HolosphereModule */
 /** @typedef {import('../../generated/holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
+/** @typedef {{engine: HolosphereEngine, wasmModule: HolosphereModule}} LiveSession */
 
 /**
  * Send a protocol message back to the controller. Cast because the DOM lib
@@ -304,12 +305,10 @@ function createSegmentWorkerSession() {
     if (!applyEffectState(msg)) return;
 
     post({ type: 'ready' });
-    return;
   }
 
-  /** @param {Extract<WorkerInboundMsg, {type: 'setEffect'}>} msg */
-  function handleSetEffect(msg) {
-    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+  /** @param {Extract<WorkerInboundMsg, {type: 'setEffect'}>} msg @param {LiveSession} live */
+  function handleSetEffect(msg, {engine, wasmModule}) {
 
     // INSTALLED is the sole success; either rejection keeps the old effect.
     if (engine.setEffect(msg.name)
@@ -323,12 +322,10 @@ function createSegmentWorkerSession() {
     arenaMetricsWarned = false;
     awaitingEffect = false;
     if (applyEffectState(msg)) paramRevision = msg.paramRevision;
-    return;
   }
 
-  /** @param {Extract<WorkerInboundMsg, {type: 'setResolution'}>} msg */
-  function handleSetResolution(msg) {
-    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+  /** @param {Extract<WorkerInboundMsg, {type: 'setResolution'}>} msg @param {LiveSession} live */
+  function handleSetResolution(msg, {engine, wasmModule}) {
 
     // RESIZED and ALREADY_ACTIVE both commit; RESIZED also dropped the
     // effect and the clip.
@@ -345,38 +342,30 @@ function createSegmentWorkerSession() {
     canvasH = msg.h;
     arenaMetricsWarned = false;
     segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
-    return;
   }
 
   /** @param {Extract<WorkerInboundMsg, {type: 'setParameter'}>} msg */
   function handleSetParameter(msg) {
-    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
 
     applyParam(msg.name, msg.value);
     paramRevision = msg.paramRevision;
-    return;
   }
 
-  /** @param {Extract<WorkerInboundMsg, {type: 'setAnimationsPaused'}>} msg */
-  function handleSetAnimationsPaused(msg) {
-    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+  /** @param {Extract<WorkerInboundMsg, {type: 'setAnimationsPaused'}>} msg @param {LiveSession} live */
+  function handleSetAnimationsPaused(msg, {engine}) {
 
     engine.setAnimationsPaused(msg.paused);
-    return;
   }
 
   /** @param {Extract<WorkerInboundMsg, {type: 'selectPreset'}>} msg */
   function handleSelectPreset(msg) {
-    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
 
     applyPreset(msg.index);
     paramRevision = msg.paramRevision;
-    return;
   }
 
-  /** @param {Extract<WorkerInboundMsg, {type: 'setDisplayCaps'}>} msg */
-  function handleSetDisplayCaps(msg) {
-    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+  /** @param {Extract<WorkerInboundMsg, {type: 'setDisplayCaps'}>} msg @param {LiveSession} live */
+  function handleSetDisplayCaps(msg, {engine}) {
 
     if (!engine.setDisplayCaps(msg.topCap, msg.bottomCap)) {
       post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
@@ -384,23 +373,18 @@ function createSegmentWorkerSession() {
     }
     arenaMetricsWarned = false;
     applyClip();
-    return;
   }
 
-  /** @param {Extract<WorkerInboundMsg, {type: 'setPoleLod'}>} msg */
-  function handleSetPoleLod(msg) {
-    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+  /** @param {Extract<WorkerInboundMsg, {type: 'setPoleLod'}>} msg @param {LiveSession} live */
+  function handleSetPoleLod(msg, {engine}) {
 
     engine.setPoleLod(msg.value);
-    return;
   }
 
-  /** @param {Extract<WorkerInboundMsg, {type: 'setTemporalSampling'}>} msg */
-  function handleSetTemporalSampling(msg) {
-    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+  /** @param {Extract<WorkerInboundMsg, {type: 'setTemporalSampling'}>} msg @param {LiveSession} live */
+  function handleSetTemporalSampling(msg, {engine}) {
 
     engine.setTemporalSampling(msg.enabled);
-    return;
   }
 
   /** @param {Extract<WorkerInboundMsg, {type: 'render'}>} msg @param {number} elapsed */
@@ -470,12 +454,10 @@ function createSegmentWorkerSession() {
       presetIndex,
       warnings: divergenceWarnings.size > 0 ? [...divergenceWarnings.values()] : undefined,
     }, [pixelsCopy.buffer]);
-    return;
   }
 
-  /** @param {Extract<WorkerInboundMsg, {type: 'render'}>} msg */
-  function handleRender(msg) {
-    if (!engine || !wasmModule) throw new Error('segment_worker: handler without a live engine');
+  /** @param {Extract<WorkerInboundMsg, {type: 'render'}>} msg @param {LiveSession} live */
+  function handleRender(msg, {engine}) {
 
     // Fail fast: no reply would leave the frame outstanding until the watchdog.
     if (!segRange)
@@ -498,9 +480,8 @@ function createSegmentWorkerSession() {
     replyFrame(msg, elapsed);
   }
 
-  /** @type {{[Type in WorkerInboundMsg['type']]: (msg: Extract<WorkerInboundMsg, {type: Type}>) => void|Promise<void>}} */
+  /** @type {{[Type in Exclude<WorkerInboundMsg['type'], 'init'>]: (msg: Extract<WorkerInboundMsg, {type: Type}>, live: LiveSession) => void|Promise<void>}} */
   const handlers = {
-    init: initializeSession,
     setEffect: handleSetEffect,
     setResolution: handleSetResolution,
     setParameter: handleSetParameter,
@@ -515,7 +496,7 @@ function createSegmentWorkerSession() {
   /** @param {WorkerInboundMsg} msg @returns {Promise<void>} */
   async function handleMessage(msg) {
     if (engineDead) return;
-    if (msg.type === 'init') return handlers.init(msg);
+    if (msg.type === 'init') return initializeSession(msg);
     if (!engine || !wasmModule) {
       if (msg.type === 'render') {
         throw new Error('segment_worker: render before a completed init '
@@ -527,16 +508,17 @@ function createSegmentWorkerSession() {
       rejectBeforeInit(msg.type);
       return;
     }
+    const live = {engine, wasmModule};
     switch (msg.type) {
-      case 'setEffect': return handlers.setEffect(msg);
-      case 'setResolution': return handlers.setResolution(msg);
-      case 'setParameter': return handlers.setParameter(msg);
-      case 'setAnimationsPaused': return handlers.setAnimationsPaused(msg);
-      case 'selectPreset': return handlers.selectPreset(msg);
-      case 'setDisplayCaps': return handlers.setDisplayCaps(msg);
-      case 'setPoleLod': return handlers.setPoleLod(msg);
-      case 'setTemporalSampling': return handlers.setTemporalSampling(msg);
-      case 'render': return handlers.render(msg);
+      case 'setEffect': return handlers.setEffect(msg, live);
+      case 'setResolution': return handlers.setResolution(msg, live);
+      case 'setParameter': return handlers.setParameter(msg, live);
+      case 'setAnimationsPaused': return handlers.setAnimationsPaused(msg, live);
+      case 'selectPreset': return handlers.selectPreset(msg, live);
+      case 'setDisplayCaps': return handlers.setDisplayCaps(msg, live);
+      case 'setPoleLod': return handlers.setPoleLod(msg, live);
+      case 'setTemporalSampling': return handlers.setTemporalSampling(msg, live);
+      case 'render': return handlers.render(msg, live);
       default: {
         // Fail fast on protocol drift; `never` makes an unhandled
         // WorkerInboundMsg member a typecheck error.
