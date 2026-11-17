@@ -522,8 +522,7 @@ function createSegmentWorkerSession() {
           + `(engine=${engine ? 'set' : 'null'}, `
           + `segRange=${segRange ? 'set' : 'null'})`);
       }
-      if (!['setEffect', 'setResolution', 'setParameter', 'setAnimationsPaused',
-        'selectPreset', 'setDisplayCaps', 'setPoleLod', 'setTemporalSampling'].includes(msg.type))
+      if (!Object.hasOwn(handlers, msg.type))
         throw new Error(`segment_worker: unknown message type ${msg.type}`);
       rejectBeforeInit(msg.type);
       return;
