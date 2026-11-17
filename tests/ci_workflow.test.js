@@ -180,6 +180,42 @@ test('engine selection snapshots current master and preserves an explicit pair',
   }
 });
 
+for (const failures of [2, 4]) {
+  test(`engine selection handles ${failures} consecutive API failures`, (t) => {
+    const shell = findBash();
+    if (!shell) { t.skip('Bash is unavailable'); return; }
+    const scratch = scratchDir(t, 'daydream-engine-selection-retries-');
+    const output = join(scratch, 'output');
+    const attempts = join(scratch, 'attempts');
+    const current = 'c'.repeat(40);
+    const result = spawnSync(shell, ['-e', '-s'], {
+      encoding: 'utf8',
+      input: `
+        sleep() { :; }
+        gh() {
+          n=0
+          if [ -f "$ATTEMPTS" ]; then n=$(cat "$ATTEMPTS"); fi
+          n=$((n + 1))
+          printf '%s' "$n" > "$ATTEMPTS"
+          if [ "$n" -le "$FAILURES" ]; then printf 'temporary failure'; return 1; fi
+          printf '%s\\n' '${current}'
+        }
+        ${stepScript('engine-bundle.yml', 'Resolve engine pin')}
+      `,
+      env: { ...process.env, SELECTED_PIN: '', FAILURES: String(failures),
+        ATTEMPTS: attempts.replaceAll('\\', '/'), GITHUB_OUTPUT: output.replaceAll('\\', '/') },
+    });
+    assert.equal(readFileSync(attempts, 'utf8'), String(Math.min(failures + 1, 4)));
+    if (failures < 4) {
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(readFileSync(output, 'utf8').trim(), `pin=${current}`);
+    } else {
+      assert.notEqual(result.status, 0);
+      assert.match(result.stdout, /Selected engine must be one full commit/);
+    }
+  });
+}
+
 for (const [results, status, output] of [
   [{ build: { result: 'success' } }, 0, /\b1\b/],
   [{ build: { result: 'failure' } }, 1, /::error::.*"build":"failure"/],

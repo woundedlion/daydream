@@ -47,7 +47,11 @@ jobs:
         run: |
           pin="$SELECTED_PIN"
           if [ -z "$pin" ]; then
-            pin="$(gh api repos/woundedlion/pov/commits/master --jq .sha)"
+            for attempt in 1 2 3 4; do
+              if pin="$(gh api repos/woundedlion/pov/commits/master --jq .sha)"; then break; fi
+              pin=''
+              if [ "$attempt" -lt 4 ]; then sleep 5; fi
+            done
           fi
           if ! printf '%s' "$pin" | grep -Eq '^[0-9a-f]{40}$'; then
             echo "::error::Selected engine must be one full commit"
