@@ -453,7 +453,7 @@ export function createChainValidator(createModule) {
         if (!replay.mesh) return rejected();
         let adjusted = false;
         if (!replayMeshOps(replay, candidate, {
-          before: (_mesh, op) => { what = `Op "${chainOpName(op)}"`; },
+          before: (mesh, op) => { what = `Op "${chainOpName(op)}"`; },
           applied: () => { adjusted = Ops.getLastAdjusted(); },
           after: () => !adjusted,
         })) return saturated();
