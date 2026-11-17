@@ -270,20 +270,12 @@ export class Daydream {
     this.statsView = statsView;
   }
 
-  /**
-   * Wire WebGL context-loss / -restore handling on the canvas: on loss, flag
-   * contextLost (render() then stops issuing GL calls), end any recording, and
-   * show a reload prompt.
-   */
+  /** Bind canvas context-loss and restore handling. */
   setupContextLossHandling() {
     setupContextLossHandling(this);
   }
 
-  /**
-   * Give the canvas a keyboard route to the orbit controls, which OrbitControls
-   * itself exposes only to pointer input: arrow keys rotate about the orbit
-   * target, +/- dolly in and out.
-   */
+  /** Bind keyboard orbit controls. */
   setupKeyboardOrbit() {
     setupKeyboardOrbit(this, Daydream);
   }
@@ -303,12 +295,9 @@ export class Daydream {
     cancelViewReset(this);
   }
 
-  /**
-   * Keyboard handler: space toggles pause; right-arrow single-steps while
-   * paused; left/right select presets while running.
-   * @param {KeyboardEvent} e - The keydown event driving playback or presets.
-   * @param {(delta: number) => boolean} [movePreset] - Selects an adjacent preset.
-   */
+  /** Handle playback and preset keys.
+   * @param {KeyboardEvent} e - Key event.
+   * @param {(delta: number) => boolean} [movePreset] - Preset selector. */
   keydown(e, movePreset = () => false) {
     keydown(this, e, movePreset);
   }
@@ -525,10 +514,7 @@ export class Daydream {
     resetPovOnNextFrame(this);
   }
 
-  /**
-   * Rebuild the floating axis labels, acquiring pooled sprites only for those on
-   * the camera-facing hemisphere.
-   */
+  /** Refresh axis labels. */
   refreshLabels() {
     refreshLabels(this, Daydream);
   }
@@ -557,19 +543,12 @@ export class Daydream {
     setStrobeColumns(this, strobe);
   }
 
-  /**
-   * Render the main sphere view into its viewport. Assumes the scissor test is
-   * already enabled by the caller.
-   */
+  /** Render the main sphere viewport. */
   renderMainView() {
     renderMainView(this);
   }
 
-  /**
-   * Render the picture-in-picture corner view: the sphere seen from the antipode
-   * of the main camera. Skipped while showPip is off, in a compact viewport,
-   * under headless automation (navigator.webdriver), and while recording.
-   */
+  /** Render the picture-in-picture viewport. */
   renderPip() {
     renderPip(this);
   }
@@ -585,12 +564,7 @@ export class Daydream {
     this.dotMesh = null;
   }
 
-  /**
-   * (Re)build the InstancedMesh of dots, one instance per pixel (W*H). Disposes
-   * any previous mesh, lazily builds the dot material (whose injected shader
-   * hides black pixels and back-face-culls the far hemisphere), and picks a
-   * sphere tessellation that drops as pixel count rises to cap geometry cost.
-   */
+  /** Build the pixel dot mesh. */
   setupDots() {
     setupDots(this);
   }
@@ -662,11 +636,9 @@ export class Daydream {
     this.invalidate();
   }
 
-  /**
-   * Hand one frame's measurements to the stats overlay.
+  /** Update the stats overlay.
    * @param {number} duration - Frame draw time in milliseconds.
-   * @param {{getArenaMetrics?: () => ArenaMetrics|null}} adapter - Render adapter; its getArenaMetrics() supplies arena usage when present.
-   */
+   * @param {{getArenaMetrics?: () => ArenaMetrics|null}} adapter - Render adapter. */
   updateStats(duration, adapter) {
     return updateStats(this, duration, adapter);
   }

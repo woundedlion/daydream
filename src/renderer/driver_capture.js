@@ -7,9 +7,9 @@
 
 /**
  * Hand one frame's measurements to the stats overlay.
+ * @param {import('./driver.js').Daydream} driver - Display state.
  * @param {number} duration - Frame draw time in milliseconds.
  * @param {{getArenaMetrics?: () => ArenaMetrics|null}} adapter - Render adapter; its getArenaMetrics() supplies arena usage when present.
- * @param {import('./driver.js').Daydream} driver - Display state.
  */
 export function updateStats(driver, duration, adapter) {
   driver.statsView?.update(duration, adapter?.getArenaMetrics?.() ?? null);

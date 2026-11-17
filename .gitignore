@@ -2,10 +2,8 @@
 # Match at any depth so a stray install under tests/ is never committed.
 node_modules/
 
-# Vendored third-party libraries served directly by the page. These are large
-# and reproducible; keeping them out of the repo avoids accidental vendoring
-# commits and a bloated GitHub Pages artifact. (package-lock.json IS committed
-# so the dependency set stays pinned.)
+# Local library trees: three.js/ feeds npm run importmap:local; vendor/ is
+# skipped by lint and test discovery.
 /three.js/
 /vendor/
 

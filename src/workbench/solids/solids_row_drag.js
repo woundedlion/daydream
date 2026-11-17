@@ -40,7 +40,7 @@ export function createSolidsRowDrag(page, actions, dependencies = {}) {
 
   /**
    * Update the row reorder preview for the current pointer position.
-   * @param {{el: HTMLElement, grip: HTMLElement, list: HTMLElement, index: number, originX: number, originY: number, originListTop: number, originListLeft: number}} gesture - Drag state.
+   * @param {RowGesture} gesture - Drag state.
    * @param {PointerEvent} e - Pointer position.
    */
   function moveRowDragPreview(gesture, e) {
