@@ -16,7 +16,9 @@ const PALETTE_GAP = 4;
  *   commit: (label: string|null) => boolean,
  *   report: (result: *) => boolean, announce: (message: string) => void,
  *   pinnedLabels: Set<string>}} deps
- * @returns {*} Operator palette gestures and anchor state.
+ * @returns {{open: (options: {kind: 'insert'|'replace', index: number, anchor: HTMLElement}) => void,
+ * close: () => void, pointerDown: (event: *) => void, anchor: () => HTMLElement|null,
+ * forget: () => void}} Operator palette gestures and anchor state.
  */
 export function createChainPalette({doc, el, store, presentation, commit, report, announce, pinnedLabels}) {
   const {opOf, socketChoices, choiceKey, choiceEntries} = presentation;

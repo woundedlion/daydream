@@ -21,7 +21,7 @@
 
 /**
  * The live chain editor: its document store and strip.
- * @typedef {{store: import('./chain_document_store.js').ChainStore, strip: *}} ChainUi
+ * @typedef {{store: import('./chain_document_store.js').ChainStore, strip: import('./chain_strip.js').ChainStrip}} ChainUi
  */
 
 /**
