@@ -185,7 +185,15 @@ function workbenchMounts() {
     'shader-document-status', 'shader-document-notice', 'shader-document-error',
     'shader-document-digest', 'shader-parity-toggle',
     'shader-animation-toggle', 'shader-document-save-as',
-  ].map((id) => [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
+  ].map((id) => {
+    const toolbar = ['shader-document-open', 'shader-document-save',
+      'shader-document-save-as', 'shader-document-digest',
+      'shader-parity-toggle', 'shader-animation-toggle'].includes(id);
+    const element = fakeElement(toolbar ? 'button'
+      : id === 'shader-document-file' ? 'input' : id.endsWith('select') ? 'select' : 'div');
+    if (toolbar) element.disabled = id !== 'shader-document-open';
+    return [id, element];
+  }));
   const scratch = fakeElement('option');
   scratch.value = '';
   scratch.textContent = 'Scratch Chain';
@@ -230,7 +238,6 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
                      useDefaultFetch = false,
                      wrapImportCompiler = (f) => f } = {}) {
   const elements = workbenchMounts();
-  elements.get('shader-document-save').disabled = true;
 
   const downloads = [];
   const selections = [];

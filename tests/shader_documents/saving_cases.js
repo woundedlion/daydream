@@ -20,7 +20,9 @@ test('Save writes the canonical v2 serialization', async () => {
 test('Save As writes a new document id and leaves the loaded one alone', async () => {
   const harness = await editorWorkbench();
 
-  assert.equal(await harness.controller.saveAs(), true);
+  harness.elements.get('shader-document-save-as').dispatch('click');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(harness.downloads.length, 1);
   const [copyName, copySource] = harness.downloads.at(-1);
   const copy = JSON.parse(copySource);
   assert.equal(copy.document_id, 'chain-study-copy1');

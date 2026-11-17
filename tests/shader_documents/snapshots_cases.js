@@ -182,6 +182,7 @@ test('the descriptor digest button copies the full digest and announces failures
   const harness = await editorWorkbench();
   const button = harness.elements.get('shader-document-digest');
   const status = harness.elements.get('shader-document-status');
+  assert.equal(button.disabled, false);
   const digest = button.dataset.digest;
   assert.ok(digest.length > button.textContent.length);
   const copied = [];

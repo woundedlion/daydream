@@ -445,34 +445,41 @@ test('Symmetric snapshot restore requires current controls and rotation state in
 });
 
 test('live composed groups cover every parameter and both planar-warp slots', () => {
-  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(Object.hasOwn(engine.getEffectSizes(), 'Shader'), false,
     'the slot workbench is absent from the active effect roster');
   const unassigned = [];
   const misplaced = [];
   const dualWarpRosters = [];
   let checked = 0;
-  for (const effect of Object.keys(engine.getEffectSizes())) {
-    if (engine.setEffect(effect) !== M.EffectSetResult.INSTALLED) continue;
-    const presets = Math.max(1, engine.getPresetCount());
-    for (let preset = 0; preset < presets; ++preset) {
-      if (preset > 0) assert.equal(engine.selectPreset(preset), true, `${effect} preset ${preset}`);
-      const definitions = Array.from(engine.getParameterDefinitions());
-      if (!definitions.some((entry) => entry.group)) continue;
-      ++checked;
-      const assignments = stageGrouping(definitions)?.assignments;
-      for (const definition of definitions) {
-        if (!assignments?.has(definition.name)) {
-          unassigned.push(`${effect} preset ${preset}: ${definition.name}`);
+  for (const resolution of [[W, H], [288, 144]]) {
+    assert.ok(resolutionOk(engine.setResolution(...resolution)), `${resolution.join('x')} must stay buildable`);
+    for (const effect of Object.keys(engine.getEffectSizes())) {
+      if (engine.setEffect(effect) !== M.EffectSetResult.INSTALLED) continue;
+      const presets = Math.max(1, engine.getPresetCount());
+      for (let preset = 0; preset < presets; ++preset) {
+        if (preset > 0) assert.equal(engine.selectPreset(preset), true, `${resolution.join('x')} ${effect} preset ${preset}`);
+        const definitions = Array.from(engine.getParameterDefinitions());
+        const assignments = stageGrouping(definitions)?.assignments;
+        if (['KaleidoscopeMelt', 'KaleidoscopeSmooth', 'AshCloud', 'ChromaticLichen'].includes(effect)) {
+          assert.ok(assignments, `${resolution.join('x')} ${effect} preset ${preset}`);
+          if (effect === 'KaleidoscopeSmooth')
+            assert.equal(assignments.get('Mirror Rotation'), 'Planar Warp 2');
         }
-      }
-      if (definitions.some((entry) => entry.name === 'Singularity Fade')
-          && assignments?.get('Singularity Fade') !== 'Projection') {
-        misplaced.push(`${effect} preset ${preset}: Singularity Fade`);
-      }
-      if (assignments?.get('Planar Warp 1 Speed') === 'Planar Warp 1'
-          && assignments?.get('Planar Warp 2 Speed') === 'Planar Warp 2') {
-        dualWarpRosters.push(`${effect} preset ${preset}`);
+        if (!definitions.some((entry) => entry.group)) continue;
+        ++checked;
+        for (const definition of definitions) {
+          if (!assignments?.has(definition.name)) {
+            unassigned.push(`${resolution.join('x')} ${effect} preset ${preset}: ${definition.name}`);
+          }
+        }
+        if (definitions.some((entry) => entry.name === 'Singularity Fade')
+            && assignments?.get('Singularity Fade') !== 'Projection') {
+          misplaced.push(`${resolution.join('x')} ${effect} preset ${preset}: Singularity Fade`);
+        }
+        if (assignments?.get('Planar Warp 1 Speed') === 'Planar Warp 1'
+            && assignments?.get('Planar Warp 2 Speed') === 'Planar Warp 2') {
+          dualWarpRosters.push(`${resolution.join('x')} ${effect} preset ${preset}`);
+        }
       }
     }
   }

@@ -144,26 +144,6 @@ test('preset values survive URL reload after flushed or pending parameter edits'
   }
 });
 
-test('composed engine definitions publish complete pipeline groups', async () => {
-  const {stageGrouping} = await import('../src/effects/shader_stages.js');
-  const module = await loadEngineModule();
-  const engine = new module.HolosphereEngine();
-  try {
-    for (const resolution of [[96, 20], [288, 144]]) {
-      assert.notEqual(engine.setResolution(...resolution), module.ResolutionSetResult.UNSUPPORTED, resolution.join('x'));
-      for (const effect of ['KaleidoscopeMelt', 'KaleidoscopeSmooth', 'AshCloud', 'ChromaticLichen']) {
-        assert.equal(engine.setEffect(effect), module.EffectSetResult.INSTALLED, effect);
-        const parameters = engine.getParameterDefinitions();
-        const assignments = stageGrouping(parameters)?.assignments;
-        assert.ok(assignments, effect);
-        assert.equal(assignments.size, parameters.length);
-        if (effect === 'KaleidoscopeSmooth')
-          assert.equal(assignments.get('Mirror Rotation'), 'Planar Warp 2');
-      }
-    }
-  } finally { engine.delete(); }
-});
-
 test('URL numbers resolve every implicit slider step in live effect ranges', async () => {
   const module = await loadEngineModule();
   const engine = new module.HolosphereEngine();

@@ -23,64 +23,18 @@ import {createSolidsPage, setOps} from '../src/workbench/solids/solids_state.js'
 
 function fakePage(context) {
   const page = createSolidsPage(undefined);
-  for (const [group, fields] of Object.entries({
-    "engine": [
-      "wasmModule",
-      "meshOpsWasm",
-      "createHolosphereModule",
-      "arenaMetricsTimer",
-      "validator",
-      "opGate"
-    ],
-    "mesh": [
-      "currentMesh",
-      "currentMeshIsCurrent",
-      "currentFaceClasses",
-      "currentClassifyFailure"
-    ],
-    "scene": [
-      "camera",
-      "scene",
-      "renderer",
-      "controls",
-      "meshRenderer",
-      "labelsContainer",
-      "labelsNeedReproject"
-    ],
-    "registry": [
-      "baseThumbnails",
-      "simpleSolids",
-      "islamicStarPatterns",
-      "registrySolidNames"
-    ],
-    "doc": [
-      "opsRevision",
-      "dropSlotChecks",
-      "dropSlotGen",
-      "parameterEdits",
-      "savedStore",
-      "savedStorage",
-      "savedSolids",
-      "savedStorageStatus"
-    ],
-    "view": [
-      "gateMsgTimer",
-      "reducedMotion"
-    ]
-  })) {
-    for (const key of fields) Object.defineProperty(page[group], key, {
-      configurable: true, get: () => key in context ? context[key] : undefined,
-      set: value => { context[key] = value; },
-    });
+  for (const [group, fields] of Object.entries(page)) {
+    for (const key of Object.keys(fields)) {
+      const stateField = group === 'doc' && ['base', 'ops'].includes(key)
+        || group === 'view' && !['gateMsgTimer', 'reducedMotion'].includes(key);
+      Object.defineProperty(fields, key, {
+        configurable: true,
+        get: () => stateField ? context.state?.[key] : context[key],
+        set: value => { (stateField ? context.state : context)[key] = value; },
+      });
+    }
   }
   page.doc.parameterEdits ??= new Map();
-  for (const key of ['base', 'ops']) Object.defineProperty(page.doc, key, {
-    get: () => context.state?.[key], set: value => { context.state[key] = value; },
-  });
-  for (const key of Object.keys(page.view).filter(key => !['gateMsgTimer','reducedMotion'].includes(key)))
-    Object.defineProperty(page.view, key, {
-      get: () => context.state?.[key], set: value => { context.state[key] = value; },
-    });
   return page;
 }
 

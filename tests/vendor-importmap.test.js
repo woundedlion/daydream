@@ -7,6 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { servedPages } from './helpers/site_pages.js';
+import { isolatedGitEnv } from './helpers/fixture_repo.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = readFileSync(join(REPO, 'vendor-importmap.js'), 'utf8');
@@ -22,7 +23,7 @@ after(() => rmSync(FIXTURE, { recursive: true, force: true }));
  * @returns {string} The rewritten source, with a locally-resolved VENDOR block.
  */
 const generateLocalSrc = () => {
-  execFileSync('git', ['init', '-q'], { cwd: FIXTURE });
+  execFileSync('git', ['init', '-q'], { cwd: FIXTURE, env: isolatedGitEnv() });
   copyFileSync(join(REPO, 'package.json'), join(FIXTURE, 'package.json'));
   copyFileSync(join(REPO, 'vendor-importmap.js'), join(FIXTURE, 'vendor-importmap.js'));
   // --local resolves a library locally only where its vendored entry point exists.
@@ -31,7 +32,7 @@ const generateLocalSrc = () => {
   mkdirSync(join(FIXTURE, 'node_modules', 'lil-gui', 'dist'), { recursive: true });
   writeFileSync(join(FIXTURE, 'node_modules', 'lil-gui', 'dist', 'lil-gui.esm.min.js'), '');
   execFileSync(process.execPath, [join(REPO, 'scripts', 'generate-importmap.mjs'), '--root', FIXTURE, '--local'],
-    { stdio: ['ignore', 'ignore', 'inherit'] });
+    { stdio: ['ignore', 'ignore', 'inherit'], env: isolatedGitEnv() });
   return readFileSync(join(FIXTURE, 'vendor-importmap.js'), 'utf8');
 };
 
