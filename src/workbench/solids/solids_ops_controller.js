@@ -76,13 +76,20 @@ export function createSolidsOpsController(page, actions, dependencies = {}) {
   function updateOpParam(index, key, value, revision) {
     if (revision !== page.doc.opsRevision || !page.doc.ops[index]) return;
     const def = env.OP_DEFS[page.doc.ops[index].op]?.params?.[key];
+    const item = (/** @type {HTMLElement} */ (env.document.getElementById('opsList'))).children[index];
+    const row = item && [.../** @type {NodeListOf<HTMLElement>} */ (item.querySelectorAll('.op-param'))].find(r => r.dataset.key === key);
+    const slider = (/** @type {HTMLInputElement|null|undefined} */ (row?.querySelector('input[type="range"]')));
+    const range = def && slider ? {...def,
+      min: Math.min(Number(slider.min), def.min),
+      max: Math.max(Number(slider.max), def.max)}
+      : def && env.authoredParamRange(def, page.doc.ops[index].params[key]);
     let val = parseFloat(value);
     const invalidValue = Number.isNaN(val);
     if (invalidValue) {
       val = page.doc.ops[index].params[key];
     } else if (def) {
       val = val === page.doc.ops[index].params[key]
-        ? val : env.snapToStep(val, env.authoredParamRange(def, page.doc.ops[index].params[key]));
+        ? val : env.snapToStep(val, range);
     }
     const editKey = `${revision}:${index}:${key}`;
     const edit = Symbol();
@@ -92,10 +99,8 @@ export function createSolidsOpsController(page, actions, dependencies = {}) {
       params: { ...page.doc.ops[index].params, [key]: val },
     };
 
-    const item = (/** @type {HTMLElement} */ (env.document.getElementById('opsList'))).children[index];
-    const row = item && [.../** @type {NodeListOf<HTMLElement>} */ (item.querySelectorAll('.op-param'))].find(r => r.dataset.key === key);
+
     if (row) {
-      const slider = (/** @type {HTMLInputElement|null} */ (row.querySelector('input[type="range"]')));
       const input = (/** @type {HTMLInputElement|null} */ (row.querySelector('input[type="number"]')));
 
       if (slider) slider.value = String(val);

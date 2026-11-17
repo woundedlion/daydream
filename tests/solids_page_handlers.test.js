@@ -1139,3 +1139,22 @@ test('replacing the op list invalidates row revisions and pending parameter edit
   assert.equal(page.doc.opsRevision, 1);
   assert.equal(page.doc.parameterEdits.size, 0);
 });
+
+
+test('off-band operation sliders retain their rendered range across edits', () => {
+  const state = {base: 'cube', ops: [{op: 'truncate', params: {t: 0.87266463}}]};
+  const slider = {min: '0', max: '0.8727', value: ''};
+  const input = {value: ''};
+  const row = {dataset: {key: 't'}, contains: () => false,
+    querySelector: selector => selector.includes('range') ? slider : input};
+  const item = {querySelectorAll: () => [row]};
+  const edit = ops({state, opsRevision: 1, OP_DEFS, authoredParamRange, snapToStep,
+    parameterEdits: new Map(), formatParamValue: String, syncSweepWarning() {},
+    document: {getElementById: () => ({children: [item]})},
+    opTopologyKey: () => 'same', scheduleUpdate() {},
+  }).updateOpParam;
+  edit(0, 't', '0.7', 1);
+  edit(0, 't', '0.8', 1);
+  assert.equal(state.ops[0].params.t, 0.8);
+  assert.equal(slider.value, '0.8');
+});
