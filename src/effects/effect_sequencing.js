@@ -7,7 +7,6 @@
 
 import {createEffectSelector, readSidebarMetrics} from './effect_apply_helpers.js';
 import { resolveActiveEffect } from "./effect_roster.js";
-import { getChainSnapshot as readEngineChainSnapshot, restoreChainSnapshot as restoreEngineChainSnapshot } from '../engine/workbench_bindings.js';
 
 /** @typedef {import('../../generated/holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
 /** @typedef {import('../../generated/holosphere_wasm.js').HolosphereModule} HolosphereModule */
@@ -325,8 +324,10 @@ export function createSwitchCoordinator({
  * @param {() => HolosphereEngine|null} deps.getEngine - The main WASM engine, null until
  *   the module finishes loading.
  * @param {() => HolosphereModule} deps.getModule - The loaded WASM module, for its
- *   EffectSetResult, ResolutionSetResult and ChainSnapshotRestoreResult enums;
+ *   EffectSetResult and ResolutionSetResult enums;
  *   non-null whenever getEngine() answers an engine.
+ * @param {() => *} [deps.getChainSnapshot] - Captures engine-owned runtime state.
+ * @param {(snapshot: *) => boolean} [deps.restoreChainSnapshot] - Restores engine-owned runtime state.
  * @param {() => void} deps.invalidateEngineView - Drops the cached pixel view so
  *   the next refresh re-fetches it after a resize.
  * @param {Object<string, {w: number, h: number, dotSize: number}>} deps.presets -
@@ -362,6 +363,8 @@ export function createApplyPipeline({
   appState,
   getEngine,
   getModule,
+  getChainSnapshot = () => null,
+  restoreChainSnapshot = () => false,
   invalidateEngineView,
   presets,
   availableEffects,
@@ -396,7 +399,7 @@ export function createApplyPipeline({
     // A rejected effect leaves the engine unchanged; return before the worker
     // broadcast.
     if (getEngine() && !selectEngineEffect()) return ApplyResult.REJECTED;
-    if (chainSnapshot && restoreEngineChainSnapshot(getEngine(), getModule(), chainSnapshot) !== getModule().ChainSnapshotRestoreResult.APPLIED)
+    if (chainSnapshot && !restoreChainSnapshot(chainSnapshot))
       return ApplyResult.REJECTED;
 
     effectGui.destroy();
@@ -442,7 +445,7 @@ export function createApplyPipeline({
     }
 
     const engine = getEngine();
-    const chainSnapshot = readEngineChainSnapshot(engine);
+    const chainSnapshot = getChainSnapshot();
     if (engine) {
       // Only UNSUPPORTED rejects; RESIZED and ALREADY_ACTIVE both leave the
       // requested size active.

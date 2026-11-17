@@ -93,6 +93,9 @@ export function createAppEffects({doc, win, host, loaded, segments, display, app
     appState,
     getEngine: () => host.engine,
     getModule: () => loaded.module,
+    getChainSnapshot: () => getChainSnapshot(host.engine),
+    restoreChainSnapshot: (snapshot) => restoreChainSnapshot(host.engine, loaded.module, snapshot)
+      === loaded.module.ChainSnapshotRestoreResult.APPLIED,
     invalidateEngineView: () => host.invalidateView(),
     presets: resolutionPresets,
     availableEffects,

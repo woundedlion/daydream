@@ -423,15 +423,6 @@ function makeApp({
   };
 
   const engine = {
-    getShaderChainBindings: () => chainSnapshot ? {
-      getSnapshot: () => { log.push('chain.capture'); return structuredClone(chainSnapshot); },
-      restoreSnapshot: (snapshot) => {
-        log.push('chain.restore');
-        assert.deepEqual(snapshot, chainSnapshot);
-        return restoreSnapshotResult;
-      },
-      delete: () => {},
-    } : null,
     setEffect(name) {
       log.push(`engine.setEffect ${name}`);
       return rejectedEffects.has(name)
@@ -464,7 +455,17 @@ function makeApp({
   const pipeline = createApplyPipeline({
     appState,
     getEngine: () => (noEngine ? null : engine),
-    getModule: () => (noEngine ? null : { EffectSetResult, ResolutionSetResult, ChainSnapshotRestoreResult }),
+    getModule: () => (noEngine ? null : { EffectSetResult, ResolutionSetResult }),
+    getChainSnapshot: () => {
+      if (noEngine || !chainSnapshot) return null;
+      log.push('chain.capture');
+      return structuredClone(chainSnapshot);
+    },
+    restoreChainSnapshot: (snapshot) => {
+      log.push('chain.restore');
+      assert.deepEqual(snapshot, chainSnapshot);
+      return restoreSnapshotResult === ChainSnapshotRestoreResult.APPLIED;
+    },
     invalidateEngineView: () => log.push('host.invalidateView'),
     presets: APPLY_PRESETS,
     availableEffects: (label) => offers[label],
