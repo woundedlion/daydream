@@ -430,13 +430,13 @@ body {
   border-color: #f87171;
 }
 
+.move-op-btn, .remove-op-btn, .del-btn, .saved-clash-btn {
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+}
+
 /* Small screens: stack the columns and let the page scroll. */
 @media (max-width: 900px) {
-  .move-op-btn, .remove-op-btn, .del-btn, .saved-clash-btn {
-    min-width: 1.5rem;
-    min-height: 1.5rem;
-  }
-
   :root {
     --main-width: 100vw;
   }
