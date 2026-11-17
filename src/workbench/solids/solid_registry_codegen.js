@@ -14,7 +14,7 @@ import {
 } from './solid_validation.js';
 import {
   chainOpName, CATALAN_BASES, DEFINED_SEED_CONSTANTS, OP_DEFS, KNOWN_OPS,
-  SIMPLE_SEEDS, exactHankinDegrees, opParams, opsFromRecipe,
+  SIMPLE_SEEDS, exactHankinDegrees, opParams, opsFromRecipe, opTopologyKey,
 } from './solid_op_params.js';
 import { generateFuncAndRecipe, snakeIdentifier } from './solid_codegen.js';
 import { engineHalted } from '../../shared/engine_halt.js';
@@ -33,8 +33,8 @@ export const LOWERING = {
   needle: () => ['dual', 'kis'],
   zip: () => ['kis', 'dual'],
   gyro: () => [{ op: 'snub', params: { t: 0.5, twist: 0 } }, 'dual'],
-  bevel: (op) => ['ambo', typeof op !== 'string' && Math.fround(op.params?.t ?? NaN) === 0.5
-    ? 'ambo' : { op: 'truncate', params: typeof op === 'string' ? {} : (op.params ?? {}) }],
+  bevel: (op) => ['ambo', opTopologyKey(op) === 'bevel:ambo'
+    ? 'ambo' : { op: 'truncate', params: opParams(op) }],
 };
 
 /**
