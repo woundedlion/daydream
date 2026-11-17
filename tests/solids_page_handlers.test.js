@@ -101,6 +101,19 @@ const gate = context => factoryHandlers(createSolidsOpGateView, context);
 const saved = context => factoryHandlers(createSolidsSavedController, context);
 const bases = context => factoryHandlers(createSolidsBasePicker, context);
 
+test('the operations controller wires its clear button and add grid', () => {
+  const controls = new Map(['clearOpsBtn', 'addOpGrid'].map(id => [id, fakeElement('button')]));
+  const calls = [];
+  ops({
+    document: { getElementById: id => controls.get(id) },
+    resetOps: () => calls.push('reset'),
+    activateAddOp: () => calls.push('add'),
+  }).wireOpControls();
+  controls.get('clearOpsBtn').dispatch('click');
+  controls.get('addOpGrid').dispatch('click');
+  assert.deepEqual(calls, ['reset', 'add']);
+});
+
 test('solids view toggles share the state used to render and publish them', () => {
   const state = { autoRotate: false, showNormals: false, showIndices: true };
   const buttons = new Map(['toggleRotate', 'toggleNormals', 'toggleIndices']

@@ -43,6 +43,7 @@ async function init() {
   actions.updateArenaMetrics();
   if (!page.engine.wasmModule) return;
   actions.mountSolidScene();
+  actions.wireOpControls();
   actions.wireSavedSolidControls();
   actions.generateThumbnails(thumbnailAbort.signal).catch(error => {
     if (actions.engineTrapped(error)) return;

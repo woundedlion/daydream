@@ -17,6 +17,12 @@ function defaultDependencies() {
  * @param {Partial<ReturnType<typeof defaultDependencies>>} [dependencies] */
 export function createSolidsOpsController(page, actions, dependencies = {}) {
   const env = {...defaultDependencies(), ...dependencies};
+  /** Wires operation-chain controls. @returns {void} */
+  function wireOpControls() {
+    (/** @type {HTMLElement} */ (env.document.getElementById('clearOpsBtn'))).addEventListener('click', actions.resetOps);
+    (/** @type {HTMLElement} */ (env.document.getElementById('addOpGrid'))).addEventListener('click', actions.activateAddOp);
+  }
+
   /** @param {number} from @param {number} to @param {number} revision @returns {void} */
   function reorderOp(from, to, revision) {
     if (revision !== page.doc.opsRevision) return;
@@ -193,5 +199,5 @@ export function createSolidsOpsController(page, actions, dependencies = {}) {
       actions.update();
     });
   }
-  return { reorderOp, renderOps, updateOpParam, removeOp, activateAddOp, addOp, resetOps };
+  return { wireOpControls, reorderOp, renderOps, updateOpParam, removeOp, activateAddOp, addOp, resetOps };
 }

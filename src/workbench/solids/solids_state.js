@@ -38,6 +38,7 @@ import {loadSavedSolids, resolveSavedSolidsStorage} from './solid_saved_store.js
  * @property {(event: Event) => void} activateAddOp
  * @property {(name: string) => void} addOp
  * @property {() => void} resetOps
+ * @property {() => void} wireOpControls
  * @property {(from: number, target: number) => Promise<void>} checkDropSlot
  * @property {(event: PointerEvent, list: HTMLElement) => number} getDragTargetIndex
  * @property {(gesture: import('./solids_row_drag.js').RowGesture, event: PointerEvent) => void} moveRowDragPreview

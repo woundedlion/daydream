@@ -58,7 +58,6 @@ export function createSolidsSavedController(page, actions, dependencies = {}) {
   function wireSavedSolidControls() {
     (/** @type {HTMLElement} */ (env.document.getElementById('saveBtn'))).addEventListener('click', actions.saveSolid);
 
-    (/** @type {HTMLElement} */ (env.document.getElementById('clearOpsBtn'))).addEventListener('click', actions.resetOps);
     (/** @type {HTMLElement} */ (env.document.getElementById('exportSavedBtn'))).addEventListener('click', actions.exportSavedSolids);
     const importFile = /** @type {HTMLInputElement} */ (env.document.getElementById('importSavedFile'));
     (/** @type {HTMLElement} */ (env.document.getElementById('importSavedBtn'))).addEventListener('click', () => importFile.click());
@@ -73,8 +72,6 @@ export function createSolidsSavedController(page, actions, dependencies = {}) {
       }
     });
     (/** @type {HTMLElement} */ (env.document.getElementById('clearSavedBtn'))).addEventListener('click', actions.clearSavedSolids);
-    (/** @type {HTMLElement} */ (env.document.getElementById('addOpGrid'))).addEventListener('click', actions.activateAddOp);
-
   }
 
   /** Reloads saved cards after a storage update. @param {StorageEvent} event @returns {void} */
