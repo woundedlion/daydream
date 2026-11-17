@@ -320,6 +320,34 @@ Parameter keys remain in the `fx` namespace.
 
 | Module | Responsibility |
 | --- | --- |
+| `src/app/frame_loop_guard.js` | Per-frame error reporting, recovery and terminal module release |
+| `src/app/module_load.js` | WASM startup deadline, load completion and disposal guards |
+| `src/app/render_adapter.js` | Per-frame engine and worker integration, display aliases and capture readiness |
+| `src/effects/effect_apply_helpers.js` | Engine effect selection, strobe layout and sidebar metrics |
+| `src/renderer/dot_detail.js` | Sphere tessellation detail from display pixel count |
+| `src/renderer/label_pool.js` | Reusable projected-label elements and their lifetimes |
+| `src/shared/aria_description.js` | Adds and removes a widget's ARIA description references |
+| `src/shared/dom.js` | Type-checked DOM lookup by ID |
+| `src/ui/effect_action_feedback.js` | Effect action labels, clipboard results and accessible feedback |
+| `src/ui/effect_param_controllers.js` | Engine parameter controller creation, order and value synchronization |
+| `src/ui/lil_gui_adapter.js` | Panel collapse state and forced updates to read-only number controls |
+| `src/workbench/palettes/hue_key_handles.js` | Editable hue wheel handles and keyboard nudging |
+| `src/workbench/palettes/palette_controls/math.js` | Hue wrapping and axis endpoint conversions |
+| `src/workbench/palettes/palette_controls/model.js` | V4 palette recipe schema and enumerants |
+| `src/workbench/palettes/palette_controls/recipe.js` | V4 control mappings, availability rules and preset recipes |
+| `src/workbench/palettes/palette_controls/view.js` | Palette tabs, strip viewport gestures and accessible view state |
+| `src/workbench/palettes/strip_copy_feedback.js` | Palette strip color copying, feedback and timer cleanup |
+| `src/workbench/shader/chain_chip_drag.js` | Stage chip drag tracking, drop targets and reorder feedback |
+| `src/workbench/shader/chain_document_edits.js` | Validated chain structure and preset edits |
+| `src/workbench/shader/chain_document_history.js` | Chain snapshots, undo and redo, and coalescing parameter edits |
+| `src/workbench/shader/chain_document_legality.js` | Operator replacement and span legality |
+| `src/workbench/shader/chain_row_controls.js` | Inline enum, slider and numeric controls for stage parameters |
+| `src/workbench/shader/chain_selection.js` | Active, focused and pinned stage selection |
+| `src/workbench/shader/chain_viewport.js` | Chain strip scroll and focus geometry |
+| `src/workbench/shader/shader_document_edits.js` | Preset application and stage parameter routing for compiled and editable builds |
+| `src/workbench/shader/shader_document_loader.js` | Shader document adoption, build selection and toolbar restoration |
+| `src/workbench/shader/shader_document_persistence.js` | Saving, downloading and copying shader documents |
+| `src/workbench/shader/shader_document_state.js` | Active document, chain editor, catalogs and controller state |
 | `src/workbench/solids/solids_state.js` | Typed page state, operation revisions, validator and commit queue |
 | `src/workbench/solids/solids_engine.js` | Engine lifecycle, arena metrics and mesh recomputation |
 | `src/workbench/solids/solids_scene.js` | Preview materials, scene lifecycle, view toggles and label projection |
