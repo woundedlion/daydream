@@ -912,18 +912,18 @@ test('a pooled effect switch offers pause only for a preset bank', async (t) => 
 
 test('simulator shares canonical identity, preserves display metadata and reloads its route', async (t) => {
   t.mock.timers.enable({apis: ['setTimeout']});
-  const document = offeredIds(HIGH_RES).find((id) => SHADER_DOCUMENT_EFFECTS.includes(id));
-  assert.ok(document);
+  const documentEffect = offeredIds(HIGH_RES).find((id) => SHADER_DOCUMENT_EFFECTS.includes(id));
+  assert.ok(documentEffect);
   const app = await bootedApp({search: `?effect=${SIMULATOR_EFFECT.display_name}&fx.Speed=0.7`,
     loadModule: async () => fakeWasmModule()});
   const option = app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
-    .find((entry) => entry.dataset.effect === document);
+    .find((entry) => entry.dataset.effect === documentEffect);
   assert.ok(option);
-  assert.equal(option.getAttribute('aria-label').startsWith(`${effectDisplayName(document)}, `), true);
+  assert.equal(option.getAttribute('aria-label').startsWith(`${effectDisplayName(documentEffect)}, `), true);
   option.onclick();
   t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
   const shared = new URL(app.urlWrites.at(-1), 'https://example.test');
-  assert.equal(shared.searchParams.get('effect'), document);
+  assert.equal(shared.searchParams.get('effect'), documentEffect);
   assert.equal(shared.searchParams.get('view'), 'simulator');
   const reload = startApp({search: shared.search});
   assert.deepEqual(reload.replaced, []);

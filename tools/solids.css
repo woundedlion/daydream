@@ -154,7 +154,7 @@ body {
   border-radius: 0.6rem;
   font-size: clamp(0.65rem, var(--main-width) * 0.01, 0.9rem);
   line-height: 1.25;
-  color: #e2e8f0;
+  color: var(--slate-200);
   overflow-wrap: anywhere;
   overflow: hidden;
   pointer-events: none;
@@ -245,7 +245,7 @@ body {
 }
 
 .move-op-btn {
-  color: #94a3b8;
+  color: var(--slate-400);
   font-size: 0.7rem;
   line-height: 1;
   padding: 0.15rem;
@@ -294,7 +294,7 @@ body {
   padding: 0.4rem 0.8rem;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.65rem;
-  color: #a5b4fc;
+  color: var(--indigo-300);
   text-transform: uppercase;
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
@@ -375,17 +375,17 @@ body {
 
 .saved-item .details {
   font-size: 0.7rem;
-  color: #94a3b8;
+  color: var(--slate-400);
   margin-bottom: 0.5rem;
 }
 
 .saved-item .saved-stats,
 .saved-item .saved-row-label {
-  color: #94a3b8;
+  color: var(--slate-400);
 }
 
 #arenaStats {
-  color: #94a3b8;
+  color: var(--slate-400);
   background-color: rgb(15 23 42 / 0.9);
 }
 

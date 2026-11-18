@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { installConsoleCapture } from ".././helpers/fake_console.js";
-import { installDocument } from ".././helpers/fake_dom.js";
+import { installConsoleCapture } from "../helpers/fake_console.js";
+import { installDocument } from "../helpers/fake_dom.js";
 import { DEFAULT_BITRATE_MBPS, MEMORY_BUFFER_LIMIT_BYTES, WRITE_BACKLOG_SECONDS, VideoRecorder } from "../../src/recording/recorder.js";
 import { FPS } from "../../src/renderer/frame_constants.js";
 import { expectEmptySessionWarnings, makeFakeStream, recordableCanvas, FakeMediaRecorder, installRecorderEnv, drainSink, trackSinkFinish, startAborted } from "./fixture.js";

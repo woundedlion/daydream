@@ -76,7 +76,7 @@ body {
 #gen_status,
 #hue_key_status {
   min-width: 0;
-  color: #94A3B8;
+  color: var(--slate-400);
   font-size: 0.6875rem;
   line-height: 1rem;
 }

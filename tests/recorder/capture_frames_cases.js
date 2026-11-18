@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { installConsoleCapture } from ".././helpers/fake_console.js";
-import { installDocument } from ".././helpers/fake_dom.js";
+import { installConsoleCapture } from "../helpers/fake_console.js";
+import { installDocument } from "../helpers/fake_dom.js";
 import { VideoRecorder } from "../../src/recording/recorder.js";
 import { recordableCanvas, installRecorderEnv, startRecorder, drainSink, captureLetterbox, trackHostError } from "./fixture.js";
 

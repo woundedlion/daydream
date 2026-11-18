@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { installConsoleCapture } from ".././helpers/fake_console.js";
-import { fakeElement, installDocument, stashGlobals } from ".././helpers/fake_dom.js";
+import { installConsoleCapture } from "../helpers/fake_console.js";
+import { fakeElement, installDocument, stashGlobals } from "../helpers/fake_dom.js";
 import { VideoRecorder } from "../../src/recording/recorder.js";
 
 /** Fixed local wall-clock time so the timestamped file name is exact. */

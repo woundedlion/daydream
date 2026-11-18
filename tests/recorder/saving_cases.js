@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { installConsoleCapture } from ".././helpers/fake_console.js";
+import { installConsoleCapture } from "../helpers/fake_console.js";
 import { VideoRecorder } from "../../src/recording/recorder.js";
 import { SAVE_CLOCK, recordableCanvas, FakeMediaRecorder, installRecorderEnv, drainSink, trackSinkFinish, installSavePath, installRecorderSaveEnv } from "./fixture.js";
 

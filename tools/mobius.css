@@ -54,7 +54,7 @@
   background-color: var(--slate-800);
   border: 1px solid var(--slate-700);
   border-radius: 0.5rem;
-  color: #e2e8f0;
+  color: var(--slate-200);
   font-size: 0.9rem;
   transition: all 0.2s ease;
 }
@@ -71,7 +71,7 @@
 
 .preset-desc {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--slate-400);
   margin-top: 0.25rem;
   line-height: 1.2;
 }
