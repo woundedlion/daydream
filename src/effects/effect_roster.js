@@ -106,6 +106,7 @@ const AllFallback = unlistedEffects(EFFECT_IDENTITIES, [HiResFavorites, LoResFav
 
 // The effect the simulator seeds when the URL names none.
 export const DEFAULT_EFFECT = 'Millefiori';
+export const DEFAULT_RESOLUTION = 'Phantasm (288x144)';
 
 // Display metadata (dot size), geometry, and the effect list offered per
 // resolution. Null prototype: a URL string indexes this table, and an inherited
@@ -113,20 +114,20 @@ export const DEFAULT_EFFECT = 'Millefiori';
 /** @type {Record<string, {h: number, w: number, dotSize: number, favorites: string[]}>} */
 export const resolutionPresets = Object.assign(Object.create(null), {
   "Holosphere (96x20)": { h: 20, w: 96, dotSize: 2, favorites: [...LoResFavorites, ...AllFallback] },
-  "Phantasm (288x144)": { h: 144, w: 288, dotSize: 0.25, favorites: [...HiResFavorites, ...AllFallback] },
+  [DEFAULT_RESOLUTION]: { h: 144, w: 288, dotSize: 0.25, favorites: [...HiResFavorites, ...AllFallback] },
 });
 
 /**
  * The effect list offered at a resolution.
  * @param {string} resolution - A resolutionPresets key.
- * @returns {string[]} That preset's favorites, or the high-res list when the
+ * @returns {string[]} That preset's favorites, or the default list when the
  *   preset is unknown or carries none.
  */
 export function favoritesFor(resolution) {
   const favorites = resolutionEffects(resolutionPresets, resolution);
   if (!favorites) {
-    console.error(`No effect list for resolution "${resolution}"; offering the high-res list.`);
-    return resolutionPresets["Phantasm (288x144)"].favorites;
+    console.error(`No effect list for resolution "${resolution}"; offering the default resolution's list.`);
+    return resolutionPresets[DEFAULT_RESOLUTION].favorites;
   }
   return favorites;
 }

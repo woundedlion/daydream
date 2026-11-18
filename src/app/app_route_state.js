@@ -5,7 +5,7 @@
 
 import {AppState, URLSync} from './state.js';
 import {canonicalEffectId} from '../effects/effect_identity.js';
-import {DEFAULT_EFFECT, favoritesFor, resolutionPresets, SHADER_DOCUMENT_EFFECTS, WORKBENCH_EFFECTS}
+import {DEFAULT_EFFECT, DEFAULT_RESOLUTION, favoritesFor, resolutionPresets, SHADER_DOCUMENT_EFFECTS, WORKBENCH_EFFECTS}
   from '../effects/effect_roster.js';
 
 /** @param {Pick<import('./app_context.js').PageContext, 'shaderWorkbench'|'routeParams'|'win'>} deps */
@@ -19,7 +19,7 @@ export function createRouteState({shaderWorkbench, routeParams, win}) {
   const appState = new AppState({
     effect: canonicalEffectId(shaderWorkbench ? 'ShaderChain' : DEFAULT_EFFECT),
     view: null,
-    resolution: "Phantasm (288x144)",
+    resolution: DEFAULT_RESOLUTION,
   });
   const syncRoute = () => appState.set('view', !shaderWorkbench
     && SHADER_DOCUMENT_EFFECTS.includes(canonicalEffectId(appState.get('effect')))
