@@ -155,10 +155,18 @@ test('a hue-key drag grabs a marker, follows the pointer, and lets go', () => {
   assert.deepEqual([...model.customHueOffsets()], settled, 'a press off every marker grabs nothing');
 });
 
-test('dragging a harmony key hands the recipe off to CUSTOM', () => {
-  const { wheel, model, canvas, counts, status } = setup();
+test('a successful harmony drag hands off to CUSTOM and clears an earlier refusal', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.harmony = PaletteV4.harmony.SQUARE;
+  const { wheel, model, canvas, counts, status } = setup(recipe);
   wheel.draw(model.recipe());
-  const anchors = hueKeyState(defaultPaletteRecipe());
+  const anchors = hueKeyState(recipe);
+
+  pointer(canvas, 'pointerdown', pointAt(anchors.baseTurns + anchors.offsets[1]));
+  pointer(canvas, 'pointermove', pointAt(0.3));
+  assert.equal(model.reading('hueMode'), 'HARMONY');
+  assert.match(status.textContent, /Choose another key/);
+
   pointer(canvas, 'pointerdown', pointAt(anchors.baseTurns + anchors.offsets[0]));
   pointer(canvas, 'pointermove', pointAt(0.3));
   assert.equal(model.reading('hueMode'), 'CUSTOM');

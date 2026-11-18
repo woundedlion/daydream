@@ -142,7 +142,6 @@ test('CDN smoke stages a static CDN import map without changing the committed ma
   const map = readFileSync(join(site.root, 'index.html'), 'utf8')
     .match(/<script type="importmap">([^<]+)<\/script>/)[1];
   assert.match(map, /https:\/\/cdn\.jsdelivr\.net/);
-  assert.equal(existsSync(join(site.root, 'index.html')), true);
   assert.match(readFileSync(new URL('../vendor-importmap.js', import.meta.url), 'utf8'),
     /const VENDOR = \{ three: 'cdn', lilGui: 'cdn' \};/);
 });

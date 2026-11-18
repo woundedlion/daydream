@@ -30,10 +30,11 @@ describe(
     let repo;
     let virgin;
     let env;
-    /** Commit OIDs: master sits at mid, old is its ancestor, ahead its child. */
+    /** Master sits at mid, with ancestor old, child ahead and sibling side. */
     let old;
     let mid;
     let ahead;
+    let side;
     /** Sole commit of the fixture repo that has no master branch. */
     let orphan;
 
@@ -93,6 +94,7 @@ describe(
       mid = git(repo, 'rev-parse', 'HEAD');
       git(repo, 'commit', '-q', '--allow-empty', '-m', 'ahead');
       ahead = git(repo, 'rev-parse', 'HEAD');
+      side = git(repo, 'commit-tree', git(repo, 'rev-parse', `${mid}^{tree}`), '-p', old, '-m', 'side');
       git(repo, 'update-ref', 'refs/heads/master', mid);
       git(repo, 'branch', 'fix/7', old);
       git(repo, 'branch', 'master-backup', old);
@@ -179,6 +181,13 @@ describe(
       assert.equal(status, 1);
       assert.match(stderr, /REFUSED non-fast-forward update of master/);
       assert.match(readLog(), new RegExp(`REFUSED rewind master ${mid} -> ${old}`));
+    });
+
+    test('refuses a divergent update of master', () => {
+      const { status, stderr } = runHook([`${ZERO} ${side} refs/heads/master`]);
+      assert.equal(status, 1);
+      assert.match(stderr, /REFUSED non-fast-forward update of master/);
+      assert.match(readLog(), new RegExp(`REFUSED rewind master ${mid} -> ${side}`));
     });
 
     test('refusals from git -C name an absolute token path', () => {

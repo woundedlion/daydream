@@ -503,8 +503,9 @@ test('palette snapshot restores reject inconsistent fade state', () => {
   }
 });
 
-test('a null ripple snapshot wave is refused without throwing or mutating either engine', () => {
+test('engine and fake snapshots agree on ripple wave count and reject null waves', () => {
   const fake = new FakeChainEngine();
+  const waveCounts = [];
   for (const target of [engine, fake]) {
     target.setEffect('ShaderChain');
     assert.equal(chainCall(target, 'setShaderChain', [DEFAULT_CHAIN[0],
@@ -512,11 +513,14 @@ test('a null ripple snapshot wave is refused without throwing or mutating either
     'APPLIED');
     const before = chainCall(target, 'getSnapshot');
     const invalid = structuredClone(before);
-    invalid.runtime.find(({kind}) => kind === 'ripple-burst-v1').state.waves[0] = null;
+    const {waves} = invalid.runtime.find(({kind}) => kind === 'ripple-burst-v1').state;
+    waveCounts.push(waves.length);
+    waves[0] = null;
     assert.equal(chainCall(target, 'restoreSnapshot', invalid).value,
       ChainSnapshotRestoreResult.INVALID_VALUE.value);
     assert.deepEqual(chainCall(target, 'getSnapshot'), before);
   }
+  assert.equal(waveCounts[1], waveCounts[0], 'fake and engine ripple wave capacity');
 });
 
 test('every catalog operator matches fake snapshot runtime kinds and state keys', () => {
