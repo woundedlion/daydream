@@ -282,10 +282,11 @@ test('a missing GENERATED block fails without rewriting the source', () => {
   assert.equal(readFileSync(join(root, 'vendor-importmap.js'), 'utf8'), source);
 });
 
-test('static page regeneration updates the import map and exact CSP hash together', () => {
+test('static page regeneration updates the import map and its CSP package sources and hash', () => {
   installModules();
   const page = '<html><head><meta http-equiv="Content-Security-Policy" ' +
-    'content="default-src \'self\'; script-src \'self\' \'unsafe-inline\' https://cdn.jsdelivr.net">' +
+    'content="default-src \'self\'; script-src \'self\' \'unsafe-inline\' https://cdn.jsdelivr.net ' +
+    'https://cdn.jsdelivr.net/npm/three@0.0.0/">' +
     '<script src="./vendor-importmap.js"></script></head></html>\n';
   writeFileSync(join(root, 'index.html'), page);
   execFileSync('git', ['add', 'index.html'], { cwd: root, env });
@@ -294,7 +295,21 @@ test('static page regeneration updates the import map and exact CSP hash togethe
   const body = output.match(/<script type="importmap">([^<]+)<\/script>/)[1];
   assert.equal(JSON.parse(body).imports.three,
     'https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.module.js');
-  assert.ok(output.includes(`'sha256-${createHash('sha256').update(body).digest('base64')}'`));
-  assert.ok(!output.includes("'unsafe-inline'"));
+  assert.deepEqual(output.match(/script-src ([^"]+)"/)[1].split(' '), [
+    "'self'",
+    'https://cdn.jsdelivr.net/npm/three@0.183.1/',
+    'https://cdn.jsdelivr.net/npm/lil-gui@0.21.0/',
+    `'sha256-${createHash('sha256').update(body).digest('base64')}'`,
+  ]);
   assert.ok(!output.includes('src="./vendor-importmap.js"'));
+
+  vendorLocal();
+  run('--local');
+  const local = readFileSync(join(root, 'index.html'), 'utf8');
+  const localBody = local.match(/<script type="importmap">([^<]+)<\/script>/)[1];
+  assert.equal(JSON.parse(localBody).imports.three, './three.js/build/three.module.js');
+  assert.deepEqual(local.match(/script-src ([^"]+)"/)[1].split(' '), [
+    "'self'",
+    `'sha256-${createHash('sha256').update(localBody).digest('base64')}'`,
+  ]);
 });

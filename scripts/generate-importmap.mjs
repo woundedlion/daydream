@@ -237,12 +237,12 @@ function writePageImportmap(sourcePath) {
   const embedded = /<script\b[^>]*\btype=["']importmap["'][^>]*>[\s\S]*?<\/script>/;
   if (!loader.test(source) && !embedded.test(source)) return;
   const prefix = (posix.relative(posix.dirname(page), '.') || '.') + '/';
-  const cdn = 'https://cdn.jsdelivr.net/npm';
-  const threeBase = vendor.three === 'local'
-    ? `${prefix}three.js/` : `${cdn}/three@${versions.three}/`;
-  const gui = vendor.lilGui === 'local'
-    ? `${prefix}node_modules/lil-gui/dist/lil-gui.esm.min.js`
-    : `${cdn}/lil-gui@${versions.lilGui}/dist/lil-gui.esm.min.js`;
+  const cdn = 'https://cdn.jsdelivr.net';
+  const threeCdn = `${cdn}/npm/three@${versions.three}/`;
+  const guiCdn = `${cdn}/npm/lil-gui@${versions.lilGui}/`;
+  const threeBase = vendor.three === 'local' ? `${prefix}three.js/` : threeCdn;
+  const guiBase = vendor.lilGui === 'local' ? `${prefix}node_modules/lil-gui/` : guiCdn;
+  const gui = `${guiBase}dist/lil-gui.esm.min.js`;
   const imports = {
     three: `${threeBase}build/three.module.js`,
     'three/addons/': `${threeBase}examples/jsm/`,
@@ -269,7 +269,11 @@ function writePageImportmap(sourcePath) {
     const scriptIndex = directives.findIndex(value => /^\s*script-src\s/.test(value));
     if (scriptIndex < 0) fail(`${page} has no script-src directive`);
     const tokens = directives[scriptIndex].trim().split(/\s+/)
-      .filter(value => value !== "'unsafe-inline'" && !value.startsWith("'sha256-"));
+      .filter(value => value !== "'unsafe-inline'" && !value.startsWith("'sha256-")
+        && value !== cdn && value !== `${cdn}/`
+        && !value.startsWith(`${cdn}/npm/three@`) && !value.startsWith(`${cdn}/npm/lil-gui@`));
+    if (vendor.three === 'cdn') tokens.push(threeCdn);
+    if (vendor.lilGui === 'cdn') tokens.push(guiCdn);
     tokens.push(hash);
     directives[scriptIndex] = ' ' + tokens.join(' ');
     return before + directives.join(';') + after;

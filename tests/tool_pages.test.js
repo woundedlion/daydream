@@ -90,16 +90,17 @@ const SERVED_PAGES = servedPages().map((page) => ({
   scripts: scriptsOf(page),
 }));
 
+const CDN_PACKAGES = [
+  'https://cdn.jsdelivr.net/npm/three@0.183.1/',
+  'https://cdn.jsdelivr.net/npm/lil-gui@0.21.0/',
+];
 const SCRIPT_SRC = {
-  'tools/lissajous.html': ["'self'", 'https://cdn.jsdelivr.net'],
-  'tools/mobius.html': ["'self'", 'https://cdn.jsdelivr.net'],
+  'tools/lissajous.html': ["'self'", ...CDN_PACKAGES],
+  'tools/mobius.html': ["'self'", ...CDN_PACKAGES],
   'tools/palettes.html': ["'self'", "'wasm-unsafe-eval'"],
-  'tools/shader.html':
-    ["'self'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
-  'tools/solids.html':
-    ["'self'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
-  'index.html':
-    ["'self'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
+  'tools/shader.html': ["'self'", "'wasm-unsafe-eval'", ...CDN_PACKAGES],
+  'tools/solids.html': ["'self'", "'wasm-unsafe-eval'", ...CDN_PACKAGES],
+  'index.html': ["'self'", "'wasm-unsafe-eval'", ...CDN_PACKAGES],
 };
 
 /**
