@@ -19,7 +19,7 @@ const SEGMENT_NOTICE = 'segments';
 // Elements that own their keystrokes: a key landing inside one belongs to that
 // control, not to the global shortcuts.
 const INTERACTIVE_KEY_TARGET =
-  'input, textarea, select, button, a[href], [contenteditable], .lil-gui, .effect-sidebar, .chain-strip-region';
+  'input, textarea, select, button, a[href], [contenteditable], .lil-gui, .effect-sidebar, .chain-strip-region, #global-stats-desktop, .stats-bar';
 
 /**
  * Build the window keydown handler for the global playback shortcuts.

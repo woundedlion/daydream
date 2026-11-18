@@ -65,6 +65,18 @@ test('a hotkey inside a GUI panel or the sidebar belongs to that control', () =>
   assert.deepEqual(h.keys, []);
 });
 
+test('engine statistics regions own Space and arrow keys', () => {
+  const h = makeKeydownHandler();
+  const desktop = fakeElement('div');
+  desktop.setAttribute('id', 'global-stats-desktop');
+  const mobile = fakeElement('div');
+  mobile.className = 'stats-bar';
+  for (const target of [desktop, mobile]) {
+    for (const key of [' ', 'ArrowLeft', 'ArrowRight']) h.handler({ key, target });
+  }
+  assert.deepEqual(h.keys, []);
+});
+
 test('a key with no element target still reaches the simulation', () => {
   const h = makeKeydownHandler();
 

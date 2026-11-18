@@ -85,18 +85,19 @@ function captureFlag(options) {
 }
 
 /**
- * Matches class, attribute-presence, tag and tag-plus-attribute selectors.
+ * Matches ID, class, attribute-presence, tag and tag-plus-attribute selectors.
  * Other selector forms throw.
  * @param {Object} node - Candidate element.
- * @param {string} selector - '.class', '[attr]', a tag name, or 'tag[attr]'.
+ * @param {string} selector - '#id', '.class', '[attr]', a tag name, or 'tag[attr]'.
  * @returns {boolean} True when the node matches.
  */
 function matchesOne(node, selector) {
   const tagAttribute = /^([a-z][\w-]*)(\[[\w-]+\])$/i.exec(selector);
   if (tagAttribute) return matchesOne(node, tagAttribute[1]) && matchesOne(node, tagAttribute[2]);
-  if (!/^(?:\.[\w-]+|\[[\w-]+\]|[a-z][\w-]*)$/i.test(selector)) {
+  if (!/^(?:[.#][\w-]+|\[[\w-]+\]|[a-z][\w-]*)$/i.test(selector)) {
     throw new Error(`unsupported selector: ${selector}`);
   }
+  if (selector.startsWith('#')) return node.id === selector.slice(1);
   if (selector.startsWith('.')) return node.classList.contains(selector.slice(1));
   if (selector.startsWith('[')) return node.getAttribute(selector.slice(1, -1)) !== null;
   return node.tagName === selector.toUpperCase();
