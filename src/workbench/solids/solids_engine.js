@@ -64,7 +64,7 @@ export function createSolidsEngine(page, actions, dependencies = {}) {
     try {
       const m = page.engine.meshOpsWasm.getArenaMetrics();
       /** @param {{lifetime_high_water_mark: number, capacity: number}} x */
-      const fmt = (x) => `${env.formatKB(x.lifetime_high_water_mark, 0)} / ${env.formatKB(x.capacity, 0)}KB`;
+      const fmt = (x) => `${env.formatKB(x.lifetime_high_water_mark, 0)} / ${env.formatKB(x.capacity, 0)} KiB`;
       const statsEl = env.document.getElementById('arenaStats');
       if (statsEl) {
         statsEl.innerText = `Live ${fmt(m.tooling_arena)} · `
