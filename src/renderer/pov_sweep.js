@@ -155,12 +155,17 @@ export class PovSweep {
       for (let y = 0; y < this.height; y++) {
         for (let x = column; x < this.width; x += half) {
           const index = (y * this.width + x) * 3;
-          for (let channel = 0; channel < 3; channel++) {
-            let value = 0;
-            for (let frame = 0; frame < count; frame++)
-              value += sources[frame][index + channel] * this.responseWeights[frame];
-            this.responsePixels[index + channel] = Math.min(65535, Math.round(value));
+          let red = 0, green = 0, blue = 0;
+          for (let frame = 0; frame < count; frame++) {
+            const pixels = sources[frame];
+            const weight = this.responseWeights[frame];
+            red += pixels[index] * weight;
+            green += pixels[index + 1] * weight;
+            blue += pixels[index + 2] * weight;
           }
+          this.responsePixels[index] = Math.min(65535, Math.round(red));
+          this.responsePixels[index + 1] = Math.min(65535, Math.round(green));
+          this.responsePixels[index + 2] = Math.min(65535, Math.round(blue));
         }
       }
     }
