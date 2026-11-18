@@ -435,9 +435,11 @@ test('removing and reinserting one operator preserves its descriptor digest', as
   const store = await createChainDocumentStore({
     document: structuredClone(STAINED_GLASS.document), catalog: CATALOG,
   });
+  const warpIndex = store.chain().findIndex((entry) => entry.label === 'warp1');
+  assert.ok(warpIndex >= 0);
   const roundTrip = () => {
-    assert.equal(store.replaceSpan(WARP, 1, []).ok, true);
-    assert.equal(store.replaceSpan(WARP, 0, [
+    assert.equal(store.replaceSpan(warpIndex, 1, []).ok, true);
+    assert.equal(store.replaceSpan(warpIndex, 0, [
       { label: 'warp1', operator: 'warp.vector-noise.v2' },
     ]).ok, true);
   };

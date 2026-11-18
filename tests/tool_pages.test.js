@@ -90,9 +90,10 @@ const SERVED_PAGES = servedPages().map((page) => ({
   scripts: scriptsOf(page),
 }));
 
+const { dependencies } = JSON.parse(read('package.json'));
 const CDN_PACKAGES = [
-  'https://cdn.jsdelivr.net/npm/three@0.183.1/',
-  'https://cdn.jsdelivr.net/npm/lil-gui@0.21.0/',
+  `https://cdn.jsdelivr.net/npm/three@${dependencies.three}/`,
+  `https://cdn.jsdelivr.net/npm/lil-gui@${dependencies['lil-gui']}/`,
 ];
 const SCRIPT_SRC = {
   'tools/lissajous.html': ["'self'", ...CDN_PACKAGES],

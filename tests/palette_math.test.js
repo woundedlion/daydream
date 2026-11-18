@@ -316,9 +316,10 @@ test('compilePaletteRecipe bakes the LUT and owns its buffers', () => {
 
 test('GenerativePalette reports compiler failures', () => {
   const ops = mockPaletteOps({ compileAndBakeV4: () => ({ status: { code: paletteEnums.PaletteCompileCode.NON_FINITE, field: paletteEnums.PaletteRecipeField.BASE_TURNS } }) });
+  const { BASE_TURNS } = paletteEnums.PaletteRecipeField;
   withPaletteOps(ops, () => {
     assert.throws(() => new GenerativePalette(defaultPaletteRecipe()),
-      {message: `Palette recipe error NON_FINITE (${paletteEnums.PaletteCompileCode.NON_FINITE.value}) at field BASE_TURNS (7)`});
+      {message: `Palette recipe error NON_FINITE (${paletteEnums.PaletteCompileCode.NON_FINITE.value}) at field BASE_TURNS (${BASE_TURNS.value})`});
   });
 });
 
@@ -329,12 +330,14 @@ test('GenerativePalette reports compiler failures', () => {
  */
 test('paletteCompileError names the engine enumerators', () => {
   setPaletteOps(null, paletteEnums);
-  assert.equal(paletteCompileError({ code: paletteEnums.PaletteCompileCode.NON_INTEGER_LOOP_SWEEP, field: paletteEnums.PaletteRecipeField.SWEEP_TURNS }),
-    `Palette recipe error NON_INTEGER_LOOP_SWEEP (${paletteEnums.PaletteCompileCode.NON_INTEGER_LOOP_SWEEP.value}) at field SWEEP_TURNS (9)`);
-  assert.equal(paletteCompileError({ code: paletteEnums.PaletteCompileCode.INVALID_ENUM, field: paletteEnums.PaletteRecipeField.NONE }),
-    `Palette recipe error INVALID_ENUM (${paletteEnums.PaletteCompileCode.INVALID_ENUM.value}) at field NONE (0)`);
-  assert.equal(paletteCompileError({ code: { value: 99 }, field: { value: 200 } }),
-    'Palette recipe error unnamed 99 at field unnamed 200');
+  const { SWEEP_TURNS, NONE, COUNT } = paletteEnums.PaletteRecipeField;
+  const unnamedField = COUNT.value + 5;
+  assert.equal(paletteCompileError({ code: paletteEnums.PaletteCompileCode.NON_INTEGER_LOOP_SWEEP, field: SWEEP_TURNS }),
+    `Palette recipe error NON_INTEGER_LOOP_SWEEP (${paletteEnums.PaletteCompileCode.NON_INTEGER_LOOP_SWEEP.value}) at field SWEEP_TURNS (${SWEEP_TURNS.value})`);
+  assert.equal(paletteCompileError({ code: paletteEnums.PaletteCompileCode.INVALID_ENUM, field: NONE }),
+    `Palette recipe error INVALID_ENUM (${paletteEnums.PaletteCompileCode.INVALID_ENUM.value}) at field NONE (${NONE.value})`);
+  assert.equal(paletteCompileError({ code: { value: 99 }, field: { value: unnamedField } }),
+    `Palette recipe error unnamed 99 at field unnamed ${unnamedField}`);
 });
 
 /**
@@ -347,14 +350,16 @@ test('paletteAdjustmentSummary names every adjusted field', () => {
   assert.equal(paletteAdjustmentSummary(
     { wrappedFields: 0, clampedFields: 0, canonicalizedFields: 0 }), '');
   assert.equal(paletteAdjustmentSummary({}), '');
+  const { BASE_TURNS, LIGHTNESS_CENTER, INPUT_OFFSET, INPUT_SPAN, FALLOFF_START, COUNT } = paletteEnums.PaletteRecipeField;
+  const unnamedField = COUNT.value + 5;
   assert.equal(paletteAdjustmentSummary({
-    wrappedFields: 2 ** 7,
-    clampedFields: 2 ** 15 + 2 ** 33 + 2 ** 34,
-    canonicalizedFields: 2 ** 31,
+    wrappedFields: 2 ** BASE_TURNS.value,
+    clampedFields: 2 ** LIGHTNESS_CENTER.value + 2 ** INPUT_OFFSET.value + 2 ** INPUT_SPAN.value,
+    canonicalizedFields: 2 ** FALLOFF_START.value,
   }), 'wrapped BASE_TURNS; clamped LIGHTNESS_CENTER, INPUT_OFFSET, INPUT_SPAN; '
     + 'canonicalized FALLOFF_START');
-  assert.equal(paletteAdjustmentSummary({ wrappedFields: 2 ** 40 }),
-    'wrapped unnamed 40');
+  assert.equal(paletteAdjustmentSummary({ wrappedFields: 2 ** unnamedField }),
+    `wrapped unnamed ${unnamedField}`);
 });
 
 test('GenerativePalette uses the canonical recipe', () => {

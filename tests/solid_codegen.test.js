@@ -199,7 +199,8 @@ test('generateRecipeCpp keeps every breakable line within the column limit', () 
   let overflowed = 0;
   for (const [seeds, ops] of sweeps) {
     for (const base of seeds) {
-      for (const line of generateRecipeCpp({ base, ops, vCount: 12345 }, 'Archimedean').split('\n')) {
+      const recipe = { base, ops, vCount: 12345, fCount: 12345, iCount: 12345 };
+      for (const line of generateRecipeCpp(recipe, 'Archimedean').split('\n')) {
         if (line.length > 80) overflowed++;
         const atom = line.replace(/^\s*(\* )?/, '');
         assert.ok(line.length <= 80 || UNBREAKABLE.test(atom),
@@ -219,6 +220,16 @@ test('generateRecipeCpp wraps at the column limit, not one column early or late'
   }, 'Archimedean').split('\n').find((line) => line.startsWith('HS_FLASH_INLINE'));
   assert.equal(signature, `HS_FLASH_INLINE inline PolyMesh ${'a'.repeat(19)}_relax9(Arena &a, Arena &b) {`);
   assert.equal(signature.length, 80);
+
+  const wrapped = generateRecipeCpp({
+    base: 'a'.repeat(20), ops: [{ op: 'relax', params: { iter: 9 } }],
+  }, 'Archimedean').split('\n');
+  const first = wrapped.findIndex((line) => line.startsWith('HS_FLASH_INLINE'));
+  const head = `HS_FLASH_INLINE inline PolyMesh ${'a'.repeat(20)}_relax9(`;
+  assert.deepEqual(wrapped.slice(first, first + 2), [
+    `${head}Arena &a,`,
+    `${' '.repeat(head.length)}Arena &b) {`,
+  ]);
 
   for (const [namespace, base] of [['Archimedean', 'truncatedIcosidodecahedron'],
     ['Catalan', 'pentagonalHexecontahedron']]) {
