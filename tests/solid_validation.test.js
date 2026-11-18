@@ -128,7 +128,7 @@ test('solids validator resolves the module factory after async initialization', 
   installDocument({ getElementById: () => null });
   try {
     const page = createSolidsPage(undefined);
-    initializeSolidsState(page, {});
+    initializeSolidsState(page, assert.fail);
     const { Mod } = fakeModule();
     let calls = 0;
     await Promise.resolve();

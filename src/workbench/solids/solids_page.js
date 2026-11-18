@@ -17,17 +17,19 @@ import {createSolidsBasePicker} from './solids_base_picker.js';
 
 const page = createSolidsPage(window.matchMedia?.('(prefers-reduced-motion: reduce)'));
 const actions = /** @type {import('./solids_state.js').SolidsActions} */ ({});
-Object.assign(actions,
-  createSolidsEngine(page, actions),
-  createSolidsScene(page, actions),
-  createSolidsOpsController(page, actions),
-  createSolidsRowDrag(page, actions),
-  createSolidsOpGateView(page, actions),
-  createSolidsSavedController(page, actions),
-  createSolidsBasePicker(page, actions));
-actions.setOps = next => setOps(page, next);
-actions.scheduleUpdate = createFrameScheduler(actions.update);
-initializeSolidsState(page, actions);
+const parts = /** @satisfies {import('./solids_state.js').SolidsActions} */ ({
+  ...createSolidsEngine(page, actions),
+  ...createSolidsScene(page, actions),
+  ...createSolidsOpsController(page, actions),
+  ...createSolidsRowDrag(page, actions),
+  ...createSolidsOpGateView(page, actions),
+  ...createSolidsSavedController(page, actions),
+  ...createSolidsBasePicker(page, actions),
+  setOps: next => setOps(page, next),
+  scheduleUpdate: createFrameScheduler(() => actions.update()),
+  ...initializeSolidsState(page, message => actions.showGateMsg(message)),
+});
+Object.assign(actions, parts);
 
 /** Loads the engine and mounts the solids tool. @returns {Promise<void>} */
 async function init() {

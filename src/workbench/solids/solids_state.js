@@ -138,8 +138,12 @@ export function setOps(page, next) {
   page.doc.opsRevision++;
 }
 
-/** @param {SolidsPage} page @param {SolidsActions} actions @returns {void} */
-export function initializeSolidsState(page, actions) {
+/**
+ * @param {SolidsPage} page
+ * @param {SolidsActions['showGateMsg']} showGateMsg
+ * @returns {Pick<SolidsActions, 'chainIsValid'|'queueCommit'>}
+ */
+export function initializeSolidsState(page, showGateMsg) {
   page.doc.savedStorage = loadSavedSolids(page.doc.savedStore.storage);
   page.doc.savedSolids = page.doc.savedStorage.entries;
   page.doc.savedStorageStatus = document.getElementById('savedStorageStatus');
@@ -150,10 +154,12 @@ export function initializeSolidsState(page, actions) {
     return page.engine.createHolosphereModule();
   });
   page.engine.opGate = createOpGate(page.engine.validator);
-  actions.chainIsValid = page.engine.validator.chainIsValid;
   const commit = createCommitQueue(error => {
     console.error(error);
-    actions.showGateMsg(`Operation failed: ${error instanceof Error ? error.message : error}`);
+    showGateMsg(`Operation failed: ${error instanceof Error ? error.message : error}`);
   });
-  actions.queueCommit = fn => commit(() => page.engine.wasmModule ? fn() : undefined);
+  return {
+    chainIsValid: page.engine.validator.chainIsValid,
+    queueCommit: fn => commit(() => page.engine.wasmModule ? fn() : undefined),
+  };
 }
