@@ -9,10 +9,11 @@ import { declarationFromCatalogField } from '../generated/shader/shader_workbenc
 import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import {resolutionPresets} from '../src/effects/effect_roster.js';
-import { deactivatedParameterIds, modulationValueLimits } from '../src/workbench/shader/chain_presentation.js';
+import {
+  BAKED_MODULATION_SCALE_MAX, deactivatedParameterIds, modulationValueLimits,
+} from '../src/workbench/shader/chain_presentation.js';
 
 import {chainSnapshot} from './helpers/effect_gui_harness.js';
-import {BAKED_MODULATION_SCALE_MAX} from '../src/workbench/shader/chain_presentation.js';
 import { RETIRED_OPERATORS } from './helpers/retired_operators.js';
 import {
   DEFAULT_CHAIN, FakeChainEngine, ChainSnapshotRestoreResult, ChainStatus, PALETTE_FADE_FRAMES, PALETTE_HUE_STEP,

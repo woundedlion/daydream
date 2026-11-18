@@ -121,272 +121,272 @@
           </div>
         </div> <!-- End Procedural Tab -->
 
-    <div id="tab-content-generative" class="tab-content" role="tabpanel"
-      aria-labelledby="tab-btn-generative" hidden>
-      <div class="recipe-header">
-        <div class="recipe-title-status">
-          <h2 class="font-semibold text-white">OKLCH Recipe</h2>
-          <p id="gen_status" role="status"></p>
-          <p id="hue_key_status" role="status"></p>
-        </div>
-        <div class="recipe-presets" role="group" aria-label="Generative recipe presets">
-          <button type="button" class="recipe-preset" data-recipe-preset="balancedAnalogous">Analogous</button>
-          <button type="button" class="recipe-preset" data-recipe-preset="isolightSpectralLoop">Loop</button>
-          <button type="button" class="recipe-preset" data-recipe-preset="tonalMonochrome">Monochrome</button>
-          <select id="effect_recipe_preset" class="recipe-preset-select"
-            aria-label="Effect palette recipe">
-            <option value="">Effect recipes...</option>
-          </select>
-        </div>
-      </div>
-      <div class="recipe-controls">
-        <section class="param-group recipe-group hue-recipe-card" aria-labelledby="recipe_hue_heading">
-          <h3 id="recipe_hue_heading" class="font-bold text-blue-300">Hue</h3>
-          <div class="hue-card-content">
-            <div class="hue-card-controls">
-              <div id="gen_base_hue_field" class="recipe-field">
-                <label for="gen_base_hue">Hue</label>
-                <div class="recipe-slider">
-                  <input type="range" id="gen_base_hue" min="0" max="359.9999" step="0.0001" value="0"
-                    aria-label="Base Hue (degrees)" title="Base Hue (degrees)">
-                  <span id="gen_base_hue_value" class="slider-label">0&deg;</span>
+        <div id="tab-content-generative" class="tab-content" role="tabpanel"
+          aria-labelledby="tab-btn-generative" hidden>
+          <div class="recipe-header">
+            <div class="recipe-title-status">
+              <h2 class="font-semibold text-white">OKLCH Recipe</h2>
+              <p id="gen_status" role="status"></p>
+              <p id="hue_key_status" role="status"></p>
+            </div>
+            <div class="recipe-presets" role="group" aria-label="Generative recipe presets">
+              <button type="button" class="recipe-preset" data-recipe-preset="balancedAnalogous">Analogous</button>
+              <button type="button" class="recipe-preset" data-recipe-preset="isolightSpectralLoop">Loop</button>
+              <button type="button" class="recipe-preset" data-recipe-preset="tonalMonochrome">Monochrome</button>
+              <select id="effect_recipe_preset" class="recipe-preset-select"
+                aria-label="Effect palette recipe">
+                <option value="">Effect recipes...</option>
+              </select>
+            </div>
+          </div>
+          <div class="recipe-controls">
+            <section class="param-group recipe-group hue-recipe-card" aria-labelledby="recipe_hue_heading">
+              <h3 id="recipe_hue_heading" class="font-bold text-blue-300">Hue</h3>
+              <div class="hue-card-content">
+                <div class="hue-card-controls">
+                  <div id="gen_base_hue_field" class="recipe-field">
+                    <label for="gen_base_hue">Hue</label>
+                    <div class="recipe-slider">
+                      <input type="range" id="gen_base_hue" min="0" max="359.9999" step="0.0001" value="0"
+                        aria-label="Base Hue (degrees)" title="Base Hue (degrees)">
+                      <span id="gen_base_hue_value" class="slider-label">0&deg;</span>
+                    </div>
+                  </div>
+                  <div id="gen_hue_mode_field" class="recipe-field">
+                    <label for="gen_hue_mode">Distribution</label>
+                    <select id="gen_hue_mode" aria-label="Hue Distribution" title="Hue Distribution"
+                      class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+                      <option value="HARMONY">Harmony</option>
+                      <option value="SWEEP">Sweep</option>
+                      <option value="CUSTOM">Custom</option>
+                    </select>
+                  </div>
+                  <div id="gen_harmony_field" class="recipe-field">
+                    <label for="gen_harmony">Harmony</label>
+                    <select id="gen_harmony" aria-label="Color Harmony" title="Color Harmony"
+                      class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+                      <option value="ANALOGOUS">Analogous</option>
+                      <option value="MONOCHROMATIC">Mono</option>
+                      <option value="ACCENTED_ANALOGOUS">Accented</option>
+                      <option value="COMPLEMENTARY">Complement</option>
+                      <option value="SPLIT_COMPLEMENTARY">Split</option>
+                      <option value="TRIADIC">Triadic</option>
+                      <option value="TETRADIC">Tetradic</option>
+                      <option value="SQUARE">Square</option>
+                    </select>
+                  </div>
+                  <div id="gen_spread_field" class="recipe-field">
+                    <label for="gen_spread">Spread</label>
+                    <div class="recipe-slider">
+                      <input type="range" id="gen_spread" min="0" max="90" step="any" value="25.2"
+                        aria-label="Harmony Spread (degrees)" title="Harmony Spread (degrees)">
+                      <span id="gen_spread_value" class="slider-label">25.2&deg;</span>
+                    </div>
+                  </div>
+                  <div id="gen_sweep_field" class="recipe-field">
+                    <label for="gen_sweep">Sweep</label>
+                    <div class="recipe-slider">
+                      <input type="range" id="gen_sweep" min="-16" max="16" step="any" value="1"
+                        aria-label="Sweep Travel (turns)" title="Sweep Travel (turns)">
+                      <span id="gen_sweep_value" class="slider-label">1.0</span>
+                    </div>
+                  </div>
+                  <div id="gen_torsion_field" class="recipe-field">
+                    <label for="gen_torsion">Torsion</label>
+                    <div class="recipe-slider">
+                      <input type="range" id="gen_torsion" min="-12.5" max="12.5" step="any" value="0"
+                        aria-label="Hue Torsion (radians per unit lightness)"
+                        title="Hue Torsion (radians per unit lightness)">
+                      <span id="gen_torsion_value" class="slider-label">0.0</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="hue-key-visualizer">
+                  <h4 id="key_wheel_heading" class="visually-hidden">OKLCH Hue Keys</h4>
+                  <div id="hueKeyWheelGroup" class="key-wheel-canvas-wrap focus-ring-group" role="group"
+                    aria-roledescription="interactive gamut wheel"
+                    aria-describedby="key_wheel_help"
+                    aria-labelledby="key_wheel_heading">
+                    <canvas class="focus-ring-target" id="hueKeyWheelCanvas" width="256" height="256"
+                      role="img"
+                      aria-label="OKLCH gamut wheel with hue key positions"></canvas>
+                  </div>
+                  <p id="key_wheel_help" class="visually-hidden">Drag keys on the wheel, or
+                    tab to a key handle and nudge it with the arrow keys.</p>
                 </div>
               </div>
-              <div id="gen_hue_mode_field" class="recipe-field">
-                <label for="gen_hue_mode">Distribution</label>
-                <select id="gen_hue_mode" aria-label="Hue Distribution" title="Hue Distribution"
+            </section>
+
+            <section class="param-group recipe-group" aria-labelledby="recipe_chroma_heading">
+              <h3 id="recipe_chroma_heading" class="font-bold text-yellow-400">Chroma</h3>
+              <div class="recipe-field">
+                <label for="gen_chroma_curve">Curve</label>
+                <select id="gen_chroma_curve" aria-label="Relative Chroma Curve" title="Relative Chroma Curve"
                   class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-                  <option value="HARMONY">Harmony</option>
-                  <option value="SWEEP">Sweep</option>
-                  <option value="CUSTOM">Custom</option>
+                  <option value="CONSTANT">Constant</option>
+                  <option value="ASCENDING">Ascending</option>
+                  <option value="DESCENDING">Descending</option>
+                  <option value="BELL">Peak</option>
+                  <option value="CUP">Trough</option>
+                  <option value="CUSTOM" disabled>Custom</option>
                 </select>
               </div>
-              <div id="gen_harmony_field" class="recipe-field">
-                <label for="gen_harmony">Harmony</label>
-                <select id="gen_harmony" aria-label="Color Harmony" title="Color Harmony"
+              <div id="gen_chroma_minimum_field" class="recipe-field">
+                <label id="gen_chroma_minimum_label" for="gen_chroma_minimum">Chroma</label>
+                <div class="recipe-slider">
+                  <input type="range" id="gen_chroma_minimum" min="0" max="1" step="any" value="0.62">
+                  <span id="gen_chroma_minimum_value" class="slider-label">0.62</span>
+                </div>
+              </div>
+              <div id="gen_chroma_maximum_field" class="recipe-field">
+                <label id="gen_chroma_maximum_label" for="gen_chroma_maximum">Maximum</label>
+                <div class="recipe-slider">
+                  <input type="range" id="gen_chroma_maximum" min="0" max="1" step="any" value="0.62">
+                  <span id="gen_chroma_maximum_value" class="slider-label">0.62</span>
+                </div>
+              </div>
+              <div id="gen_headroom_field" class="recipe-field">
+                <label for="gen_headroom">Headroom</label>
+                <div class="recipe-slider">
+                  <input type="range" id="gen_headroom" min="0" max="1" step="any" value="0.94"
+                    aria-label="Gamut Headroom" title="Gamut Headroom">
+                  <span id="gen_headroom_value" class="slider-label">0.94</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="param-group recipe-group" aria-labelledby="recipe_lightness_heading">
+              <h3 id="recipe_lightness_heading" class="font-bold text-red-300">Lightness</h3>
+              <div class="recipe-field">
+                <label for="gen_lightness_curve">Curve</label>
+                <select id="gen_lightness_curve" aria-label="Lightness Curve" title="Lightness Curve"
                   class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-                  <option value="ANALOGOUS">Analogous</option>
-                  <option value="MONOCHROMATIC">Mono</option>
-                  <option value="ACCENTED_ANALOGOUS">Accented</option>
-                  <option value="COMPLEMENTARY">Complement</option>
-                  <option value="SPLIT_COMPLEMENTARY">Split</option>
-                  <option value="TRIADIC">Triadic</option>
-                  <option value="TETRADIC">Tetradic</option>
-                  <option value="SQUARE">Square</option>
+                  <option value="CONSTANT">Constant</option>
+                  <option value="ASCENDING">Ascending</option>
+                  <option value="DESCENDING">Descending</option>
+                  <option value="BELL">Peak</option>
+                  <option value="CUP">Trough</option>
+                  <option value="CUSTOM" disabled>Custom</option>
                 </select>
               </div>
-              <div id="gen_spread_field" class="recipe-field">
-                <label for="gen_spread">Spread</label>
+              <div id="gen_lightness_minimum_field" class="recipe-field">
+                <label id="gen_lightness_minimum_label" for="gen_lightness_minimum">Lightness</label>
                 <div class="recipe-slider">
-                  <input type="range" id="gen_spread" min="0" max="90" step="any" value="25.2"
-                    aria-label="Harmony Spread (degrees)" title="Harmony Spread (degrees)">
-                  <span id="gen_spread_value" class="slider-label">25.2&deg;</span>
+                  <input type="range" id="gen_lightness_minimum" min="0" max="1" step="any" value="0.62">
+                  <span id="gen_lightness_minimum_value" class="slider-label">0.62</span>
                 </div>
               </div>
-              <div id="gen_sweep_field" class="recipe-field">
-                <label for="gen_sweep">Sweep</label>
+              <div id="gen_lightness_maximum_field" class="recipe-field">
+                <label id="gen_lightness_maximum_label" for="gen_lightness_maximum">Maximum</label>
                 <div class="recipe-slider">
-                  <input type="range" id="gen_sweep" min="-16" max="16" step="any" value="1"
-                    aria-label="Sweep Travel (turns)" title="Sweep Travel (turns)">
-                  <span id="gen_sweep_value" class="slider-label">1.0</span>
+                  <input type="range" id="gen_lightness_maximum" min="0" max="1" step="any" value="0.62">
+                  <span id="gen_lightness_maximum_value" class="slider-label">0.62</span>
                 </div>
               </div>
-              <div id="gen_torsion_field" class="recipe-field">
-                <label for="gen_torsion">Torsion</label>
+            </section>
+
+            <section class="param-group recipe-group domain-recipe-card" aria-labelledby="recipe_domain_heading">
+              <h3 id="recipe_domain_heading" class="font-bold text-purple-300">Domain</h3>
+              <div class="recipe-field">
+                <label for="gen_domain">Domain</label>
+                <select id="gen_domain" aria-label="Domain Mapping" title="Domain Mapping"
+                  class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+                  <option value="STRAIGHT">Straight</option>
+                  <option value="MIRROR">Mirror</option>
+                  <option value="VIGNETTE">Vignette</option>
+                  <option value="FALLOFF">Falloff</option>
+                  <option value="LOOP">Loop</option>
+                </select>
+              </div>
+              <div id="gen_falloff_field" class="recipe-field">
+                <label for="gen_falloff">Falloff</label>
                 <div class="recipe-slider">
-                  <input type="range" id="gen_torsion" min="-12.5" max="12.5" step="any" value="0"
-                    aria-label="Hue Torsion (radians per unit lightness)"
-                    title="Hue Torsion (radians per unit lightness)">
-                  <span id="gen_torsion_value" class="slider-label">0.0</span>
+                  <input type="range" id="gen_falloff" min="0.67" max="0.99" step="any" value="0.9"
+                    aria-label="Falloff Start" title="Falloff Start">
+                  <span id="gen_falloff_value" class="slider-label">0.90</span>
                 </div>
               </div>
-            </div>
-            <div class="hue-key-visualizer">
-              <h4 id="key_wheel_heading" class="visually-hidden">OKLCH Hue Keys</h4>
-              <div id="hueKeyWheelGroup" class="key-wheel-canvas-wrap focus-ring-group" role="group"
-                aria-roledescription="interactive gamut wheel"
-                aria-describedby="key_wheel_help"
-                aria-labelledby="key_wheel_heading">
-                <canvas class="focus-ring-target" id="hueKeyWheelCanvas" width="256" height="256"
-                  role="img"
-                  aria-label="OKLCH gamut wheel with hue key positions"></canvas>
+              <div class="recipe-field">
+                <label for="gen_easing">Easing</label>
+                <select id="gen_easing" aria-label="Segment Easing" title="Segment Easing"
+                  class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+                  <option value="LINEAR">Linear</option>
+                  <option value="COSINE" selected>Cosine</option>
+                  <option value="SMOOTHSTEP">Smoothstep</option>
+                </select>
               </div>
-              <p id="key_wheel_help" class="visually-hidden">Drag keys on the wheel, or
-                tab to a key handle and nudge it with the arrow keys.</p>
+              <div id="gen_path_field" class="recipe-field">
+                <label for="gen_path">Path</label>
+                <select id="gen_path" aria-label="Color-space Path" title="Color-space Path"
+                  class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+                  <option value="OKLCH_ARC">OKLCH</option>
+                  <option value="OKLAB_CARTESIAN">OKLab</option>
+                </select>
+              </div>
+              <div id="gen_direction_field" class="recipe-field">
+                <label for="gen_direction">Direction</label>
+                <select id="gen_direction" aria-label="Hue Direction" title="Hue Direction"
+                  class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+                  <option value="SHORTEST">Shortest</option>
+                  <option value="CLOCKWISE">CW</option>
+                  <option value="COUNTERCLOCKWISE">CCW</option>
+                </select>
+              </div>
+              <div class="recipe-field">
+                <label for="gen_offset">Offset</label>
+                <div class="recipe-slider">
+                  <input type="range" id="gen_offset" min="0" max="0" step="any" value="0"
+                    aria-label="Input Offset" title="Input Offset">
+                  <span id="gen_offset_value" class="slider-label">0.000</span>
+                </div>
+              </div>
+              <div class="recipe-field">
+                <label for="gen_span">Span</label>
+                <div class="recipe-slider">
+                  <input type="range" id="gen_span" min="0.01" max="1" step="any" value="1"
+                    aria-label="Input Span" title="Input Span">
+                  <span id="gen_span_value" class="slider-label">1.000</span>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </div> <!-- End Generative Tab -->
+
+        <!-- RGB WAVE FUNCTIONS (GRAPH) -->
+        <section class="param-group visualization-card wave-panel">
+          <div class="wave-heading">
+            <h2 id="wave_graph_title" class="font-semibold text-white">sRGB Channel Curves</h2>
+            <div class="wave-legend" role="group" aria-label="sRGB channel curve legend">
+              <span style="--legend-color:#EF4444">Red</span>
+              <span style="--legend-color:#22C55E">Green</span>
+              <span style="--legend-color:var(--blue-500)">Blue</span>
             </div>
           </div>
+          <canvas id="waveGraphCanvas" width="1024"
+            height="300" role="img"
+            aria-label="Plot of the sRGB red, green and blue channel curves against normalized palette coordinate t"></canvas>
         </section>
 
-        <section class="param-group recipe-group" aria-labelledby="recipe_chroma_heading">
-          <h3 id="recipe_chroma_heading" class="font-bold text-yellow-400">Chroma</h3>
-          <div class="recipe-field">
-            <label for="gen_chroma_curve">Curve</label>
-            <select id="gen_chroma_curve" aria-label="Relative Chroma Curve" title="Relative Chroma Curve"
-              class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="CONSTANT">Constant</option>
-              <option value="ASCENDING">Ascending</option>
-              <option value="DESCENDING">Descending</option>
-              <option value="BELL">Peak</option>
-              <option value="CUP">Trough</option>
-              <option value="CUSTOM" disabled>Custom</option>
-            </select>
+        <!-- RESULTING PALETTE (STATIC STRIP) -->
+        <section class="param-group visualization-card strip-panel">
+          <div class="flex justify-between items-center">
+            <h2 id="palette_range_heading" class="font-semibold text-white">sRGB Palette (t &isin; [0, 1])</h2> <button type="button"
+              id="resetZoomButton"
+              class="hidden px-3 py-1 bg-blue-600 text-white hover:bg-blue-700 rounded-md text-sm font-medium transition-all shadow-lg">Reset
+              Zoom</button>
           </div>
-          <div id="gen_chroma_minimum_field" class="recipe-field">
-            <label id="gen_chroma_minimum_label" for="gen_chroma_minimum">Chroma</label>
-            <div class="recipe-slider">
-              <input type="range" id="gen_chroma_minimum" min="0" max="1" step="any" value="0.62">
-              <span id="gen_chroma_minimum_value" class="slider-label">0.62</span>
-            </div>
-          </div>
-          <div id="gen_chroma_maximum_field" class="recipe-field">
-            <label id="gen_chroma_maximum_label" for="gen_chroma_maximum">Maximum</label>
-            <div class="recipe-slider">
-              <input type="range" id="gen_chroma_maximum" min="0" max="1" step="any" value="0.62">
-              <span id="gen_chroma_maximum_value" class="slider-label">0.62</span>
-            </div>
-          </div>
-          <div id="gen_headroom_field" class="recipe-field">
-            <label for="gen_headroom">Headroom</label>
-            <div class="recipe-slider">
-              <input type="range" id="gen_headroom" min="0" max="1" step="any" value="0.94"
-                aria-label="Gamut Headroom" title="Gamut Headroom">
-              <span id="gen_headroom_value" class="slider-label">0.94</span>
-            </div>
+          <p class="text-sm text-gray-300">Click a color to copy its hex value, or click and drag to zoom. With the
+            strip focused, Enter copies the center color, Shift+→ zooms in and Shift+← resets the zoom.</p>
+          <canvas id="colorStripCanvas" width="1024" height="100"
+            tabindex="0" role="button" aria-label="Palette strip; click a color to copy it or drag to zoom"
+            aria-keyshortcuts="Enter Space Shift+ArrowLeft Shift+ArrowRight"></canvas>
+          <div id="palette_copy_feedback" class="palette-copy-feedback" role="status" aria-live="polite">
+            <span id="palette_copy_swatch" class="palette-copy-swatch" aria-hidden="true"></span>
+            <span id="palette_copy_status"></span>
+            <code id="palette_copy_hex"></code>
           </div>
         </section>
-
-        <section class="param-group recipe-group" aria-labelledby="recipe_lightness_heading">
-          <h3 id="recipe_lightness_heading" class="font-bold text-red-300">Lightness</h3>
-          <div class="recipe-field">
-            <label for="gen_lightness_curve">Curve</label>
-            <select id="gen_lightness_curve" aria-label="Lightness Curve" title="Lightness Curve"
-              class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="CONSTANT">Constant</option>
-              <option value="ASCENDING">Ascending</option>
-              <option value="DESCENDING">Descending</option>
-              <option value="BELL">Peak</option>
-              <option value="CUP">Trough</option>
-              <option value="CUSTOM" disabled>Custom</option>
-            </select>
-          </div>
-          <div id="gen_lightness_minimum_field" class="recipe-field">
-            <label id="gen_lightness_minimum_label" for="gen_lightness_minimum">Lightness</label>
-            <div class="recipe-slider">
-              <input type="range" id="gen_lightness_minimum" min="0" max="1" step="any" value="0.62">
-              <span id="gen_lightness_minimum_value" class="slider-label">0.62</span>
-            </div>
-          </div>
-          <div id="gen_lightness_maximum_field" class="recipe-field">
-            <label id="gen_lightness_maximum_label" for="gen_lightness_maximum">Maximum</label>
-            <div class="recipe-slider">
-              <input type="range" id="gen_lightness_maximum" min="0" max="1" step="any" value="0.62">
-              <span id="gen_lightness_maximum_value" class="slider-label">0.62</span>
-            </div>
-          </div>
-        </section>
-
-        <section class="param-group recipe-group domain-recipe-card" aria-labelledby="recipe_domain_heading">
-          <h3 id="recipe_domain_heading" class="font-bold text-purple-300">Domain</h3>
-          <div class="recipe-field">
-            <label for="gen_domain">Domain</label>
-            <select id="gen_domain" aria-label="Domain Mapping" title="Domain Mapping"
-              class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="STRAIGHT">Straight</option>
-              <option value="MIRROR">Mirror</option>
-              <option value="VIGNETTE">Vignette</option>
-              <option value="FALLOFF">Falloff</option>
-              <option value="LOOP">Loop</option>
-            </select>
-          </div>
-          <div id="gen_falloff_field" class="recipe-field">
-            <label for="gen_falloff">Falloff</label>
-            <div class="recipe-slider">
-              <input type="range" id="gen_falloff" min="0.67" max="0.99" step="any" value="0.9"
-                aria-label="Falloff Start" title="Falloff Start">
-              <span id="gen_falloff_value" class="slider-label">0.90</span>
-            </div>
-          </div>
-          <div class="recipe-field">
-            <label for="gen_easing">Easing</label>
-            <select id="gen_easing" aria-label="Segment Easing" title="Segment Easing"
-              class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="LINEAR">Linear</option>
-              <option value="COSINE" selected>Cosine</option>
-              <option value="SMOOTHSTEP">Smoothstep</option>
-            </select>
-          </div>
-          <div id="gen_path_field" class="recipe-field">
-            <label for="gen_path">Path</label>
-            <select id="gen_path" aria-label="Color-space Path" title="Color-space Path"
-              class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="OKLCH_ARC">OKLCH</option>
-              <option value="OKLAB_CARTESIAN">OKLab</option>
-            </select>
-          </div>
-          <div id="gen_direction_field" class="recipe-field">
-            <label for="gen_direction">Direction</label>
-            <select id="gen_direction" aria-label="Hue Direction" title="Hue Direction"
-              class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="SHORTEST">Shortest</option>
-              <option value="CLOCKWISE">CW</option>
-              <option value="COUNTERCLOCKWISE">CCW</option>
-            </select>
-          </div>
-          <div class="recipe-field">
-            <label for="gen_offset">Offset</label>
-            <div class="recipe-slider">
-              <input type="range" id="gen_offset" min="0" max="0" step="any" value="0"
-                aria-label="Input Offset" title="Input Offset">
-              <span id="gen_offset_value" class="slider-label">0.000</span>
-            </div>
-          </div>
-          <div class="recipe-field">
-            <label for="gen_span">Span</label>
-            <div class="recipe-slider">
-              <input type="range" id="gen_span" min="0.01" max="1" step="any" value="1"
-                aria-label="Input Span" title="Input Span">
-              <span id="gen_span_value" class="slider-label">1.000</span>
-            </div>
-          </div>
-        </section>
-
-      </div>
-    </div> <!-- End Generative Tab -->
-
-    <!-- RGB WAVE FUNCTIONS (GRAPH) -->
-    <section class="param-group visualization-card wave-panel">
-      <div class="wave-heading">
-        <h2 id="wave_graph_title" class="font-semibold text-white">sRGB Channel Curves</h2>
-        <div class="wave-legend" role="group" aria-label="sRGB channel curve legend">
-          <span style="--legend-color:#EF4444">Red</span>
-          <span style="--legend-color:#22C55E">Green</span>
-          <span style="--legend-color:var(--blue-500)">Blue</span>
-        </div>
-      </div>
-      <canvas id="waveGraphCanvas" width="1024"
-        height="300" role="img"
-        aria-label="Plot of the sRGB red, green and blue channel curves against normalized palette coordinate t"></canvas>
-    </section>
-
-    <!-- RESULTING PALETTE (STATIC STRIP) -->
-    <section class="param-group visualization-card strip-panel">
-      <div class="flex justify-between items-center">
-        <h2 id="palette_range_heading" class="font-semibold text-white">sRGB Palette (t &isin; [0, 1])</h2> <button type="button"
-          id="resetZoomButton"
-          class="hidden px-3 py-1 bg-blue-600 text-white hover:bg-blue-700 rounded-md text-sm font-medium transition-all shadow-lg">Reset
-          Zoom</button>
-      </div>
-      <p class="text-sm text-gray-300">Click a color to copy its hex value, or click and drag to zoom. With the
-        strip focused, Enter copies the center color, Shift+→ zooms in and Shift+← resets the zoom.</p>
-      <canvas id="colorStripCanvas" width="1024" height="100"
-        tabindex="0" role="button" aria-label="Palette strip; click a color to copy it or drag to zoom"
-        aria-keyshortcuts="Enter Space Shift+ArrowLeft Shift+ArrowRight"></canvas>
-      <div id="palette_copy_feedback" class="palette-copy-feedback" role="status" aria-live="polite">
-        <span id="palette_copy_swatch" class="palette-copy-swatch" aria-hidden="true"></span>
-        <span id="palette_copy_status"></span>
-        <code id="palette_copy_hex"></code>
-      </div>
-    </section>
 
       </main>
 
