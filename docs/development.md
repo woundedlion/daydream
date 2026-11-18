@@ -320,11 +320,30 @@ Parameter keys remain in the `fx` namespace.
 
 | Module | Responsibility |
 | --- | --- |
+| `src/app/app_boot.js` | Module-ready startup, render adapter and recorder creation, and initial state application |
+| `src/app/app_context.js` | Shared types for successive stages of page assembly |
+| `src/app/app_controls.js` | Playback shortcuts, Test All, and view, segment and recording control wiring |
+| `src/app/app_effects.js` | Effect panel, parameter and preset wiring, and effect and resolution transactions |
+| `src/app/app_engine_controls.js` | Main-engine parameter writes, animation pause across engines, and snapshot capability checks |
+| `src/app/app_frame_loop.js` | Guarded render and recording ticks |
+| `src/app/app_instances.js` | Renderer and engine host creation, with display-buffer alias wiring |
+| `src/app/app_route_state.js` | URL hydration, resolution and effect validation, and route synchronization |
+| `src/app/app_segments.js` | Segment controller, buffer aliases, statistics, and recording abort on faults |
+| `src/app/app_shader_documents.js` | Shader document controller and effect panel wiring for the workbench |
+| `src/app/app_shell.js` | View panel and effect sidebar mounting, and supported resolution selection |
+| `src/app/app_teardown.js` | App resource disposal and page lifecycle listener cleanup |
 | `src/app/frame_loop_guard.js` | Per-frame error reporting, recovery and terminal module release |
 | `src/app/module_load.js` | WASM startup deadline, load completion and disposal guards |
 | `src/app/render_adapter.js` | Per-frame engine and worker integration, display aliases and capture readiness |
 | `src/effects/effect_apply_helpers.js` | Engine effect selection, strobe layout and sidebar metrics |
 | `src/renderer/dot_detail.js` | Sphere tessellation detail from display pixel count |
+| `src/renderer/driver_capture.js` | Frame statistics and recording capture scheduling |
+| `src/renderer/driver_context.js` | WebGL context loss and restoration, including the reload prompt |
+| `src/renderer/driver_dots.js` | Instanced sphere dot geometry and material setup |
+| `src/renderer/driver_input.js` | Keyboard orbit, view reset, and playback and preset shortcuts |
+| `src/renderer/driver_labels.js` | Camera-facing axis label selection and refresh |
+| `src/renderer/driver_pov.js` | POV sweep lifecycle, reset scheduling, and strobe mode |
+| `src/renderer/driver_views.js` | Main and picture-in-picture rendering, with capture and label passes |
 | `src/renderer/label_pool.js` | Reusable projected-label elements and their lifetimes |
 | `src/shared/aria_description.js` | Adds and removes a widget's ARIA description references |
 | `src/shared/dom.js` | Type-checked DOM lookup by ID |
