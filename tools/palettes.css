@@ -393,7 +393,6 @@ input.g-thumb::-moz-range-thumb {
 .palette-copy-feedback code {
   color: white;
   font-family: 'JetBrains Mono', monospace;
-  font-weight: 600;
 }
 
 #palette_gallery {
