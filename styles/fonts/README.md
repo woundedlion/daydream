@@ -8,7 +8,7 @@ shared variable font file. The JetBrains Mono 400 faces, Unicode ranges, and
 
 Retrieved 2026-11-05 with a current Chromium user agent. The WOFF2 files are
 unmodified downloads from the official URLs recorded with SHA-256 digests in
-`sources.json`. Inter's weights share each subset's variable font file.
+`sources.json`.
 
 The fonts total 261,656 bytes across 13 files. The Latin pair is 69,424 bytes;
 the browser loads other subsets only for matching text. Local hosting preserves
