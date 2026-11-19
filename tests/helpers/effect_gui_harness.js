@@ -4,7 +4,7 @@ import { fakePanelGui } from './fake_gui.js';
 import { createEffectGui } from '../../src/ui/effect_gui.js';
 import { fakeElement, installDocument } from './fake_dom.js';
 import { ChainSnapshotRestoreResult } from './fake_engine.js';
-import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../../src/workbench/shader/shader_deeplink.js';
+import { CHAIN_SNAPSHOT_SCHEMA_VERSION, supportedSnapshotSchema } from '../../src/workbench/shader/shader_deeplink.js';
 
 export function chainSnapshot(value = 0) {
   return {
@@ -290,7 +290,7 @@ export function makeHarness({
         controllersAtRestore.push(guis.at(-1).controllers.length);
         if (!restoreChainSnapshotAccepted || !Number.isInteger(snapshot.schemaVersion))
           return ChainSnapshotRestoreResult.INVALID_VALUE;
-        return snapshot.schemaVersion === CHAIN_SNAPSHOT_SCHEMA_VERSION
+        return supportedSnapshotSchema(snapshot.schemaVersion)
           ? ChainSnapshotRestoreResult.APPLIED : ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
       },
       restoreResults: () => ChainSnapshotRestoreResult,

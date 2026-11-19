@@ -86,9 +86,14 @@ for (const scenario of GENERATOR_SCENARIOS) {
       const generatorWrites = writes.filter(({name}) => Object.hasOwn(target, name));
       assert.equal(generatorWrites.length, Object.keys(target).length * (scenario.raw && scenario.accepted ? 2 : 1));
       assert.ok(generatorWrites.every(({accepted}) => accepted));
+      const stored = (key) => {
+        const text = win.location.searchParams.get(key);
+        assert.notEqual(text, null, `${key} is missing from the canonical URL`);
+        return Number(text);
+      };
       for (const [name, value] of Object.entries(target)) {
-        if (scenario.raw) assert.equal(Number(win.location.searchParams.get(`fx.${name}`)), value);
-        assert.equal(Number(win.location.searchParams.get(`fx.__accepted.${name}`)), value);
+        if (scenario.raw) assert.equal(stored(`fx.${name}`), value);
+        assert.equal(stored(`fx.__accepted.${name}`), value);
       }
     } finally {
       panel.destroy();

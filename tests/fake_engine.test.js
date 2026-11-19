@@ -9,7 +9,7 @@ function installModulatedChain(engine) {
   engine.bindings.setShaderChain([...engine.program, {instance: 'modulation', operator: 'color.modulate.v1'}]);
 }
 
-const CHAIN = DEFAULT_CHAIN.map(({instance: label, operator}) => ({label, operator}));
+const chainPayload = () => DEFAULT_CHAIN.map((entry) => ({...entry}));
 
 test('FakeChainEngine mocks nothing outside the pinned engine surface', () => {
   const engine = new FakeChainEngine();
@@ -44,7 +44,7 @@ test('the fake chain engine exposes status identities on every return path', () 
 test('fake parameter batches distinguish malformed and oversized payloads', () => {
   const engine = new FakeChainEngine();
   engine.setEffect('ShaderChain');
-  engine.bindings.setShaderChain(CHAIN.map(({ label, operator }) => ({ instance: label, operator })));
+  engine.bindings.setShaderChain(chainPayload());
   const before = engine.getParameterDefinitions();
   for (const payload of [null, undefined, {}, [null], [undefined],
     [{ name: 1, value: 0 }], [{ name: 'camera.wander' }],
@@ -110,8 +110,7 @@ test('an injected APPLIED cannot report success without applying the chain', () 
   const program = engine.program;
   const definitions = engine.definitions;
   engine.nextChainResult = { code: 'APPLIED', entryIndex: -1 };
-  assert.throws(() => engine.bindings.setShaderChain(CHAIN.slice(1)
-    .map(({ label, operator }) => ({ instance: label, operator }))),
+  assert.throws(() => engine.bindings.setShaderChain(chainPayload().slice(1)),
   /Injected chain results must be refusals/);
   assert.equal(engine.getParamGeneration(), generation);
   assert.equal(engine.program, program);
@@ -164,11 +163,11 @@ test('fake source writes synchronize the snapshot clock with the selected recipe
 test('the fake chain engine advances generations after repeated application', () => {
   const engine = new FakeChainEngine();
   engine.setEffect('ShaderChain');
-  const installed = CHAIN.reduce((count, { operator: id }) =>
+  const installed = DEFAULT_CHAIN.reduce((count, { operator: id }) =>
     count + engine.catalog.operators.find(operator => operator.id === id).params.length, 0);
   assert.ok(installed > 0);
   assert.equal(engine.getParameterDefinitions().length, installed);
-  const chain = CHAIN.map(({ label, operator }) => ({ instance: label, operator }));
+  const chain = chainPayload();
   let generation = engine.getParamGeneration();
   for (let i = 0; i < 2; i++) {
     assert.equal(engine.bindings.setShaderChain(chain).status, ChainStatus.OK);
@@ -186,8 +185,7 @@ test('field snapshot fakes preserve their drift clocks', () => {
     const engine = new FakeChainEngine();
     engine.setEffect('ShaderChain');
     const bindings = engine.getShaderChainBindings();
-    const chain = [{instance: 'field', operator}, ...CHAIN.slice(1)
-      .map(({label, operator}) => ({instance: label, operator}))];
+    const chain = [{instance: 'field', operator}, ...chainPayload().slice(1)];
     assert.equal(bindings.setShaderChain(chain).code, 'APPLIED');
     const saved = bindings.getSnapshot();
     const clock = saved.runtime.find(({instance}) => instance === 'field');

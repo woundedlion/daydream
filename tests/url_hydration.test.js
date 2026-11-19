@@ -34,12 +34,13 @@ test('hydrate resolves typed values, corrections and enum diagnostics', () => {
     ['bad', 1, [[2, '2']], 'ignored', 1, true, ['non-numeric', 'duplicate', 'range']],
     ['true', false, [[false, true]], 'applied', true, false],
   ];
-  for (const [raw, current, args, kind, value, rewrite, warnings = []] of cases) {
+  for (const [index, [raw, current, args, kind, value, rewrite, warnings = []]] of cases.entries()) {
+    const label = `case ${index + 1} (${JSON.stringify(raw)})`;
     const result = hydrate({ raw, current, args });
-    assert.equal(result.kind, kind, String(raw));
-    assert.equal(result.value, value, String(raw));
-    assert.equal(result.rewrite, rewrite, String(raw));
-    assert.deepEqual(result.warning?.reasons ?? [], warnings, String(raw));
-    if (warnings.length) assert.equal(result.warning.raw, raw);
+    assert.equal(result.kind, kind, label);
+    assert.equal(result.value, value, label);
+    assert.equal(result.rewrite, rewrite, label);
+    assert.deepEqual(result.warning?.reasons ?? [], warnings, label);
+    if (warnings.length) assert.equal(result.warning.raw, raw, label);
   }
 });
