@@ -748,7 +748,7 @@ export function createShaderDocumentController({
   const onDigest = async () => {
     const digest = digestButton?.dataset.digest;
     if (!digest) return;
-    if (await copyToClipboard(digest)) showStatus(`Copied the descriptor digest ${digest}.`);
+    if (await copyText(digest)) showStatus(`Copied the descriptor digest ${digest}.`);
     else announce('The descriptor digest could not be copied.');
   };
 

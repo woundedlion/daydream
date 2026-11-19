@@ -178,30 +178,25 @@ test('abandoning a refused link reports its release once', async () => {
   assert.equal(releases, 1);
 });
 
-test('the descriptor digest button copies the full digest and announces failures', async () => {
-  const harness = await editorWorkbench();
+test('the descriptor digest button uses the injected clipboard writer', async () => {
+  const copied = [];
+  let accepted = true;
+  const harness = await editorWorkbench({copyText: async (text) => {
+    copied.push(text);
+    return accepted;
+  }});
   const button = harness.elements.get('shader-document-digest');
   const status = harness.elements.get('shader-document-status');
   assert.equal(button.disabled, false);
   const digest = button.dataset.digest;
   assert.ok(digest.length > button.textContent.length);
-  const copied = [];
-  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
-  const clipboard = { writeText: async (text) => { copied.push(text); } };
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { clipboard } });
   const onClick = button.listeners.find((entry) => entry.type === 'click').handler;
-  try {
-    await onClick();
-    assert.deepEqual(copied, [digest]);
-    assert.equal(status.textContent, `Copied the descriptor digest ${digest}.`);
-    clipboard.writeText = async () => { throw new Error('clipboard refused'); };
-    document.execCommand = () => false;
-    await onClick();
-    assert.equal(status.textContent, 'The descriptor digest could not be copied.');
-  } finally {
-    if (navigatorDescriptor) Object.defineProperty(globalThis, 'navigator', navigatorDescriptor);
-    else delete globalThis.navigator;
-  }
+  await onClick();
+  assert.deepEqual(copied, [digest]);
+  assert.equal(status.textContent, `Copied the descriptor digest ${digest}.`);
+  accepted = false;
+  await onClick();
+  assert.equal(status.textContent, 'The descriptor digest could not be copied.');
 });
 
 test('compiled lattice edits keep the authored fallback period and reapply', async () => {
