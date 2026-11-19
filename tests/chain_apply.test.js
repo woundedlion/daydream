@@ -97,6 +97,37 @@ test('a preview frame admits all modulation endpoints in one write', () => {
   assert.equal(calls.length, 2);
 });
 
+test('a palette morph encodes both authored recipes with the source and modulation batch', () => {
+  const definitions = [
+    {name: 'colorize.palette-type', options: ['Procedural', 'Gradient'], optionValues: [2, 3]},
+    {name: 'colorize.palette-name'},
+  ];
+  const palette = {
+    instance: 'colorize', mix: 0.75,
+    from: {'colorize.palette-type': 'Gradient', 'colorize.palette-name': 23},
+    to: {'colorize.palette-type': 'Procedural', 'colorize.palette-name': 17},
+  };
+  const calls = [];
+  const engine = {getShaderChainBindings: () => ({
+    setShaderChainPaletteMorphParameters(...args) {
+      calls.push(args);
+      return ParamSetResult.APPLIED;
+    },
+    delete() {},
+  })};
+  const render = (paletteMorph) => writeChainParameters(engine, MODULE, definitions, [],
+    {transition: true, paletteMorph, seek: true});
+  assert.deepEqual(render(palette), {refusal: null, code: null});
+  assert.deepEqual(calls, [[[], null, [], {
+    ...palette,
+    from: {'colorize.palette-type': 3, 'colorize.palette-name': 23},
+    to: {'colorize.palette-type': 2, 'colorize.palette-name': 17},
+    snap: true,
+  }]]);
+  assert.match(render({...palette, to: {'colorize.palette-type': 'Unknown'}}).refusal, /has no option/);
+  assert.equal(calls.length, 1);
+});
+
 const CHAIN = [
   { label: 'camera', operator: 'sphere.rotate.v2' },
   { label: 'project', operator: 'project.stereographic.v2' },

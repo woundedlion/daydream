@@ -12,6 +12,7 @@ import { labelOf } from './chain_presentation.js';
 /** @typedef {{document: *, descriptor_digest?: string, preset_bank_digest?: string, diagnostics?: import('./chain_document_store.js').Diagnostic[], status?: string}} CompiledDocument */
 /** @typedef {import('../../../generated/shader/shader_workbench.mjs').SourceMorph} SourceMorph */
 /** @typedef {import('../../../generated/shader/shader_workbench.mjs').ModulationMorph} ModulationMorph */
+/** @typedef {import('../../../generated/shader/shader_workbench.mjs').PaletteMorph} PaletteMorph */
 
 /**
  * @param {ParameterDefinition[]} definitions
@@ -71,10 +72,10 @@ function resolveMorph(definitions, morph, seek) {
  * @param {*} module - Engine module and admission codes.
  * @param {ParameterDefinition[]} definitions - Active parameter definitions.
  * @param {Array<[string, *]>} entries - Parameter ids and authored values.
- * @param {{transition?: boolean, sourceMorph?: SourceMorph, modulationMorphs?: ModulationMorph[], seek?: boolean}} [options] - Preview writes and their sampled endpoints.
+ * @param {{transition?: boolean, sourceMorph?: SourceMorph, modulationMorphs?: ModulationMorph[], paletteMorph?: PaletteMorph, seek?: boolean}} [options] - Preview writes and their sampled endpoints.
  * @returns {{refusal: string|null, code: number|null}} Resolution refusal, admission failure, or success.
  */
-export function writeChainParameters(engine, module, definitions, entries, {transition = false, sourceMorph, modulationMorphs = [], seek = false} = {}) {
+export function writeChainParameters(engine, module, definitions, entries, {transition = false, sourceMorph, modulationMorphs = [], paletteMorph, seek = false} = {}) {
   const writes = [];
   for (const [id, value] of entries) {
     if (transition && value !== null && typeof value === 'object') {
@@ -91,14 +92,21 @@ export function writeChainParameters(engine, module, definitions, entries, {tran
   }
   const source = sourceMorph ? resolveMorph(definitions, sourceMorph, seek) : null;
   if (typeof source === 'string') return {refusal: source, code: null};
-  if (modulationMorphs.length) {
+  if (modulationMorphs.length || paletteMorph) {
     const layers = [];
     for (const morph of modulationMorphs) {
       const layer = resolveMorph(definitions, morph, seek);
       if (typeof layer === 'string') return {refusal: layer, code: null};
       layers.push(layer);
     }
-    const code = callWorkbenchBinding(engine, 'setShaderChainMorphParameters', [writes, source, layers]);
+    let code = null;
+    if (paletteMorph) {
+      const palette = resolveMorph(definitions, paletteMorph, seek);
+      if (typeof palette === 'string') return {refusal: palette, code: null};
+      code = callWorkbenchBinding(engine, 'setShaderChainPaletteMorphParameters', [writes, source, layers, palette]);
+    }
+    if (code === null && layers.length)
+      code = callWorkbenchBinding(engine, 'setShaderChainMorphParameters', [writes, source, layers]);
     if (code !== null)
       return {refusal: null, code: code === module.ParamSetResult.APPLIED ? null : code};
   }

@@ -24,6 +24,7 @@ export type ModulationMorph = {
   to: Record<string, number|string>;
   mix: number;
 };
+export type PaletteMorph = ModulationMorph;
 export function evaluateTransition(descriptor: object, bank: object, fromId: string, toId: string, evaluation: number, catalog?: object): {
   evaluation: number;
   duration: number;
@@ -32,4 +33,5 @@ export function evaluateTransition(descriptor: object, bank: object, fromId: str
   values: Record<string, number|string|{from: string; to: string; mix: number}>;
   sourceMorph?: SourceMorph;
   modulationMorphs?: ModulationMorph[];
+  paletteMorph?: PaletteMorph;
 };
