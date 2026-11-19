@@ -63,20 +63,15 @@ export async function resizeViewport(tab, viewport) {
 }
 
 /** @param {import('puppeteer-core').Page} tab */
-async function savedDocument(tab) {
+async function exportedDocument(tab) {
   await tab.evaluate(() => {
-    const create = URL.createObjectURL.bind(URL);
-    Object.assign(window, { exported: [] });
-    URL.createObjectURL = (blob) => {
-      window.exported.push(blob.text());
-      return create(blob);
-    };
+    window.exported = '';
+    Object.defineProperty(navigator, 'clipboard', { configurable: true,
+      value: { writeText: async (source) => { window.exported = source; } } });
   });
-  await (await tab.waitForSelector('#shader-document-save')).click();
-  await tab.waitForFunction(() => window.exported.length > 0);
-  const source = await tab.evaluate(async () => (await Promise.all(window.exported)).at(-1));
-  if (typeof source !== 'string') throw new Error('Save exported no document');
-  return JSON.parse(source);
+  await (await tab.waitForSelector('#shader-document-export')).click();
+  await tab.waitForFunction(() => window.exported !== '');
+  return JSON.parse(await tab.evaluate(() => window.exported));
 }
 
 /** @param {import('puppeteer-core').Page} tab */
@@ -609,14 +604,14 @@ export async function probeStrip(tab) {
   const slider = await boxOf(tab, track);
   await tab.mouse.click(slider.x + slider.width * SLIDER_FRACTION, centre(slider).y);
   const shown = Number(await tab.$eval(track, (node) => node.value));
-  const stored = (await savedDocument(tab)).preset_bank.presets[0].values['rotate.wander'];
+  const stored = (await exportedDocument(tab)).preset_bank.presets[0].values['rotate.wander'];
   check(shown !== before && Math.abs(stored - shown) < VALUE_TOLERANCE,
-    `an inline control saves its value (${stored})`);
+    `Export includes the inline control value (${stored})`);
 
   await (await tab.waitForSelector('.chain-chip[data-label="rotate"] .chain-chip-reset')).click();
   const resetValue = Number(await tab.$eval(track, (node) => node.value));
   check(resetValue === 0
-      && (await savedDocument(tab)).preset_bank.presets[0].values['rotate.wander'] === 0,
+      && (await exportedDocument(tab)).preset_bank.presets[0].values['rotate.wander'] === 0,
   'a card reset restores its default in the controls and exported document');
   await (await tab.waitForSelector('.chain-undo')).click();
   check(Math.abs(Number(await tab.$eval(track, (node) => node.value)) - shown) < VALUE_TOLERANCE,
@@ -835,42 +830,12 @@ export async function probeDocumentActions(tab) {
     value: [...node.options].find((option) => option.value !== node.value).value,
   }));
   await tab.select(`[data-parameter="${topology.id}"] select`, topology.value);
-  const exported = await savedDocument(tab);
-  check(exported.descriptor.chain[0].label === 'camera-rotate', 'rename reaches the saved chain');
+  const exported = await exportedDocument(tab);
+  check(exported.descriptor.chain[0].label === 'camera-rotate', 'rename reaches the exported chain');
   check(exported.preset_bank.presets[0].values[topology.id] === topology.value,
-    'a topology select edit reaches the saved preset');
-  await tab.evaluate(() => {
-    Object.assign(window, { saveAsFile: { suggestedName: '', source: '', closed: false } });
-    Object.defineProperty(window, 'showSaveFilePicker', { configurable: true,
-      value: async ({ suggestedName }) => {
-        window.saveAsFile.suggestedName = suggestedName;
-        return { name: 'chosen-study.shader.json', createWritable: async () => ({
-          write: async (source) => { window.saveAsFile.source = source; },
-          close: async () => { window.saveAsFile.closed = true; },
-          abort: async () => {},
-        }) };
-      } });
-  });
-  await tab.click('#shader-document-save-as');
-  await tab.waitForFunction(() => window.saveAsFile.closed);
-  const savedAs = await tab.evaluate(() => window.saveAsFile);
-  const copy = JSON.parse(savedAs.source);
-  check(copy.document_id !== exported.document_id, 'Save As creates a distinct document id');
-  check(savedAs.suggestedName === `${copy.document_id}.shader.json`,
-    'the file picker suggests the copy filename');
+    'a topology select edit reaches the exported preset');
   check(await tab.$eval('#shader-document-status', (node) => node.textContent)
-    === 'Saved chosen-study.shader.json.', 'Save As reports the selected filename');
-  check((await savedDocument(tab)).document_id === exported.document_id,
-    'Save after Save As retains the original document id');
-  await tab.evaluate(() => {
-    Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: undefined });
-    window.prompt = () => 'fallback-study';
-  });
-  const exportsBefore = await tab.evaluate(() => window.exported.length);
-  await tab.click('#shader-document-save-as');
-  await tab.waitForFunction((count) => window.exported.length > count, {}, exportsBefore);
-  check(await tab.$eval('#shader-document-status', (node) => node.textContent)
-    === 'Saved fallback-study.shader.json.', 'the fallback prompt accepts a filename');
+    === 'Copied the shader document to the clipboard.', 'Export announces the clipboard copy');
   await tab.evaluate(() => {
     window.copiedDigest = '';
     Object.defineProperty(navigator, 'clipboard', { configurable: true,
@@ -880,20 +845,41 @@ export async function probeDocumentActions(tab) {
   check(await tab.waitForFunction(() => /^[a-f0-9]{64}$/.test(window.copiedDigest))
     .then(() => true, () => false),
     'the digest button copies the full descriptor digest');
-  await tab.waitForFunction(() => location.hash.startsWith('#shader=v2.'));
+  await tab.waitForFunction(() => location.hash.startsWith('#shader='));
   const linked = await tab.evaluate(async () => {
     const { decodeShaderStateHash } = await import('../src/workbench/shader/shader_deeplink.js');
     return decodeShaderStateHash(location.hash);
   });
   check(linked.document.descriptor.chain[0].label === 'camera-rotate' && linked.bypassed.length === 0,
     'the live location hash preserves the edited chain and bypass state');
+  await tab.click('#shader-animation-toggle');
+  await tab.waitForFunction(async () => {
+    const { decodeShaderStateHash } = await import('../src/workbench/shader/shader_deeplink.js');
+    return (await decodeShaderStateHash(location.hash))?.paused;
+  });
+  const pausedHash = await tab.evaluate(() => location.hash);
+  await tab.click('#shader-document-clear');
+  check(await tab.waitForSelector(chip).then(() => true, () => false),
+    'Clear All restores the default chain');
+  check(await tab.$eval('#shader-preset-select', (node) => node.value) === 'catalog-defaults',
+    'Clear All restores Catalog Defaults');
+  check(await tab.$eval('#shader-animation-toggle', (node) => node.getAttribute('aria-pressed')) === 'false',
+    'Clear All resumes preset animations');
+  check(await tab.$eval('.chain-undo', (node) => node.disabled), 'Clear All resets chain history');
+  await tab.waitForFunction((hash) => location.hash !== hash, {}, pausedHash);
+  const reset = await tab.evaluate(async () => {
+    const { decodeShaderStateHash } = await import('../src/workbench/shader/shader_deeplink.js');
+    return decodeShaderStateHash(location.hash);
+  });
+  check(reset.document.descriptor.chain[0].label === 'rotate' && !reset.paused,
+    'Clear All writes the default chain to the share link');
   return failures;
 }
 
 /** @param {import('puppeteer-core').Page} tab */
 export async function probeSnapshotImport(tab) {
   const { failures, check } = checks();
-  await tab.waitForFunction(() => location.hash.startsWith('#shader=v2.'));
+  await tab.waitForFunction(() => location.hash.startsWith('#shader='));
   const snapshot = await tab.evaluate(async () => {
     const {decodeShaderStateHash} = await import('../src/workbench/shader/shader_deeplink.js');
     return (await decodeShaderStateHash(location.hash)).chainSnapshot;
@@ -904,7 +890,7 @@ export async function probeSnapshotImport(tab) {
     'fx.__chainSnapshot': JSON.stringify(snapshot)}).toString();
   await tab.goto(url.href, {timeout: TIMEOUT_MS});
   await tab.waitForFunction(() => !document.getElementById('loading-overlay'));
-  await tab.waitForFunction(() => location.hash.startsWith('#shader=v2.'));
+  await tab.waitForFunction(() => location.hash.startsWith('#shader='));
   const imported = await tab.evaluate(async () => {
     const {decodeShaderStateHash} = await import('../src/workbench/shader/shader_deeplink.js');
     return decodeShaderStateHash(location.hash);
@@ -980,7 +966,7 @@ export async function probeColorCard(tab) {
       node.dispatchEvent(new Event('change', { bubbles: true }));
     }, value);
   }
-  await tab.waitForFunction(() => location.hash.startsWith('#shader=v2.'));
+  await tab.waitForFunction(() => location.hash.startsWith('#shader='));
   let recipe;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const state = await decodeShaderStateHash(await tab.evaluate(() => location.hash));
@@ -1111,7 +1097,7 @@ export async function probePaletteAndModulations(tab) {
   await tab.$eval(`${layer(first)} .chain-modulation-enabled`, (node) => {
     node.click();
   });
-  const document = await savedDocument(tab);
+  const document = await exportedDocument(tab);
   const shared = await (await tab.waitForFunction(async (label) => {
     const {decodeShaderStateHash} = await import('../src/workbench/shader/shader_deeplink.js');
     const state = await decodeShaderStateHash(location.hash);
@@ -1126,7 +1112,7 @@ export async function probePaletteAndModulations(tab) {
   'the disabled layer retains its authored order and settings in the editor and share link');
   check(document.descriptor.chain.slice(-2).map((entry) => entry.label).join() === [second, hue].join()
     && document.descriptor.chain.every((entry) => entry.label !== first),
-  'Save omits the disabled modulation and keeps the enabled layers in order');
+  'Export omits the disabled modulation and keeps the enabled layers in order');
   await tab.$eval(`${layer(hue)} .chain-chip-remove`, (node) => node.click());
   check(await tab.$(layer(hue)) === null && await tab.$('.chain-chip[data-label="colorize"]') !== null,
     'removing a modulation preserves the permanent Palette card');
@@ -1158,9 +1144,9 @@ export async function probeColorStageDrag(tab) {
     {x: first.x + 8, y: first.y + 1});
   check((await labels()).join() === [...before].reverse().join(),
     'dragging a Color stage header reorders the stages in their own container');
-  const document = await savedDocument(tab);
+  const document = await exportedDocument(tab);
   check(document.descriptor.chain.slice(-2).map((entry) => entry.label).join() === [...before].reverse().join(),
-    'Save retains the order committed by the Color header drag');
+    'Export retains the order committed by the Color header drag');
   return failures;
 }
 
@@ -1210,11 +1196,11 @@ export async function probeSphericalSources(tab) {
     }, state.chainSnapshot);
     check(render.restored && render.colors > 8,
       `${operator} restores and renders a spatially varying frame in the WASM engine`);
-    const saved = await savedDocument(tab);
+    const saved = await exportedDocument(tab);
     check(saved.descriptor.chain.some((entry) => entry.operator === operator)
         && !saved.descriptor.chain.some((entry) => entry.operator.startsWith('project.')
           || entry.operator.startsWith('warp.')),
-    `${operator} saves its direct spherical route`);
+    `Export includes the direct spherical route for ${operator}`);
     await tab.select(sourceSelector, planarRoute);
     check(await tab.$('.chain-band[data-carrier="plane"]') !== null
         && await tab.$('.chain-chip-replace[aria-label="Projection"]') !== null

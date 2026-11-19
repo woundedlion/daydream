@@ -19,7 +19,6 @@ import * as composedRoster from '../../../generated/shader/composed_effect_roste
 import { BAKED_CONSTANT_IDS, bakedTopologyFields } from '../../../generated/shader/shader_workbench.mjs';
 import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../../effects/effect_persistence.js';
 import { copyToClipboard } from '../../shared/copy_text.js';
-import { downloadBlob } from '../../shared/download_file.js';
 import {
   decodeShaderStateHash,
 } from './shader_deeplink.js';
@@ -44,11 +43,6 @@ const DIGEST_ABBREVIATION = 12;
 /** @typedef {import('./shader_document_state.js').OfficialDocument} OfficialDocument */
 /** @typedef {import('./shader_document_state.js').ActiveDocument} ActiveDocument */
 
-/** @param {Document} doc @param {string} filename @param {string} source */
-function defaultDownload(doc, filename, source) {
-  downloadBlob(doc, new Blob([source], { type: 'application/json' }), filename);
-}
-
 /**
  * Owns document import, validation, preview selection, editing, and export UI.
  * @param {{doc: Document, getEngine: () => *, getModule: () => *,
@@ -60,7 +54,7 @@ function defaultDownload(doc, filename, source) {
  * setParamFilter?: (filter: {external: true}|null) => void,
  * onOriginalLinkReleased?: () => void,
  * fetchText?: (url: string) => Promise<string>, importCompiler?: () => Promise<*>,
- * download?: (filename: string, source: string) => void,
+ * copyText?: (source: string) => Promise<boolean>,
  * initialEffect?: string|null, win?: *}} dependencies - initialEffect is the effect the
  *   page was opened on, which init() honors when it names a catalog source.
  */
@@ -84,7 +78,7 @@ export function createShaderDocumentController({
     return response.text();
   },
   importCompiler = () => import('../../../generated/shader/shader_workbench.mjs'),
-  download = (filename, source) => defaultDownload(doc, filename, source),
+  copyText = copyToClipboard,
   initialEffect = null,
   win = globalThis,
 }) {
@@ -110,10 +104,10 @@ export function createShaderDocumentController({
     doc.getElementById('shader-preset-select'));
   const openButton = /** @type {HTMLButtonElement|null} */ (
     doc.getElementById('shader-document-open'));
-  const saveButton = /** @type {HTMLButtonElement|null} */ (
-    doc.getElementById('shader-document-save'));
-  const saveAsButton = /** @type {HTMLButtonElement|null} */ (
-    doc.getElementById('shader-document-save-as'));
+  const exportButton = /** @type {HTMLButtonElement|null} */ (
+    doc.getElementById('shader-document-export'));
+  const clearButton = /** @type {HTMLButtonElement|null} */ (
+    doc.getElementById('shader-document-clear'));
   const fileInput = /** @type {HTMLInputElement|null} */ (
     doc.getElementById('shader-document-file'));
   const status = /** @type {HTMLOutputElement|null} */ (
@@ -126,7 +120,7 @@ export function createShaderDocumentController({
     doc.getElementById('shader-parity-toggle'));
   const animationToggle = /** @type {HTMLButtonElement|null} */ (
     doc.getElementById('shader-animation-toggle'));
-  if (!sourceSelect || !presetSelect || !openButton || !saveButton
+  if (!sourceSelect || !presetSelect || !openButton || !exportButton || !clearButton
       || !fileInput || !status) return null;
   const stripMount = doc.getElementById('chain-strip');
   const railMount = doc.getElementById('shader-preset-rail');
@@ -400,7 +394,7 @@ export function createShaderDocumentController({
     : structuredClone((/** @type {ActiveDocument} */ (state.active)).compiled.document);
 
   /**
-   * The document Save writes: the current one without its disabled stages.
+   * The current document without its disabled stages.
    * @returns {*} An isolated copy.
    * @throws {Error} If the document without those stages fails validation.
    */
@@ -470,22 +464,22 @@ export function createShaderDocumentController({
   });
 
   const {loadSource, loadLinkedSource} = createShaderDocumentLoader({
-    state, linkWriter, doc, stripMount, presetSelect, saveButton, saveAsButton,
+    state, linkWriter, doc, stripMount, presetSelect, documentActions: [exportButton, clearButton],
     status, importCompiler, flushDeepLink, getEngine, getModule, selectEffect,
     teardownChainUi, setParamFilter, populatePresets, showDigest, syncParity,
     applyPreset, buildChainUi, clearPreview: presetEditor.reset, showError, setAnimationsPaused, showAnimationState,
     syncEffectGui, invalidate, currentDocument,
     selectLoadedSource: (effect, filename, kind) => selectLoadedSource(effect, filename, kind),
   });
-  const {save, saveAs} = createShaderDocumentPersistence({state,
-    win, flushDeepLink, currentDocument, exportableDocument, download, showStatus, showError});
+  const exportShader = createShaderDocumentPersistence({state,
+    flushDeepLink, currentDocument, exportableDocument, copyText, showStatus, showError});
 
   /**
    * Opens the default chain on catalog defaults through the ordinary load path.
    * @returns {Promise<boolean>} Whether the scratch document is on screen.
    */
   const loadScratch = () =>
-    loadSource(scratchChainDocument(state.operatorCatalog), SCRATCH_FILENAME);
+    loadSource(scratchChainDocument(state.operatorCatalog));
 
   /** @type {HTMLOptionElement | null} */
   let loadedSourceOption = null;
@@ -518,7 +512,7 @@ export function createShaderDocumentController({
       const snapshot = JSON.parse(chainText);
       const imported = documentFromChainSnapshot(snapshot, state.operatorCatalog);
       const previous = getChainSnapshot(getEngine());
-      if (!await loadSource(imported, 'imported.shader.json'))
+      if (!await loadSource(imported))
         return status.textContent || 'the imported chain could not be adopted';
       const outcome = restoreChainSnapshot(getEngine(), getModule(), snapshot);
       if (outcome !== getModule().ChainSnapshotRestoreResult.APPLIED) {
@@ -609,7 +603,7 @@ export function createShaderDocumentController({
     let loaded;
     if (requested === undefined) loaded = await loadScratch();
     else {
-      loaded = await loadSource(requested.source, requested.filename, requested.compiled);
+      loaded = await loadSource(requested.source, requested.compiled);
       if (loaded) sourceSelect.value = requested.effectId;
     }
     selectedSource = sourceSelect.value;
@@ -627,8 +621,20 @@ export function createShaderDocumentController({
 
   const allowSourceChange = () => {
     state.chainUi?.strip.flushParameterEdit();
-    return !state.active || JSON.stringify(currentDocument()) === state.active.savedDocument
-      || win.confirm('Discard unsaved shader edits?');
+    return !state.active || JSON.stringify(currentDocument()) === state.active.documentBaseline
+      || win.confirm('Discard unexported shader edits?');
+  };
+
+  const onClearAll = async () => {
+    if (!state.active || !allowSourceChange()) return;
+    try {
+      if (!await loadScratch()) return;
+      restoreAnimationsPaused(false);
+      invalidate();
+      await adoptLoadedSource('', SCRATCH_FILENAME, '');
+    } catch (error) {
+      showError(`Could not reset the shader workbench: ${errorDetail(error)}`);
+    }
   };
 
   const onSourceChange = async () => {
@@ -651,7 +657,7 @@ export function createShaderDocumentController({
         showError(`The source catalog carries no document for "${option.value}".`);
         return;
       }
-      if (!await loadSource(entry.source, entry.filename, entry.compiled)) {
+      if (!await loadSource(entry.source, entry.compiled)) {
         sourceSelect.value = selectedSource;
         return;
       }
@@ -686,7 +692,7 @@ export function createShaderDocumentController({
         return;
       }
       if (!allowSourceChange()) return;
-      if (!await loadSource(await file.text(), file.name)) return;
+      if (!await loadSource(await file.text())) return;
       await adoptLoadedSource(null, file.name, 'Imported');
     } catch (error) {
       showError(`Could not open shader document: ${errorDetail(error)}`);
@@ -771,8 +777,8 @@ export function createShaderDocumentController({
   presetSelect.addEventListener('change', onPresetChange);
   openButton.addEventListener('click', onOpen);
   fileInput.addEventListener('change', onFileChange);
-  saveButton.addEventListener('click', save);
-  saveAsButton?.addEventListener('click', saveAs);
+  exportButton.addEventListener('click', exportShader);
+  clearButton.addEventListener('click', onClearAll);
   animationToggle?.addEventListener('click', onAnimationToggle);
   parityToggle?.addEventListener('click', onParityToggle);
   digestButton?.addEventListener('click', onDigest);
@@ -785,8 +791,8 @@ export function createShaderDocumentController({
     presetSelect.removeEventListener('change', onPresetChange);
     openButton.removeEventListener('click', onOpen);
     fileInput.removeEventListener('change', onFileChange);
-    saveButton.removeEventListener('click', save);
-    saveAsButton?.removeEventListener('click', saveAs);
+    exportButton.removeEventListener('click', exportShader);
+    clearButton.removeEventListener('click', onClearAll);
     animationToggle?.removeEventListener('click', onAnimationToggle);
     parityToggle?.removeEventListener('click', onParityToggle);
     digestButton?.removeEventListener('click', onDigest);
@@ -795,7 +801,7 @@ export function createShaderDocumentController({
   };
 
   return {
-    init, loadSource, save, saveAs, applyPreset,
+    init, loadSource, exportShader, applyPreset,
     stepPreview() {
       try {
         presetEditor.transport.tick();

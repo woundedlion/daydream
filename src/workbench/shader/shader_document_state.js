@@ -14,9 +14,9 @@
 
 /**
  * The document on screen and its preview selection.
- * @typedef {{compiled: CompiledDocument, filename: string, official: OfficialDocument|null,
+ * @typedef {{compiled: CompiledDocument, official: OfficialDocument|null,
  *   compiledSide: boolean, presetId: string|null, referencePresetIds: string[],
- *   savedDocument?: string|null}} ActiveDocument
+ *   documentBaseline?: string|null}} ActiveDocument
  */
 
 /**

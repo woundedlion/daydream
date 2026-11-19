@@ -580,7 +580,7 @@ test('palette and modulation probe reports a family whose controls fail to appea
           : stages.map((entry) => ({dataset: {label: entry.label}})));
       },
       async evaluate(callback) {
-        if (String(callback).includes('Promise.all'))
+        if (String(callback) === '() => window.exported')
           return JSON.stringify({descriptor: {chain: stages.filter((entry) => entry.label !== disabled)}});
       },
     };

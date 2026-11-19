@@ -376,7 +376,7 @@ Parameter keys remain in the `fx` namespace.
 | `src/workbench/shader/chain_viewport.js` | Chain strip scroll and focus geometry |
 | `src/workbench/shader/shader_document_edits.js` | Preset application and stage parameter routing for compiled and editable builds |
 | `src/workbench/shader/shader_document_loader.js` | Shader document adoption, build selection and toolbar restoration |
-| `src/workbench/shader/shader_document_persistence.js` | Saving, downloading and copying shader documents |
+| `src/workbench/shader/shader_document_persistence.js` | Clipboard export of shader documents |
 | `src/workbench/shader/shader_document_state.js` | Active document, chain editor, catalogs and controller state |
 | `src/workbench/solids/solids_state.js` | Typed page state, operation revisions, validator and commit queue |
 | `src/workbench/solids/solids_engine.js` | Engine lifecycle, arena metrics and mesh recomputation |

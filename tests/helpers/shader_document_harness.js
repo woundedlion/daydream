@@ -183,13 +183,13 @@ function workbenchEngine() {
  */
 function workbenchMounts() {
   const elements = new Map(['shader-document-select', 'shader-preset-select',
-    'shader-document-open', 'shader-document-save', 'shader-document-file',
+    'shader-document-open', 'shader-document-export', 'shader-document-file',
     'shader-document-status', 'shader-document-notice', 'shader-document-error',
     'shader-document-digest', 'shader-parity-toggle',
-    'shader-animation-toggle', 'shader-document-save-as',
+    'shader-animation-toggle', 'shader-document-clear',
   ].map((id) => {
-    const toolbar = ['shader-document-open', 'shader-document-save',
-      'shader-document-save-as', 'shader-document-digest',
+    const toolbar = ['shader-document-open', 'shader-document-export',
+      'shader-document-clear', 'shader-document-digest',
       'shader-parity-toggle', 'shader-animation-toggle'].includes(id);
     const element = fakeElement(toolbar ? 'button'
       : id === 'shader-document-file' ? 'input' : id.endsWith('select') ? 'select' : 'div');
@@ -241,7 +241,7 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
                      wrapImportCompiler = (f) => f } = {}) {
   const elements = workbenchMounts();
 
-  const downloads = [];
+  const copied = [];
   const selections = [];
   const ran = { gui: 0, invalidated: 0 };
   const controller = createShaderDocumentController({
@@ -269,11 +269,11 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
       exportShaderDocumentJson: (document) =>
         `${JSON.stringify(document, null, 2)}\n`,
     })),
-    download: (filename, source) => downloads.push([filename, source]),
+    copyText: async (source) => { copied.push(source); return true; },
     initialEffect,
   });
   ownedEditors.add(controller);
-  return { controller, elements, downloads, selections, engine, ran };
+  return { controller, elements, copied, selections, engine, ran };
 }
 
 /** @param {Object} element @returns {Function} The element's change handler. */
@@ -379,6 +379,7 @@ async function editorWorkbench({
   onOriginalLinkReleased = () => {},
   pausedFromEngine = false,
   withPresetRail = false,
+  copyText,
   prepare = () => {},
   importCompiler = () => import('../../generated/shader/shader_workbench.mjs'),
 } = {}) {
@@ -412,7 +413,7 @@ async function editorWorkbench({
     createElement: (tag) => fakeElement(tag),
     ...documentEvents(),
   });
-  const downloads = [];
+  const copied = [];
   const selections = [];
   const filters = [];
   const urls = [];
@@ -421,7 +422,6 @@ async function editorWorkbench({
   };
   const win = {
     ...documentEvents(),
-    prompt: (message, filename) => filename,
     location,
     history: {
       replaceState: (state, title, url) => {
@@ -461,17 +461,17 @@ async function editorWorkbench({
       { 'chain_study.shader.json': CHAIN_STUDY,
         ...sourceFiles }, patternCatalog, engineCatalog),
     importCompiler,
-    download: (filename, source) => downloads.push([filename, source]),
+    copyText: copyText ?? (async (source) => { copied.push(source); return true; }),
     win,
     initialEffect,
   });
   ownedEditors.add(controller);
   assert.equal(await controller.init(), true, elements.get('shader-document-status').textContent);
   if (source !== null)
-    assert.equal(await controller.loadSource(source, 'study.shader.json'), true);
+    assert.equal(await controller.loadSource(source), true);
   await controller.flushDeepLink();
   return {
-    controller, engine, compiledEngine, elements, downloads, selections, filters, ran,
+    controller, engine, compiledEngine, elements, copied, selections, filters, ran,
     animationFrames, animationWrites, animationsPaused: () => animationsPaused,
     pausedReads: () => pausedReads, urls, win,
   };
@@ -540,9 +540,9 @@ function stageEditor(harness, label) {
   };
 }
 
-const savedValues = (harness) => {
-  assert.equal(harness.controller.save(), true);
-  return JSON.parse(harness.downloads.at(-1)[1]).preset_bank.presets[0].values;
+const exportedValues = async (harness) => {
+  assert.equal(await harness.controller.exportShader(), true);
+  return JSON.parse(harness.copied.at(-1)).preset_bank.presets[0].values;
 };
 
 const affineLatticeStudy = () => {
@@ -568,7 +568,7 @@ export {
   withoutEmbeddedModulation, CHAIN_STUDY,
   KALEIDOSCOPE_STAINED_GLASS, EMPTY_PATTERN_CATALOG, STUDY_PATTERN_CATALOG, compiledBuildEngine,
   editorWorkbench, clickPlaneBandEntry, stripChips, displayedParameter, sampleFrequencySlider,
-  expectStageAbsent, stageEditor, savedValues, affineLatticeStudy, applyFixed,
+  expectStageAbsent, stageEditor, exportedValues, affineLatticeStudy, applyFixed,
 };
 
 export function singlePatternCatalog(effectId, file, name) {

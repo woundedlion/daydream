@@ -1,4 +1,4 @@
-import { singlePatternCatalog, ENGINE_CATALOG, SCRATCH, onChange, CHAIN_STUDY, KALEIDOSCOPE_STAINED_GLASS, STUDY_PATTERN_CATALOG, editorWorkbench, clickPlaneBandEntry, stripChips, stripChip, paramControl, displayedParameter, stageEditor, savedValues } from "../helpers/shader_document_harness.js";
+import { singlePatternCatalog, ENGINE_CATALOG, SCRATCH, onChange, CHAIN_STUDY, KALEIDOSCOPE_STAINED_GLASS, STUDY_PATTERN_CATALOG, editorWorkbench, clickPlaneBandEntry, stripChips, stripChip, paramControl, displayedParameter, stageEditor, exportedValues } from "../helpers/shader_document_harness.js";
 import { canonicalEffectId } from "../../src/effects/effect_identity.js";
 import { engineControlNames, compileShaderDocument } from "../../generated/shader/shader_workbench.mjs";
 import { test } from "node:test";
@@ -27,9 +27,8 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   assert.ok(harness.engine.writes.some(([name]) => name === 'warp.strength'),
     'the re-apply carries the backfilled catalog defaults');
 
-  // Save exports the store's edited document, not the load-time compile.
-  assert.equal(harness.controller.save(), true);
-  const saved = JSON.parse(harness.downloads[0][1]);
+  assert.equal(await harness.controller.exportShader(), true);
+  const saved = JSON.parse(harness.copied[0]);
   assert.equal(saved.descriptor.chain.length, STUDY_CHAIN.length + 1);
   assert.ok(Object.keys(saved.preset_bank.presets[0].values)
     .some((id) => id.startsWith('warp.')));
@@ -134,7 +133,7 @@ test('compiled Twist stage edits resolve an arbitrary instance label', async () 
   edit('whorl.drift', 0.006);
   assert.deepEqual(harness.compiledEngine.writes, [['whorl.Twist Angle (rad)', 7.25]]);
   assert.equal(toggle.disabled, true);
-  const saved = savedValues(harness);
+  const saved = await exportedValues(harness);
   assert.equal(saved['whorl.twist-angle'], 7.25);
   assert.equal(saved['whorl.twist-distribution'], 0.625);
   assert.equal(saved['whorl.speed'], Math.fround(0.035));
@@ -229,7 +228,7 @@ test('a refused compiled coupled edit restores the unchanged document preset', a
   const engine = harness.compiledEngine;
   engine.getParameterDefinitions().push({name: 'Modulation Mechanic',
     options: ['hue-rotation', 'positive-lightness-lift', 'opacity']});
-  const before = savedValues(harness);
+  const before = await exportedValues(harness);
   const selectionCount = engine.selected.length;
   const write = engine.setParameter;
   let refused = false;
@@ -244,5 +243,5 @@ test('a refused compiled coupled edit restores the unchanged document preset', a
   assert.equal(refused, true);
   assert.equal(engine.selected.length, selectionCount + 1);
   assert.match(harness.elements.get('shader-document-status').textContent, /was refused/);
-  assert.deepEqual(savedValues(harness), before);
+  assert.deepEqual(await exportedValues(harness), before);
 });

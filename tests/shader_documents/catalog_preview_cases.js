@@ -19,8 +19,8 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH, /id="shader-document-select"/);
   assert.match(WORKBENCH, /id="shader-preset-select"/);
   assert.match(WORKBENCH, /id="shader-document-open"/);
-  assert.match(WORKBENCH, /id="shader-document-save"/);
-  assert.match(WORKBENCH, /id="shader-document-save-as"/);
+  assert.match(WORKBENCH, /id="shader-document-export"/);
+  assert.match(WORKBENCH, /id="shader-document-clear"/);
   assert.match(WORKBENCH, /id="shader-parity-toggle"/);
   assert.match(WORKBENCH, /id="shader-animation-toggle"/);
   assert.match(WORKBENCH, /id="shader-document-digest"/);
@@ -94,7 +94,7 @@ for (const operation of ['selectEffect', 'setShaderChainParameters', 'stage edit
       stageEditor(harness, 'sample')('sample.pattern-freq', 7);
     } else {
       assert.equal(await harness.controller.loadSource(
-        KALEIDOSCOPE_STAINED_GLASS, 'other.shader.json'), false);
+        KALEIDOSCOPE_STAINED_GLASS), false);
     }
     assert.equal(MODULE.HS_MODULE_DEAD, true);
     assert.equal(calls, 1);
@@ -102,7 +102,7 @@ for (const operation of ['selectEffect', 'setShaderChainParameters', 'stage edit
     const selections = harness.selections.length;
     const chainCalls = harness.engine.chainCalls.length;
     assert.equal(await harness.controller.loadSource(
-      KALEIDOSCOPE_STAINED_GLASS, 'later.shader.json'), false);
+      KALEIDOSCOPE_STAINED_GLASS), false);
     assert.equal(calls, 1);
     assert.equal(harness.selections.length, selections, 'the later load selected no effect');
     assert.equal(harness.engine.chainCalls.length, chainCalls, 'the later load wrote no chain');
@@ -266,7 +266,7 @@ test('choosing a catalog source previews it through the interpreter', async () =
   const presets = harness.elements.get('shader-preset-select');
   assert.deepEqual(presets.options.map((option) => option.value), ['noon', 'dusk']);
   assert.equal(presets.disabled, false);
-  assert.equal(harness.elements.get('shader-document-save').disabled, false);
+  assert.equal(harness.elements.get('shader-document-export').disabled, false);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /Kaleidoscope Flowers · Noon · interpreter/);
   assert.equal(harness.elements.get('shader-parity-toggle').disabled, false,
@@ -341,7 +341,7 @@ test('an imported study the catalog does not carry has no parity build', async (
   await harness.controller.init();
 
   assert.equal(await harness.controller.loadSource(
-    shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), true);
+    shaderDocument({ digest: 'digest-study' })), true);
   assert.deepEqual(harness.selections, [canonicalEffectId('shader-chain'), canonicalEffectId('shader-chain')]);
   assert.deepEqual(harness.engine.selected, [],
     'the dynamic path stages no fixed-effect reference preset');
@@ -354,7 +354,7 @@ test('an imported study the catalog does not carry has no parity build', async (
   assert.equal(status.dataset.status, 'ok');
   assert.equal(status.textContent, 'Kaleidoscope Flowers · Noon');
   assert.equal(harness.elements.get('shader-parity-toggle').disabled, true);
-  assert.equal(harness.elements.get('shader-document-save').disabled, false);
+  assert.equal(harness.elements.get('shader-document-export').disabled, false);
   assert.deepEqual(harness.ran, { gui: 2, invalidated: 2 });
 });
 
@@ -370,17 +370,17 @@ test('overlapping loads are serialized in request order', async () => {
   second.document.preset_bank.presets[0].values['sample.pattern-freq'] = 9;
 
   const firstLoad = harness.controller.loadSource(
-    shaderDocument({ digest: 'digest-first' }), 'first.shader.json');
+    shaderDocument({ digest: 'digest-first' }));
   const secondLoad = harness.controller.loadSource(
-    JSON.stringify(second), 'second.shader.json');
+    JSON.stringify(second));
   await new Promise((resolve) => setImmediate(resolve));
   release();
   assert.deepEqual(await Promise.all([firstLoad, secondLoad]), [true, true]);
   assert.equal(imports, 1);
 
   assert.deepEqual(harness.engine.writes.at(-1), ['sample.pattern-freq', 9]);
-  assert.equal(harness.controller.save(), true);
-  assert.equal(harness.downloads.at(-1)[0], 'second.shader.json');
+  assert.equal(await harness.controller.exportShader(), true);
+  assert.equal(JSON.parse(harness.copied.at(-1)).preset_bank.presets[0].values['sample.pattern-freq'], 9);
 });
 
 test('a setShaderChain refusal is surfaced with its code', async () => {
@@ -396,7 +396,7 @@ test('a setShaderChain refusal is surfaced with its code', async () => {
   };
 
   assert.equal(await harness.controller.loadSource(
-    shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), false);
+    shaderDocument({ digest: 'digest-study' })), false);
   assert.deepEqual(harness.engine.writes.slice(initialWrites), []);
   assert.equal(status.dataset.status, 'error');
   assert.match(status.textContent, /ARENA_OVERFLOW/);
@@ -433,8 +433,8 @@ test('an effect the preview engine rejects leaves the export disabled', async ()
   assert.equal(await harness.controller.loadSource(shaderDocument()), false);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /rejected effect "ShaderChain"/);
-  assert.equal(harness.elements.get('shader-document-save').disabled, true);
-  assert.equal(harness.controller.save(), false);
+  assert.equal(harness.elements.get('shader-document-export').disabled, true);
+  assert.equal(await harness.controller.exportShader(), false);
 });
 
 // Invalid semantics leave the current preview untouched, so a compiler that
@@ -443,39 +443,35 @@ test('a compile that throws is reported and leaves the loaded document previewin
   const harness = workbench();
   await harness.controller.init();
   assert.equal(await harness.controller.loadSource(
-    shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), true);
+    shaderDocument({ digest: 'digest-study' })), true);
   const installs = harness.selections.length;
 
   assert.equal(
-    await harness.controller.loadSource('{ not json', 'broken.shader.json'), false);
+    await harness.controller.loadSource('{ not json'), false);
   const status = harness.elements.get('shader-document-status');
   assert.equal(status.dataset.status, 'error');
   assert.match(status.textContent, /could not be compiled/);
   assert.equal(harness.selections.length, installs,
     'a refused load must not reinstall the preview effect');
-  assert.equal(harness.elements.get('shader-document-save').disabled, false,
-    'the loaded document is still the one Save writes');
+  assert.equal(harness.elements.get('shader-document-export').disabled, false,
+    'the loaded document is still available for export');
 });
 
-// Every edit is a document edit, so Save serializes the document
-// rather than capturing state only the engine holds.
-test('saving exports the document, harvesting nothing from the engine', async () => {
+test('Export serializes the authored document without reading preview values', async () => {
   const harness = workbench();
   await chooseCatalogSource(harness);
   harness.engine.definitions.find((d) => d.name === 'Pattern Freq').value = 9;
   harness.engine.getParameterDefinitions = () => {
-    throw new Error('Save must not read the engine');
+    throw new Error('Export must not read the engine');
   };
 
-  assert.equal(harness.controller.save(), true);
-  const [filename, source] = harness.downloads[0];
-  assert.equal(filename, 'kaleidoscope_flowers.shader.json');
-  const saved = JSON.parse(source);
+  assert.equal(await harness.controller.exportShader(), true);
+  const saved = JSON.parse(harness.copied[0]);
   assert.equal(saved.preset_bank.presets[0].values['sample.pattern-freq'], 2);
   assert.equal(saved.preset_bank.presets[1].values['sample.pattern-freq'], 5,
     'the presets the session never previewed must survive the round trip');
   assert.match(harness.elements.get('shader-document-status').textContent,
-    /Saved kaleidoscope_flowers\.shader\.json/);
+    /Copied the shader document to the clipboard/);
 });
 
 // An effect the controller selects but the roster omits survives the load and
@@ -486,7 +482,7 @@ test('the workbench roster admits every effect the controller selects', async ()
   });
   await harness.controller.init();
   await harness.controller.loadSource(
-    shaderDocument({ digest: 'digest-study' }), 'study.shader.json');
+    shaderDocument({ digest: 'digest-study' }));
   const select = harness.elements.get('shader-document-select');
   select.value = '';
   await onChange(select)();

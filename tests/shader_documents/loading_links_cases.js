@@ -23,7 +23,7 @@ test('returning to the scratch source reopens the default chain', async () => {
   assert.deepEqual(presets.options.map((option) => option.textContent),
     ['Catalog Defaults']);
   assert.equal(presets.disabled, false);
-  assert.equal(harness.elements.get('shader-document-save').disabled, false);
+  assert.equal(harness.elements.get('shader-document-export').disabled, false);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /Scratch Chain · Catalog Defaults/);
 });
@@ -59,7 +59,7 @@ test('an effect the engine rejects leaves the loaded chain editor standing', asy
 
   installs = false;
   assert.equal(
-    await harness.controller.loadSource(CHAIN_STUDY, 'other.shader.json'), false);
+    await harness.controller.loadSource(CHAIN_STUDY), false);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /rejected effect "ShaderChain"/);
   assert.deepEqual(stripChips(harness).map((chip) => chip.dataset.label), before,
@@ -97,7 +97,7 @@ test('a link whose bypass the store refuses leaves the toolbar on the loaded doc
 
   const document = withPreset(JSON.parse(CHAIN_STUDY), 'second');
 
-  assert.equal(await harness.controller.loadSource(document, 'other.shader.json', null,
+  assert.equal(await harness.controller.loadSource(document, null,
     { preset: 'second', bypassed: ['nosuchstage'], paused: false }), false);
 
   assert.match(harness.elements.get('shader-document-status').textContent,
@@ -109,9 +109,9 @@ test('a link whose bypass the store refuses leaves the toolbar on the loaded doc
   assert.deepEqual(
     harness.elements.get('shader-preset-select').options.map((o) => o.value), presets,
     'the preset list must still be the loaded document, not the refused one');
-  harness.controller.save();
-  assert.equal(harness.downloads.at(-1)[0], 'study.shader.json',
-    'Save must still write the document the engine is rendering');
+  assert.equal(await harness.controller.exportShader(), true);
+  assert.equal(JSON.parse(harness.copied.at(-1)).preset_bank.presets.length, presets.length,
+    'Export must still copy the document the engine is rendering');
 });
 
 // applyPreset is itself the program write: a refusal from inside it has already
@@ -132,7 +132,7 @@ test('a load whose preset the engine refuses puts the program back', async () =>
   };
 
   assert.equal(await harness.controller.loadSource(
-    KALEIDOSCOPE_STAINED_GLASS, 'other.shader.json'), false);
+    KALEIDOSCOPE_STAINED_GLASS), false);
 
   assert.match(harness.elements.get('shader-document-status').textContent,
     /could not be applied: .*READONLY/,
@@ -197,7 +197,7 @@ test('a modulation bypass link is refused without adopting a stuck stage', async
   const harness = await editorWorkbench();
   const chips = stripChips(harness);
   const programs = harness.engine.chainCalls.length;
-  assert.equal(await harness.controller.loadSource(document, 'modulation.shader.json', null,
+  assert.equal(await harness.controller.loadSource(document, null,
     {preset: document.preset_bank.presets[0].preset_id, bypassed: ['modulation'], paused: false}), false);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /uses its modulation-enabled parameter/);
@@ -236,7 +236,7 @@ test('an oversized document clears the previous shader state hash', async () => 
   document.preset_bank.choreography = {
     generated_order: document.preset_bank.presets.map((preset) => preset.preset_id),
   };
-  assert.equal(await harness.controller.loadSource(JSON.stringify(document), 'large.shader.json'), true,
+  assert.equal(await harness.controller.loadSource(JSON.stringify(document)), true,
     harness.elements.get('shader-document-status').textContent);
   await harness.controller.flushDeepLink();
   assert.equal(harness.win.location.hash, '');
@@ -397,30 +397,28 @@ test('ending a slider drag flushes its final link without waiting', async () => 
   }
 });
 
-for (const [action, title] of [['save', 'save'], ['saveAs', 'save as']]) {
-  test(`${title} flushes the last slider input before its animation frame`, async () => {
-    const harness = await editorWorkbench({ source: null });
-    mock.timers.enable({ apis: ['setTimeout'] });
-    try {
-      harness.urls.length = 0;
-      const slider = sampleFrequencySlider(harness);
-      slider.value = '7.5';
-      slider.dispatch('input');
+test('Export flushes the last slider input before its animation frame', async () => {
+  const harness = await editorWorkbench({ source: null });
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    harness.urls.length = 0;
+    const slider = sampleFrequencySlider(harness);
+    slider.value = '7.5';
+    slider.dispatch('input');
 
-      assert.equal(await harness.controller[action](), true);
-      assert.equal(JSON.parse(harness.downloads.at(-1)[1]).preset_bank.presets[0]
-        .values['sample.pattern-freq'], 7.5);
-      await harness.controller.flushDeepLink();
+    assert.equal(await harness.controller.exportShader(), true);
+    assert.equal(JSON.parse(harness.copied.at(-1)).preset_bank.presets[0]
+      .values['sample.pattern-freq'], 7.5);
+    await harness.controller.flushDeepLink();
 
-      assert.equal(harness.urls.length, 1);
-      const state = await decodeShaderStateHash(harness.win.location.hash);
-      assert.equal(state.document.preset_bank.presets[0]
-        .values['sample.pattern-freq'], 7.5);
-    } finally {
-      mock.timers.reset();
-    }
-  });
-}
+    assert.equal(harness.urls.length, 1);
+    const state = await decodeShaderStateHash(harness.win.location.hash);
+    assert.equal(state.document.preset_bank.presets[0]
+      .values['sample.pattern-freq'], 7.5);
+  } finally {
+    mock.timers.reset();
+  }
+});
 
 test('a malformed shader state link falls back to an editable scratch chain', async () => {
   const harness = await editorWorkbench({

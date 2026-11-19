@@ -1,4 +1,4 @@
-import { singlePatternCatalog, paramRow, ownedEditors, ENGINE_CATALOG, SCRATCH, MODULE, promotedDocument, onChange, withoutEmbeddedModulation, CHAIN_STUDY, editorWorkbench, displayedParameter, stageEditor, savedValues, affineLatticeStudy } from "../helpers/shader_document_harness.js";
+import { singlePatternCatalog, paramRow, ownedEditors, ENGINE_CATALOG, SCRATCH, MODULE, promotedDocument, onChange, withoutEmbeddedModulation, CHAIN_STUDY, editorWorkbench, displayedParameter, stageEditor, exportedValues, affineLatticeStudy } from "../helpers/shader_document_harness.js";
 import { compileShaderDocument } from "../../generated/shader/shader_workbench.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -68,7 +68,7 @@ for (const route of ['link', 'query']) {
     assert.deepEqual(restored.runtime, snapshot.runtime);
     assert.deepEqual(restored.paletteBank, snapshot.paletteBank);
     assert.equal(restored.animationsPaused, true);
-    assert.equal(savedValues(harness)['lens.twist-angle'], angle);
+    assert.equal((await exportedValues(harness))['lens.twist-angle'], angle);
     assert.deepEqual(snapshot, before);
   });
 }
@@ -207,14 +207,14 @@ test('the descriptor digest button copies the full digest and announces failures
 test('compiled lattice edits keep the authored fallback period and reapply', async () => {
   const source = withoutEmbeddedModulation(JSON.stringify(promotedDocument('grid_space.shader.json')));
   const harness = await editorWorkbench({ source, sourceFiles: {'grid_space.shader.json': source}, patternCatalog: singlePatternCatalog('grid-space', 'grid_space.shader.json', 'Grid Space') });
-  const original = savedValues(harness);
+  const original = await exportedValues(harness);
   const toggle = harness.elements.get('shader-parity-toggle');
   assert.equal(toggle.disabled, false);
   toggle.dispatch('click');
   const edit = stageEditor(harness, 'sample');
   edit('sample.cell-scale', 2.7);
   edit('sample.cell-scale', 3.1);
-  const values = savedValues(harness);
+  const values = await exportedValues(harness);
   assert.equal(Math.fround(values['sample.cell-scale']), Math.fround(3.1));
   assert.equal(values['warp1.lattice-period'], original['warp1.lattice-period']);
   const period = displayedParameter(harness, 'warp1', 'warp1.lattice-period');
@@ -222,16 +222,16 @@ test('compiled lattice edits keep the authored fallback period and reapply', asy
   await onChange(harness.elements.get('shader-preset-select'))();
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
   harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
-  assert.deepEqual(savedValues(harness), original);
+  assert.deepEqual(await exportedValues(harness), original);
   harness.elements.get('chain-strip').querySelector('.chain-redo').dispatch('click');
-  assert.deepEqual(savedValues(harness), values);
+  assert.deepEqual(await exportedValues(harness), values);
   toggle.dispatch('click');
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
 });
 
 test('an affine fallback period stays editable beside a lattice source', async () => {
   const harness = await editorWorkbench(affineLatticeStudy());
-  assert.equal(savedValues(harness)['warp.lattice-period'], 1);
+  assert.equal((await exportedValues(harness))['warp.lattice-period'], 1);
   const batches = [];
   const apply = harness.engine.bindings.setShaderChainParameters;
   harness.engine.bindings.setShaderChainParameters = (writes) => {
@@ -240,9 +240,9 @@ test('an affine fallback period stays editable beside a lattice source', async (
   };
   stageEditor(harness, 'sample')('sample.cell-scale', 2.7);
   assert.ok(batches.flat().every(({ name }) => name !== 'warp.lattice-period'));
-  assert.equal(savedValues(harness)['warp.lattice-period'], 1);
+  assert.equal((await exportedValues(harness))['warp.lattice-period'], 1);
   stageEditor(harness, 'warp')('warp.lattice-period', 0.75);
-  assert.equal(savedValues(harness)['warp.lattice-period'], 0.75);
+  assert.equal((await exportedValues(harness))['warp.lattice-period'], 0.75);
   const row = paramRow(harness, 'warp', 'warp.lattice-period');
   assert.equal(row.querySelector('.chain-param-control').disabled, false);
 });
@@ -265,7 +265,7 @@ test('editing a compiled bank returns its authored camera and affine controls to
   stageEditor(harness, 'sample')('sample.coverage-mode', 'edge-fade');
   assert.deepEqual(harness.compiledEngine.writes, [['camera.Wander', 0.4]]);
   assert.equal(harness.elements.get('shader-parity-toggle').disabled, true);
-  const saved = savedValues(harness);
+  const saved = await exportedValues(harness);
   assert.equal(saved['warp1.lattice-period'], Math.fround(0.413));
   assert.equal(saved['camera.spin-speed'], Math.fround(0.03));
   assert.equal(saved['sample.coverage-mode'], 'edge-fade');
@@ -298,7 +298,7 @@ test('authored compiled modulation edits replay coupled source and amount writes
   assert.deepEqual(attempts, [
     ['modulation-source', 2], ['modulation-evaluation', 0], ['modulation-source', 2],
   ]);
-  const changedSource = savedValues(harness);
+  const changedSource = await exportedValues(harness);
   assert.equal(changedSource['modulation.modulation-source'], 'sphere-interference');
   assert.equal(changedSource['modulation.modulation-evaluation'], 'direct');
 
@@ -313,7 +313,7 @@ test('authored compiled modulation edits replay coupled source and amount writes
   assert.deepEqual(attempts, [
     ['modulation-mechanic', 1], ['Modulation Amount', Math.fround(authoredAmount)], ['modulation-mechanic', 1],
   ]);
-  const saved = savedValues(harness);
+  const saved = await exportedValues(harness);
   assert.equal(saved['modulation.modulation-mechanic'], 'positive-lightness-lift');
   assert.equal(saved['modulation.modulation-amount'], Math.fround(authoredAmount));
   assert.equal(native['modulation-mechanic'], 1);
@@ -329,7 +329,7 @@ for (const failure of ['editor', 'runtime']) {
         return compiler.validateShaderDocument(...args);
       },
     }) });
-    const previous = savedValues(harness);
+    const previous = await exportedValues(harness);
     const strip = harness.elements.get('chain-strip').children[0];
     const snapshot = callWorkbenchBinding(harness.engine, 'getSnapshot', []);
     const document = JSON.parse(CHAIN_STUDY);
@@ -348,11 +348,11 @@ for (const failure of ['editor', 'runtime']) {
         return bindings;
       };
     }
-    assert.equal(await harness.controller.loadSource(document, 'refused.shader.json', null, session), false);
+    assert.equal(await harness.controller.loadSource(document, null, session), false);
     assert.match(harness.elements.get('shader-document-status').textContent,
       failure === 'editor' ? /editor adoption refused/ : /runtime snapshot was rejected/);
     assert.equal(harness.elements.get('chain-strip').children[0], strip);
-    assert.deepEqual(savedValues(harness), previous);
+    assert.deepEqual(await exportedValues(harness), previous);
     assert.deepEqual(callWorkbenchBinding(harness.engine, 'getSnapshot', []), snapshot);
   });
 }
@@ -410,8 +410,8 @@ test('an untouched linked scratch chain keeps its source and saved baseline', as
   h.win.confirm = () => { throw new Error('unexpected discard prompt'); };
   source.value = '';
   await onChange(source)();
-  h.controller.save();
-  assert.equal(h.downloads.at(-1)[0], 'scratch.shader.json');
+  assert.equal(await h.controller.exportShader(), true);
+  assert.equal(JSON.parse(h.copied.at(-1)).document_id, SCRATCH.document_id);
 });
 
 test('hash navigation loads a new shader and disposal removes its listener', async () => {
@@ -422,8 +422,8 @@ test('hash navigation loads a new shader and disposal removes its listener', asy
   h.win.location.hash = await encodeShaderStateHash({ document,
     preset: document.preset_bank.presets[0].preset_id, bypassed: [], paused: false });
   await h.win.listeners.find(listener => listener.type === 'hashchange').handler();
-  h.controller.save();
-  assert.equal(JSON.parse(h.downloads.at(-1)[1]).preset_bank.presets[0]
+  await h.controller.exportShader();
+  assert.equal(JSON.parse(h.copied.at(-1)).preset_bank.presets[0]
     .values['sample.pattern-freq'], 3.5);
   await h.controller.dispose();
   ownedEditors.delete(h.controller);

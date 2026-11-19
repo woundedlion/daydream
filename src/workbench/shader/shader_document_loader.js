@@ -30,7 +30,7 @@ export function diagnosticText(compiled) {
  * @param {{state: import('./shader_document_state.js').LoaderState,
  * linkWriter: ReturnType<typeof import('./shader_deeplink.js').createShaderLinkWriter>,
  * doc: Document, stripMount: HTMLElement|null, presetSelect: HTMLSelectElement,
- * saveButton: HTMLButtonElement, saveAsButton: HTMLButtonElement|null, status: HTMLOutputElement,
+ * documentActions: HTMLButtonElement[], status: HTMLOutputElement,
  * importCompiler: () => Promise<*>, flushDeepLink: () => Promise<*>, getEngine: () => *, getModule: () => *,
  * selectEffect: (effect: string) => boolean, teardownChainUi: () => void,
  * setParamFilter: (filter: {external: true}|null) => void,
@@ -40,19 +40,17 @@ export function diagnosticText(compiled) {
  * showAnimationState: () => void, syncEffectGui: () => void, invalidate: () => void,
  * currentDocument: () => *, selectLoadedSource: (effect: string|null, filename: string, kind: string) => void}} dependencies */
 export function createShaderDocumentLoader({state, linkWriter, doc, stripMount, presetSelect,
-  saveButton, saveAsButton, status, importCompiler, flushDeepLink, getEngine, getModule,
+  documentActions, status, importCompiler, flushDeepLink, getEngine, getModule,
   selectEffect, teardownChainUi, setParamFilter, populatePresets, showDigest, syncParity,
   applyPreset, buildChainUi, clearPreview, showError, setAnimationsPaused, showAnimationState,
   syncEffectGui, invalidate, currentDocument, selectLoadedSource}) {
   /**
    * @param {string|*} source - Document JSON, or the document itself.
-   * @param {string} [filename]
    * @param {*} [precompiled] - The catalog's already-compiled document, when the
    *   source is a catalog entry rather than an imported study.
    * @param {*|null} [session] - Deep-linked preset, bypass, and pause state.
    */
-  const loadSourceNow = async (source, filename = 'import.shader.json',
-    precompiled = null, session = null) => {
+  const loadSourceNow = async (source, precompiled = null, session = null) => {
     await flushDeepLink();
     linkWriter.invalidate();
     state.compiler ??= await importCompiler();
@@ -105,7 +103,6 @@ export function createShaderDocumentLoader({state, linkWriter, doc, stripMount, 
     state.chainUi = null;
     state.active = {
       compiled,
-      filename,
       official,
       compiledSide: false,
       presetId,
@@ -161,8 +158,6 @@ export function createShaderDocumentLoader({state, linkWriter, doc, stripMount, 
     }
     populatePresets(compiled);
     presetSelect.value = presetId;
-    saveButton.disabled = false;
-    if (saveAsButton) saveAsButton.disabled = false;
     showDigest();
     syncParity();
     if (!applyPreset(presetId)) return abandon({ written: true });
@@ -189,7 +184,8 @@ export function createShaderDocumentLoader({state, linkWriter, doc, stripMount, 
       syncEffectGui();
       invalidate();
     }
-    state.active.savedDocument = JSON.stringify(currentDocument());
+    state.active.documentBaseline = JSON.stringify(currentDocument());
+    for (const button of documentActions) button.disabled = false;
     previousUi?.strip.destroy();
     if (stripMount && candidateMount) stripMount.replaceChildren(candidateMount);
     return true;
@@ -199,9 +195,9 @@ export function createShaderDocumentLoader({state, linkWriter, doc, stripMount, 
   let loadQueue = Promise.resolve();
 
   /** @type {typeof loadSourceNow} */
-  const loadSource = (source, filename, precompiled, session) => {
+  const loadSource = (source, precompiled, session) => {
     const queued = loadQueue.then(() =>
-      loadSourceNow(source, filename, precompiled, session));
+      loadSourceNow(source, precompiled, session));
     loadQueue = queued.then(() => undefined, () => undefined);
     return queued;
   };
@@ -213,8 +209,8 @@ export function createShaderDocumentLoader({state, linkWriter, doc, stripMount, 
       (candidate) => candidate.compiled.document.effect_id === effectId);
     const scratch = effectId === 'scratch';
     const filename = entry?.filename ?? (scratch ? SCRATCH_FILENAME : 'linked.shader.json');
-    if (await loadSource(linked.document, filename, null, linked)) {
-      (/** @type {ActiveDocument} */ (state.active)).savedDocument = entry ? JSON.stringify(entry.compiled.document)
+    if (await loadSource(linked.document, null, linked)) {
+      (/** @type {ActiveDocument} */ (state.active)).documentBaseline = entry ? JSON.stringify(entry.compiled.document)
         : scratch ? JSON.stringify(state.compiler.compileShaderDocument(
           scratchChainDocument(state.operatorCatalog), { catalog: state.operatorCatalog }).document) : null;
       selectLoadedSource(scratch ? '' : entry?.effectId ?? null, filename, scratch ? '' : 'Linked');

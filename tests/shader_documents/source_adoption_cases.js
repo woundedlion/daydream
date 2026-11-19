@@ -1,4 +1,4 @@
-import { ownedEditors, MODULE, workbench, onChange, CHAIN_STUDY, STUDY_PATTERN_CATALOG, editorWorkbench, stripChips, paramControl, sampleFrequencySlider, stageEditor, savedValues } from "../helpers/shader_document_harness.js";
+import { ownedEditors, MODULE, SCRATCH, workbench, onChange, CHAIN_STUDY, STUDY_PATTERN_CATALOG, editorWorkbench, stripChips, stripChip, paramControl, sampleFrequencySlider, stageEditor, exportedValues } from "../helpers/shader_document_harness.js";
 import { DEFAULT_LIMITS } from "../../generated/shader/shader_workbench.mjs";
 import { mock, test } from "node:test";
 import assert from "node:assert/strict";
@@ -44,6 +44,39 @@ test('a rejected file read is announced and the same file can be picked again', 
   assert.equal(input.value, '');
 });
 
+test('Clear All restores the default source, preset, and preview state', async () => {
+  const document = JSON.parse(CHAIN_STUDY);
+  const preset = document.preset_bank.presets[1].preset_id;
+  const hash = await encodeShaderStateHash({ document, preset, bypassed: ['lens'], paused: true });
+  const harness = await editorWorkbench({ source: null, hash });
+  const { elements, win, controller } = harness;
+  const source = elements.get('shader-document-select');
+  const clear = elements.get('shader-document-clear').listeners.find(({ type }) => type === 'click').handler;
+  const loadedHash = win.location.hash;
+  win.confirm = () => false;
+  await clear();
+  assert.equal(source.value, '__loaded-document__');
+  assert.equal(win.location.hash, loadedHash);
+
+  win.confirm = () => true;
+  await clear();
+  assert.equal(source.value, '');
+  assert.equal(source.options.some(({ value }) => value === '__loaded-document__'), false);
+  assert.equal(elements.get('shader-preset-select').value, SCRATCH.preset_bank.presets[0].preset_id);
+  assert.equal(elements.get('shader-animation-toggle').getAttribute('aria-pressed'), 'false');
+  assert.equal(elements.get('shader-parity-toggle').disabled, true);
+  assert.equal(stripChip(harness, 'lens'), undefined);
+  assert.equal(elements.get('chain-strip').querySelector('.chain-undo').disabled, true);
+
+  const defaults = await editorWorkbench({ source: null });
+  await controller.flushDeepLink();
+  const reset = await decodeShaderStateHash(win.location.hash);
+  const fresh = await decodeShaderStateHash(defaults.win.location.hash);
+  assert.deepEqual(reset.document, fresh.document);
+  assert.deepEqual(reset.bypassed, []);
+  assert.equal(reset.paused, false);
+});
+
 test('an oversized file is rejected before reading and clears the picker', async () => {
   const { controller, elements, selections } = workbench();
   await controller.init();
@@ -72,7 +105,7 @@ test('disposing a document controller flushes edits and releases its whole UI', 
   const events = [
     ['shader-document-select', 'change'], ['shader-preset-select', 'change'],
     ['shader-document-open', 'click'], ['shader-document-file', 'change'],
-    ['shader-document-save', 'click'], ['shader-document-save-as', 'click'],
+    ['shader-document-export', 'click'], ['shader-document-clear', 'click'],
     ['shader-animation-toggle', 'click'], ['shader-parity-toggle', 'click'],
     ['shader-document-digest', 'click'],
   ];
@@ -143,9 +176,9 @@ test('source and file switches preserve edits when discard is refused', async ()
   assert.equal(reads, 0);
   assert.equal(confirmations, 2);
   assert.equal(harness.win.location.hash, hash);
-  harness.controller.save();
+  await harness.controller.exportShader();
   await onChange(source)();
-  assert.equal(confirmations, 2, 'saving clears the dirty marker');
+  assert.equal(confirmations, 2, 'exporting clears the dirty marker');
 });
 
 test('refused replacement restores the previous compiled preset after switching effects', async () => {
@@ -153,7 +186,7 @@ test('refused replacement restores the previous compiled preset after switching 
   harness.elements.get('shader-parity-toggle').dispatch('click');
   harness.compiledEngine.selected.length = 0;
   assert.equal(await harness.controller.loadSource(
-    JSON.parse(CHAIN_STUDY), 'refused.shader.json', null,
+    JSON.parse(CHAIN_STUDY), null,
     { preset: JSON.parse(CHAIN_STUDY).preset_bank.presets[0].preset_id, bypassed: ['missing-stage'], paused: false }), false);
   assert.equal(harness.selections.at(-1), 'ChainStudy');
   assert.deepEqual(harness.compiledEngine.selected, [JSON.parse(CHAIN_STUDY).preset_bank.presets[0].preset_id]);
@@ -195,8 +228,8 @@ for (const compiled of [false, true]) {
   test(`an omitted parameter edit declares it and updates parity from ${compiled ? 'compiled' : 'interpreter'} preview`, async () => {
     const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
     const toggle = harness.elements.get('shader-parity-toggle');
-    const original = savedValues(harness);
-    const before = JSON.parse(harness.downloads.at(-1)[1]);
+    const original = await exportedValues(harness);
+    const before = JSON.parse(harness.copied.at(-1));
     const digest = harness.elements.get('shader-document-digest').dataset.digest;
     assert.equal(toggle.disabled, false);
     assert.equal(Object.hasOwn(original, 'sample.edge-width'), false);
@@ -206,17 +239,17 @@ for (const compiled of [false, true]) {
     assert.equal(toggle.getAttribute('aria-pressed'), 'false');
     assert.ok(harness.engine.writes.some(([name, value]) =>
       name === 'sample.edge-width' && value === 0.25));
-    assert.equal(savedValues(harness)['sample.edge-width'], 0.25);
+    assert.equal((await exportedValues(harness))['sample.edge-width'], 0.25);
     assert.notEqual(harness.elements.get('shader-document-digest').dataset.digest, digest);
     harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
     assert.equal(toggle.disabled, false);
-    savedValues(harness);
-    assert.deepEqual(JSON.parse(harness.downloads.at(-1)[1]), before);
+    await exportedValues(harness);
+    assert.deepEqual(JSON.parse(harness.copied.at(-1)), before);
     assert.equal(harness.elements.get('shader-document-digest').dataset.digest, digest);
   });
 }
 
-test('restored edits require discard confirmation and save to the catalog filename', async () => {
+test('restored edits require discard confirmation and survive export', async () => {
   const document = JSON.parse(CHAIN_STUDY);
   document.preset_bank.presets[0].values['sample.pattern-freq'] = 7.25;
   const hash = await encodeShaderStateHash({
@@ -231,8 +264,8 @@ test('restored edits require discard confirmation and save to the catalog filena
   await onChange(source)();
   assert.equal(confirmations, 1);
   assert.equal(source.value, before);
-  harness.controller.save();
-  assert.equal(harness.downloads.at(-1)[0], 'chain_study.shader.json');
+  assert.equal(await harness.controller.exportShader(), true);
+  assert.equal(JSON.parse(harness.copied.at(-1)).preset_bank.presets[0].values['sample.pattern-freq'], 7.25);
 });
 
 test('imported documents have a named source and can switch directly to scratch', async () => {

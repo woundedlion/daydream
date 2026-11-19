@@ -201,7 +201,7 @@ test('the workbench restores a column override after its initial effect switch',
   const {default: createModule} = await import('../generated/holosphere_wasm.js');
   const module = await createModule({print: () => {}});
   const documentIds = ['shader-document-select', 'shader-preset-select', 'shader-document-open',
-    'shader-document-save', 'shader-document-file', 'shader-document-status'];
+    'shader-document-export', 'shader-document-clear', 'shader-document-file', 'shader-document-status'];
   t.mock.method(globalThis, 'fetch', async (url) => ({ok: true, text: async () => readFileSync(url, 'utf8')}));
   const app = await bootedApp({daydreamMode: 'shader-workbench',
     search: '?effect=AlienBrain&view.noBlackColumns=true', hydratedView: {noBlackColumns: true},
