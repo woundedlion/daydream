@@ -309,7 +309,6 @@ function createSegmentWorkerSession() {
 
   /** @param {Extract<WorkerInboundMsg, {type: 'setEffect'}>} msg @param {LiveSession} live */
   function handleSetEffect(msg, {engine, wasmModule}) {
-
     // INSTALLED is the sole success; either rejection keeps the old effect.
     if (engine.setEffect(msg.name)
         !== wasmModule.EffectSetResult.INSTALLED) {
@@ -326,7 +325,6 @@ function createSegmentWorkerSession() {
 
   /** @param {Extract<WorkerInboundMsg, {type: 'setResolution'}>} msg @param {LiveSession} live */
   function handleSetResolution(msg, {engine, wasmModule}) {
-
     // RESIZED and ALREADY_ACTIVE both commit; RESIZED also dropped the
     // effect and the clip.
     const resolutionResult = engine.setResolution(msg.w, msg.h);
@@ -346,27 +344,23 @@ function createSegmentWorkerSession() {
 
   /** @param {Extract<WorkerInboundMsg, {type: 'setParameter'}>} msg */
   function handleSetParameter(msg) {
-
     applyParam(msg.name, msg.value);
     paramRevision = msg.paramRevision;
   }
 
   /** @param {Extract<WorkerInboundMsg, {type: 'setAnimationsPaused'}>} msg @param {LiveSession} live */
   function handleSetAnimationsPaused(msg, {engine}) {
-
     engine.setAnimationsPaused(msg.paused);
   }
 
   /** @param {Extract<WorkerInboundMsg, {type: 'selectPreset'}>} msg */
   function handleSelectPreset(msg) {
-
     applyPreset(msg.index);
     paramRevision = msg.paramRevision;
   }
 
   /** @param {Extract<WorkerInboundMsg, {type: 'setDisplayCaps'}>} msg @param {LiveSession} live */
   function handleSetDisplayCaps(msg, {engine}) {
-
     if (!engine.setDisplayCaps(msg.topCap, msg.bottomCap)) {
       post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
       return;
@@ -377,13 +371,11 @@ function createSegmentWorkerSession() {
 
   /** @param {Extract<WorkerInboundMsg, {type: 'setPoleLod'}>} msg @param {LiveSession} live */
   function handleSetPoleLod(msg, {engine}) {
-
     engine.setPoleLod(msg.value);
   }
 
   /** @param {Extract<WorkerInboundMsg, {type: 'setTemporalSampling'}>} msg @param {LiveSession} live */
   function handleSetTemporalSampling(msg, {engine}) {
-
     engine.setTemporalSampling(msg.enabled);
   }
 
@@ -458,7 +450,6 @@ function createSegmentWorkerSession() {
 
   /** @param {Extract<WorkerInboundMsg, {type: 'render'}>} msg @param {LiveSession} live */
   function handleRender(msg, {engine}) {
-
     // Fail fast: no reply would leave the frame outstanding until the watchdog.
     if (!segRange)
       throw new Error('segment_worker: render without a configured segment range');
