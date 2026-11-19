@@ -50,7 +50,7 @@ export function createShaderPresetEditor({state, doc, mount, getEngine, getModul
       if (!current || !state.active) return false;
       if (seek && state.active.compiledSide && !toInterpreter()) return false;
       const document = current.compile().document;
-      const {values, sourceMorph} = state.compiler.evaluateTransition(document.descriptor, document.preset_bank,
+      const {values, sourceMorph, modulationMorphs} = state.compiler.evaluateTransition(document.descriptor, document.preset_bank,
         edge.from, edge.to, frame, state.operatorCatalog);
       if (!state.active.compiledSide) {
         const engine = getEngine();
@@ -61,6 +61,9 @@ export function createShaderPresetEditor({state, doc, mount, getEngine, getModul
         const written = writeChainParameters(engine, module, definitions(), entries, {
           transition: true,
           sourceMorph: sourceMorph && !bypassed.has(sourceMorph.instance) ? sourceMorph : undefined,
+          modulationMorphs: modulationMorphs?.filter(
+            (/** @type {import('../../../generated/shader/shader_workbench.mjs').ModulationMorph} */ layer) =>
+              !bypassed.has(layer.instance)),
           seek,
         });
         if (written.refusal !== null || written.code !== null) {

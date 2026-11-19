@@ -82,13 +82,16 @@ test('the rail writes live preview frames and editing a slider snaps to its acti
 
   const frames = [];
   const morphs = [];
+  const modulations = [];
   const harness = await editorWorkbench({source: JSON.stringify(document), withPresetRail: true,
     async importCompiler() {
       const compiler = await import('../../generated/shader/shader_workbench.mjs');
       return {...compiler, evaluateTransition(...args) {
         const frame = compiler.evaluateTransition(...args);
         return {...frame, sourceMorph: {instance: 'sample', evaluation: frame.evaluation, duration: frame.duration,
-          easing: 'LINEAR', from: {'sample.pattern-freq': 1}, to: {'sample.pattern-freq': 2}}};
+          easing: 'LINEAR', from: {'sample.pattern-freq': 1}, to: {'sample.pattern-freq': 2}},
+          modulationMorphs: [{instance: 'modulation', mix: frame.eased_progress,
+            from: {'modulation.modulation-amount': 0.25}, to: {'modulation.modulation-amount': 2}}]};
       }};
     },
     prepare(engine) {
@@ -96,9 +99,10 @@ test('the rail writes live preview frames and editing a slider snaps to its acti
       engine.getShaderChainBindings = () => {
         const binding = getBindings();
         if (binding) {
-          binding.setShaderChainSourceMorphParameters = (writes, morph) => {
+          binding.setShaderChainMorphParameters = (writes, morph, layers) => {
             frames.push(writes.find(({name}) => name === 'camera.wander').value);
             morphs.push(morph);
+            modulations.push(layers);
             return ParamSetResult.APPLIED;
           };
         }
@@ -112,6 +116,8 @@ test('the rail writes live preview frames and editing a slider snaps to its acti
   assert.deepEqual(frames, [0.125]);
   assert.deepEqual(morphs, [{instance: 'sample', evaluation: 1, duration: 4, easing: 'LINEAR',
     from: {'sample.pattern-freq': 1}, to: {'sample.pattern-freq': 2}}]);
+  assert.deepEqual(modulations[0], [{instance: 'modulation', mix: 0.25,
+    from: {'modulation.modulation-amount': 0.25}, to: {'modulation.modulation-amount': 2}}]);
   assert.equal(progress(), '25%');
   assert.equal(Number(displayedParameter(harness, 'camera', 'camera.wander')), 0.125);
   assert.equal(harness.animationsPaused(), false);
@@ -124,6 +130,7 @@ test('the rail writes live preview frames and editing a slider snaps to its acti
   harness.controller.stepPreview();
   assert.deepEqual(frames, [0.125, 0.375]);
   assert.deepEqual(morphs[1], {...morphs[0], evaluation: 3, snap: true});
+  assert.deepEqual(modulations[1], [{...modulations[0][0], mix: 0.75, snap: true}]);
   assert.equal(progress(), '75%');
 
   stageEditor(harness, 'camera')('camera.wander', 0.625);

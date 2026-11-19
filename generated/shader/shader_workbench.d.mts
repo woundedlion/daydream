@@ -18,6 +18,12 @@ export type SourceMorph = {
   duration: number;
   easing: string;
 };
+export type ModulationMorph = {
+  instance: string;
+  from: Record<string, number|string>;
+  to: Record<string, number|string>;
+  mix: number;
+};
 export function evaluateTransition(descriptor: object, bank: object, fromId: string, toId: string, evaluation: number, catalog?: object): {
   evaluation: number;
   duration: number;
@@ -25,4 +31,5 @@ export function evaluateTransition(descriptor: object, bank: object, fromId: str
   eased_progress: number;
   values: Record<string, number|string|{from: string; to: string; mix: number}>;
   sourceMorph?: SourceMorph;
+  modulationMorphs?: ModulationMorph[];
 };

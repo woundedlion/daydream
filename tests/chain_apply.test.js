@@ -69,6 +69,34 @@ test('source morph writes encode both authored endpoint maps in the atomic previ
   assert.equal(batch, undefined);
 });
 
+test('a preview frame admits all modulation endpoints in one write', () => {
+  const definitions = [
+    {name: 'hue.source', options: ['Noise', 'Displacement'], optionValues: [0, 6]},
+    {name: 'hue.amount'}, {name: 'lift.amount'}, {name: 'sample.scale'},
+  ];
+  const hue = {instance: 'hue', mix: 0.25, from: {'hue.source': 'Noise', 'hue.amount': 0.25},
+    to: {'hue.source': 'Displacement', 'hue.amount': 2}};
+  const lift = {instance: 'lift', mix: 0.75, from: {'lift.amount': 0.5}, to: {'lift.amount': 1}};
+  const source = {instance: 'sample', evaluation: 2, duration: 8, easing: 'LINEAR',
+    from: {'sample.scale': 1}, to: {'sample.scale': 2}};
+  const calls = [];
+  const engine = {getShaderChainBindings: () => ({
+    setShaderChainMorphParameters(...args) { calls.push(args); return ParamSetResult.APPLIED; },
+    delete() {},
+  })};
+  const write = (layers, sourceMorph) => writeChainParameters(engine, MODULE, definitions, [['sample.scale', 1.25]],
+    {transition: true, sourceMorph, modulationMorphs: layers, seek: true});
+  assert.deepEqual(write([hue, lift], source), {refusal: null, code: null});
+  assert.deepEqual(calls[0], [[{name: 'sample.scale', value: 1.25}], {...source, snap: true}, [
+    {...hue, from: {'hue.source': 0, 'hue.amount': 0.25}, to: {'hue.source': 6, 'hue.amount': 2}, snap: true},
+    {...lift, snap: true},
+  ]]);
+  assert.deepEqual(write([hue]), {refusal: null, code: null});
+  assert.equal(calls[1][1], null);
+  assert.match(write([hue, {...lift, to: {'missing.amount': 1}}], source).refusal, /missing.amount/);
+  assert.equal(calls.length, 2);
+});
+
 const CHAIN = [
   { label: 'camera', operator: 'sphere.rotate.v2' },
   { label: 'project', operator: 'project.stereographic.v2' },

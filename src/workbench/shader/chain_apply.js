@@ -11,6 +11,7 @@ import { labelOf } from './chain_presentation.js';
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[], optionValues?: number[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string, preset_bank_digest?: string, diagnostics?: import('./chain_document_store.js').Diagnostic[], status?: string}} CompiledDocument */
 /** @typedef {import('../../../generated/shader/shader_workbench.mjs').SourceMorph} SourceMorph */
+/** @typedef {import('../../../generated/shader/shader_workbench.mjs').ModulationMorph} ModulationMorph */
 
 /**
  * @param {ParameterDefinition[]} definitions
@@ -51,15 +52,29 @@ function resolveSourceEndpoint(definitions, values) {
 }
 
 /**
+ * @param {ParameterDefinition[]} definitions
+ * @param {SourceMorph|ModulationMorph} morph
+ * @param {boolean} seek
+ * @returns {object|string} Encoded endpoints or a parameter refusal.
+ */
+function resolveMorph(definitions, morph, seek) {
+  const from = resolveSourceEndpoint(definitions, morph.from);
+  if (typeof from === 'string') return from;
+  const to = resolveSourceEndpoint(definitions, morph.to);
+  if (typeof to === 'string') return to;
+  return {...morph, from, to, ...(seek ? {snap: true} : {})};
+}
+
+/**
  * Resolves and atomically admits a batch of chain parameter values.
  * @param {*} engine - Active engine.
  * @param {*} module - Engine module and admission codes.
  * @param {ParameterDefinition[]} definitions - Active parameter definitions.
  * @param {Array<[string, *]>} entries - Parameter ids and authored values.
- * @param {{transition?: boolean, sourceMorph?: SourceMorph, seek?: boolean}} [options] - Preview writes and their source endpoints.
+ * @param {{transition?: boolean, sourceMorph?: SourceMorph, modulationMorphs?: ModulationMorph[], seek?: boolean}} [options] - Preview writes and their sampled endpoints.
  * @returns {{refusal: string|null, code: number|null}} Resolution refusal, admission failure, or success.
  */
-export function writeChainParameters(engine, module, definitions, entries, {transition = false, sourceMorph, seek = false} = {}) {
+export function writeChainParameters(engine, module, definitions, entries, {transition = false, sourceMorph, modulationMorphs = [], seek = false} = {}) {
   const writes = [];
   for (const [id, value] of entries) {
     if (transition && value !== null && typeof value === 'object') {
@@ -74,17 +89,22 @@ export function writeChainParameters(engine, module, definitions, entries, {tran
       writes.push({name: write.name, value: write.stored});
     }
   }
-  let method = transition ? 'setShaderChainTransitionParameters' : 'setShaderChainParameters';
-  /** @type {unknown[]} */
-  const args = [writes];
-  if (sourceMorph) {
-    const from = resolveSourceEndpoint(definitions, sourceMorph.from);
-    if (typeof from === 'string') return {refusal: from, code: null};
-    const to = resolveSourceEndpoint(definitions, sourceMorph.to);
-    if (typeof to === 'string') return {refusal: to, code: null};
-    method = 'setShaderChainSourceMorphParameters';
-    args.push({ ...sourceMorph, from, to, ...(seek ? {snap: true} : {}) });
+  const source = sourceMorph ? resolveMorph(definitions, sourceMorph, seek) : null;
+  if (typeof source === 'string') return {refusal: source, code: null};
+  if (modulationMorphs.length) {
+    const layers = [];
+    for (const morph of modulationMorphs) {
+      const layer = resolveMorph(definitions, morph, seek);
+      if (typeof layer === 'string') return {refusal: layer, code: null};
+      layers.push(layer);
+    }
+    const code = callWorkbenchBinding(engine, 'setShaderChainMorphParameters', [writes, source, layers]);
+    if (code !== null)
+      return {refusal: null, code: code === module.ParamSetResult.APPLIED ? null : code};
   }
+  const method = source ? 'setShaderChainSourceMorphParameters'
+    : transition ? 'setShaderChainTransitionParameters' : 'setShaderChainParameters';
+  const args = source ? [writes, source] : [writes];
   const code = callWorkbenchBinding(engine, method, args, module.ParamSetResult.NO_EFFECT);
   return {refusal: null, code: code === module.ParamSetResult.APPLIED ? null : code};
 }
