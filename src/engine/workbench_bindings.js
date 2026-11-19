@@ -22,7 +22,7 @@ export function callWorkbenchBinding(engine, method, args, unavailable = null) {
   if (!bindings) return unavailable;
   let release = true;
   try {
-    return bindings[method](...args);
+    return typeof bindings[method] === 'function' ? bindings[method](...args) : unavailable;
   } catch (error) {
     release = !engineHalted(error);
     throw error;

@@ -40,6 +40,7 @@ import { repointDisplayAliases } from '../engine/display_aliases.js';
  * @param {RenderSegments} deps.segments - The SegmentController.
  * @param {(advanced: boolean) => void} deps.syncEffectGui - Mirrors engine params
  *   into the panel, told whether the simulation stepped this frame.
+ * @param {() => void} [deps.beforeFrame] - Writes preview state for this simulation frame.
  * @param {AliasGuard} deps.aliasGuard - Heals display aliases that diverge
  *   from the view after a single-engine frame.
  * @returns {RenderAdapter} The adapter.
@@ -50,6 +51,7 @@ export function createRenderAdapter({
   segments,
   syncEffectGui,
   aliasGuard,
+  beforeFrame,
 }) {
   return {
     /** Whether the worker pool owns the display while awaiting a published frame. */
@@ -75,6 +77,7 @@ export function createRenderAdapter({
       } else {
         // A still-spawning pool paints nothing; render here and report the spawn.
         if (segments.active) segments.updateStats();
+        beforeFrame?.();
         host.engine.drawFrame();
         host.refresh();
         const view = host.view();

@@ -4,6 +4,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import {PLANAR_SOURCE} from './chain_planar_source.js';
 import {createParameterRowControls} from './chain_row_controls.js';
 import { titleCase } from '../../shared/labels.js';
 import { createFrameScheduler } from '../../shared/page_lifecycle.js';
@@ -19,6 +20,10 @@ import {
 /** @typedef {import('./chain_document_store.js').ParameterDeclaration} ParameterDeclaration */
 /** @typedef {import('./chain_presentation.js').ChainEntry} ChainEntry */
 /** @typedef {{name: string, min: number, max: number}} ParameterRange */
+/** @typedef {{status: (id: string) => {changed: boolean, uniform: boolean, unlocked: boolean}|null,
+  * lock: (id: string) => void, copyPrevious: (id: string) => void, applyAll: (id: string) => void,
+  * beforeEdit: () => void}} PresetRowEditor */
+/** @typedef {{from: string, to: string, mix?: number}} EnumPreview */
 
 export const BAKED_PARAMETER_REASON = 'This parameter is baked into the compiled build';
 
@@ -33,7 +38,7 @@ export const BAKED_PARAMETER_REASON = 'This parameter is baked into the compiled
  *   parameterLive: (id: string) => boolean,
  *   parameterRanges: () => ParameterRange[],
  *   onEditParameter: (id: string, value: number|string) => boolean|void,
- *   onCommitParameter: () => void,
+ *   onCommitParameter: () => void, presetEditor?: PresetRowEditor|undefined,
  *   render: () => void,
  *   commit: (label: string|null) => boolean,
  *   report: (result: import('./chain_document_store.js').EditResult) => boolean,
@@ -41,7 +46,7 @@ export const BAKED_PARAMETER_REASON = 'This parameter is baked into the compiled
  */
 export function createChainParamRows({
   el, container, store, catalog, opOf, chipByLabel, chipLabel, parameterLive, parameterRanges,
-  onEditParameter, onCommitParameter, render, commit, report, pinnedLabels,
+  onEditParameter, onCommitParameter, presetEditor, render, commit, report, pinnedLabels,
 }) {
   /** @type {ParameterDeclaration[]} */
   let declarations = [];
@@ -49,6 +54,9 @@ export function createChainParamRows({
   let values = {};
   /** @type {Map<string, HTMLElement>} */
   const rows = new Map();
+  /** @type {Record<string, EnumPreview>|null} */
+  let enumPreview = null;
+  let previewPlaying = false;
   /** @type {Map<string, Map<number, boolean>>} */
   const potentialSectionChoices = new Map();
 
@@ -85,13 +93,17 @@ export function createChainParamRows({
     if (refreshRanges)
       admittedRanges = new Map(parameterRanges().map((range) => [range.name, range]));
     const ranges = admittedRanges;
-    const off = deactivatedParameterIds(declarations, values, chain, catalog);
+    /** @type {Record<string, *>} */
+    const gateValues = enumPreview ? {...values} : values;
+    for (const [id, preview] of Object.entries(enumPreview ?? {}))
+      if (typeof preview.mix === 'number') gateValues[id] = preview;
+    const off = deactivatedParameterIds(declarations, gateValues, chain, catalog);
     for (const control of /** @type {NodeListOf<HTMLButtonElement>} */ (container.querySelectorAll('.chain-modulation-enabled'))) {
       const id = `${control.dataset.label}.modulation-enabled`;
       const disabled = values[id] === 'disabled';
       control.setAttribute('aria-pressed', String(disabled));
       control.setAttribute('title', parameterLive(id) ? 'Bypass' : BAKED_PARAMETER_REASON);
-      control.disabled = !parameterLive(id);
+      control.disabled = previewPlaying || !parameterLive(id);
       const entry = chain.find(entry => entry.label === control.dataset.label);
       if (entry) {
         const chip = chipByLabel(entry.label);
@@ -102,7 +114,7 @@ export function createChainParamRows({
     for (const control of /** @type {NodeListOf<HTMLSelectElement>} */ (container.querySelectorAll('.chain-palette-type'))) {
       const id = /** @type {string} */ (control.dataset.parameter);
       control.value = String(values[id]);
-      control.disabled = !parameterLive(id);
+      control.disabled = previewPlaying || !parameterLive(id);
     }
     for (const [id, row] of rows) {
       const label = labelOf(id);
@@ -146,7 +158,25 @@ export function createChainParamRows({
         || (modulation && modulationParameterHidden(field, (field) => values[`${label}.${field}`]));
       const shown = row.querySelector('.chain-param-note');
       const live = parameterLive(id);
-      for (const control of /** @type {NodeListOf<HTMLInputElement|HTMLSelectElement>} */ (row.querySelectorAll('input, select'))) control.disabled = !live;
+      for (const control of /** @type {NodeListOf<HTMLInputElement|HTMLSelectElement>} */ (row.querySelectorAll('input, select'))) {
+        control.disabled = !live;
+        control.setAttribute('aria-readonly', String(previewPlaying));
+      }
+      const status = presetEditor?.status(id);
+      if (status) {
+        row.classList.toggle('chain-param-changed', status.changed);
+        const lock = row.querySelector('.chain-param-lock');
+        lock?.setAttribute('aria-pressed', String(status.uniform && !status.unlocked));
+        lock?.setAttribute('title', status.uniform && !status.unlocked
+          ? 'Edits write every preset. Unlock to edit this preset.' : 'Use this value in every preset');
+      }
+      const preview = enumPreview?.[id];
+      const readout = /** @type {HTMLElement|null} */ (row.querySelector('.chain-enum-preview'));
+      if (readout) {
+        readout.hidden = !preview || preview.from === preview.to;
+        readout.textContent = preview ? titleCase(preview.from) + ' ? ' + titleCase(preview.to) : '';
+        readout.style.setProperty('--enum-mix', typeof preview?.mix === 'number' ? String(preview.mix * 100) + '%' : '0%');
+      }
       if (!row.hidden && !live) {
         row.dataset.deactivated = 'true';
         if (shown !== null) { shown.textContent = BAKED_PARAMETER_REASON; continue; }
@@ -181,6 +211,7 @@ export function createChainParamRows({
    * @returns {boolean}
    */
   const editParameter = (parameterId, value) => {
+    presetEditor?.beforeEdit();
     if (!parameterLive(parameterId)) return false;
     const control = /** @type {HTMLInputElement|HTMLSelectElement|null} */ (rows.get(parameterId)?.querySelector('.chain-param-control'));
     if (control?.tagName === 'SELECT'
@@ -364,6 +395,7 @@ export function createChainParamRows({
     for (const declaration of [...ordered, ...declared.filter((parameter) => !ordered.includes(parameter))]) {
       const field = fieldOf(declaration.id);
       if (modulation && field === 'modulation-enabled') continue;
+      if (entry.operator === PLANAR_SOURCE && field === 'source') continue;
       if (palette && field === 'palette-type') continue;
       const localField = potential ? field.replace(/^term-[1-4]-/, '') : field;
       const name = color ? COLOR_PARAMETER_NAMES[field]
@@ -423,8 +455,42 @@ export function createChainParamRows({
         label.setAttribute('title', 'Higher values produce finer noise; lower values produce broader patches.');
       if (color && field === 'pattern-speed')
         label.setAttribute('title', 'Animation rate. Zero freezes the noise; negative values reverse it.');
-      row.appendChild(label);
+      const labelCell = el('div', 'chain-param-label');
+      labelCell.appendChild(label);
+      row.appendChild(labelCell);
       appendParameterControl(row, declaration, name);
+      if (declaration.storage === 'enum8' && presetEditor) {
+        const preview = el('span', 'chain-enum-preview');
+        preview.hidden = true;
+        row.appendChild(preview);
+      }
+      if (presetEditor && store.presetBankView().presets.length > 1) {
+        const lock = el('button', 'chain-param-lock');
+        lock.type = 'button';
+        lock.textContent = '=';
+        lock.setAttribute('aria-label', 'Same in all presets, ' + name);
+        lock.addEventListener('click', () => { presetEditor.lock(declaration.id); syncParameterRows(false); });
+        labelCell.appendChild(lock);
+        const menu = el('details', 'chain-param-menu');
+        const summary = el('summary', '');
+        summary.textContent = '?';
+        summary.setAttribute('aria-label', 'Preset actions for ' + name);
+        menu.appendChild(summary);
+        for (const [text, action] of [
+          ['Apply to all presets', presetEditor.applyAll],
+          ['Copy from previous', presetEditor.copyPrevious],
+        ]) {
+          const button = el('button', '');
+          button.type = 'button';
+          button.textContent = String(text);
+          button.addEventListener('click', () => {
+            if (typeof action === 'function') action(declaration.id);
+            menu.open = false;
+          });
+          menu.appendChild(button);
+        }
+        labelCell.appendChild(menu);
+      }
       rows.set(declaration.id, row);
       parent.appendChild(row);
     }
@@ -432,6 +498,25 @@ export function createChainParamRows({
     return region;
   };
 
+
+  /** @param {Record<string, *>} updates */
+  function syncParameterValues(updates) {
+    for (const [id, value] of Object.entries(updates)) {
+      values[id] = value;
+      const row = rows.get(id);
+      if (!row) continue;
+      const control = /** @type {HTMLInputElement|HTMLSelectElement} */ (row.querySelector('.chain-param-control'));
+      if (control.type === 'checkbox') /** @type {HTMLInputElement} */ (control).checked = value === 'on';
+      else if (control.type === 'range') {
+        const declaration = declarations.find((parameter) => parameter.id === id);
+        control.value = String(numericSliderPosition(declaration, Number(value)));
+        control.setAttribute('aria-valuetext', formatNumericValue(value));
+      } else control.value = String(value);
+      const readout = /** @type {HTMLInputElement|null} */ (row.querySelector('.chain-param-value'));
+      if (readout) readout.value = formatNumericValue(value);
+    }
+    syncParameterRows();
+  }
 
   return {
     paramsElement,
@@ -443,6 +528,8 @@ export function createChainParamRows({
     /** @param {ParameterDeclaration[]} nextDeclarations @param {Record<string, number|string>} nextValues */
     reset(nextDeclarations, nextValues) {
       rows.clear();
+      enumPreview = null;
+      previewPlaying = false;
       declarations = nextDeclarations;
       values = nextValues;
       const labels = new Set(store.chain().map((entry) => entry.label));
@@ -450,23 +537,20 @@ export function createChainParamRows({
         if (!labels.has(label)) potentialSectionChoices.delete(label);
       }
     },
-    /** @param {Record<string, *>} updates - Committed parameter values. */
-    syncParameterValues(updates) {
-      for (const [id, value] of Object.entries(updates)) {
-        values[id] = value;
-        const row = rows.get(id);
-        if (!row) continue;
-        const control = /** @type {HTMLInputElement|HTMLSelectElement} */ (row.querySelector('.chain-param-control'));
-        if (control.type === 'checkbox') /** @type {HTMLInputElement} */ (control).checked = value === 'on';
-        else if (control.type === 'range') {
-          const declaration = declarations.find((parameter) => parameter.id === id);
-          control.value = String(numericSliderPosition(declaration, Number(value)));
-          control.setAttribute('aria-valuetext', formatNumericValue(value));
-        } else control.value = String(value);
-        const readout = /** @type {HTMLInputElement|null} */ (row.querySelector('.chain-param-value'));
-        if (readout) readout.value = formatNumericValue(value);
+    syncParameterValues,
+    /** @param {Record<string, *>} updates @param {Record<string, EnumPreview>|null} preview
+     * @param {boolean} playing */
+    showTransitionValues(updates, preview, playing) {
+      enumPreview = preview;
+      previewPlaying = playing;
+      syncParameterValues(updates);
+      for (const output of /** @type {NodeListOf<HTMLElement>} */ (container.querySelectorAll('.chain-source-preview'))) {
+        const transition = preview?.[output.dataset.parameter ?? ''];
+        output.hidden = !transition || transition.from === transition.to;
+        output.textContent = transition ? titleCase(transition.from) + ' ? ' + titleCase(transition.to) : '';
+        if (typeof transition?.mix === 'number')
+          output.style.setProperty('--enum-mix', String(transition.mix * 100) + '%');
       }
-      syncParameterRows();
     },
 
     destroy() {

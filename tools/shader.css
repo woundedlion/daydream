@@ -769,3 +769,147 @@ select.chain-param-control {
     grid-column: 1 / -1;
   }
 }
+
+.shader-preset-rail {
+  flex: 0 0 auto;
+  background: var(--sidebar-bg);
+  border-bottom: 1px solid var(--panel-border);
+  color: var(--panel-text);
+  padding: 0.375rem 0.625rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.75rem;
+  font: 0.75rem var(--ui-font);
+  max-height: 35vh;
+  overflow: auto;
+}
+
+.shader-preset-rail:empty {
+  display: none;
+}
+
+body:has(.shader-preset-rail:not(:empty)) [for="shader-preset-select"],
+body:has(.shader-preset-rail:not(:empty)) #shader-preset-select {
+  display: none;
+}
+
+.shader-preset-transport,
+.shader-preset-timing,
+.shader-preset-track,
+.shader-preset-tile {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.shader-preset-transport input[type="range"] {
+  width: clamp(4rem, 12vw, 10rem);
+}
+
+.shader-preset-track {
+  width: 100%;
+}
+
+.shader-preset-tile,
+.shader-preset-edge {
+  border: 1px solid var(--panel-border);
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.25rem;
+}
+
+.shader-preset-tile:has([aria-pressed="true"]) {
+  border-color: var(--accent, #56bce9);
+}
+
+.shader-preset-rail button,
+.shader-preset-rail select,
+.shader-preset-rail input:not([type="range"]),
+.chain-param-lock,
+.chain-param-menu button,
+.chain-source-simplify {
+  background: var(--sidebar-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.25rem;
+  color: var(--panel-text);
+  font: inherit;
+  padding: 0.125rem 0.25rem;
+}
+
+.shader-preset-rail button:disabled,
+.chain-source-simplify:disabled {
+  opacity: 0.55;
+}
+
+.shader-preset-rail summary,
+.chain-param-menu summary {
+  cursor: pointer;
+}
+
+.shader-preset-rail [type="number"] {
+  width: 4.5rem;
+  margin-left: 0.25rem;
+}
+
+.shader-preset-edge-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  padding-top: 0.25rem;
+}
+
+.shader-preset-edge-settings select {
+  margin-left: 0.25rem;
+}
+
+.chain-param-changed .chain-param-name::before {
+  content: "●";
+  color: var(--accent, #56bce9);
+  padding-right: 0.2rem;
+}
+
+.chain-param-lock[aria-pressed="true"] {
+  border-color: var(--accent, #56bce9);
+}
+
+.chain-param-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.125rem;
+}
+
+.chain-param-menu[open] button {
+  display: block;
+}
+
+.chain-enum-preview {
+  grid-column: 1 / -1;
+  background: linear-gradient(to right, rgb(86 188 233 / 0.25) var(--enum-mix, 0%), transparent 0);
+  padding: 0.125rem 0.25rem;
+}
+
+.chain-source-scope,
+.chain-source-kinds {
+  color: var(--muted-text);
+  font-size: 0.625rem;
+}
+
+.chain-source-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.chain-source-kind {
+  border: 1px solid var(--panel-border);
+  border-radius: 0.25rem;
+  padding: 0.125rem;
+}
+
+.chain-source-kind--active {
+  color: var(--panel-text);
+  border-color: var(--accent, #56bce9);
+}

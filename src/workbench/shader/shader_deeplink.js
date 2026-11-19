@@ -9,7 +9,8 @@ import { replaceUrl } from '../../shared/url.js';
 
 /** Absolute URL of the installed shader document compiler. */
 export const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
-const PREFIX = '#shader=v2.';
+const PREFIX = '#shader=v3.';
+const LEGACY_PREFIX = '#shader=v2.';
 const MAX_PAYLOAD_CHARS = 65536;
 const MAX_STATE_BYTES = 524288;
 
@@ -17,7 +18,11 @@ export const SHADER_LINK_DEBOUNCE_MS = 200;
 export const SHADER_LINK_MAX_WAIT_MS = 1000;
 
 /** Chain snapshot schema the engine's ChainSnapshot encodes and accepts. */
-export const CHAIN_SNAPSHOT_SCHEMA_VERSION = 5;
+export const CHAIN_SNAPSHOT_SCHEMA_VERSION = 6;
+
+/** @param {unknown} version @returns {boolean} */
+export const supportedSnapshotSchema = (version) =>
+  version === 5 || version === CHAIN_SNAPSHOT_SCHEMA_VERSION;
 
 /**
  * Coalesces URL writes, rejecting stale encodes after the state is superseded.
@@ -106,7 +111,7 @@ function normalizedState(value) {
     throw new Error('invalid shader link state');
   }
   const snapshot = value.chainSnapshot;
-  if (snapshot !== undefined && snapshot?.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION)
+  if (snapshot !== undefined && !supportedSnapshotSchema(snapshot?.schemaVersion))
     throw new Error(`unsupported shader snapshot version; expected ${CHAIN_SNAPSHOT_SCHEMA_VERSION}`);
   if (snapshot !== undefined
       && (typeof snapshot !== 'object'
@@ -206,11 +211,12 @@ export async function encodeShaderStateHash(state) {
  * @throws {Error} For an unsupported shader version, invalid payload/state or oversized state.
  */
 export async function decodeShaderStateHash(hash) {
-  if (!hash.startsWith(PREFIX)) {
+  const prefix = [PREFIX, LEGACY_PREFIX].find((prefix) => hash.startsWith(prefix));
+  if (!prefix) {
     if (hash.startsWith('#shader=')) throw new Error('unsupported shader link version');
     return null;
   }
-  const payload = hash.slice(PREFIX.length);
+  const payload = hash.slice(prefix.length);
   if (payload.length === 0 || payload.length > MAX_PAYLOAD_CHARS)
     throw new Error('invalid shader link payload');
   let compact;

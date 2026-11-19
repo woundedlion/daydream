@@ -15,6 +15,7 @@ import {
   createChainDocumentStore, documentFromChainSnapshot, scratchChainDocument,
 } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
+import * as composedRoster from '../../../generated/shader/composed_effect_roster.mjs';
 import { BAKED_CONSTANT_IDS, bakedTopologyFields } from '../../../generated/shader/shader_workbench.mjs';
 import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../../effects/effect_persistence.js';
 import { copyToClipboard } from '../../shared/copy_text.js';
@@ -26,6 +27,7 @@ import {
 import {createShaderStageEditor, compiledControlFor, documentControlFor, applyFixedShaderDocument} from './shader_document_edits.js';
 import {CHAIN_EFFECT, SCRATCH_FILENAME, createShaderDocumentLoader, createShaderDocumentLinks, diagnosticText} from './shader_document_loader.js';
 import {createShaderDocumentPersistence} from './shader_document_persistence.js';
+import {createShaderPresetEditor} from './shader_preset_editor.js';
 import {createDocumentControllerState} from './shader_document_state.js';
 export {applyFixedShaderDocument};
 
@@ -52,6 +54,7 @@ function defaultDownload(doc, filename, source) {
  * @param {{doc: Document, getEngine: () => *, getModule: () => *,
  * selectEffect: (effect: string) => boolean,
  * syncEffectGui: () => void, invalidate: () => void,
+ * requestPreviewFrame?: () => void,
  * getAnimationsPaused?: () => boolean|null,
  * setAnimationsPaused?: (paused: boolean) => void,
  * setParamFilter?: (filter: {external: true}|null) => void,
@@ -68,6 +71,7 @@ export function createShaderDocumentController({
   selectEffect: readSelectEffect,
   syncEffectGui,
   invalidate,
+  requestPreviewFrame = invalidate,
   getAnimationsPaused: readAnimationsPaused = () => null,
   setAnimationsPaused = () => {},
   setParamFilter = () => {},
@@ -125,6 +129,7 @@ export function createShaderDocumentController({
   if (!sourceSelect || !presetSelect || !openButton || !saveButton
       || !fileInput || !status) return null;
   const stripMount = doc.getElementById('chain-strip');
+  const railMount = doc.getElementById('shader-preset-rail');
 
   const state = createDocumentControllerState();
   let selectedSource = '';
@@ -141,8 +146,7 @@ export function createShaderDocumentController({
   /** @param {string} message */
   const showStatus = (message) => writeStatus(message, false);
   const showParityDropStatus = () => showStatus(
-    'The edit changed the descriptor: the preview is back on the '
-    + 'interpreter and the parity toggle is disarmed.');
+    'The edit changed the descriptor or preset bank. Preview is back on the interpreter and the parity toggle is disarmed.');
   /** @param {string} message */
   const showError = (message) => writeStatus(message, true);
   /** @param {string} detail Refusal text, with or without its closing period. */
@@ -153,23 +157,16 @@ export function createShaderDocumentController({
   /** @param {string} message */
   const announce = (message) => writeStatus(message, message !== '');
 
-  /**
-   * The descriptor digest of whichever document is authoritative: the store's
-   * once the editor is live, else the load-time compile.
-   * @returns {string|undefined} The digest.
-   */
-  const liveDigest = () => state.chainUi
-    ? state.chainUi.store.compile().descriptor_digest
-    : state.active?.compiled.descriptor_digest;
-
-  /**
-   * Whether the loaded chain still digests to the promoted effect it opened as.
-   * Bypass never touches the document, so it leaves this true.
-   * @returns {boolean} Whether the parity toggle is armed.
-   */
-  const parityArmed = () =>
-    state.active?.official != null
-    && liveDigest() === state.active.official.descriptorDigest;
+  const liveCompile = () => state.chainUi?.store.compile() ?? state.active?.compiled;
+  const liveDigest = () => liveCompile()?.descriptor_digest;
+  const parityArmed = () => {
+    if (state.active?.official == null) return false;
+    const official = state.active.official;
+    const compiled = liveCompile();
+    return official.presetBankDigest !== undefined
+      && compiled?.descriptor_digest === official.descriptorDigest
+      && compiled?.preset_bank_digest === official.presetBankDigest;
+  };
 
   /**
    * Repaints the parity toggle and, once a descriptor edit has broken the
@@ -214,7 +211,12 @@ export function createShaderDocumentController({
   /** @param {CompiledDocument} compiled */
   const populatePresets = (compiled) => {
     presetSelect.replaceChildren();
-    for (const preset of compiled.document.preset_bank.presets) {
+    const bank = compiled.document.preset_bank;
+    const order = bank.choreography?.generated_order
+      ?? bank.presets.map((/** @type {*} */ preset) => preset.preset_id);
+    for (const id of order) {
+      const preset = bank.presets.find((/** @type {*} */ preset) => preset.preset_id === id);
+      if (!preset) continue;
       const option = doc.createElement('option');
       option.value = preset.preset_id;
       option.textContent = preset.display_name ?? preset.preset_id;
@@ -276,7 +278,9 @@ export function createShaderDocumentController({
         return false;
       }
       state.active.presetId = presetId;
+      presetSelect.value = presetId;
       state.chainUi?.strip.syncParameterRows();
+      presetEditor.render();
       showPreviewStatus();
       showDigest();
       linkWriter.schedule();
@@ -289,9 +293,11 @@ export function createShaderDocumentController({
   };
 
   const teardownChainUi = () => {
+    presetEditor.reset();
     if (state.chainUi === null) return;
     state.chainUi.strip.destroy();
     state.chainUi = null;
+    presetEditor.render();
     state.rebuildAfterParameterCommit = false;
     setParamFilter(null);
   };
@@ -362,25 +368,20 @@ export function createShaderDocumentController({
       store,
       catalog: state.operatorCatalog,
       announce,
-      onApply: () => {
-        linkWriter.releaseOriginalLink();
-        const dropped = syncParity();
-        const applied = applyPreset(state.active?.presetId ?? presetSelect.value);
-        if (dropped) {
-          state.chainUi?.strip.render();
-          if (applied) showParityDropStatus();
-        }
-      },
+      onApply: () => refreshAfterEdit(undefined, false),
       presetId: () => state.active?.presetId ?? null,
-      onEditParameter: writeStageEdit,
+      onEditParameter: presetEditor.editParameter,
+      presetEditor: presetEditor.rows,
       parameterLive,
       parameterRanges: () => state.chainUi?.store === store && state.active?.compiledSide !== true
         ? callWorkbenchBinding(getEngine(), 'getShaderChainParameterRanges', [], []) : [],
       onCommitParameter: () => {
+        presetEditor.endGesture();
         if (state.rebuildAfterParameterCommit) {
           state.rebuildAfterParameterCommit = false;
           state.chainUi?.strip.render();
         }
+        presetEditor.render();
         void flushDeepLink();
       },
       bypassAvailable: () => state.active?.compiledSide !== true,
@@ -408,18 +409,71 @@ export function createShaderDocumentController({
     : structuredClone((/** @type {ActiveDocument} */ (state.active)).compiled.document);
 
   const {linkWriter, flushDeepLink} = createShaderDocumentLinks({state,
-    currentDocument, getEngine, getAnimationsPaused, win, showError, onOriginalLinkReleased});
+    currentDocument, getEngine, getAnimationsPaused, win, showError, onOriginalLinkReleased,
+    includeSnapshot: () => !presetEditor.transport.inProgress()});
 
   const {writeStageEdit} = createShaderStageEditor({state, linkWriter,
     parameterLive, getEngine, getModule, getAnimationsPaused, engineControlName,
     restoreAnimationsPaused, invalidate, announce, syncParity, applyPreset,
     showParityDropStatus, showPreviewStatus, status, markHalted, showError});
 
+  /** @param {string} [id] @param {boolean} [renderStrip] */
+  const refreshAfterEdit = (id, renderStrip = true) => {
+    const current = state.chainUi?.store;
+    if (!current || !state.active) return;
+    presetEditor.transport.clear();
+    presetEditor.endGesture();
+    const bank = current.presetBankView();
+    const target = id ?? state.active.presetId;
+    const next = target !== null && current.presetValuesView(target) !== null
+      ? target : bank.choreography.generated_order[0];
+    linkWriter.releaseOriginalLink();
+    populatePresets(current.compile());
+    const dropped = syncParity();
+    const changedPreset = next !== state.active.presetId;
+    const applied = applyPreset(next);
+    if (renderStrip || dropped || changedPreset) state.chainUi?.strip.render();
+    if (dropped && applied) showParityDropStatus();
+  };
+
+  const presetEditor = createShaderPresetEditor({
+    state, doc, mount: railMount, getEngine, getModule, definitions: liveDefinitions,
+    snap: applyPreset,
+    adopt: (id) => {
+      if (!state.active) return;
+      state.active.presetId = id;
+      presetSelect.value = id;
+      state.chainUi?.strip.render();
+      presetEditor.render();
+      showPreviewStatus();
+      linkWriter.schedule();
+    },
+    choose: (id) => { presetSelect.value = id; onPresetChange(); },
+    onEdit: (result, id) => {
+      if (!result.ok) {
+        announce(result.diagnostics[0]?.message ?? 'The preset edit was refused.');
+        presetEditor.render();
+        return;
+      }
+      refreshAfterEdit(id);
+    },
+    toInterpreter: () => {
+      if (!state.active?.compiledSide) return true;
+      if (!selectEffect(CHAIN_EFFECT)) return false;
+      state.active.compiledSide = false;
+      syncParity();
+      state.chainUi?.strip.render();
+      return state.active.presetId !== null && applyPreset(state.active.presetId);
+    },
+    announce: showError, requestFrame: requestPreviewFrame,
+    writeParameter: writeStageEdit,
+  });
+
   const {loadSource, loadLinkedSource} = createShaderDocumentLoader({
     state, linkWriter, doc, stripMount, presetSelect, saveButton, saveAsButton,
     status, importCompiler, flushDeepLink, getEngine, getModule, selectEffect,
     teardownChainUi, setParamFilter, populatePresets, showDigest, syncParity,
-    applyPreset, buildChainUi, showError, setAnimationsPaused, showAnimationState,
+    applyPreset, buildChainUi, clearPreview: presetEditor.reset, showError, setAnimationsPaused, showAnimationState,
     syncEffectGui, invalidate, currentDocument,
     selectLoadedSource: (effect, filename, kind) => selectLoadedSource(effect, filename, kind),
   });
@@ -508,6 +562,9 @@ export function createShaderDocumentController({
             source,
             compiled,
             descriptorDigest: compiled.descriptor_digest,
+            presetBankDigest: typeof getEngine()?.getPresetBankDigestForEffect === 'function'
+              ? getEngine().getPresetBankDigestForEffect(effectId) : compiled.preset_bank_digest,
+            ...composedRoster.SHADER_DOCUMENT_PROMOTION_OPTIONS?.[effectId],
             presetIds: compiled.document.preset_bank.presets.map(
               (/** @type {*} */ preset) => preset.preset_id),
           };
@@ -604,6 +661,8 @@ export function createShaderDocumentController({
     }
   };
   const onPresetChange = () => {
+    presetEditor.transport.clear();
+    presetEditor.endGesture();
     if (!applyPreset(presetSelect.value)) {
       const refusal = status.textContent ?? 'The preset could not be applied.';
       presetSelect.value = state.active?.presetId ?? '';
@@ -647,11 +706,19 @@ export function createShaderDocumentController({
   const onParityToggle = () => {
     if (state.active === null || !parityArmed()) return;
     try {
+      if (presetEditor.transport.inProgress()) presetEditor.transport.stop();
       const official = /** @type {OfficialDocument} */ (state.active.official);
       const compiledSide = !state.active.compiledSide;
       const effect = compiledSide ? official.effectId : CHAIN_EFFECT;
       if (!selectEffect(effect)) {
         announce(`The preview engine rejected effect "${effectDisplayName(effect)}".`);
+        return;
+      }
+      if (compiledSide && typeof getEngine()?.getPresetBankDigest === 'function'
+          && getEngine().getPresetBankDigest() !== official.presetBankDigest) {
+        selectEffect(CHAIN_EFFECT);
+        applyPreset(state.active.presetId ?? presetSelect.value);
+        showError('The compiled effect has a different preset bank digest.');
         return;
       }
       state.active.compiledSide = compiledSide;
@@ -729,6 +796,15 @@ export function createShaderDocumentController({
 
   return {
     init, loadSource, save, saveAs, applyPreset,
+    stepPreview() {
+      try {
+        presetEditor.transport.tick();
+      } catch (error) {
+        markHalted(error);
+        presetEditor.transport.clear();
+        showError(`Preview failed: ${errorDetail(error)}`);
+      }
+    },
     dispose,
     flushDeepLink,
     preservesOriginalLink: linkWriter.preservesOriginalLink,

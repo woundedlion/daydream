@@ -8,7 +8,7 @@ import {createChainPalette} from './chain_palette.js';
 import {createChainParamRows} from './chain_param_rows.js';
 import { titleCase } from '../../shared/labels.js';
 import {
-  createChainPresentation,
+  createChainPresentation, labelOf,
 } from './chain_presentation.js';
 
 import {createChipDrag} from './chain_chip_drag.js';
@@ -36,6 +36,8 @@ import {createStripHistory} from './chain_strip_history.js';
  * @property {(options?: RenderOptions) => void} render
  * @property {ReturnType<typeof createChainParamRows>['syncParameterRows']} syncParameterRows
  * @property {ReturnType<typeof createChainParamRows>['syncParameterValues']} syncParameterValues
+ * @property {ReturnType<typeof createChainParamRows>['showTransitionValues']} showTransitionValues
+ * @property {(parameterId: string) => void} focusParameter
  * @property {() => void} syncHistory
  * @property {ReturnType<typeof createChainParamRows>['flushParameterEdit']} flushParameterEdit
  * @property {() => void} destroy
@@ -64,13 +66,14 @@ import {createStripHistory} from './chain_strip_history.js';
  *   what is rendering. False disables the toggles and states why.
  * @param {(parameterId: string) => boolean} [options.parameterLive] - Whether a parameter reaches the active build.
  * @param {() => ParameterRange[]} [options.parameterRanges] - Current scalar and enum-index limits from the preview engine.
+ * @param {import('./chain_param_rows.js').PresetRowEditor} [options.presetEditor]
  * @returns {ChainStrip} The strip.
  */
 export function createChainStrip({
   doc, container, store, catalog, announce, onApply,
   presetId = () => null, onEditParameter = () => {}, onCommitParameter = () => {},
   bypassAvailable = () => true, parameterLive = () => true,
-  parameterRanges = () => [],
+  parameterRanges = () => [], presetEditor,
 }) {
   const presentation = createChainPresentation({
     catalog, chain: store.chain, legalSequences: store.legalSequences,
@@ -168,7 +171,7 @@ export function createChainStrip({
 
   const parameterRows = createChainParamRows({
     el, container, store, catalog, opOf, chipByLabel, chipLabel: (entry, bypassed) => chipLabel(presentation, entry, bypassed), parameterLive, parameterRanges,
-    onEditParameter, onCommitParameter, render: () => render(), commit, report, pinnedLabels,
+    onEditParameter, onCommitParameter, presetEditor, render: () => render(), commit, report, pinnedLabels,
   });
 
   const {buildChip, bandAddButton} = createChipElements({
@@ -292,6 +295,19 @@ export function createChainStrip({
     syncParameterRows: parameterRows.syncParameterRows,
 
     syncParameterValues: parameterRows.syncParameterValues,
+    showTransitionValues: parameterRows.showTransitionValues,
+
+    focusParameter(parameterId) {
+      const label = labelOf(parameterId);
+      if (!pinnedLabels.has(label)) select(label);
+      const chip = chipByLabel(label);
+      const row = [...(chip?.querySelectorAll('.chain-param') ?? [])]
+        .find((entry) => entry.getAttribute('data-parameter') === parameterId);
+      const control = /** @type {HTMLElement|null|undefined} */ (
+        row?.querySelector('.chain-param-control') ?? chip?.querySelector('.chain-chip-replace') ?? chip);
+      control?.scrollIntoView({block: 'nearest'});
+      control?.focus();
+    },
 
     syncHistory: history.sync,
 

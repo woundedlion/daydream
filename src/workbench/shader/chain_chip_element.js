@@ -4,6 +4,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import {PLANAR_SOURCE, legacySourceFamily, presetSourceKind} from './chain_planar_source.js';
 import {titleCase} from '../../shared/labels.js';
 import {BAKED_PARAMETER_REASON} from './chain_param_rows.js';
 import {fieldOf, PALETTE_OPERATOR, MODULATION_OPERATOR} from './chain_presentation.js';
@@ -55,7 +56,7 @@ export function createChipElements({
   context, el, presentation, parameterRows, paletteController, wireChipDrag,
   select, focusChip, report, commit, moveChip, removeChip, toggleStage, resetParameters,
 }) {
-  const {store, view, bypassAvailable, parameterLive} = context;
+  const {store, view, bypassAvailable, parameterLive, presetId} = context;
   const {pinnedLabels} = view;
   const {opOf, appendGap, choiceEntries, choiceKey, socketChoices, sharesBand} = presentation;
   const {open: openPalette, close: closePalette} = paletteController;
@@ -160,27 +161,48 @@ export function createChipElements({
       replacement.setAttribute('aria-label', socketFunction.accessibleName);
       const choices = new Map(socketChoices(index).map(
         (choice) => [choiceKey(choice.operators), choice]));
+      /** @type {Map<string, HTMLOptGroupElement>} */
       const sourceGroups = new Map();
+      /** @param {string} name */
+      const optionGroup = (name) => {
+        const existing = sourceGroups.get(name);
+        if (existing) return existing;
+        const group = el('optgroup', '');
+        group.label = name;
+        sourceGroups.set(name, group);
+        replacement.appendChild(group);
+        return group;
+      };
+      const planarChoice = choices.get(PLANAR_SOURCE)?.operators.at(-1);
+      const sourceField = planarChoice?.params.find((field) => field.id === 'source');
+      const planarEnabled = op.input === 'plane' && op.output === 'field'
+        && (entry.operator === PLANAR_SOURCE || legacySourceFamily(entry.operator) !== null)
+        && sourceField?.topology === true;
+      const active = presetId() ?? store.presetBankView().choreography.generated_order[0];
+      const currentKind = planarEnabled
+        ? presetSourceKind(entry.operator, entry.label, store.presetValuesView(active) ?? {}, op) : null;
+      if (planarEnabled && sourceField.topology === true) {
+        const group = optionGroup('Planar sources');
+        for (const kind of sourceField.values) {
+          const option = el('option', 'chain-chip-replace-option');
+          option.value = 'planar:' + kind;
+          option.textContent = titleCase(kind);
+          option.selected = kind === currentKind;
+          group.appendChild(option);
+        }
+      }
       for (const [key, choice] of paletteType ? [] : choices) {
+        const source = choice.operators.at(-1);
+        if (op.output === 'field' && (source?.id === PLANAR_SOURCE
+          || (planarEnabled && source && legacySourceFamily(source.id) !== null))) continue;
         const option = el('option', 'chain-chip-replace-option');
         option.value = key;
         option.textContent = choice.operators.map((candidate) => candidate.name)
           .join(' → ');
         option.selected = key === entry.operator;
-        const source = choice.operators.at(-1);
         const groupName = op.output === 'field'
           ? SOURCE_GROUP_NAMES[source?.input ?? ''] : undefined;
-        let parent = replacement;
-        if (groupName) {
-          if (!sourceGroups.has(groupName)) {
-            const group = el('optgroup', '');
-            group.label = groupName;
-            sourceGroups.set(groupName, group);
-            replacement.appendChild(group);
-          }
-          parent = sourceGroups.get(groupName);
-        }
-        parent.appendChild(option);
+        (groupName ? optionGroup(groupName) : replacement).appendChild(option);
       }
       replacement.addEventListener('click', (/** @type {*} */ event) => {
         event.stopPropagation();
@@ -188,6 +210,14 @@ export function createChipElements({
       replacement.addEventListener('change', (/** @type {*} */ event) => {
         event.stopPropagation();
         if (paletteType) return;
+        if (event.target.value.startsWith('planar:')) {
+          const result = store.setSourceKind(entry.label, active, event.target.value.slice('planar:'.length));
+          if (!result.ok) {
+            replacement.value = 'planar:' + currentKind;
+            report(result);
+          } else commit(entry.label, '.chain-chip-replace');
+          return;
+        }
         const choice = choices.get(event.target.value);
         if (choice === undefined) return;
         const result = store.replaceSpan(choice.start, choice.deleteCount,
@@ -201,6 +231,43 @@ export function createChipElements({
       });
       functionLabel.appendChild(replacement);
       header.appendChild(functionLabel);
+      if (planarEnabled && sourceGroups.has('Spherical sources')) {
+        const scope = el('span', 'chain-source-scope');
+        scope.textContent = 'Spherical sources apply to all presets';
+        header.appendChild(scope);
+      }
+      if (entry.operator === PLANAR_SOURCE) {
+        const preview = el('span', 'chain-source-preview chain-enum-preview');
+        preview.hidden = true;
+        preview.dataset.parameter = entry.label + '.source';
+        header.appendChild(preview);
+        const kindStrip = el('div', 'chain-source-kinds');
+        kindStrip.setAttribute('aria-label', 'Source kinds by preset');
+        const {presets, choreography} = store.presetBankView();
+        const kinds = new Set();
+        for (const id of choreography.generated_order) {
+          const item = presets.find((preset) => preset.preset_id === id);
+          const kind = presetSourceKind(entry.operator, entry.label, item?.values ?? {}, op);
+          if (kind === null) continue;
+          kinds.add(kind);
+          const mark = el('span', 'chain-source-kind');
+          mark.title = (item?.display_name ?? id) + ' ? ' + titleCase(kind);
+          mark.textContent = titleCase(kind);
+          mark.classList.toggle('chain-source-kind--active', id === active);
+          kindStrip.appendChild(mark);
+        }
+        header.appendChild(kindStrip);
+        const simplify = el('button', 'chain-source-simplify');
+        simplify.type = 'button';
+        simplify.textContent = 'Simplify source';
+        simplify.disabled = kinds.size !== 1;
+        simplify.addEventListener('click', () => {
+          const result = store.simplifySource(entry.label);
+          if (result.ok) commit(entry.label, '.chain-chip-replace');
+          else report(result);
+        });
+        header.appendChild(simplify);
+      }
     } else {
       const name = el('span', 'chain-chip-name');
       name.textContent = op.name;

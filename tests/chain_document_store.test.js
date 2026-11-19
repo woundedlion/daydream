@@ -415,7 +415,7 @@ test('a move is an m-for-m replacement that keeps instance values', async () => 
   assert.equal(result.ok, true);
   const document = store.document();
   assert.deepEqual(labels(store).slice(0, 2), ['lens', 'camera']);
-  assert.deepEqual(document.preset_bank, before.preset_bank);
+  assert.deepEqual(document.preset_bank.presets, before.preset_bank.presets);
   assert.deepEqual(document.descriptor.parameters, before.descriptor.parameters);
   assertGreen(store);
 });
@@ -938,14 +938,15 @@ test('chainArenaBytes matches a mixed-alignment golden and validator diagnostic 
   }
 });
 
-test('a removal drops transition edges it makes degenerate', async () => {
+test('a removal preserves neighbouring edges when their presets become identical', async () => {
   const store = await makeStore({
     mutate: (document) => presetsDifferBy(document, { 'warp2.rotation': 1.5 }),
   });
-  assert.equal(store.document().preset_bank.edges.length, 2);
+  const edges = store.document().preset_bank.edges;
   assert.equal(store.replaceSpan(WARP, 1, []).ok, true);
-  assert.equal(store.document().preset_bank.edges.length, 0);
-  assert.equal(store.document().preset_bank.presets.length, 2);
+  const bank = store.document().preset_bank;
+  assert.deepEqual(bank.presets[0].values, bank.presets[1].values);
+  assert.deepEqual(bank.edges, edges);
   assertGreen(store);
 });
 
@@ -1317,7 +1318,7 @@ test('a chain snapshot import refuses unknown parameters and unsupported shapes'
   /unknown chain snapshot parameter: missing\.parameter/);
   for (const snapshot of [null, { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION + 1, chain: SNAPSHOT_CHAIN, modulation: [], parameters: [] },
     { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: null, parameters: [], modulation: [] },
-    { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION - 1, chain: SNAPSHOT_CHAIN, parameters: [], modulation: [] },
+    { schemaVersion: 4, chain: SNAPSHOT_CHAIN, parameters: [], modulation: [] },
     { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: SNAPSHOT_CHAIN, parameters: [] },
     { schemaVersion: CHAIN_SNAPSHOT_SCHEMA_VERSION, chain: SNAPSHOT_CHAIN, modulation: [], parameters: null }])
     assert.throws(() => documentFromChainSnapshot(snapshot, CATALOG), /unsupported chain snapshot/);

@@ -27,6 +27,13 @@ test('current documents and snapshots round-trip without conversion', async () =
   assert.deepEqual(JSON.parse(JSON.stringify(await decodeShaderStateHash(await encodeShaderStateHash(value)))), value);
 });
 
+test('legacy v2 links retain compatible v5 runtime snapshots', async () => {
+  const value = state({...current(), schemaVersion: 5});
+  assert.deepEqual(JSON.parse(JSON.stringify(await decodeShaderStateHash(rawHash(value)))), value);
+  assert.equal(compileShaderDocument(documentFromChainSnapshot(value.chainSnapshot, CATALOG),
+    {catalog: CATALOG}).status, 'VALID');
+});
+
 for (const schemaVersion of [3, 4]) {
   test(`snapshot version ${schemaVersion} is refused by links and document import`, async () => {
     const snapshot = {...current(), schemaVersion};

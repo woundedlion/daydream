@@ -4,6 +4,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import {isCatalogFieldLive} from '../../../generated/shader/shader_workbench.mjs';
 import { float32Decimal } from '../../shared/cpp_format.js';
 
 /** @typedef {import('./chain_document_store.js').CatalogOperator} CatalogOperator */
@@ -190,12 +191,11 @@ export function deactivatedParameterIds(parameters, values, chain, catalog) {
     const field = fieldOf(parameter.id);
     const label = labelOf(parameter.id);
     const operator = operatorByLabel.get(label);
-    const gate = operator?.params.find((candidate) => candidate.id === field)?.gated_by;
-    if (!gate) continue;
-    const schema = operator.params.find((candidate) => candidate.id === gate.field);
-    const value = values[`${label}.${gate.field}`];
-    if (schema?.topology === true && value !== undefined && !gate.values.includes(value))
-      deactivated.add(parameter.id);
+    const schema = operator?.params.find((candidate) => candidate.id === field);
+    if (!schema || !operator) continue;
+    if (schema.gated_by && values[`${label}.${schema.gated_by.field}`] === undefined
+        && schema.sources === undefined) continue;
+    if (!isCatalogFieldLive({label, operator: operator.id}, schema, values)) deactivated.add(parameter.id);
   }
   return deactivated;
 }

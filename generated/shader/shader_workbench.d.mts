@@ -6,3 +6,7 @@ export function documentModulationBinding(descriptor: {chain?: Array<{label: str
 export const LABEL_PATTERN: RegExp;
 export function declarationFromCatalogField(label: string, field: import("../../src/workbench/shader/chain_document_store.js").CatalogField, operator: string): import("../../src/workbench/shader/chain_document_store.js").ParameterDeclaration;
 export function promotedControlNames(parameterId: string, descriptor?: {chain?: Array<{label: string; operator: string; resource_key?: string}>}, catalog?: object|null): string[];
+export function isCatalogFieldLive(slot: {label: string; operator: string}, field: import("../../src/workbench/shader/chain_document_store.js").CatalogField, values: Readonly<Record<string, unknown>>): boolean;
+export function isUnusedPlanarParameter(descriptor: object, presets: Array<{values: Record<string, unknown>}>, parameterId: string): boolean;
+export const PLANAR_SOURCE_OPERATOR: 'sample.planar.v1';
+export function planarSourceFamily(kind: string): string|null;

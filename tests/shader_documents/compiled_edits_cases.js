@@ -82,10 +82,7 @@ test('preset and stage writes preserve the animation state', async () => {
     'an edit also preserves an intentional pause');
 });
 
-// A descriptor edit breaks the match with the promoted
-// build and disarms the toggle. A bypass is a program-shape override and a chip
-// control edit of a declared parameter writes a preset value; neither changes the descriptor digest.
-test('the parity toggle disarms on a descriptor edit, not on a bypass', async () => {
+test('parity requires the bank digest and re-arms after undo', async () => {
   const harness = await editorWorkbench({ patternCatalog: STUDY_PATTERN_CATALOG });
   const toggle = harness.elements.get('shader-parity-toggle');
   assert.equal(toggle.disabled, false, 'the loaded digest matches a promoted effect');
@@ -96,7 +93,11 @@ test('the parity toggle disarms on a descriptor edit, not on a bypass', async ()
     .querySelector('.chain-chip-bypass').dispatch('click');
   assert.equal(toggle.disabled, false);
 
+  const digest = harness.elements.get('shader-document-digest').dataset.digest;
   stageEditor(harness, 'sample')('sample.pattern-freq', 7);
+  assert.equal(harness.elements.get('shader-document-digest').dataset.digest, digest);
+  assert.equal(toggle.disabled, true);
+  harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
   assert.equal(toggle.disabled, false);
 
   clickPlaneBandEntry(harness, 'warp.wave-shear.v2');
@@ -131,11 +132,13 @@ test('compiled Twist stage edits resolve an arbitrary instance label', async () 
   edit('whorl.twist-distribution', 0.625);
   edit('whorl.speed', 0.035);
   edit('whorl.drift', 0.006);
-  assert.deepEqual(harness.compiledEngine.writes, [
-    ['whorl.Twist Angle (rad)', 7.25], ['whorl.Twist Distribution', 0.625],
-    ['whorl.Speed', 0.035], ['whorl.Drift', 0.006],
-  ]);
-  assert.equal(savedValues(harness)['whorl.twist-angle'], 7.25);
+  assert.deepEqual(harness.compiledEngine.writes, [['whorl.Twist Angle (rad)', 7.25]]);
+  assert.equal(toggle.disabled, true);
+  const saved = savedValues(harness);
+  assert.equal(saved['whorl.twist-angle'], 7.25);
+  assert.equal(saved['whorl.twist-distribution'], 0.625);
+  assert.equal(saved['whorl.speed'], Math.fround(0.035));
+  assert.equal(saved['whorl.drift'], Math.fround(0.006));
 });
 
 test('an accepted compiled edit clears the previous refusal', async () => {
@@ -152,7 +155,7 @@ test('an accepted compiled edit clears the previous refusal', async () => {
   definitions.push(...original);
   stageEditor(harness, 'warp2')('warp2.speed', 0.01);
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'ok');
-  assert.match(harness.elements.get('shader-document-status').textContent, /compiled build/);
+  assert.match(harness.elements.get('shader-document-status').textContent, /back on the interpreter/);
   assert.equal(harness.elements.get('shader-document-error').textContent, '');
 });
 
@@ -190,7 +193,7 @@ test('compiled stage rows share one document-definition read and refresh it afte
   };
   const edit = stageEditor(harness, 'sample');
   const before = reads;
-  edit('sample.pattern-freq', 2.5);
+  edit('sample.pattern-freq', preset_bank.presets[0].values['sample.pattern-freq']);
 
   assert.equal(reads - before, 2, 'the write and its row refresh each read once');
   assert.equal(control().disabled, true);

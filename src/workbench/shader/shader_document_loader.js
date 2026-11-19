@@ -35,14 +35,14 @@ export function diagnosticText(compiled) {
  * selectEffect: (effect: string) => boolean, teardownChainUi: () => void,
  * setParamFilter: (filter: {external: true}|null) => void,
  * populatePresets: (compiled: CompiledDocument) => void, showDigest: () => void, syncParity: () => boolean,
- * applyPreset: (id: string) => boolean, buildChainUi: (document: *, container: HTMLElement) => Promise<*>,
+ * clearPreview: () => void, applyPreset: (id: string) => boolean, buildChainUi: (document: *, container: HTMLElement) => Promise<*>,
  * showError: (message: string) => void, setAnimationsPaused: (paused: boolean) => void,
  * showAnimationState: () => void, syncEffectGui: () => void, invalidate: () => void,
  * currentDocument: () => *, selectLoadedSource: (effect: string|null, filename: string, kind: string) => void}} dependencies */
 export function createShaderDocumentLoader({state, linkWriter, doc, stripMount, presetSelect,
   saveButton, saveAsButton, status, importCompiler, flushDeepLink, getEngine, getModule,
   selectEffect, teardownChainUi, setParamFilter, populatePresets, showDigest, syncParity,
-  applyPreset, buildChainUi, showError, setAnimationsPaused, showAnimationState,
+  applyPreset, buildChainUi, clearPreview, showError, setAnimationsPaused, showAnimationState,
   syncEffectGui, invalidate, currentDocument, selectLoadedSource}) {
   /**
    * @param {string|*} source - Document JSON, or the document itself.
@@ -97,6 +97,7 @@ export function createShaderDocumentLoader({state, linkWriter, doc, stripMount, 
       showError(`The preview edit failed: ${errorDetail(error)}`);
       return false;
     }
+    clearPreview();
     const previous = state.active;
     const previousUi = state.chainUi;
     const candidateMount = stripMount ? doc.createElement('div') : null;
@@ -227,13 +228,13 @@ export function createShaderDocumentLoader({state, linkWriter, doc, stripMount, 
 /** Creates link serialization and flushes pending stage edits before writing.
  * @param {{state: import('./shader_document_state.js').LinkState,
  * currentDocument: () => *, getEngine: () => *, getAnimationsPaused: () => boolean|null,
- * win: *, showError: (message: string) => void, onOriginalLinkReleased: () => void}} dependencies */
+ * includeSnapshot?: () => boolean, win: *, showError: (message: string) => void, onOriginalLinkReleased: () => void}} dependencies */
 export function createShaderDocumentLinks({state, currentDocument, getEngine,
-  getAnimationsPaused, win, showError, onOriginalLinkReleased}) {
+  getAnimationsPaused, win, showError, onOriginalLinkReleased, includeSnapshot = () => true}) {
   const linkWriter = createShaderLinkWriter({
     canWrite: () => state.active !== null && state.active.presetId !== null,
     readState: () => {
-      const chainSnapshot = getChainSnapshot(getEngine());
+      const chainSnapshot = includeSnapshot() ? getChainSnapshot(getEngine()) : null;
       return {
         document: currentDocument(),
         preset: state.active?.presetId,

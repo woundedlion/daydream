@@ -51,7 +51,7 @@ test('shader state hashes round-trip the complete authoring state', async () => 
   };
   const hash = await encodeShaderStateHash(state);
 
-  assert.match(hash, /^#shader=v2\.[A-Za-z0-9_-]+$/);
+  assert.match(hash, /^#shader=v3\.[A-Za-z0-9_-]+$/);
   assert.deepEqual(JSON.parse(JSON.stringify(await decodeShaderStateHash(hash))), state);
   assert.equal(await decodeShaderStateHash('#unrelated'), null);
   await assert.rejects(decodeShaderStateHash('#shader=v2.not-gzip'),
@@ -66,7 +66,7 @@ test('shader links reject callable snapshots carrying the current schema version
     preset: 'one', bypassed: [], paused: false, chainSnapshot}), /invalid shader link snapshot/);
 });
 
-test('v2 shader links retain typed runtime and palette state', async () => {
+test('v3 shader links retain typed runtime and palette state', async () => {
   const state = {
     document: {descriptor: {chain: [{label: 'source'}]}},
     preset: 'night', bypassed: [], paused: true,
@@ -175,7 +175,7 @@ test('shader links reject duplicate document keys before information is lost', a
 });
 
 test('unsupported shader hash versions are rejected', async () => {
-  for (const version of [0, 1, 3]) {
+  for (const version of [0, 1, 4]) {
     await assert.rejects(decodeShaderStateHash(`#shader=v${version}.payload`),
       /unsupported shader link version/);
   }

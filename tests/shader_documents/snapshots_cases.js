@@ -247,7 +247,7 @@ test('an affine fallback period stays editable beside a lattice source', async (
   assert.equal(row.querySelector('.chain-param-control').disabled, false);
 });
 
-test('authored compiled stage edits keep camera spin, coverage and independent affine period live', async () => {
+test('editing a compiled bank returns its authored camera and affine controls to interpreter preview', async () => {
   const source = JSON.stringify(scratchChainDocument(JSON.parse(ENGINE_CATALOG),
     promotedDocument('grid_space.shader.json').descriptor.chain.filter((entry) => entry.operator !== 'color.modulate.v1')));
   const harness = await editorWorkbench({source, sourceFiles: {'grid_space.shader.json': source},
@@ -263,10 +263,8 @@ test('authored compiled stage edits keep camera spin, coverage and independent a
   stageEditor(harness, 'warp1')('warp1.lattice-period', 0.413);
   stageEditor(harness, 'sample')('sample.cell-scale', 3.1);
   stageEditor(harness, 'sample')('sample.coverage-mode', 'edge-fade');
-  assert.deepEqual(harness.compiledEngine.writes, [
-    ['camera.Wander', 0.4], ['camera.Spin Speed', 0.03],
-    ['outer_warp.Lattice Period', 0.413], ['Cell Scale', 3.1], ['coverage-mode', 3],
-  ]);
+  assert.deepEqual(harness.compiledEngine.writes, [['camera.Wander', 0.4]]);
+  assert.equal(harness.elements.get('shader-parity-toggle').disabled, true);
   const saved = savedValues(harness);
   assert.equal(saved['warp1.lattice-period'], Math.fround(0.413));
   assert.equal(saved['camera.spin-speed'], Math.fround(0.03));
@@ -300,19 +298,24 @@ test('authored compiled modulation edits replay coupled source and amount writes
   assert.deepEqual(attempts, [
     ['modulation-source', 2], ['modulation-evaluation', 0], ['modulation-source', 2],
   ]);
-  attempts.length = 0;
-  edit('modulation.modulation-amount', 2);
+  const changedSource = savedValues(harness);
+  assert.equal(changedSource['modulation.modulation-source'], 'sphere-interference');
+  assert.equal(changedSource['modulation.modulation-evaluation'], 'direct');
+
+  harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
+  const toggle = harness.elements.get('shader-parity-toggle');
+  assert.equal(toggle.disabled, false);
+  toggle.dispatch('click');
+  const authoredAmount = JSON.parse(source).preset_bank.presets[0].values['modulation.modulation-amount'];
+  native['Modulation Amount'] = 2;
   attempts.length = 0;
   edit('modulation.modulation-mechanic', 'positive-lightness-lift');
   assert.deepEqual(attempts, [
-    ['modulation-mechanic', 1], ['Modulation Amount', 1], ['modulation-mechanic', 1],
+    ['modulation-mechanic', 1], ['Modulation Amount', Math.fround(authoredAmount)], ['modulation-mechanic', 1],
   ]);
   const saved = savedValues(harness);
-  assert.equal(saved['modulation.modulation-source'], 'sphere-interference');
-  assert.equal(saved['modulation.modulation-evaluation'], 'direct');
   assert.equal(saved['modulation.modulation-mechanic'], 'positive-lightness-lift');
-  assert.equal(saved['modulation.modulation-amount'], 1);
-  assert.equal(native['modulation-source'], 2);
+  assert.equal(saved['modulation.modulation-amount'], Math.fround(authoredAmount));
   assert.equal(native['modulation-mechanic'], 1);
 });
 

@@ -22,6 +22,7 @@ export function createAppShaderDocuments({doc, win, host, loaded, releaseWorkben
     },
     syncEffectGui: () => effectGui.sync(),
     invalidate: () => daydream.invalidate(),
+    requestPreviewFrame: () => daydream.stepOnce(),
     getAnimationsPaused: () => host.engine?.getAnimationsPaused() ?? null,
     setAnimationsPaused,
     setParamFilter: (filter) => { paramFilterRef.current = filter; },

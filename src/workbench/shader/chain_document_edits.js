@@ -4,6 +4,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import {reconcilePresetEdges} from './chain_preset_bank.js';
 import {LABEL_PATTERN, declarationFromCatalogField as parameterFromField} from '../../../generated/shader/shader_workbench.mjs';
 /** @typedef {import('./chain_document_store.js').CatalogOperator} CatalogOperator */
 /** @typedef {import('./chain_document_store.js').ChainEntry} ChainEntry */
@@ -105,26 +106,10 @@ function addInstance(context, candidate, entry) {
   for (const parameter of parameters) addParameter(candidate, parameter);
 }
 
-/** @param {EditContext} context - Store collaborators.
- * @param {*} candidate */
-function dropDegenerateEdges(context, candidate) {
-  const {state, compiler} = context;
-  const previous = new Map(state.doc.preset_bank.presets.map(
-    (/** @type {{preset_id: string, values: Object}} */ preset) =>
-      [preset.preset_id, compiler.stableStringify(preset.values)]));
-  const signatures = new Map(candidate.preset_bank.presets.map(
-    (/** @type {{preset_id: string, values: Object}} */ preset) =>
-      [preset.preset_id, compiler.stableStringify(preset.values)]));
-  candidate.preset_bank.edges = candidate.preset_bank.edges.filter(
-    (/** @type {{from: string, to: string}} */ edge) =>
-      previous.get(edge.from) === previous.get(edge.to) ||
-        signatures.get(edge.from) !== signatures.get(edge.to));
-}
-
 /**
  * The one structural mutation: replaces a contiguous span of the chain with
  * a catalog sequence, reconciles the whole document (backfill added
- * instances, strip removed ones, drop degenerate transition edges) and
+ * instances and strip removed ones) and
  * commits only if the result passes the v2 validator. An entry whose label
  * survives with the same operator keeps its parameter values; a label
  * omitted from a sequence entry takes the operator's stem, numbered from
@@ -204,7 +189,7 @@ function replaceSpan(context, start, deleteCount, sequence) {
     return refusal('INVALID_CATALOG_FIELD', '$.descriptor.chain',
       error instanceof Error ? error.message : String(error));
   }
-  if (removed.length > 0) dropDegenerateEdges(context, candidate);
+  reconcilePresetEdges(candidate, state.doc.preset_bank);
   return commit(candidate);
 }
 
@@ -251,6 +236,7 @@ function relabel(context, oldLabel, newLabel) {
     preset.values = Object.fromEntries(Object.entries(preset.values)
       .map(([id, value]) => [rewrite(id), value]));
   }
+  reconcilePresetEdges(candidate, state.doc.preset_bank);
   const followBypass = state.bypassed.has(oldLabel);
   const followSelection = state.selected === oldLabel;
   const result = commit(candidate);
@@ -273,13 +259,19 @@ function relabel(context, oldLabel, newLabel) {
  * @returns {EditResult} The outcome; a refusal leaves the store untouched.
  */
 function setPresetValues(context, presetId, values, admit = null) {
+  return writePresetValues(context, presetId, values, admit);
+}
+
+/** @param {EditContext} context @param {string|null} presetId @param {Record<string, *>} values
+ * @param {(() => EditResult)|null} admit @returns {EditResult} */
+function writePresetValues(context, presetId, values, admit) {
   const {state, chain, operatorOf, commit} = context;
-  const index = state.doc.preset_bank.presets.findIndex(
-    (/** @type {{preset_id: string}} */ preset) => preset.preset_id === presetId);
-  if (index < 0)
-    return refusal('UNKNOWN_PRESET', '$.preset_bank.presets',
-        `the preset bank carries no preset "${presetId}"`);
   const candidate = structuredClone(state.doc);
+  const presets = presetId === null ? candidate.preset_bank.presets : candidate.preset_bank.presets.filter(
+    (/** @type {{preset_id: string}} */ preset) => preset.preset_id === presetId);
+  if (presets.length === 0)
+    return refusal('UNKNOWN_PRESET', '$.preset_bank.presets',
+      'the preset bank carries no preset "' + presetId + '"');
   for (const [parameterId, value] of Object.entries(values)) {
     if (!candidate.descriptor.parameters.some(
       (/** @type {{id: string}} */ parameter) => parameter.id === parameterId)) {
@@ -288,12 +280,12 @@ function setPresetValues(context, presetId, values, admit = null) {
         (field) => `${entry.label}.${field.id}` === parameterId);
       if (!entry || !field)
         return refusal('UNKNOWN_PARAMETER', '$.descriptor.parameters',
-            `the catalog carries no parameter "${parameterId}" for this chain`);
+          'the catalog carries no parameter "' + parameterId + '" for this chain');
       addParameter(candidate, parameterFromField(entry.label, field, entry.operator));
     }
-    candidate.preset_bank.presets[index].values[parameterId] = value;
+    for (const preset of presets) preset.values[parameterId] = value;
   }
-  return commit(candidate, `${presetId} ${Object.keys(values).join(' ')}`, admit);
+  return commit(candidate, JSON.stringify([presetId, Object.keys(values).sort()]), admit);
 }
 
 /** Stores one preset value in a coalesced control edit.
@@ -309,7 +301,7 @@ function setPresetValue(context, presetId, parameterId, value, admit = null) {
 export function createChainDocumentEdits(context) {
   return {
     removeInstances,
-    dropDegenerateEdges: (/** @type {*} */ candidate) => dropDegenerateEdges(context, candidate),
+    setValuesInAllPresets: (/** @type {Record<string, *>} */ values, /** @type {(() => EditResult)|null} */ admit = null) => writePresetValues(context, null, values, admit),
     replaceSpan: (/** @type {number} */ start, /** @type {number} */ deleteCount, /** @type {ChainEdit[]} */ sequence) => replaceSpan(context, start, deleteCount, sequence),
     relabel: (/** @type {string} */ oldLabel, /** @type {string} */ newLabel) => relabel(context, oldLabel, newLabel),
     setPresetValues: (/** @type {string} */ presetId, /** @type {Record<string, *>} */ values, /** @type {(() => EditResult)|null} */ admit = null) => setPresetValues(context, presetId, values, admit),

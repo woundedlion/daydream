@@ -9,7 +9,7 @@
 
 /**
  * The promoted effect a loaded document's descriptor digest matches.
- * @typedef {{effectId: string, descriptorDigest?: string, presetIds: string[]}} OfficialDocument
+ * @typedef {{effectId: string, descriptorDigest?: string, presetBankDigest?: string, authoredTopology?: boolean, authoredPalette?: boolean, presetIds: string[]}} OfficialDocument
  */
 
 /**
@@ -27,7 +27,7 @@
 /**
  * One source-catalog document, compiled at init.
  * @typedef {{effectId: string, filename: string, source: string, compiled: *,
- *   descriptorDigest: string, presetIds: string[]}} SourceEntry
+ *   descriptorDigest: string, presetBankDigest?: string, authoredTopology?: boolean, authoredPalette?: boolean, presetIds: string[]}} SourceEntry
  */
 
 /**

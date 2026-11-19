@@ -6,7 +6,7 @@
 import {enumConstantName, replayParameterWrites} from '../../effects/param_sync.js';
 import {fieldOf as fieldSegment, labelOf, MODULATION_OPERATOR, modulationValueLimits} from './chain_presentation.js';
 import {resolveParameterWrite, writeChainParameters} from './chain_apply.js';
-import {BAKED_CONSTANT_IDS, documentModulationBinding, promotedControlNames} from '../../../generated/shader/shader_workbench.mjs';
+import {BAKED_CONSTANT_IDS, documentModulationBinding, promotedControlNames, isUnusedPlanarParameter} from '../../../generated/shader/shader_workbench.mjs';
 import {errorDetail} from '../../shared/banner.js';
 /** @typedef {import('./chain_apply.js').ParameterDefinition} ParameterDefinition */
 /** @typedef {import('./chain_apply.js').CompiledDocument} CompiledDocument */
@@ -144,7 +144,8 @@ function applyDocumentValues(engine, module, compiled, values, baked, derived, c
   const resolved = resolveFixedWrites(values, definitions,
     engine.getDocumentParameterDefinitions?.() ?? [], compiled.document.descriptor,
     (id) => compiledControlFor(id, definitions, baked, compiled.document.descriptor, catalog),
-    (id) => derived.has(id));
+    (id) => derived.has(id) || isUnusedPlanarParameter(compiled.document.descriptor,
+      compiled.document.preset_bank.presets, id));
   return resolved.refusal ?? performEngineWrites(engine, module, resolved.writes)
     ?? performDocumentWrites(engine, module, resolved.documentWrites);
 }
@@ -292,9 +293,10 @@ export function createShaderStageEditor({state, linkWriter, parameterLive, getEn
    * the source of truth and the engine write is its side effect.
    * @param {string} parameterId - The edited parameter's id.
    * @param {*} value - The document value: a number, or an enum8 option id.
+   * @param {boolean} [all] - Whether to write this edit into every preset.
    * @returns {boolean}
    */
-  const writeStageEdit = (parameterId, value) => {
+  const writeStageEdit = (parameterId, value, all = false) => {
     if (!parameterLive(parameterId)) return false;
     try {
       if (state.chainUi === null || state.active === null || state.active.presetId === null) return false;
@@ -308,9 +310,11 @@ export function createShaderStageEditor({state, linkWriter, parameterLive, getEn
       const addsDeclaration = Object.keys(values).some(id => !store.declares(id));
       const coupled = Object.keys(values).length > 1;
       let compiledWritesStarted = false;
-      const result = store.setPresetValues(presetId, values, () => admitStageValues({parameterId, value, values, presetValues, descriptor,
+      const admit = () => admitStageValues({parameterId, value, values, presetValues, descriptor,
         compiledSide, addsDeclaration, coupled,
-        onCompiledWrites: () => { compiledWritesStarted = true; }}));
+        onCompiledWrites: () => { compiledWritesStarted = true; }});
+      const result = all ? store.setValuesInAllPresets(values, admit)
+        : store.setPresetValues(presetId, values, admit);
       if (!result.ok) {
         const diagnostic = result.diagnostics[0];
         if (compiledSide && compiledWritesStarted && diagnostic.code === 'ENGINE_REFUSAL')
@@ -321,8 +325,8 @@ export function createShaderStageEditor({state, linkWriter, parameterLive, getEn
       }
       linkWriter.releaseOriginalLink();
       let applied = true;
-      if (addsDeclaration) {
-        const dropped = syncParity();
+      const dropped = syncParity();
+      if (addsDeclaration || dropped) {
         applied = applyPreset(state.active.presetId);
         if (dropped && applied) {
           state.rebuildAfterParameterCommit = true;

@@ -3,9 +3,9 @@ import {after, test} from 'node:test';
 import createModule from '../generated/holosphere_wasm.js';
 import {callWorkbenchBinding} from '../src/engine/workbench_bindings.js';
 import {readFileSync} from 'node:fs';
-import {bakedTopologyFields, compileShaderDocument, documentModulationBinding, fixedDerivedBinding} from '../generated/shader/shader_workbench.mjs';
+import {bakedTopologyFields, compileShaderDocument, documentModulationBinding, evaluateTransition, fixedDerivedBinding, promotedControlNames} from '../generated/shader/shader_workbench.mjs';
 import {documentFromChainSnapshot, scratchChainDocument} from '../src/workbench/shader/chain_document_store.js';
-import {applyChainDocument} from '../src/workbench/shader/chain_apply.js';
+import {applyChainDocument, writeChainParameters} from '../src/workbench/shader/chain_apply.js';
 import {applyFixedShaderDocument} from '../src/workbench/shader/shader_documents.js';
 import {currentChainSnapshot} from './helpers/chain_snapshot.js';
 import {CHAIN_SNAPSHOT_SCHEMA_VERSION} from '../src/workbench/shader/shader_deeplink.js';
@@ -44,6 +44,54 @@ test('every catalog document preset applies to its compiled engine', () => {
   assert.deepEqual(Object.keys(sources).sort(),
     patternsCatalog.product_group.children.map(({effect_id}) => effect_id).sort());
   assert.ok(applied > 0);
+});
+
+test('GridWarp plays its authored edge on both wasm preview paths', () => {
+  const source = readFileSync(new URL('../generated/shader/patterns/grid_warp.shader.json', import.meta.url), 'utf8');
+  const compiled = compileShaderDocument(source, {catalog});
+  assert.equal(compiled.status, 'VALID');
+  const {descriptor, preset_bank: bank} = compiled.document;
+  const [from, to] = bank.choreography.generated_order;
+  const edge = bank.edges.find((entry) => entry.from === from && entry.to === to);
+  assert.ok(edge);
+  const kindId = descriptor.chain.find(({operator}) => operator === 'sample.planar.v1').label + '.source';
+  const wanderId = 'camera.wander';
+  const names = promotedControlNames(wanderId, descriptor, catalog);
+  const frameCount = edge.duration;
+  const frames = Array.from({length: frameCount}, (_, index) =>
+    evaluateTransition(descriptor, bank, from, to, index + 1, catalog).values);
+  assert.notEqual(frames[0][kindId].from, frames[0][kindId].to);
+  assert.ok(frames[0][kindId].mix > 0 && frames[0][kindId].mix < 1);
+
+  engine.setResolution(96, 20);
+  assert.equal(engine.setEffect('grid-warp'), module.EffectSetResult.INSTALLED);
+  assert.equal(engine.getPresetBankDigestForEffect('grid-warp'), compiled.preset_bank_digest);
+  assert.equal(engine.getPresetBankDigest(), compiled.preset_bank_digest);
+  assert.equal(engine.startPresetTransition(0, 1), true);
+  const compiledWander = engine.getParameterDefinitions().findIndex(({name}) => names.includes(name));
+  assert.ok(compiledWander >= 0);
+  for (const [index, values] of frames.entries()) {
+    engine.drawFrame();
+    assert.ok(Math.abs(engine.getParamValues()[compiledWander] - values[wanderId]) < 2e-6,
+      'compiled wander at frame ' + (index + 1));
+  }
+  assert.ok(engine.getPixels().some((channel) => channel !== 0));
+
+  assert.equal(engine.setEffect('shader-chain'), module.EffectSetResult.INSTALLED);
+  assert.equal(applyChainDocument({engine, module, compiled, presetId: from,
+    syncEffectGui: () => {}, invalidate: () => {}}), null);
+  engine.setAnimationsPaused(false);
+  const definitions = engine.getParameterDefinitions();
+  const wander = definitions.findIndex(({name}) => name === wanderId);
+  assert.ok(wander >= 0);
+  for (const [index, values] of frames.entries()) {
+    const written = writeChainParameters(engine, module, definitions, Object.entries(values), true);
+    assert.deepEqual(written, {refusal: null, code: null}, 'interpreter admission at frame ' + (index + 1));
+    engine.drawFrame();
+    assert.equal(engine.getAnimationsPaused(), false, 'interpreter playback keeps clocks running');
+    assert.equal(engine.getParamValues()[wander], Math.fround(values[wanderId]));
+  }
+  assert.ok(engine.getPixels().some((channel) => channel !== 0));
 });
 
 test('Ash Cloud applies its real compiled controls and validates unregistered readonly fields', () => {

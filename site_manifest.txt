@@ -121,6 +121,7 @@ tools/shader.html
 tools/shader.css
 src/workbench/shader/shader_deeplink.js
 src/workbench/shader/shader_documents.js
+src/workbench/shader/shader_preset_editor.js
 src/workbench/shader/shader_document_state.js
 tools/solids.html
 tools/solids.css
@@ -137,6 +138,7 @@ src/workbench/shader/chain_chip_element.js
 src/workbench/shader/chain_strip_history.js
 src/workbench/shader/chain_palette.js
 src/workbench/shader/chain_param_rows.js
+src/workbench/shader/chain_planar_source.js
 src/workbench/shader/chain_presentation.js
 src/shared/labels.js
 src/shared/clipboard.js
@@ -197,6 +199,9 @@ src/workbench/shader/chain_selection.js
 src/workbench/shader/chain_viewport.js
 src/workbench/palettes/hue_key_handles.js
 src/workbench/palettes/strip_copy_feedback.js
+src/workbench/shader/chain_preset_bank.js
+src/workbench/shader/chain_preset_rail.js
+src/workbench/shader/chain_preset_transport.js
 src/workbench/shader/chain_row_controls.js
 src/workbench/shader/chain_document_edits.js
 src/workbench/shader/chain_document_history.js

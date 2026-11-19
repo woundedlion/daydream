@@ -107,6 +107,7 @@ const shaderDocument = ({ digest = 'digest-equator', status = 'VALID',
   status,
   diagnostics,
   descriptor_digest: digest,
+  preset_bank_digest: digest + '-presets',
   document: {
     effect_id: 'KaleidoscopeFlowers',
     effect_metadata: { display_name: 'Kaleidoscope Flowers' },
@@ -463,7 +464,7 @@ async function editorWorkbench({
     initialEffect,
   });
   ownedEditors.add(controller);
-  assert.equal(await controller.init(), true);
+  assert.equal(await controller.init(), true, elements.get('shader-document-status').textContent);
   if (source !== null)
     assert.equal(await controller.loadSource(source, 'study.shader.json'), true);
   await controller.flushDeepLink();

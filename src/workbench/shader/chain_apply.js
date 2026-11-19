@@ -9,7 +9,7 @@ import { enumConstantName, optionValue } from '../../effects/param_sync.js';
 import { labelOf } from './chain_presentation.js';
 
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[], optionValues?: number[]}} ParameterDefinition */
-/** @typedef {{document: *, descriptor_digest?: string, diagnostics?: import('./chain_document_store.js').Diagnostic[], status?: string}} CompiledDocument */
+/** @typedef {{document: *, descriptor_digest?: string, preset_bank_digest?: string, diagnostics?: import('./chain_document_store.js').Diagnostic[], status?: string}} CompiledDocument */
 
 /**
  * @param {ParameterDefinition[]} definitions
@@ -39,16 +39,26 @@ export function resolveParameterWrite(definitions, name, value) {
  * @param {*} module - Engine module and admission codes.
  * @param {ParameterDefinition[]} definitions - Active parameter definitions.
  * @param {Array<[string, *]>} entries - Parameter ids and authored values.
+ * @param {boolean} [transition] - A live transition frame.
  * @returns {{refusal: string|null, code: number|null}} Resolution refusal, admission failure, or success.
  */
-export function writeChainParameters(engine, module, definitions, entries) {
+export function writeChainParameters(engine, module, definitions, entries, transition = false) {
   const writes = [];
   for (const [id, value] of entries) {
-    const write = resolveParameterWrite(definitions, id, value);
-    if (typeof write === 'string') return {refusal: write, code: null};
-    writes.push({name: write.name, value: write.stored});
+    if (transition && value !== null && typeof value === 'object') {
+      const from = resolveParameterWrite(definitions, id, value.from);
+      if (typeof from === 'string') return {refusal: from, code: null};
+      const to = resolveParameterWrite(definitions, id, value.to);
+      if (typeof to === 'string') return {refusal: to, code: null};
+      writes.push({name: id, value: {from: from.stored, to: to.stored, mix: value.mix}});
+    } else {
+      const write = resolveParameterWrite(definitions, id, value);
+      if (typeof write === 'string') return {refusal: write, code: null};
+      writes.push({name: write.name, value: write.stored});
+    }
   }
-  const code = callWorkbenchBinding(engine, 'setShaderChainParameters', [writes], module.ParamSetResult.NO_EFFECT);
+  const method = transition ? 'setShaderChainTransitionParameters' : 'setShaderChainParameters';
+  const code = callWorkbenchBinding(engine, method, [writes], module.ParamSetResult.NO_EFFECT);
   return {refusal: null, code: code === module.ParamSetResult.APPLIED ? null : code};
 }
 

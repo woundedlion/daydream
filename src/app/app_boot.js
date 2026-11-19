@@ -72,6 +72,7 @@ export function createAppBoot({doc, win, host, loaded, daydream, display, segmen
         segments,
         syncEffectGui: (advanced) => effectGui.sync(advanced),
         aliasGuard: createDriverAliasGuard(display, 'drawFrame'),
+        beforeFrame: () => shaderDocuments?.stepPreview(),
       });
       host.adapter = renderAdapter;
 
