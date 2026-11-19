@@ -280,7 +280,11 @@ export function createPresetRail({doc, mount, store, preset, choose, edit, trans
       report.appendChild(button(issue.message, () => jump(issue)));
     }
     for (const edge of extras) {
-      report.appendChild(button('Off-rail edge ' + edge.from + ' → ' + edge.to, () => transport.selectEdge(edge)));
+      const control = button('Off-rail edge ' + edge.from + ' → ' + edge.to, () => transport.selectEdge(edge));
+      control.dataset.offrail = 'true';
+      control.dataset.from = edge.from;
+      control.dataset.to = edge.to;
+      report.appendChild(control);
     }
     mount.replaceChildren(toolbar, timing, track, report);
     sync();

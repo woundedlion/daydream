@@ -83,12 +83,18 @@ test('parameter gate predicates match every catalog live value', () => {
   for (const { operator, parameter } of gates) {
     const gate = parameter.gated_by;
     const choices = operator.params.find(candidate => candidate.id === gate.field).values;
-    const active = choices.filter((value) => {
-      const result = deactivatedParameterIds([{ id: `stage.${parameter.id}` }],
-        { [`stage.${gate.field}`]: value }, [{ label: 'stage', operator: operator.id }], CATALOG);
-      return !result.has(`stage.${parameter.id}`);
-    });
-    assert.deepEqual(active, gate.values, `${operator.id}.${parameter.id}`);
+    const kinds = parameter.sources
+      ? operator.params.find((field) => field.id === 'source').values : [undefined];
+    for (const kind of kinds) {
+      const active = choices.filter((value) => {
+        const result = deactivatedParameterIds([{ id: `stage.${parameter.id}` }],
+          { 'stage.source': kind, [`stage.${gate.field}`]: value }, [{ label: 'stage', operator: operator.id }], CATALOG);
+        return !result.has(`stage.${parameter.id}`);
+      });
+      const expected = gate.field === 'source' || !parameter.sources || parameter.sources.includes(kind)
+        ? gate.values : [];
+      assert.deepEqual(active, expected, `${operator.id}.${parameter.id}.${kind}`);
+    }
   }
 });
 
@@ -172,7 +178,10 @@ test('every catalog operator exposes its parameter controls without declarations
     chipByLabel(h, owner).dispatch('click');
     const fields = operator.params.filter((field) =>
       !(operator.id === 'color.modulate.v1' && field.id === 'modulation-enabled')
-      && !(operator.id === 'colorize.generated-palette.v4' && field.id === 'palette-type'));
+      && !(operator.id === 'colorize.generated-palette.v4' && field.id === 'palette-type')
+      && !(operator.id === 'sample.planar.v1' && field.id === 'source'));
+    if (operator.id === 'sample.planar.v1')
+      assert.equal(chipByLabel(h, owner).querySelector('.chain-chip-replace').value, 'planar:grid');
     if (operator.id === 'colorize.generated-palette.v4')
       assert.equal(chipByLabel(h, owner).querySelector('.chain-palette-type').value, 'cycling-generated');
     assert.deepEqual(rowsOf(h, owner).filter((row) => row.dataset.parameter.startsWith('audit.')).map((row) => row.dataset.parameter).sort(),

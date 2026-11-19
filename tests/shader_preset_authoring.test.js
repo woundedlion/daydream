@@ -79,24 +79,42 @@ test('all-preset writes coalesce and a rejected batch leaves every value intact'
   assert.deepEqual(store.document(), before);
 });
 
-test('a planar upgrade preserves installed values and a simplify restores the legacy digests', async () => {
-  if (!catalog.operators.some((op) => op.id === 'sample.planar.v1')) {
-    const grid = catalog.operators.find((op) => op.id === 'sample.grid.v4');
-    const spiral = catalog.operators.find((op) => op.id === 'sample.spiral.v3');
-    const localFields = ['edge-width', 'coverage-mode', 'weight-mode'];
-    catalog.operators.push({...grid, id: 'sample.planar.v1', name: 'Planar Source', params: [
-      {id: 'source', topology: true, blend: true, values: ['grid', 'spiral'], default: 'grid'},
-      ...grid.params.filter((field) => localFields.includes(field.id)),
-      ...[grid, spiral].flatMap((op) => {
-        const family = op === grid ? 'grid' : 'spiral';
-        return op.params.filter((field) => !localFields.includes(field.id)).map((field) => {
-          const gated_by = field.gated_by ? {...field.gated_by, field: family + '-' + field.gated_by.field} : undefined;
-          return {...field, id: family + '-' + field.id, sources: [family], gated_by};
-        });
-      }),
-    ]});
+function planarCatalog() {
+  if (catalog.operators.some((operator) => operator.id === 'sample.planar.v1')) return catalog;
+  const kinds = {
+    'sample.grid.v4': ['grid'],
+    'sample.spiral.v3': ['spiral'],
+    'sample.tessellation.v3': ['tessellation-square-cells', 'tessellation-hexagonal-edges'],
+    'sample.projected-noise.v2': ['projected-noise-simplex', 'projected-noise-ridged3'],
+  };
+  const familyOf = (id) => id.split('.')[1];
+  const sourceFields = ['edge-width', 'coverage-mode', 'weight-mode'];
+  const grid = catalog.operators.find((operator) => operator.id === 'sample.grid.v4');
+  const params = [
+    {id: 'source', topology: true, blend: true, values: Object.values(kinds).flat(), default: 'grid'},
+    ...grid.params.filter((field) => sourceFields.includes(field.id)),
+  ];
+  for (const [id, sources] of Object.entries(kinds)) {
+    const family = familyOf(id);
+    const operator = catalog.operators.find((operator) => operator.id === id);
+    for (const field of operator.params) {
+      if ([...sourceFields, 'kind', 'fill', 'basis'].includes(field.id)) continue;
+      let gate;
+      if (field.gated_by?.field === 'fill') {
+        gate = {field: 'source',
+          values: sources.filter((kind) => field.gated_by.values.some((fill) => kind.endsWith('-' + fill)))};
+      } else if (field.gated_by) {
+        gate = {...field.gated_by, field: family + '-' + field.gated_by.field};
+      }
+      params.push({...field, id: family + '-' + field.id, sources, gated_by: gate});
+    }
   }
-  const store = await open();
+  return {...catalog, operators: [...catalog.operators, {...grid, id: 'sample.planar.v1', name: 'Planar Source', params}]};
+}
+
+test('a planar upgrade preserves installed values and a simplify restores the legacy digests', async () => {
+  const catalog = planarCatalog();
+  const store = await createChainDocumentStore({document: fixture(), catalog});
   const second = store.addPreset(first).presetId;
   assert.equal(store.setPresetValue(first, 'paint.pattern-freq', 2).ok, true);
   assert.equal(store.setPresetValue(second, 'paint.pattern-freq', 3).ok, true);
@@ -120,6 +138,25 @@ test('a planar upgrade preserves installed values and a simplify restores the le
   assert.equal(store.undo(), true);
   assert.equal(store.presetValuesView(first)['paint.spiral-pattern-freq'], 4);
 });
+
+for (const [operator, selected, values] of [
+  ['sample.tessellation.v3', 'tessellation-hexagonal-edges', {'paint.kind': 'hexagonal', 'paint.fill': 'edges'}],
+  ['sample.projected-noise.v2', 'projected-noise-ridged3', {'paint.basis': 'ridged3'}],
+]) {
+  test(`simplifying ${selected} restores the declaration defaults and preset values`, async () => {
+    const catalog = planarCatalog();
+    const chain = sourceChain.map((entry) => entry.label === 'paint' ? {...entry, operator} : entry);
+    const store = await createChainDocumentStore({document: scratchChainDocument(catalog, chain), catalog});
+    assert.equal(store.setPresetValues(first, values).ok, true);
+    const original = store.compile();
+    assert.equal(store.setSourceKind('paint', first, 'grid').ok, true);
+    assert.equal(store.setSourceKind('paint', first, selected).ok, true);
+    assert.equal(store.simplifySource('paint').ok, true);
+    const simplified = store.compile();
+    assert.equal(simplified.descriptor_digest, original.descriptor_digest);
+    assert.equal(simplified.preset_bank_digest, original.preset_bank_digest);
+  });
+}
 
 test('Next evaluates one frame at a time and adopts the destination after its final frame', () => {
   let preset = 'a';

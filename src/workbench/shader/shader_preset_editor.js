@@ -123,7 +123,7 @@ export function createShaderPresetEditor({state, doc, mount, getEngine, getModul
         /** @type {HTMLElement|null} */ (edge.querySelector('summary'))?.focus();
         return;
       }
-      const offRail = /** @type {HTMLElement|undefined} */ ([...(mount?.querySelectorAll('.shader-preset-offrail') ?? [])]
+      const offRail = /** @type {HTMLElement|undefined} */ ([...(mount?.querySelectorAll('[data-offrail]') ?? [])]
         .find((element) => element.getAttribute('data-from') === issue.from
           && element.getAttribute('data-to') === issue.to));
       if (offRail) {

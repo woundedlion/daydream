@@ -1,5 +1,5 @@
 import { enumeration } from './fake_enums.js';
-import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../../src/workbench/shader/shader_deeplink.js';
+import { CHAIN_SNAPSHOT_SCHEMA_VERSION, supportedSnapshotSchema } from '../../src/workbench/shader/shader_deeplink.js';
 import { canonicalEffectId } from "../../src/effects/effect_identity.js";
 import {
   BAKED_MODULATION_SCALE_MAX, UNIT_MODULATION_AMOUNT_MAX, UNIT_MODULATION_AMOUNT_MIN,
@@ -214,6 +214,10 @@ export class FakeChainEngine {
         kind = 'ripple-burst-v1';
         state = { phase: 0, seed: 1337, burstCount: 0, frames: 0,
           waves: Array.from({length: RIPPLE_WAVE_COUNT}, () => ({age: 1000, burst: 0})) };
+      } else if (operator === 'sample.planar.v1') {
+        kind = 'planar-source-clock-v1';
+        state = {grid: {primary: 0, secondary: 0, angle: 0},
+          twinWave: {primary: 0, secondary: 0, angle: 0}, projectedNoise: {phase: 0, noiseSeed: 1337}};
       } else if (operator.startsWith('sample.') || operator === 'sphere.lens.twist.v2'
           || operator === 'sphere.displace.potential.v1'
           || operator === 'sphere.displace.rossby-haurwitz.v1'
@@ -257,7 +261,7 @@ export class FakeChainEngine {
         if (snapshot === null || typeof snapshot !== 'object' || Array.isArray(snapshot)
             || !Number.isInteger(snapshot.schemaVersion) || snapshot.schemaVersion < 0
             || snapshot.schemaVersion > 0xffffffff) return ChainSnapshotRestoreResult.INVALID_VALUE;
-        if (snapshot.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION) return ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
+        if (!supportedSnapshotSchema(snapshot.schemaVersion)) return ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
         if (typeof snapshot.animationsPaused !== 'boolean') return ChainSnapshotRestoreResult.INVALID_VALUE;
         if (!Array.isArray(snapshot.chain) || !Array.isArray(snapshot.parameters) || !Array.isArray(snapshot.modulation))
           return ChainSnapshotRestoreResult.INVALID_VALUE;
@@ -291,6 +295,13 @@ export class FakeChainEngine {
               || !unsigned(entry.state.burstCount) || !unsigned(entry.state.frames)
               || !Array.isArray(entry.state.waves) || entry.state.waves.length !== RIPPLE_WAVE_COUNT
               || entry.state.waves.some((wave) => !Number.isFinite(wave?.age) || !unsigned(wave?.burst));
+          if (entry.kind === 'planar-source-clock-v1') {
+            return snapshot.schemaVersion < CHAIN_SNAPSHOT_SCHEMA_VERSION
+              || ['grid', 'twinWave'].some((key) => runtimeFields['source-clock-v1']
+                .some((field) => !Number.isFinite(entry.state[key]?.[field])))
+              || !Number.isFinite(entry.state.projectedNoise?.phase)
+              || !signed32(entry.state.projectedNoise?.noiseSeed);
+          }
           const fields = runtimeFields[entry.kind];
           return !fields || fields.some((key) => !Number.isFinite(entry.state[key]))
             || (entry.kind === 'noise-clock-v1' && !signed32(entry.state.noiseSeed))

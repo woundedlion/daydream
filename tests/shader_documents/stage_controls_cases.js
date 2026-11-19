@@ -16,12 +16,14 @@ test('each stage renders only its own rows and the source function is directly s
   const source = stripChip(harness, 'sample');
   const select = source.querySelector('.chain-chip-replace');
   assert.equal(select.getAttribute('aria-label'), 'Source function');
-  assert.equal(select.options.every((option) => option.value.startsWith('sample.')), true);
-  select.value = 'sample.spiral.v3';
+  const planar = select.querySelectorAll('optgroup').find((group) => group.label === 'Planar sources');
+  assert.ok(planar.children.some((option) => option.value === 'planar:spiral'));
+  select.value = 'planar:spiral';
   select.dispatch('change');
 
   assert.ok(harness.engine.chainCalls.at(-1)
-    .some((entry) => entry.operator === 'sample.spiral.v3'));
+    .some((entry) => entry.operator === 'sample.planar.v1'));
+  assert.equal(savedValues(harness)['sample.source'], 'spiral');
 });
 
 test('an add menu omits stages that are invalid at its gap', async () => {

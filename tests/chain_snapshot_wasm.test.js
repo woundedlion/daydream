@@ -225,11 +225,13 @@ test('snapshot validation refuses malformed state transactionally', () => {
   assert.equal(capture().modulation[0].recipe.mechanic.amount, 3);
 });
 
-test('snapshot restore requires the current version and preserves the running chain on refusal', () => {
+test('snapshot restore accepts compatible versions and preserves the running chain on refusal', () => {
   installModulatedChain();
   const current = capture();
   assert.equal(restore(current), module.ChainSnapshotRestoreResult.APPLIED);
-  for (const schemaVersion of [current.schemaVersion - 1, current.schemaVersion + 1]) {
+  assert.equal(restore({...current, schemaVersion: 5}), module.ChainSnapshotRestoreResult.APPLIED);
+  assert.deepEqual(capture(), current);
+  for (const schemaVersion of [4, current.schemaVersion + 1]) {
     assert.equal(restore({...current, schemaVersion}), module.ChainSnapshotRestoreResult.UNSUPPORTED_VERSION);
     assert.deepEqual(capture(), current);
   }

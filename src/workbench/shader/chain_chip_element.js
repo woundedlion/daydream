@@ -237,7 +237,7 @@ export function createChipElements({
         header.appendChild(scope);
       }
       if (entry.operator === PLANAR_SOURCE) {
-        const preview = el('span', 'chain-source-preview chain-enum-preview');
+        const preview = el('span', 'chain-enum-preview');
         preview.hidden = true;
         preview.dataset.parameter = entry.label + '.source';
         header.appendChild(preview);

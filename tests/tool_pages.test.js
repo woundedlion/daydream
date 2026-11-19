@@ -345,7 +345,7 @@ const NON_RENDERING_CLASS_SOURCES = new Map([
     'src/workbench/shader/chain_strip_commands.js', 'src/workbench/shader/chain_strip_history.js',
     'src/workbench/shader/chain_palette.js', 'src/workbench/shader/chain_param_rows.js',
     'src/workbench/shader/chain_chip_drag.js', 'src/workbench/shader/chain_viewport.js',
-    'src/workbench/shader/chain_row_controls.js'])],
+    'src/workbench/shader/chain_row_controls.js', 'src/workbench/shader/chain_preset_rail.js'])],
 ]);
 
 const classSourcesFor = ({ page, scripts }) => scripts
@@ -478,6 +478,12 @@ const CONTRAST_SURFACES = {
     '.chain-strip-actions button': ['.chain-strip-region', '.layout-container'],
     '.chain-strip-note': ['.chain-strip-region', '.layout-container'],
     '.shader-toolbar': ['.shader-toolbar', '.layout-container'],
+    '.shader-preset-rail': ['.shader-preset-rail', '.layout-container'],
+    ['.shader-preset-rail button, .shader-preset-rail select, .shader-preset-rail input:not([type="range"]),'
+      + ' .chain-param-lock, .chain-param-menu button, .chain-source-simplify']:
+        ['.shader-preset-rail', '.layout-container'],
+    '.chain-param-changed .chain-param-name::before': '.chain-chip',
+    '.chain-source-scope, .chain-source-kinds': '.chain-chip',
     '.shader-toolbar label': ['.shader-toolbar', '.layout-container'],
     '.shader-toolbar select': '.shader-toolbar select',
     '.shader-toolbar button': ['.shader-toolbar', '.layout-container'],

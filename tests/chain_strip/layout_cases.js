@@ -125,7 +125,7 @@ for (const operator of ['sample.spherical-noise.v1', 'sample.spherical-cells.v1'
     assert.deepEqual(spherical.children.map((option) => option.value),
       CATALOG.operators.filter((candidate) => candidate.input === 'sphere'
         && candidate.output === 'field').map((candidate) => candidate.id));
-    assert.equal(source.value, 'sample.twin-wave.v3');
+    assert.equal(source.value, 'planar:twin-wave');
     source.value = operator;
     source.dispatch('change');
 

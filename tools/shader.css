@@ -910,6 +910,5 @@ body:has(.shader-preset-rail:not(:empty)) #shader-preset-select {
 }
 
 .chain-source-kind--active {
-  color: var(--panel-text);
   border-color: var(--accent, #56bce9);
 }

@@ -146,10 +146,14 @@ export function simplifyPlanarSource(candidate, label, operators) {
   const legacy = operators.get(legacyOperator(family));
   if (!legacy) return false;
   const compound = compoundValues(kind);
+  const selector = candidate.descriptor.parameters.find((/** @type {ParameterDeclaration} */ parameter) =>
+    parameter.id === prefix + 'source');
+  const defaults = selector && sourceFamily(selector.default) === family
+    ? compoundValues(selector.default) : compound;
   const appended = legacy.params.filter((field) => Object.hasOwn(compound, field.id))
     .map((field) => {
       const declaration = declarationFromCatalogField(label, field, legacy.id);
-      declaration.default = compound[field.id];
+      declaration.default = defaults[field.id];
       return declaration;
     });
   rewriteDeclarations(candidate, label, (id) => {
@@ -158,6 +162,8 @@ export function simplifyPlanarSource(candidate, label, operators) {
     const familyPrefix = family + '-';
     return field.startsWith(familyPrefix) ? prefix + field.slice(familyPrefix.length) : null;
   }, appended);
+  for (const preset of bank.presets)
+    for (const [field, value] of Object.entries(compound)) preset.values[prefix + field] = value;
   entry.operator = legacy.id;
   return true;
 }

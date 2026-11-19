@@ -544,7 +544,7 @@ export function createChainParamRows({
       enumPreview = preview;
       previewPlaying = playing;
       syncParameterValues(updates);
-      for (const output of /** @type {NodeListOf<HTMLElement>} */ (container.querySelectorAll('.chain-source-preview'))) {
+      for (const output of /** @type {NodeListOf<HTMLElement>} */ (container.querySelectorAll('.chain-enum-preview[data-parameter]'))) {
         const transition = preview?.[output.dataset.parameter ?? ''];
         output.hidden = !transition || transition.from === transition.to;
         output.textContent = transition ? titleCase(transition.from) + ' ? ' + titleCase(transition.to) : '';
