@@ -187,6 +187,8 @@ export class FakeChainEngine {
     this.program = structuredClone(entries);
     this.definitions = definitions;
     this.runtime = entries.flatMap(({ instance, operator }) => {
+      // The tiling cache has no snapshot state.
+      if (operator === 'sample.spherical-tiling.v1') return [];
       const stateSize = this.catalog.operators.find((entry) => entry.id === operator).blocks.state.size;
       if (stateSize <= 1) return [];
       let kind;
