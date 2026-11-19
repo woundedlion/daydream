@@ -480,10 +480,9 @@ const CONTRAST_SURFACES = {
     '.shader-toolbar': ['.shader-toolbar', '.layout-container'],
     '.shader-preset-rail': ['.shader-preset-rail', '.layout-container'],
     ['.shader-preset-rail button, .shader-preset-rail select, .shader-preset-rail input:not([type="range"]),'
-      + ' .chain-param-lock, .chain-param-menu button, .chain-source-simplify']:
+      + ' .chain-source-simplify']:
         ['.shader-preset-rail', '.layout-container'],
-    '.chain-param-changed .chain-param-name::before': '.chain-chip',
-    '.chain-source-scope, .chain-source-kinds': '.chain-chip',
+    '.chain-source-kinds': '.chain-chip',
     '.shader-toolbar label': ['.shader-toolbar', '.layout-container'],
     '.shader-toolbar select': '.shader-toolbar select',
     '.shader-toolbar button': ['.shader-toolbar', '.layout-container'],

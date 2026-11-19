@@ -20,9 +20,6 @@ import {
 /** @typedef {import('./chain_document_store.js').ParameterDeclaration} ParameterDeclaration */
 /** @typedef {import('./chain_presentation.js').ChainEntry} ChainEntry */
 /** @typedef {{name: string, min: number, max: number}} ParameterRange */
-/** @typedef {{status: (id: string) => {changed: boolean, uniform: boolean, unlocked: boolean}|null,
-  * lock: (id: string) => void, copyPrevious: (id: string) => void, applyAll: (id: string) => void,
-  * beforeEdit: () => void}} PresetRowEditor */
 /** @typedef {{from: string, to: string, mix?: number}} EnumPreview */
 
 export const BAKED_PARAMETER_REASON = 'This parameter is baked into the compiled build';
@@ -38,7 +35,7 @@ export const BAKED_PARAMETER_REASON = 'This parameter is baked into the compiled
  *   parameterLive: (id: string) => boolean,
  *   parameterRanges: () => ParameterRange[],
  *   onEditParameter: (id: string, value: number|string) => boolean|void,
- *   onCommitParameter: () => void, presetEditor?: PresetRowEditor|undefined,
+ *   onCommitParameter: () => void, beforeEditParameter: () => void,
  *   render: () => void,
  *   commit: (label: string|null) => boolean,
  *   report: (result: import('./chain_document_store.js').EditResult) => boolean,
@@ -46,7 +43,7 @@ export const BAKED_PARAMETER_REASON = 'This parameter is baked into the compiled
  */
 export function createChainParamRows({
   el, container, store, catalog, opOf, chipByLabel, chipLabel, parameterLive, parameterRanges,
-  onEditParameter, onCommitParameter, presetEditor, render, commit, report, pinnedLabels,
+  onEditParameter, onCommitParameter, beforeEditParameter, render, commit, report, pinnedLabels,
 }) {
   /** @type {ParameterDeclaration[]} */
   let declarations = [];
@@ -162,14 +159,6 @@ export function createChainParamRows({
         control.disabled = !live;
         control.setAttribute('aria-readonly', String(previewPlaying));
       }
-      const status = presetEditor?.status(id);
-      if (status) {
-        row.classList.toggle('chain-param-changed', status.changed);
-        const lock = row.querySelector('.chain-param-lock');
-        lock?.setAttribute('aria-pressed', String(status.uniform && !status.unlocked));
-        lock?.setAttribute('title', status.uniform && !status.unlocked
-          ? 'Edits write every preset. Unlock to edit this preset.' : 'Use this value in every preset');
-      }
       const preview = enumPreview?.[id];
       const readout = /** @type {HTMLElement|null} */ (row.querySelector('.chain-enum-preview'));
       if (readout) {
@@ -211,7 +200,7 @@ export function createChainParamRows({
    * @returns {boolean}
    */
   const editParameter = (parameterId, value) => {
-    presetEditor?.beforeEdit();
+    beforeEditParameter();
     if (!parameterLive(parameterId)) return false;
     const control = /** @type {HTMLInputElement|HTMLSelectElement|null} */ (rows.get(parameterId)?.querySelector('.chain-param-control'));
     if (control?.tagName === 'SELECT'
@@ -455,41 +444,12 @@ export function createChainParamRows({
         label.setAttribute('title', 'Higher values produce finer noise; lower values produce broader patches.');
       if (color && field === 'pattern-speed')
         label.setAttribute('title', 'Animation rate. Zero freezes the noise; negative values reverse it.');
-      const labelCell = el('div', 'chain-param-label');
-      labelCell.appendChild(label);
-      row.appendChild(labelCell);
+      row.appendChild(label);
       appendParameterControl(row, declaration, name);
-      if (declaration.storage === 'enum8' && presetEditor) {
+      if (declaration.storage === 'enum8') {
         const preview = el('span', 'chain-enum-preview');
         preview.hidden = true;
         row.appendChild(preview);
-      }
-      if (presetEditor && store.presetBankView().presets.length > 1) {
-        const lock = el('button', 'chain-param-lock');
-        lock.type = 'button';
-        lock.textContent = '=';
-        lock.setAttribute('aria-label', 'Same in all presets, ' + name);
-        lock.addEventListener('click', () => { presetEditor.lock(declaration.id); syncParameterRows(false); });
-        labelCell.appendChild(lock);
-        const menu = el('details', 'chain-param-menu');
-        const summary = el('summary', '');
-        summary.textContent = '?';
-        summary.setAttribute('aria-label', 'Preset actions for ' + name);
-        menu.appendChild(summary);
-        for (const [text, action] of [
-          ['Apply to all presets', presetEditor.applyAll],
-          ['Copy from previous', presetEditor.copyPrevious],
-        ]) {
-          const button = el('button', '');
-          button.type = 'button';
-          button.textContent = String(text);
-          button.addEventListener('click', () => {
-            if (typeof action === 'function') action(declaration.id);
-            menu.open = false;
-          });
-          menu.appendChild(button);
-        }
-        labelCell.appendChild(menu);
       }
       rows.set(declaration.id, row);
       parent.appendChild(row);

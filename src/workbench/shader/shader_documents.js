@@ -364,13 +364,12 @@ export function createShaderDocumentController({
       announce,
       onApply: () => refreshAfterEdit(undefined, false),
       presetId: () => state.active?.presetId ?? null,
-      onEditParameter: presetEditor.editParameter,
-      presetEditor: presetEditor.rows,
+      onEditParameter: writeStageEdit,
+      beforeEditParameter: presetEditor.stopPreviewForEdit,
       parameterLive,
       parameterRanges: () => state.chainUi?.store === store && state.active?.compiledSide !== true
         ? callWorkbenchBinding(getEngine(), 'getShaderChainParameterRanges', [], []) : [],
       onCommitParameter: () => {
-        presetEditor.endGesture();
         if (state.rebuildAfterParameterCommit) {
           state.rebuildAfterParameterCommit = false;
           state.chainUi?.strip.render();
@@ -416,7 +415,6 @@ export function createShaderDocumentController({
     const current = state.chainUi?.store;
     if (!current || !state.active) return;
     presetEditor.transport.clear();
-    presetEditor.endGesture();
     const bank = current.presetBankView();
     const target = id ?? state.active.presetId;
     const next = target !== null && current.presetValuesView(target) !== null
@@ -460,7 +458,6 @@ export function createShaderDocumentController({
       return state.active.presetId !== null && applyPreset(state.active.presetId);
     },
     announce: showError, requestFrame: requestPreviewFrame,
-    writeParameter: writeStageEdit,
   });
 
   const {loadSource, loadLinkedSource} = createShaderDocumentLoader({
@@ -668,7 +665,6 @@ export function createShaderDocumentController({
   };
   const onPresetChange = () => {
     presetEditor.transport.clear();
-    presetEditor.endGesture();
     if (!applyPreset(presetSelect.value)) {
       const refusal = status.textContent ?? 'The preset could not be applied.';
       presetSelect.value = state.active?.presetId ?? '';

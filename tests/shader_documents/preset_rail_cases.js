@@ -21,16 +21,24 @@ async function linkState(harness) {
   return structuredClone(await decodeShaderStateHash(harness.win.location.hash));
 }
 
-test('the preset rail edits dwell, names, edge settings and order in the linked show', async () => {
+test('the preset rail copies the preceding preset and edits it independently', async () => {
   const harness = await editorWorkbench({source: null, withPresetRail: true});
   const rail = harness.elements.get('shader-preset-rail');
   assert.equal(tiles(rail).length, 1);
   assert.equal(byLabel(rail, 'button', 'Next').disabled, true);
   const first = selected(rail).dataset.preset;
+  stageEditor(harness, 'sample')('sample.pattern-freq', 3);
+  numericInput(byLabel(rail, 'input', 'Dwell frames'), 640);
 
   click(rail, 'Add preset');
   const second = selected(rail).dataset.preset;
   assert.notEqual(second, first);
+  let {document} = await linkState(harness);
+  const original = document.preset_bank.presets.find((preset) => preset.preset_id === first);
+  const copy = document.preset_bank.presets.find((preset) => preset.preset_id === second);
+  assert.equal(original.values['sample.pattern-freq'], 3);
+  assert.deepEqual(copy.values, original.values);
+  assert.deepEqual(document.preset_bank.choreography.dwell, {[first]: 640, [second]: 640});
   assert.deepEqual(rail.querySelectorAll('.shader-preset-edge').map((edge) =>
     [edge.dataset.from, edge.dataset.to]), [[first, second], [second, first]]);
   const rename = byLabel(selected(rail), 'input', 'Preset name');
@@ -38,13 +46,11 @@ test('the preset rail edits dwell, names, edge settings and order in the linked 
   rename.dispatch('change');
   assert.equal(selected(rail).children[0].textContent, 'Night study');
 
-  click(rail, 'Same dwell in every preset');
+  stageEditor(harness, 'sample')('sample.pattern-freq', 7);
   numericInput(byLabel(rail, 'input', 'Dwell frames'), 720);
-  let {document} = await linkState(harness);
-  assert.deepEqual(document.preset_bank.choreography.dwell, {[first]: 600, [second]: 720});
-  click(rail, 'Same dwell in every preset');
   ({document} = await linkState(harness));
-  assert.deepEqual(document.preset_bank.choreography.dwell, {[first]: 720, [second]: 720});
+  assert.deepEqual(document.preset_bank.presets.map(({values}) => values['sample.pattern-freq']), [3, 7]);
+  assert.deepEqual(document.preset_bank.choreography.dwell, {[first]: 640, [second]: 720});
 
   const outgoing = () => rail.querySelectorAll('.shader-preset-edge').find((edge) => edge.dataset.from === second);
   numericInput(byLabel(outgoing(), 'input', 'Transition duration frames'), 45);

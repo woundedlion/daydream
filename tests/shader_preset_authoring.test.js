@@ -58,23 +58,23 @@ test('off-rail edges remain available to review after dwell and bank edits', asy
   const store = await open(document);
   assert.equal(store.setPresetDwell(second, 300).ok, true);
   assert.deepEqual(bank(store).choreography.dwell, {[first]: 600, [second]: 300, [third]: 600});
-  assert.equal(store.setPresetDwell(second, 300, true).ok, true);
-  assert.deepEqual(bank(store).choreography.dwell, {[first]: 300, [second]: 300, [third]: 300});
+  assert.equal(store.setPresetDwell(third, 450).ok, true);
+  assert.deepEqual(bank(store).choreography.dwell, {[first]: 600, [second]: 300, [third]: 450});
   assert.deepEqual(edges(store).at(-1), [first, third, 91, 'LINEAR']);
   assert.equal(store.undo(), true);
   assert.deepEqual(bank(store).choreography.dwell, {[first]: 600, [second]: 300, [third]: 600});
 });
 
-test('all-preset writes coalesce and a rejected batch leaves every value intact', async () => {
+test('active preset writes coalesce and a rejected batch leaves the bank intact', async () => {
   const store = await open();
   const second = store.addPreset(first).presetId;
-  assert.equal(store.setPresetValue(second, 'paint.pattern-freq', 3).ok, true);
+  assert.equal(store.setPresetValue(first, 'paint.pattern-freq', 3).ok, true);
   const before = store.document();
-  assert.equal(store.setValuesInAllPresets({'paint.pattern-freq': 2}).ok, true);
-  assert.equal(store.setValuesInAllPresets({'paint.pattern-freq': 5}).ok, true);
-  assert.deepEqual(bank(store).presets.map(({values}) => values['paint.pattern-freq']), [5, 5]);
-  assert.equal(store.setValuesInAllPresets({'paint.pattern-freq': 0}).ok, false);
-  assert.deepEqual(bank(store).presets.map(({values}) => values['paint.pattern-freq']), [5, 5]);
+  assert.equal(store.setPresetValues(second, {'paint.pattern-freq': 2}).ok, true);
+  assert.equal(store.setPresetValues(second, {'paint.pattern-freq': 5}).ok, true);
+  assert.deepEqual(bank(store).presets.map(({values}) => values['paint.pattern-freq']), [3, 5]);
+  assert.equal(store.setPresetValues(second, {'paint.pattern-freq': 0}).ok, false);
+  assert.deepEqual(bank(store).presets.map(({values}) => values['paint.pattern-freq']), [3, 5]);
   assert.equal(store.undo(), true);
   assert.deepEqual(store.document(), before);
 });
@@ -112,7 +112,7 @@ function planarCatalog() {
   return {...catalog, operators: [...catalog.operators, {...grid, id: 'sample.planar.v1', name: 'Planar Source', params}]};
 }
 
-test('a planar upgrade preserves installed values and a simplify restores the legacy digests', async () => {
+test('a planar upgrade preserves independent values and a simplify restores the legacy digests', async () => {
   const catalog = planarCatalog();
   const store = await createChainDocumentStore({document: fixture(), catalog});
   const second = store.addPreset(first).presetId;
@@ -128,7 +128,10 @@ test('a planar upgrade preserves installed values and a simplify restores the le
   assert.equal(store.simplifySource('paint').ok, false);
   assert.equal(store.setPresetValue(second, 'paint.spiral-pattern-freq', 4).ok, true);
   assert.equal(store.setSourceKind('paint', first, 'spiral').ok, true);
-  assert.equal(store.presetValuesView(first)['paint.spiral-pattern-freq'], 4);
+  const spiralDefault = store.parameterDeclarations().find(({id}) => id === 'paint.spiral-pattern-freq').default;
+  assert.notEqual(spiralDefault, 4);
+  assert.equal(store.presetValuesView(first)['paint.spiral-pattern-freq'], spiralDefault);
+  assert.equal(store.presetValuesView(second)['paint.spiral-pattern-freq'], 4);
   assert.equal(store.setSourceKind('paint', first, 'grid').ok, true);
   assert.equal(store.setSourceKind('paint', second, 'grid').ok, true);
   const retained = compileShaderDocument(store.exportDocument(), {catalog});
@@ -142,7 +145,8 @@ test('a planar upgrade preserves installed values and a simplify restores the le
   assert.equal(exported.preset_bank_digest, identical.compile().preset_bank_digest);
   assert.equal(store.simplifySource('paint').ok, true);
   assert.equal(store.undo(), true);
-  assert.equal(store.presetValuesView(first)['paint.spiral-pattern-freq'], 4);
+  assert.equal(store.presetValuesView(first)['paint.spiral-pattern-freq'], spiralDefault);
+  assert.equal(store.presetValuesView(second)['paint.spiral-pattern-freq'], 4);
 });
 
 for (const [operator, selected, values] of [

@@ -66,14 +66,14 @@ import {createStripHistory} from './chain_strip_history.js';
  *   what is rendering. False disables the toggles and states why.
  * @param {(parameterId: string) => boolean} [options.parameterLive] - Whether a parameter reaches the active build.
  * @param {() => ParameterRange[]} [options.parameterRanges] - Current scalar and enum-index limits from the preview engine.
- * @param {import('./chain_param_rows.js').PresetRowEditor} [options.presetEditor]
+ * @param {() => void} [options.beforeEditParameter] - Runs before processing a control edit.
  * @returns {ChainStrip} The strip.
  */
 export function createChainStrip({
   doc, container, store, catalog, announce, onApply,
   presetId = () => null, onEditParameter = () => {}, onCommitParameter = () => {},
   bypassAvailable = () => true, parameterLive = () => true,
-  parameterRanges = () => [], presetEditor,
+  parameterRanges = () => [], beforeEditParameter = () => {},
 }) {
   const presentation = createChainPresentation({
     catalog, chain: store.chain, legalSequences: store.legalSequences,
@@ -171,7 +171,7 @@ export function createChainStrip({
 
   const parameterRows = createChainParamRows({
     el, container, store, catalog, opOf, chipByLabel, chipLabel: (entry, bypassed) => chipLabel(presentation, entry, bypassed), parameterLive, parameterRanges,
-    onEditParameter, onCommitParameter, presetEditor, render: () => render(), commit, report, pinnedLabels,
+    onEditParameter, onCommitParameter, beforeEditParameter, render: () => render(), commit, report, pinnedLabels,
   });
 
   const {buildChip, bandAddButton} = createChipElements({

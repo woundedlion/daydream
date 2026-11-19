@@ -826,8 +826,6 @@ body:has(.shader-preset-rail:not(:empty)) #shader-preset-select {
 .shader-preset-rail button,
 .shader-preset-rail select,
 .shader-preset-rail input:not([type="range"]),
-.chain-param-lock,
-.chain-param-menu button,
 .chain-source-simplify {
   background: var(--sidebar-bg);
   border: 1px solid var(--panel-border);
@@ -842,8 +840,7 @@ body:has(.shader-preset-rail:not(:empty)) #shader-preset-select {
   opacity: 0.55;
 }
 
-.shader-preset-rail summary,
-.chain-param-menu summary {
+.shader-preset-rail summary {
   cursor: pointer;
 }
 
@@ -864,40 +861,15 @@ body:has(.shader-preset-rail:not(:empty)) #shader-preset-select {
   margin-left: 0.25rem;
 }
 
-.chain-param-changed .chain-param-name::before {
-  content: "●";
-  color: var(--accent, #56bce9);
-  padding-right: 0.2rem;
-}
-
-.chain-param-lock[aria-pressed="true"] {
-  border-color: var(--accent, #56bce9);
-}
-
-.chain-param-label {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.125rem;
-}
-
-.chain-param-menu[open] button {
-  display: block;
-}
-
 .chain-enum-preview {
   grid-column: 1 / -1;
   background: linear-gradient(to right, rgb(86 188 233 / 0.25) var(--enum-mix, 0%), transparent 0);
   padding: 0.125rem 0.25rem;
 }
 
-.chain-source-scope,
 .chain-source-kinds {
   color: var(--muted-text);
   font-size: 0.625rem;
-}
-
-.chain-source-kinds {
   display: flex;
   flex-wrap: wrap;
   gap: 0.2rem;

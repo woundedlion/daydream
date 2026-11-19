@@ -8,7 +8,7 @@ import { LABEL_PATTERN, declarationFromCatalogField as parameterFromField }
   from '../../../generated/shader/shader_workbench.mjs';
 import {createChainHistory} from './chain_document_history.js';
 import {createChainLegality} from './chain_document_legality.js';
-import {changePlanarSource, PLANAR_SOURCE, presetSourceKind, simplifyPlanarSource, sourceFamily} from './chain_planar_source.js';
+import {changePlanarSource, PLANAR_SOURCE, simplifyPlanarSource} from './chain_planar_source.js';
 import {createPresetBankEdits, reconcilePresetEdges} from './chain_preset_bank.js';
 import {createChainDocumentEdits, refusal} from './chain_document_edits.js';
 import { supportedSnapshotSchema } from './shader_deeplink.js';
@@ -190,9 +190,6 @@ export async function createChainDocumentStore({
   }
   /** @type {Map<string, {label: string, parameter: ParameterDeclaration}[]>} */
   const declarationTemplates = new Map();
-  const sourceFamilyVisits = new Set();
-  /** @param {string} label @param {string} presetId @param {string|null} kind */
-  const visitKey = (label, presetId, kind) => JSON.stringify([label, presetId, kind === null ? null : sourceFamily(kind)]);
   for (const entry of doc.descriptor.chain) {
     if (declarationTemplates.has(entry.operator)) continue;
     const prefix = `${entry.label}.`;
@@ -246,7 +243,7 @@ export async function createChainDocumentStore({
   const {budgetReason, spanError, spanLegality, legalSequences} = createChainLegality({
     compiler, budgets, catalog, entryCarrier, exitCarrier, chain, operatorOf});
 
-  const {removeInstances, replaceSpan, relabel, setPresetValues, setValuesInAllPresets,
+  const {removeInstances, replaceSpan, relabel, setPresetValues,
     setPresetValue} = createChainDocumentEdits({state: sessionState, operators,
     declarationTemplates, compiler, chain, operatorOf, labelStem, spanError, budgetReason, commit});
 
@@ -393,7 +390,6 @@ export async function createChainDocumentStore({
     relabel,
     setPresetValue,
     setPresetValues,
-    setValuesInAllPresets,
     /** @returns {Readonly<import('./chain_preset_bank.js').Bank>} */
     presetBankView: () => doc.preset_bank,
     ...createPresetBankEdits({document: () => doc, commit}),
@@ -401,17 +397,11 @@ export async function createChainDocumentStore({
     /** @param {string} label @param {string} presetId @param {string} kind */
     setSourceKind(label, presetId, kind) {
       const candidate = structuredClone(doc);
-      const key = visitKey(label, presetId, kind);
-      const previous = doc.descriptor.chain.find((/** @type {ChainEntry} */ entry) => entry.label === label);
-      const result = changePlanarSource(candidate, label, presetId, kind, operators, sourceFamilyVisits.has(key));
+      const result = changePlanarSource(candidate, label, presetId, kind, operators);
       if (!result.ok || compiler.stableStringify(candidate) === compiler.stableStringify(doc)) return result;
-      const priorKeys = doc.preset_bank.presets.map((/** @type {import('./chain_preset_bank.js').Preset} */ preset) =>
-        visitKey(label, preset.preset_id, presetSourceKind(previous.operator, label, preset.values, operators.get(previous.operator))));
       reconcilePresetEdges(candidate, doc.preset_bank);
       const committed = commit(candidate);
       if (committed.ok) {
-        sourceFamilyVisits.add(key);
-        for (const priorKey of priorKeys) sourceFamilyVisits.add(priorKey);
         const prefix = label + '.';
         declarationTemplates.set(PLANAR_SOURCE, doc.descriptor.parameters
           .filter((/** @type {ParameterDeclaration} */ parameter) => parameter.id.startsWith(prefix))

@@ -64,7 +64,7 @@ test('GridWarp ships one preset and its chain preview can morph edited sources',
   bank.choreography.generated_order.push(to);
   bank.choreography.dwell[to] = bank.choreography.dwell[from];
   const operators = new Map(catalog.operators.map((operator) => [operator.id, operator]));
-  assert.equal(changePlanarSource(preview, sample, to, 'spiral', operators, false).ok, true);
+  assert.equal(changePlanarSource(preview, sample, to, 'spiral', operators).ok, true);
   const edge = {from, to, duration: 8, easing: 'LINEAR', path_policy: 'parallel'};
   bank.edges.push(edge);
   const edited = compileShaderDocument(preview, {catalog});

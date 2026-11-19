@@ -231,11 +231,6 @@ export function createChipElements({
       });
       functionLabel.appendChild(replacement);
       header.appendChild(functionLabel);
-      if (planarEnabled && sourceGroups.has('Spherical sources')) {
-        const scope = el('span', 'chain-source-scope');
-        scope.textContent = 'Spherical sources apply to all presets';
-        header.appendChild(scope);
-      }
       if (entry.operator === PLANAR_SOURCE) {
         const preview = el('span', 'chain-enum-preview');
         preview.hidden = true;

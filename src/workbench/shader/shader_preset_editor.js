@@ -19,17 +19,12 @@ import {enumConstantName} from '../../effects/param_sync.js';
  * getEngine: () => *, getModule: () => *, definitions: () => import('./chain_apply.js').ParameterDefinition[],
  * adopt: (id: string) => void, snap: (id: string) => boolean, choose: (id: string) => void,
  * onEdit: (result: import('./chain_document_store.js').EditResult, id?: string) => void,
- * toInterpreter: () => boolean, announce: (message: string) => void, requestFrame: () => void,
- * writeParameter: (id: string, value: *, all?: boolean) => boolean
+ * toInterpreter: () => boolean, announce: (message: string) => void, requestFrame: () => void
  * }} deps */
 export function createShaderPresetEditor({state, doc, mount, getEngine, getModule,
-  definitions, adopt, snap, choose, onEdit, toInterpreter, announce, requestFrame, writeParameter}) {
+  definitions, adopt, snap, choose, onEdit, toInterpreter, announce, requestFrame}) {
   const store = () => state.chainUi?.store ?? null;
   const preset = () => state.active?.presetId ?? null;
-  /** @type {Set<string>} */
-  const unlocked = new Set();
-  /** @type {{id: string, all: boolean}|null} */
-  let gesture = null;
   /** @type {Record<string, *>} */
   let liveValues = {};
   /** @type {Record<string, import('./chain_param_rows.js').EnumPreview>|null} */
@@ -152,76 +147,10 @@ export function createShaderPresetEditor({state, doc, mount, getEngine, getModul
     }) ?? [], jump,
   }) : null;
 
-  /** @type {Readonly<import('./chain_preset_bank.js').Bank>|null} */
-  let defaultsBank = null;
-  /** @type {Map<string, *>} */
-  let defaults = new Map();
-
-  /** @param {string} id */
-  function valuesFor(id) {
-    const current = store();
-    const active = preset();
-    if (!current || active === null) return null;
-    const bank = current.presetBankView();
-    const {presets, choreography: {generated_order: order}} = bank;
-    if (defaultsBank !== bank) {
-      defaultsBank = bank;
-      defaults = new Map(current.parameterDeclarations().map(({id, default: value}) => [id, value]));
-    }
-    const authored = current.presetValuesView(active);
-    const fallback = defaults.get(id);
-    const previous = order[(order.indexOf(active) + order.length - 1) % order.length];
-    const value = authored?.[id] ?? fallback;
-    const prior = current.presetValuesView(previous)?.[id] ?? fallback;
-    const uniform = presets.every((preset) => (preset.values[id] ?? fallback) === value);
-    return {value, prior, changed: prior !== value, uniform, unlocked: unlocked.has(id)};
-  }
-
-  /** @param {string} id @param {*} value @param {boolean} [all] */
-  function editParameter(id, value, all) {
-    if (transport.inProgress()) transport.stop();
-    const status = valuesFor(id);
-    const current = store();
-    if (all !== undefined) {
-      current?.endValueRun();
-      const result = writeParameter(id, value, all);
-      current?.endValueRun();
-      gesture = null;
-      if (result) {
-        unlocked.delete(id);
-        state.chainUi?.strip.syncParameterValues({[id]: value});
-      }
-      return result;
-    }
-    if (gesture?.id !== id)
-      gesture = {id, all: status?.uniform === true && !status.unlocked};
-    const result = writeParameter(id, value, gesture.all);
-    if (result) unlocked.delete(id);
-    else gesture = null;
-    return result;
-  }
-
   return {
     transport,
-    editParameter,
+    stopPreviewForEdit: () => { if (transport.inProgress()) transport.stop(); },
     render: () => rail?.render(),
-    endGesture: () => { gesture = null; },
-    reset() { transport.clear(); unlocked.clear(); gesture = null; },
-    rows: {
-      status: valuesFor,
-      beforeEdit: () => { if (transport.inProgress()) transport.stop(); },
-      /** @param {string} id */
-      lock(id) {
-        const status = valuesFor(id);
-        if (!status) return;
-        if (status.uniform && !status.unlocked) unlocked.add(id);
-        else if (status.uniform) unlocked.delete(id);
-        else editParameter(id, status.value, true);
-      },
-      /** @param {string} id */
-      applyAll: (id) => { const status = valuesFor(id); if (status) editParameter(id, status.value, true); },
-      /** @param {string} id */
-      copyPrevious: (id) => { const status = valuesFor(id); if (status) editParameter(id, status.prior, false); },
-    },
+    reset: transport.clear,
   };
 }

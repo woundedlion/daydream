@@ -181,8 +181,8 @@ export function simplifyPlanarSource(candidate, label, operators) {
 }
 
 /** @param {*} candidate @param {string} label @param {string} presetId @param {string} kind
- * @param {Map<string, CatalogOperator>} operators @param {boolean} visited @returns {EditResult} */
-export function changePlanarSource(candidate, label, presetId, kind, operators, visited) {
+ * @param {Map<string, CatalogOperator>} operators @returns {EditResult} */
+export function changePlanarSource(candidate, label, presetId, kind, operators) {
   const entry = candidate.descriptor.chain.find((/** @type {*} */ slot) => slot.label === label);
   const planar = operators.get(PLANAR_SOURCE);
   const selector = planar?.params.find((field) => field.id === 'source');
@@ -202,14 +202,7 @@ export function changePlanarSource(candidate, label, presetId, kind, operators, 
   const prefix = label + '.';
   const family = sourceFamily(kind);
   if (previous === null || sourceFamily(previous) !== family) {
-    const order = bank.choreography.generated_order;
-    const index = order.indexOf(presetId);
-    const references = [...order.slice(0, index).reverse(), ...order.slice(index + 1)];
-    const donor = references.map((id) => bank.presets.find((entry) => entry.preset_id === id))
-      .find((entry) => entry && sourceFamily(String(entry.values[prefix + 'source'])) === family);
     const fields = planar.params.filter((field) => field.id.startsWith(family + '-'));
-    const stored = visited || fields.some((field) => preset.values[prefix + field.id] !== undefined
-      && preset.values[prefix + field.id] !== field.default);
     for (const field of fields) {
       const id = prefix + field.id;
       if (!candidate.descriptor.parameters.some((/** @type {ParameterDeclaration} */ parameter) => parameter.id === id)) {
@@ -221,7 +214,6 @@ export function changePlanarSource(candidate, label, presetId, kind, operators, 
         }
         for (const preset of bank.presets) preset.values[id] = declaration.default;
       }
-      if (!stored) preset.values[id] = donor?.values[id] ?? field.default;
     }
   }
   preset.values[prefix + 'source'] = kind;

@@ -259,17 +259,11 @@ function relabel(context, oldLabel, newLabel) {
  * @returns {EditResult} The outcome; a refusal leaves the store untouched.
  */
 function setPresetValues(context, presetId, values, admit = null) {
-  return writePresetValues(context, presetId, values, admit);
-}
-
-/** @param {EditContext} context @param {string|null} presetId @param {Record<string, *>} values
- * @param {(() => EditResult)|null} admit @returns {EditResult} */
-function writePresetValues(context, presetId, values, admit) {
   const {state, chain, operatorOf, commit} = context;
   const candidate = structuredClone(state.doc);
-  const presets = presetId === null ? candidate.preset_bank.presets : candidate.preset_bank.presets.filter(
+  const preset = candidate.preset_bank.presets.find(
     (/** @type {{preset_id: string}} */ preset) => preset.preset_id === presetId);
-  if (presets.length === 0)
+  if (!preset)
     return refusal('UNKNOWN_PRESET', '$.preset_bank.presets',
       'the preset bank carries no preset "' + presetId + '"');
   for (const [parameterId, value] of Object.entries(values)) {
@@ -283,7 +277,7 @@ function writePresetValues(context, presetId, values, admit) {
           'the catalog carries no parameter "' + parameterId + '" for this chain');
       addParameter(candidate, parameterFromField(entry.label, field, entry.operator));
     }
-    for (const preset of presets) preset.values[parameterId] = value;
+    preset.values[parameterId] = value;
   }
   return commit(candidate, JSON.stringify([presetId, Object.keys(values).sort()]), admit);
 }
@@ -301,7 +295,6 @@ function setPresetValue(context, presetId, parameterId, value, admit = null) {
 export function createChainDocumentEdits(context) {
   return {
     removeInstances,
-    setValuesInAllPresets: (/** @type {Record<string, *>} */ values, /** @type {(() => EditResult)|null} */ admit = null) => writePresetValues(context, null, values, admit),
     replaceSpan: (/** @type {number} */ start, /** @type {number} */ deleteCount, /** @type {ChainEdit[]} */ sequence) => replaceSpan(context, start, deleteCount, sequence),
     relabel: (/** @type {string} */ oldLabel, /** @type {string} */ newLabel) => relabel(context, oldLabel, newLabel),
     setPresetValues: (/** @type {string} */ presetId, /** @type {Record<string, *>} */ values, /** @type {(() => EditResult)|null} */ admit = null) => setPresetValues(context, presetId, values, admit),

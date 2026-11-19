@@ -121,11 +121,11 @@ export function createPresetBankEdits({document, commit}) {
       Object.assign(edge, settings);
       return commit(candidate);
     },
-    /** @param {string} id @param {number} value @param {boolean} [all] */
-    setPresetDwell: (id, value, all = false) => edit(id, (bank) => {
+    /** @param {string} id @param {number} value */
+    setPresetDwell: (id, value) => edit(id, (bank) => {
       const {generated_order: order, dwell} = bank.choreography;
       bank.choreography.dwell = Object.fromEntries(order.map((key) => [
-        key, all || key === id ? value : (dwell?.[key] ?? DEFAULT_PRESET_DWELL),
+        key, key === id ? value : (dwell?.[key] ?? DEFAULT_PRESET_DWELL),
       ]));
     }),
   };

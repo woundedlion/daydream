@@ -36,7 +36,6 @@ export function createPresetRail({doc, mount, store, preset, choose, edit, trans
   let openEdge = null;
   /** @type {string|null} */
   let dragged = null;
-  let dwellUnlocked = false;
 
   /** @param {string} text @param {() => void} action @param {string} [label] */
   function button(text, action, label = text) {
@@ -145,26 +144,15 @@ export function createPresetRail({doc, mount, store, preset, choose, edit, trans
 
     const dwell = bank.choreography.dwell;
     const frames = dwell?.[active] ?? DEFAULT_PRESET_DWELL;
-    const uniform = dwell !== undefined && order.every((id) => dwell[id] === frames);
     const timing = doc.createElement('div');
     timing.className = 'shader-preset-timing';
     timing.id = 'shader-preset-dwell';
     timing.tabIndex = -1;
-    const locked = uniform && !dwellUnlocked;
-    const dwellInput = frameCount(frames, 'Dwell frames', (value) => {
-      dwellUnlocked = false;
-      edit(current.setPresetDwell(active, value, locked));
-    });
-    const lock = button(locked ? 'Locked' : 'Lock dwell', () => {
-      if (uniform) {
-        dwellUnlocked = !dwellUnlocked;
-        render();
-      } else edit(current.setPresetDwell(active, frames, true));
-    }, 'Same dwell in every preset');
-    lock.setAttribute('aria-pressed', String(locked));
+    const dwellInput = frameCount(frames, 'Dwell frames',
+      (value) => edit(current.setPresetDwell(active, value)));
     const seconds = doc.createElement('span');
     seconds.textContent = (frames / FPS).toFixed(2).replace(/\.?0+$/, '') + ' s';
-    timing.append(labelled('Dwell frames', dwellInput), seconds, lock);
+    timing.append(labelled('Dwell frames', dwellInput), seconds);
 
     const track = doc.createElement('div');
     track.className = 'shader-preset-track';

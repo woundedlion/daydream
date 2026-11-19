@@ -293,10 +293,9 @@ export function createShaderStageEditor({state, linkWriter, parameterLive, getEn
    * the source of truth and the engine write is its side effect.
    * @param {string} parameterId - The edited parameter's id.
    * @param {*} value - The document value: a number, or an enum8 option id.
-   * @param {boolean} [all] - Whether to write this edit into every preset.
    * @returns {boolean}
    */
-  const writeStageEdit = (parameterId, value, all = false) => {
+  const writeStageEdit = (parameterId, value) => {
     if (!parameterLive(parameterId)) return false;
     try {
       if (state.chainUi === null || state.active === null || state.active.presetId === null) return false;
@@ -313,8 +312,7 @@ export function createShaderStageEditor({state, linkWriter, parameterLive, getEn
       const admit = () => admitStageValues({parameterId, value, values, presetValues, descriptor,
         compiledSide, addsDeclaration, coupled,
         onCompiledWrites: () => { compiledWritesStarted = true; }});
-      const result = all ? store.setValuesInAllPresets(values, admit)
-        : store.setPresetValues(presetId, values, admit);
+      const result = store.setPresetValues(presetId, values, admit);
       if (!result.ok) {
         const diagnostic = result.diagnostics[0];
         if (compiledSide && compiledWritesStarted && diagnostic.code === 'ENGINE_REFUSAL')

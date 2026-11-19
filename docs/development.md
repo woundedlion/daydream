@@ -67,7 +67,9 @@ source in one undoable edit. The strip hides the skipped Plane band and
 Projection selector. Choosing a planar route restores its projection and source
 with catalog defaults; undo restores the previous route and its authored values.
 Within a planar route, filling the Source socket with a different kind updates
-the active preset. The preset rail edits order, dwell and transitions. Next plays
+the active preset. Parameter and dwell edits write to the selected preset.
+Adding a preset inserts a copy after the selected one. The preset rail edits
+order, dwell and transitions. Next plays
 one edge, Show loops the rail and the scrubber previews an edge frame.
 An interpreter morph sends the two authored source endpoints with each frame's
 parameter writes. The source blends their sampled fields at column time. A scrub
