@@ -131,9 +131,15 @@ test('a planar upgrade preserves installed values and a simplify restores the le
   assert.equal(store.presetValuesView(first)['paint.spiral-pattern-freq'], 4);
   assert.equal(store.setSourceKind('paint', first, 'grid').ok, true);
   assert.equal(store.setSourceKind('paint', second, 'grid').ok, true);
+  const retained = compileShaderDocument(store.exportDocument(), {catalog});
+  assert.equal(retained.document.descriptor.chain.find((entry) => entry.label === 'paint').operator, 'sample.planar.v1');
+  assert.equal(store.simplifySource('paint').ok, false);
+  assert.equal(store.setPresetValue(second, 'paint.grid-pattern-freq', 2).ok, true);
+  const identical = await createChainDocumentStore({document: original.document, catalog});
+  assert.equal(identical.setPresetValue(second, 'paint.pattern-freq', 2).ok, true);
   const exported = compileShaderDocument(store.exportDocument(), {catalog});
   assert.equal(exported.descriptor_digest, original.descriptor_digest);
-  assert.equal(exported.preset_bank_digest, original.preset_bank_digest);
+  assert.equal(exported.preset_bank_digest, identical.compile().preset_bank_digest);
   assert.equal(store.simplifySource('paint').ok, true);
   assert.equal(store.undo(), true);
   assert.equal(store.presetValuesView(first)['paint.spiral-pattern-freq'], 4);

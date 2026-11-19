@@ -424,7 +424,7 @@ export async function createChainDocumentStore({
     simplifySource(label) {
       const candidate = structuredClone(doc);
       if (!simplifyPlanarSource(candidate, label, operators))
-        return refusal('MIXED_PLANAR_SOURCE', '$.descriptor.chain', 'Select the same source in every preset first.');
+        return refusal('MIXED_PLANAR_SOURCE', '$.descriptor.chain', 'Simplifying requires one source kind and matching source settings across each transition.');
       reconcilePresetEdges(candidate, doc.preset_bank);
       return commit(candidate);
     },

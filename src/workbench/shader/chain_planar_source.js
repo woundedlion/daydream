@@ -4,7 +4,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-import {declarationFromCatalogField, PLANAR_SOURCE_OPERATOR as PLANAR_SOURCE, planarSourceFamily as sourceFamily}
+import {declarationFromCatalogField, isCatalogFieldLive, PLANAR_SOURCE_OPERATOR as PLANAR_SOURCE, planarSourceFamily as sourceFamily}
   from '../../../generated/shader/shader_workbench.mjs';
 import {refusal} from './chain_document_edits.js';
 
@@ -143,8 +143,20 @@ export function simplifyPlanarSource(candidate, label, operators) {
   if (kind === null || !bank.presets.every((preset) =>
     presetSourceKind(entry.operator, label, preset.values) === kind)) return false;
   const family = /** @type {string} */ (sourceFamily(kind));
+  const planar = operators.get(PLANAR_SOURCE);
   const legacy = operators.get(legacyOperator(family));
-  if (!legacy) return false;
+  if (!planar || !legacy) return false;
+  const fields = planar.params.filter((field) => field.id.startsWith(family + '-'));
+  const presets = new Map(bank.presets.map((preset) => [preset.preset_id, preset.values]));
+  for (const edge of bank.edges) {
+    const from = presets.get(edge.from);
+    const to = presets.get(edge.to);
+    if (from && to && fields.some((field) => {
+      const id = prefix + field.id;
+      return (from[id] ?? field.default) !== (to[id] ?? field.default)
+        && (isCatalogFieldLive(entry, field, from) || isCatalogFieldLive(entry, field, to));
+    })) return false;
+  }
   const compound = compoundValues(kind);
   const selector = candidate.descriptor.parameters.find((/** @type {ParameterDeclaration} */ parameter) =>
     parameter.id === prefix + 'source');
