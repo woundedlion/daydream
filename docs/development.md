@@ -44,15 +44,18 @@ expire when the effect or geometry is replaced or the engine/module is destroyed
 
 `getSnapshot()` and `restoreSnapshot()` carry the ordered instance/operator chain,
 accepted named parameters, typed per-instance runtime, palette state and animation
-pause. Workbench links use `#shader=v2` with their document and typed snapshot.
-URL persistence stores the snapshot in `fx.__chainSnapshot`;
+pause. Workbench links use `#shader=v3` with their document and typed snapshot.
+The reader also accepts `#shader=v2` links. URL persistence stores the snapshot
+in `fx.__chainSnapshot`;
 resolution rollback and segment-worker initialization use the same snapshot. Worker
 protocol carries `chainSnapshot`.
 
-Snapshot schema version 5 requires `chain: [{instance, operator}]`,
+Snapshot schema version 6 requires `chain: [{instance, operator}]`,
 `parameters: [{name, value}]`, `animationsPaused` (boolean), and
 `modulation: [{instance, recipe}]`, with one recipe per `color.modulate.v1`
 instance. Modulation fields travel in `modulation`, not `parameters`.
+The reader also accepts version 5 snapshots. Planar sources store separate Grid,
+Twin Wave and projected-noise clocks in the `planar-source-clock-v1` runtime entry.
 The Color carrier container follows the permanent Palette card and presents modulation
 stages with add, remove, enable and header drag controls. Clicking a stage
 opens or closes its parameter panel; dragging its header reorders it within Color.
@@ -63,13 +66,17 @@ carrier. A spherical source replaces the projection, planar warps and planar
 source in one undoable edit. The strip hides the skipped Plane band and
 Projection selector. Choosing a planar route restores its projection and source
 with catalog defaults; undo restores the previous route and its authored values.
+Within a planar route, filling the Source socket with a different kind updates
+the active preset. The preset rail edits order, dwell and transitions. Next plays
+one edge, Show loops the rail and the scrubber previews an edge frame.
 Numeric controls follow each declaration's interpolation kind. `LOG_POSITIVE`
 sliders use logarithmic positions and multiplicative arrow nudges; their numeric
 readouts and accessible value text show parameter values. Live admission limits
 bound both representations without replacing the controls.
-Declaring a new parameter while previewing the compiled build returns the preview
-to the interpreter and disarms parity. A slider keeps its mounted control through
-the drag; its parameter panel refreshes on commit.
+Parity requires the compiled descriptor and preset-bank digests to match.
+An edit that changes either digest returns the preview to the interpreter and
+disarms parity. A slider keeps its mounted control through the drag and refreshes
+its parameter panel on commit.
 Each layer owns its recipe and source clock; displacement is one of the available
 sources. The Palette header selects the palette family; mapping, brightness
 and opacity belong to its parameter panel. Legacy embedded hue shift
