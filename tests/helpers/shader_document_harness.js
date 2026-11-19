@@ -364,7 +364,7 @@ function compiledBuildEngine(source = CHAIN_STUDY) {
  * FakeChainEngine, with the workbench mounts present and the chain study loaded over
  * the scratch document the page opens on.
  * @param {{source?: string|null, patternCatalog?: string, hash?: string, search?: string, initialEffect?: string|null,
- *   paused?: boolean, pausedFromEngine?: boolean, selectEffect?: () => boolean,
+ *   paused?: boolean, pausedFromEngine?: boolean, selectEffect?: () => boolean, withPresetRail?: boolean,
  *   onOriginalLinkReleased?: () => void, prepare?: (engine: FakeChainEngine) => void,
  *   sourceFiles?: Record<string, string>, engineCatalog?: string,
  *   importCompiler?: () => Promise<typeof import("../../generated/shader/shader_workbench.mjs")>}} [seams] - source null
@@ -378,6 +378,7 @@ async function editorWorkbench({
   selectEffect = () => true,
   onOriginalLinkReleased = () => {},
   pausedFromEngine = false,
+  withPresetRail = false,
   prepare = () => {},
   importCompiler = () => import('../../generated/shader/shader_workbench.mjs'),
 } = {}) {
@@ -403,6 +404,7 @@ async function editorWorkbench({
   let current = engine;
   const elements = workbenchMounts();
   elements.set('chain-strip', fakeElement('section'));
+  if (withPresetRail) elements.set('shader-preset-rail', fakeElement('section'));
   const doc = installDocument({
     body: fakeElement('body'),
     activeElement: null,
