@@ -366,10 +366,10 @@ function compiledBuildEngine(source = CHAIN_STUDY) {
  * @param {{source?: string|null, patternCatalog?: string, hash?: string, search?: string, initialEffect?: string|null,
  *   paused?: boolean, pausedFromEngine?: boolean, selectEffect?: () => boolean, withPresetRail?: boolean,
  *   onOriginalLinkReleased?: () => void, prepare?: (engine: FakeChainEngine) => void,
- *   sourceFiles?: Record<string, string>, engineCatalog?: string,
+ *   sourceFiles?: Record<string, string>, engineCatalog?: string, copyText?: (text: string) => Promise<boolean>,
  *   importCompiler?: () => Promise<typeof import("../../generated/shader/shader_workbench.mjs")>}} [seams] - source null
  *   leaves the scratch document loaded; pausedFromEngine reads the pause seam off the chain engine; prepare
- *   alters the engine before the controller starts.
+ *   alters the engine before the controller starts. copyText replaces the recording clipboard.
  * @returns {Promise<Object>} The controller and everything it wrote to.
  */
 async function editorWorkbench({
