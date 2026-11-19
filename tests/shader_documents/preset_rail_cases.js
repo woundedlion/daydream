@@ -81,14 +81,24 @@ test('the rail writes live preview frames and editing a slider snaps to its acti
   document.preset_bank.presets.find((preset) => preset.preset_id === to).values['camera.wander'] = 0.5;
 
   const frames = [];
+  const morphs = [];
   const harness = await editorWorkbench({source: JSON.stringify(document), withPresetRail: true,
+    async importCompiler() {
+      const compiler = await import('../../generated/shader/shader_workbench.mjs');
+      return {...compiler, evaluateTransition(...args) {
+        const frame = compiler.evaluateTransition(...args);
+        return {...frame, sourceMorph: {instance: 'sample', evaluation: frame.evaluation, duration: frame.duration,
+          easing: 'LINEAR', from: {'sample.pattern-freq': 1}, to: {'sample.pattern-freq': 2}}};
+      }};
+    },
     prepare(engine) {
       const getBindings = engine.getShaderChainBindings.bind(engine);
       engine.getShaderChainBindings = () => {
         const binding = getBindings();
         if (binding) {
-          binding.setShaderChainTransitionParameters = (writes) => {
+          binding.setShaderChainSourceMorphParameters = (writes, morph) => {
             frames.push(writes.find(({name}) => name === 'camera.wander').value);
+            morphs.push(morph);
             return ParamSetResult.APPLIED;
           };
         }
@@ -100,6 +110,8 @@ test('the rail writes live preview frames and editing a slider snaps to its acti
   click(rail, 'Next');
   harness.controller.stepPreview();
   assert.deepEqual(frames, [0.125]);
+  assert.deepEqual(morphs, [{instance: 'sample', evaluation: 1, duration: 4, easing: 'LINEAR',
+    from: {'sample.pattern-freq': 1}, to: {'sample.pattern-freq': 2}}]);
   assert.equal(progress(), '25%');
   assert.equal(Number(displayedParameter(harness, 'camera', 'camera.wander')), 0.125);
   assert.equal(harness.animationsPaused(), false);
@@ -111,6 +123,7 @@ test('the rail writes live preview frames and editing a slider snaps to its acti
   harness.controller.stepPreview();
   harness.controller.stepPreview();
   assert.deepEqual(frames, [0.125, 0.375]);
+  assert.deepEqual(morphs[1], {...morphs[0], evaluation: 3, snap: true});
   assert.equal(progress(), '75%');
 
   stageEditor(harness, 'camera')('camera.wander', 0.625);

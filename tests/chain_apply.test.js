@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyChainDocument, resolveParameterWrite } from '../src/workbench/shader/chain_apply.js';
+import { applyChainDocument, resolveParameterWrite, writeChainParameters } from '../src/workbench/shader/chain_apply.js';
 
 import {
   FakeChainEngine, ParamSetResult,
@@ -39,6 +39,35 @@ test('parameter writes refuse sparse numeric gaps', () => {
 });
 
 const MODULE = { ParamSetResult };
+
+test('source morph writes encode both authored endpoint maps in the atomic preview batch', () => {
+  let batch;
+  const engine = {getShaderChainBindings: () => ({
+    setShaderChainSourceMorphParameters(writes, morph) {
+      batch = {writes, morph};
+      return ParamSetResult.APPLIED;
+    },
+    delete() {},
+  })};
+  const sourceMorph = {instance: 'sample', evaluation: 2, duration: 8, easing: 'LINEAR',
+    from: {'sample.mode': 'Six', 'sample.scale': 1},
+    to: {'sample.mode': 'Six', 'sample.scale': 8}};
+  const definitions = [{name: 'sample.mode', options: ['One', 'Six'], optionValues: [1, 6]},
+    {name: 'sample.scale'}, {name: 'camera.wander'}];
+  const entries = [['sample.scale', 2], ['camera.wander', 0.5]];
+  assert.deepEqual(writeChainParameters(engine, MODULE, definitions, entries, {transition: true, sourceMorph, seek: true}),
+    {refusal: null, code: null});
+  assert.deepEqual(batch, {
+    writes: [{name: 'sample.scale', value: 2}, {name: 'camera.wander', value: 0.5}],
+    morph: {...sourceMorph, from: {'sample.mode': 6, 'sample.scale': 1},
+      to: {'sample.mode': 6, 'sample.scale': 8}, snap: true},
+  });
+  batch = undefined;
+  const invalid = {...sourceMorph, to: {'sample.mode': 'Missing'}};
+  assert.match(writeChainParameters(engine, MODULE, definitions, entries, {transition: true, sourceMorph: invalid}).refusal,
+    /has no option "Missing"/);
+  assert.equal(batch, undefined);
+});
 
 const CHAIN = [
   { label: 'camera', operator: 'sphere.rotate.v2' },

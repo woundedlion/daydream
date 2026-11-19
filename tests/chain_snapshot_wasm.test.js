@@ -59,9 +59,12 @@ test('GridWarp plays its authored edge on both wasm preview paths', () => {
   const names = promotedControlNames(wanderId, descriptor, catalog);
   const frameCount = edge.duration;
   const frames = Array.from({length: frameCount}, (_, index) =>
-    evaluateTransition(descriptor, bank, from, to, index + 1, catalog).values);
-  assert.notEqual(frames[0][kindId].from, frames[0][kindId].to);
-  assert.ok(frames[0][kindId].mix > 0 && frames[0][kindId].mix < 1);
+    evaluateTransition(descriptor, bank, from, to, index + 1, catalog));
+  const kind = frames[0].values[kindId];
+  assert.notEqual(kind.from, kind.to);
+  assert.ok(kind.mix > 0 && kind.mix < 1);
+  assert.equal(frames[0].sourceMorph.from[kindId], kind.from);
+  assert.equal(frames[0].sourceMorph.to[kindId], kind.to);
 
   engine.setResolution(96, 20);
   assert.equal(engine.setEffect('grid-warp'), module.EffectSetResult.INSTALLED);
@@ -70,7 +73,7 @@ test('GridWarp plays its authored edge on both wasm preview paths', () => {
   assert.equal(engine.startPresetTransition(0, 1), true);
   const compiledWander = engine.getParameterDefinitions().findIndex(({name}) => names.includes(name));
   assert.ok(compiledWander >= 0);
-  for (const [index, values] of frames.entries()) {
+  for (const [index, {values}] of frames.entries()) {
     engine.drawFrame();
     assert.ok(Math.abs(engine.getParamValues()[compiledWander] - values[wanderId]) < 2e-6,
       'compiled wander at frame ' + (index + 1));
@@ -84,14 +87,55 @@ test('GridWarp plays its authored edge on both wasm preview paths', () => {
   const definitions = engine.getParameterDefinitions();
   const wander = definitions.findIndex(({name}) => name === wanderId);
   assert.ok(wander >= 0);
-  for (const [index, values] of frames.entries()) {
-    const written = writeChainParameters(engine, module, definitions, Object.entries(values), true);
+  for (const [index, {values, sourceMorph}] of frames.entries()) {
+    const written = writeChainParameters(engine, module, definitions, Object.entries(values), {transition: true, sourceMorph});
     assert.deepEqual(written, {refusal: null, code: null}, 'interpreter admission at frame ' + (index + 1));
     engine.drawFrame();
     assert.equal(engine.getAnimationsPaused(), false, 'interpreter playback keeps clocks running');
     assert.equal(engine.getParamValues()[wander], Math.fround(values[wanderId]));
   }
   assert.ok(engine.getPixels().some((channel) => channel !== 0));
+});
+
+test('a same-kind tessellation scrub renders the authored endpoint fields', () => {
+  const source = readFileSync(new URL('../generated/shader/patterns/river_stones.shader.json', import.meta.url), 'utf8');
+  const compiled = compileShaderDocument(source, {catalog});
+  assert.equal(compiled.status, 'VALID');
+  const {descriptor, preset_bank: authored} = compiled.document;
+  const from = authored.presets[0];
+  const to = {
+    ...from, preset_id: 'preview-endpoint', values: {
+      ...from.values, 'sample.cell-scale': 4.75, 'sample.cell-softness': 0.32,
+    },
+  };
+  const bank = {
+    ...authored, presets: [from, to], edges: [{
+      from: from.preset_id, to: to.preset_id, duration: 8, easing: 'LINEAR',
+      path_policy: descriptor.path_policies.find(({kind}) => kind === 'PARALLEL').id,
+    }],
+  };
+  const {values, sourceMorph} = evaluateTransition(descriptor, bank, from.preset_id, to.preset_id, 4, catalog);
+  assert.equal(sourceMorph.from['sample.cell-scale'], from.values['sample.cell-scale']);
+  assert.equal(sourceMorph.to['sample.cell-scale'], to.values['sample.cell-scale']);
+  assert.equal(sourceMorph.to['sample.cell-softness'], to.values['sample.cell-softness']);
+
+  engine.setResolution(96, 20);
+  assert.equal(engine.setEffect('shader-chain'), module.EffectSetResult.INSTALLED);
+  assert.equal(applyChainDocument({engine, module, compiled, presetId: from.preset_id,
+    syncEffectGui: () => {}, invalidate: () => {}}), null);
+  const origin = capture();
+  const draw = (morph) => {
+    assert.equal(restore(origin), module.ChainSnapshotRestoreResult.APPLIED);
+    const result = writeChainParameters(engine, module, engine.getParameterDefinitions(),
+      Object.entries(values), {transition: true, sourceMorph: morph, seek: true});
+    assert.deepEqual(result, {refusal: null, code: null});
+    engine.drawFrame();
+    return Uint16Array.from(engine.getPixels());
+  };
+  const interpolatedControls = draw(undefined);
+  const sampledFields = draw(sourceMorph);
+  assert.ok(sampledFields.some((channel) => channel !== 0));
+  assert.notDeepEqual(sampledFields, interpolatedControls);
 });
 
 test('Ash Cloud applies its real compiled controls and validates unregistered readonly fields', () => {

@@ -50,7 +50,7 @@ export function createShaderPresetEditor({state, doc, mount, getEngine, getModul
       if (!current || !state.active) return false;
       if (seek && state.active.compiledSide && !toInterpreter()) return false;
       const document = current.compile().document;
-      const {values} = state.compiler.evaluateTransition(document.descriptor, document.preset_bank,
+      const {values, sourceMorph} = state.compiler.evaluateTransition(document.descriptor, document.preset_bank,
         edge.from, edge.to, frame, state.operatorCatalog);
       if (!state.active.compiledSide) {
         const engine = getEngine();
@@ -58,7 +58,11 @@ export function createShaderPresetEditor({state, doc, mount, getEngine, getModul
         if (!engine || !module) return false;
         const bypassed = new Set(current.bypassedLabels());
         const entries = Object.entries(values).filter(([id]) => !bypassed.has(labelOf(id)));
-        const written = writeChainParameters(engine, module, definitions(), entries, true);
+        const written = writeChainParameters(engine, module, definitions(), entries, {
+          transition: true,
+          sourceMorph: sourceMorph && !bypassed.has(sourceMorph.instance) ? sourceMorph : undefined,
+          seek,
+        });
         if (written.refusal !== null || written.code !== null) {
           announce(written.refusal ?? ('The engine refused this frame (' + enumConstantName(module.ParamSetResult, written.code) + ').'));
           return false;

@@ -10,6 +10,7 @@ import { labelOf } from './chain_presentation.js';
 
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[], optionValues?: number[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string, preset_bank_digest?: string, diagnostics?: import('./chain_document_store.js').Diagnostic[], status?: string}} CompiledDocument */
+/** @typedef {import('../../../generated/shader/shader_workbench.mjs').SourceMorph} SourceMorph */
 
 /**
  * @param {ParameterDefinition[]} definitions
@@ -34,15 +35,31 @@ export function resolveParameterWrite(definitions, name, value) {
 }
 
 /**
+ * @param {ParameterDefinition[]} definitions - Active parameter definitions.
+ * @param {SourceMorph['from']} values - Authored endpoint values.
+ * @returns {Record<string, number>|string} The encoded endpoint or a refusal.
+ */
+function resolveSourceEndpoint(definitions, values) {
+  /** @type {Array<[string, number]>} */
+  const entries = [];
+  for (const [id, value] of Object.entries(values)) {
+    const resolved = resolveParameterWrite(definitions, id, value);
+    if (typeof resolved === 'string') return resolved;
+    entries.push([resolved.name, resolved.stored]);
+  }
+  return Object.fromEntries(entries);
+}
+
+/**
  * Resolves and atomically admits a batch of chain parameter values.
  * @param {*} engine - Active engine.
  * @param {*} module - Engine module and admission codes.
  * @param {ParameterDefinition[]} definitions - Active parameter definitions.
  * @param {Array<[string, *]>} entries - Parameter ids and authored values.
- * @param {boolean} [transition] - A live transition frame.
+ * @param {{transition?: boolean, sourceMorph?: SourceMorph, seek?: boolean}} [options] - Preview writes and their source endpoints.
  * @returns {{refusal: string|null, code: number|null}} Resolution refusal, admission failure, or success.
  */
-export function writeChainParameters(engine, module, definitions, entries, transition = false) {
+export function writeChainParameters(engine, module, definitions, entries, {transition = false, sourceMorph, seek = false} = {}) {
   const writes = [];
   for (const [id, value] of entries) {
     if (transition && value !== null && typeof value === 'object') {
@@ -57,8 +74,18 @@ export function writeChainParameters(engine, module, definitions, entries, trans
       writes.push({name: write.name, value: write.stored});
     }
   }
-  const method = transition ? 'setShaderChainTransitionParameters' : 'setShaderChainParameters';
-  const code = callWorkbenchBinding(engine, method, [writes], module.ParamSetResult.NO_EFFECT);
+  let method = transition ? 'setShaderChainTransitionParameters' : 'setShaderChainParameters';
+  /** @type {unknown[]} */
+  const args = [writes];
+  if (sourceMorph) {
+    const from = resolveSourceEndpoint(definitions, sourceMorph.from);
+    if (typeof from === 'string') return {refusal: from, code: null};
+    const to = resolveSourceEndpoint(definitions, sourceMorph.to);
+    if (typeof to === 'string') return {refusal: to, code: null};
+    method = 'setShaderChainSourceMorphParameters';
+    args.push({ ...sourceMorph, from, to, ...(seek ? {snap: true} : {}) });
+  }
+  const code = callWorkbenchBinding(engine, method, args, module.ParamSetResult.NO_EFFECT);
   return {refusal: null, code: code === module.ParamSetResult.APPLIED ? null : code};
 }
 

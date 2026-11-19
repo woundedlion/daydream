@@ -10,3 +10,19 @@ export function isCatalogFieldLive(slot: {label: string; operator: string}, fiel
 export function isUnusedPlanarParameter(descriptor: object, presets: Array<{values: Record<string, unknown>}>, parameterId: string): boolean;
 export const PLANAR_SOURCE_OPERATOR: 'sample.planar.v1';
 export function planarSourceFamily(kind: string): string|null;
+export type SourceMorph = {
+  instance: string;
+  from: Record<string, number|string>;
+  to: Record<string, number|string>;
+  evaluation: number;
+  duration: number;
+  easing: string;
+};
+export function evaluateTransition(descriptor: object, bank: object, fromId: string, toId: string, evaluation: number, catalog?: object): {
+  evaluation: number;
+  duration: number;
+  raw_progress: number;
+  eased_progress: number;
+  values: Record<string, number|string|{from: string; to: string; mix: number}>;
+  sourceMorph?: SourceMorph;
+};

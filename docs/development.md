@@ -69,6 +69,10 @@ with catalog defaults; undo restores the previous route and its authored values.
 Within a planar route, filling the Source socket with a different kind updates
 the active preset. The preset rail edits order, dwell and transitions. Next plays
 one edge, Show loops the rail and the scrubber previews an edge frame.
+An interpreter morph sends the two authored source endpoints with each frame's
+parameter writes. The source blends their sampled fields at column time. A scrub
+uses the requested morph position across the frame, and live slider readouts
+still show the evaluated parameter values.
 Numeric controls follow each declaration's interpolation kind. `LOG_POSITIVE`
 sliders use logarithmic positions and multiplicative arrow nudges; their numeric
 readouts and accessible value text show parameter values. Live admission limits
