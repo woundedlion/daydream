@@ -3,11 +3,12 @@ import {after, test} from 'node:test';
 import createModule from '../generated/holosphere_wasm.js';
 import {callWorkbenchBinding} from '../src/engine/workbench_bindings.js';
 import {readFileSync} from 'node:fs';
-import {bakedTopologyFields, compileShaderDocument, documentModulationBinding, evaluateTransition, fixedDerivedBinding, promotedControlNames} from '../generated/shader/shader_workbench.mjs';
+import {bakedTopologyFields, compileShaderDocument, documentModulationBinding, evaluateTransition, fixedDerivedBinding} from '../generated/shader/shader_workbench.mjs';
 import {documentFromChainSnapshot, scratchChainDocument} from '../src/workbench/shader/chain_document_store.js';
 import {applyChainDocument, writeChainParameters} from '../src/workbench/shader/chain_apply.js';
 import {applyFixedShaderDocument} from '../src/workbench/shader/shader_documents.js';
 import {currentChainSnapshot} from './helpers/chain_snapshot.js';
+import {changePlanarSource} from '../src/workbench/shader/chain_planar_source.js';
 import {CHAIN_SNAPSHOT_SCHEMA_VERSION} from '../src/workbench/shader/shader_deeplink.js';
 
 const catalog = JSON.parse(readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
@@ -46,17 +47,28 @@ test('every catalog document preset applies to its compiled engine', () => {
   assert.ok(applied > 0);
 });
 
-test('GridWarp plays its authored edge on both wasm preview paths', () => {
+test('GridWarp ships one preset and its chain preview can morph edited sources', () => {
   const source = readFileSync(new URL('../generated/shader/patterns/grid_warp.shader.json', import.meta.url), 'utf8');
   const compiled = compileShaderDocument(source, {catalog});
   assert.equal(compiled.status, 'VALID');
-  const {descriptor, preset_bank: bank} = compiled.document;
-  const [from, to] = bank.choreography.generated_order;
-  const edge = bank.edges.find((entry) => entry.from === from && entry.to === to);
-  assert.ok(edge);
-  const kindId = descriptor.chain.find(({operator}) => operator === 'sample.planar.v1').label + '.source';
+  const {preset_bank: authored} = compiled.document;
+  const preview = structuredClone(compiled.document);
+  const {descriptor, preset_bank: bank} = preview;
+  const [origin] = bank.presets;
+  const from = origin.preset_id;
+  const to = 'preview-spiral';
+  const sample = descriptor.chain.find(({operator}) => operator === 'sample.grid.v4').label;
+  const kindId = sample + '.source';
   const wanderId = 'camera.wander';
-  const names = promotedControlNames(wanderId, descriptor, catalog);
+  bank.presets.push({...origin, preset_id: to, values: {...origin.values, [wanderId]: 0.2}});
+  bank.choreography.generated_order.push(to);
+  bank.choreography.dwell[to] = bank.choreography.dwell[from];
+  const operators = new Map(catalog.operators.map((operator) => [operator.id, operator]));
+  assert.equal(changePlanarSource(preview, sample, to, 'spiral', operators, false).ok, true);
+  const edge = {from, to, duration: 8, easing: 'LINEAR', path_policy: 'parallel'};
+  bank.edges.push(edge);
+  const edited = compileShaderDocument(preview, {catalog});
+  assert.equal(edited.status, 'VALID', JSON.stringify(edited.diagnostics));
   const frameCount = edge.duration;
   const frames = Array.from({length: frameCount}, (_, index) =>
     evaluateTransition(descriptor, bank, from, to, index + 1, catalog));
@@ -70,18 +82,15 @@ test('GridWarp plays its authored edge on both wasm preview paths', () => {
   assert.equal(engine.setEffect('grid-warp'), module.EffectSetResult.INSTALLED);
   assert.equal(engine.getPresetBankDigestForEffect('grid-warp'), compiled.preset_bank_digest);
   assert.equal(engine.getPresetBankDigest(), compiled.preset_bank_digest);
-  assert.equal(engine.startPresetTransition(0, 1), true);
-  const compiledWander = engine.getParameterDefinitions().findIndex(({name}) => names.includes(name));
-  assert.ok(compiledWander >= 0);
-  for (const [index, {values}] of frames.entries()) {
-    engine.drawFrame();
-    assert.ok(Math.abs(engine.getParamValues()[compiledWander] - values[wanderId]) < 2e-6,
-      'compiled wander at frame ' + (index + 1));
-  }
+  assert.deepEqual(authored.presets.map(({preset_id}) => preset_id), ['grid-warp']);
+  assert.deepEqual(authored.edges, []);
+  assert.deepEqual(engine.getPresetIds(), ['grid-warp']);
+  assert.equal(engine.startPresetTransition(0, 1), false);
+  engine.drawFrame();
   assert.ok(engine.getPixels().some((channel) => channel !== 0));
 
   assert.equal(engine.setEffect('shader-chain'), module.EffectSetResult.INSTALLED);
-  assert.equal(applyChainDocument({engine, module, compiled, presetId: from,
+  assert.equal(applyChainDocument({engine, module, compiled: edited, presetId: from,
     syncEffectGui: () => {}, invalidate: () => {}}), null);
   engine.setAnimationsPaused(false);
   const definitions = engine.getParameterDefinitions();
