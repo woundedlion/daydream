@@ -38,11 +38,19 @@ export const LOWERING = {
 };
 
 /**
- * @param {string} op - Operation name.
+ * @param {import('./solid_op_params.js').ChainOp} op - Authored operation.
+ * @returns {import('./solid_op_params.js').ChainOp[]} Lowered primitives.
+ */
+function lowerOp(op) {
+  return LOWERING[chainOpName(op)]?.(op) ?? [op];
+}
+
+/**
+ * @param {import('./solid_op_params.js').ChainOp} op - Authored operation.
  * @returns {number} Lowered primitive count.
  */
 export function primitiveCount(op) {
-  return LOWERING[op]?.(op).length ?? 1;
+  return lowerOp(op).length;
 }
 
 /**
@@ -75,10 +83,7 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
           throw new Error(`Registry endpoint has ${faces} faces; maximum is ${MAX_BUILD_FACES}`);
       };
       check();
-      const primitives = ops.flatMap((op) => {
-        const name = chainOpName(op);
-        return LOWERING[name]?.(op) ?? [op];
-      });
+      const primitives = ops.flatMap(lowerOp);
       const swept = primitives.every((primitive) => !unsweepableReason(primitive));
       let previousName = '';
       let currentName = '';
@@ -401,9 +406,8 @@ export function generateRegistryCpp(item, baseRecipe = null) {
   const recipeName = `${upperSnake(funcName)}_RECIPE`;
   const baseSteps = baseRecipe != null ? baseRecipe.ops.map(recipeStepCpp) : [];
   const stepList = baseSteps.concat(item.ops.map(opStepCpp));
-  const ops = [...(baseRecipe?.ops ?? []), ...item.ops];
-  const lowered = ops.reduce((count, op) =>
-    count + primitiveCount(chainOpName(op)), 0);
+  const ops = [...opsFromRecipe(baseRecipe?.ops ?? []), ...item.ops];
+  const lowered = ops.reduce((count, op) => count + primitiveCount(op), 0);
   if (lowered > MAX_BUILD_STEPS) {
     throw new Error(`generateRegistryCpp: the flattened chain lowers to ${lowered} `
       + `primitive steps; IslamicStars supports at most ${MAX_BUILD_STEPS}`);
