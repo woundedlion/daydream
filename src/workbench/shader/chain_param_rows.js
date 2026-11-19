@@ -163,7 +163,7 @@ export function createChainParamRows({
       const readout = /** @type {HTMLElement|null} */ (row.querySelector('.chain-enum-preview'));
       if (readout) {
         readout.hidden = !preview || preview.from === preview.to;
-        readout.textContent = preview ? titleCase(preview.from) + ' ? ' + titleCase(preview.to) : '';
+        readout.textContent = preview ? titleCase(preview.from) + ' → ' + titleCase(preview.to) : '';
         readout.style.setProperty('--enum-mix', typeof preview?.mix === 'number' ? String(preview.mix * 100) + '%' : '0%');
       }
       if (!row.hidden && !live) {
@@ -509,7 +509,7 @@ export function createChainParamRows({
         if (id === undefined) continue;
         const transition = preview?.[id];
         output.hidden = !transition || transition.from === transition.to;
-        output.textContent = transition ? titleCase(transition.from) + ' ? ' + titleCase(transition.to) : '';
+        output.textContent = transition ? titleCase(transition.from) + ' → ' + titleCase(transition.to) : '';
         if (typeof transition?.mix === 'number')
           output.style.setProperty('--enum-mix', String(transition.mix * 100) + '%');
       }

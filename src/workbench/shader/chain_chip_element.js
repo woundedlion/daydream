@@ -246,7 +246,7 @@ export function createChipElements({
           if (kind === null) continue;
           kinds.add(kind);
           const mark = el('span', 'chain-source-kind');
-          mark.title = (item?.display_name ?? id) + ' ? ' + titleCase(kind);
+          mark.title = (item?.display_name ?? id) + ' · ' + titleCase(kind);
           mark.textContent = titleCase(kind);
           mark.classList.toggle('chain-source-kind--active', id === active);
           kindStrip.appendChild(mark);
