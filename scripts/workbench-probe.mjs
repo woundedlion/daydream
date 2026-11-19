@@ -9,6 +9,7 @@ import { decodeShaderStateHash } from '../src/workbench/shader/shader_deeplink.j
 
 const PAGE = 'tools/shader.html';
 const VIEWPORT = { width: 1674, height: 543 };
+const SHORT_POINTER_VIEWPORT = { ...VIEWPORT, height: 350 };
 // Shorter than the anchored palette, so its vertical clamp has to engage.
 const SHORT_HEIGHT = 170;
 const TIMEOUT_MS = 90_000;
@@ -306,6 +307,7 @@ export async function probeStrip(tab) {
       separate,
       strip: box(document.getElementById('chain-strip')),
       main: box(document.querySelector('.main-area')),
+      presetRail: box(document.getElementById('shader-preset-rail')),
       preview: box(document.getElementById('canvas-container')),
       stripOpacity: getComputedStyle(document.getElementById('chain-strip')).opacity,
       textOpacities: [...document.querySelectorAll(
@@ -332,8 +334,10 @@ export async function probeStrip(tab) {
       && layout.textOpacities.length > 0
       && layout.textOpacities.every((opacity) => opacity === 1),
   'the pipeline sits beside the preview with fully opaque active text');
-  check(layout.main.height > VIEWPORT.height * 0.8,
-    `the preview retains ${Math.round(layout.main.height)}px alongside the pipeline`);
+  check(layout.presetRail.height > 0 && layout.presetRail.height <= VIEWPORT.height * 0.35 + 1
+      && Math.abs(layout.preview.top - layout.presetRail.bottom) < 1
+      && Math.abs(layout.preview.bottom - VIEWPORT.height) < 1,
+  `the preview fills ${Math.round(layout.preview.height)}px below the preset rail`);
 
   const scrollHits = await tab.$$eval('.chain-scroll-button', (nodes) => nodes.map((node) => {
     const rect = node.getBoundingClientRect();
@@ -479,17 +483,26 @@ export async function probeStrip(tab) {
 
   const source = '.chain-chip-replace[aria-label="Source function"]';
   const sourceChoices = await tab.$eval(source, (node) => ({
-    label: node.getAttribute('aria-label'),
-    values: node instanceof HTMLSelectElement
-      ? [...node.options].map((option) => option.value) : [],
+    count: node.querySelectorAll('option').length,
+    groups: [...node.querySelectorAll('optgroup')].map((group) => ({label: group.label,
+      values: [...group.querySelectorAll('option')].map((option) => option.value)})),
   }));
-  check(sourceChoices.label === 'Source function'
-      && sourceChoices.values.every((value) => value.startsWith('sample.')),
-  `the Source function selector offers ${sourceChoices.values.length} sampling stages`);
-  await tab.select(source, 'sample.spiral.v3');
-  check(await tab.$eval(source, (node) => node instanceof HTMLSelectElement
-    && node.value === 'sample.spiral.v3'),
-  'the source function changes directly from its selector');
+  const planar = sourceChoices.groups.find((group) => group.label === 'Planar sources')?.values ?? [];
+  const spherical = sourceChoices.groups.find((group) => group.label === 'Spherical sources')?.values ?? [];
+  check(sourceChoices.groups.length === 2 && sourceChoices.count === planar.length + spherical.length
+      && planar.includes('planar:grid') && planar.includes('planar:spiral')
+      && planar.every((value) => value.startsWith('planar:'))
+      && ['sample.spherical-noise.v1', 'sample.spherical-cells.v1', 'sample.spherical-tiling.v1']
+        .every((operator) => spherical.includes(operator))
+      && spherical.every((value) => value.startsWith('sample.spherical-')),
+  `the Source function selector groups ${planar.length} planar and ${spherical.length} spherical sources`);
+  const previousSource = await tab.$eval(source, (node) => node.value);
+  await tab.select(source, 'planar:grid');
+  const gridDocument = await exportedDocument(tab);
+  check(previousSource !== 'planar:grid'
+      && await tab.$eval(source, (node) => node.value) === 'planar:grid'
+      && gridDocument.descriptor.chain.some((entry) => entry.operator === 'sample.grid.v4'),
+  'changing the planar source selector updates the exported chain');
 
   const sphereBandBefore = await boxOf(tab, '.chain-band[data-carrier="sphere"]');
   await (await tab.waitForSelector(
@@ -660,15 +673,19 @@ export async function probeStrip(tab) {
     + `${narrowLeft},${narrowTop} from anchor ${JSON.stringify(narrowAnchor)}`);
   await tab.keyboard.press('Escape');
 
-  await resizeViewport(tab, { width: VIEWPORT.width, height: 300 });
+  await resizeViewport(tab, SHORT_POINTER_VIEWPORT);
   await tab.mouse.move(0, 0);
-  await tab.focus(add);
+  await tab.$eval(add, (node) => {
+    node.scrollIntoView({block: 'center'});
+    node.focus();
+  });
   await (await tab.waitForSelector(add)).click();
   await tab.waitForSelector('.chain-palette-entry');
   const liftedAnchor = await boxOf(tab, add);
   const liftedPalette = await boxOf(tab, '.chain-palette');
   check(liftedPalette.y < liftedAnchor.y + liftedAnchor.height
-      && liftedPalette.y >= 8 && liftedPalette.y + liftedPalette.height <= 293,
+      && liftedPalette.y >= 8
+      && liftedPalette.y + liftedPalette.height <= SHORT_POINTER_VIEWPORT.height - 8 + 1,
   'the palette lifts above its anchor inside a short usable sidebar');
   await tab.keyboard.press('Escape');
 
@@ -1155,7 +1172,7 @@ export async function probeSphericalSources(tab) {
   const { failures, check } = checks();
   await tab.select('#shader-document-select', 'kaleidoscope-hex-bright');
   const sourceSelector = '.chain-chip-replace[aria-label="Source function"]';
-  await tab.waitForFunction((selector) => document.querySelector(selector)?.value === 'sample.twin-wave.v3',
+  await tab.waitForFunction((selector) => document.querySelector(selector)?.value === 'planar:twin-wave',
     {timeout: TIMEOUT_MS}, sourceSelector);
   const sphereLabels = await tab.$$eval('.chain-band[data-carrier="sphere"] .chain-chip',
     (nodes) => nodes.map((node) => node.dataset.label).join());
@@ -1204,13 +1221,13 @@ export async function probeSphericalSources(tab) {
     await tab.select(sourceSelector, planarRoute);
     check(await tab.$('.chain-band[data-carrier="plane"]') !== null
         && await tab.$('.chain-chip-replace[aria-label="Projection"]') !== null
-        && await tab.$eval(sourceSelector, (node) => node.value) === 'sample.spiral.v3',
+        && await tab.$eval(sourceSelector, (node) => node.value) === 'planar:spiral',
     `${operator} can return to a projected planar source`);
     await tab.$eval('.chain-undo', (node) => node.click());
     await tab.waitForFunction((selector, expected) => document.querySelector(selector)?.value === expected,
       {timeout: TIMEOUT_MS}, sourceSelector, operator);
     await tab.$eval('.chain-undo', (node) => node.click());
-    check(await tab.$eval(sourceSelector, (node) => node.value) === 'sample.twin-wave.v3'
+    check(await tab.$eval(sourceSelector, (node) => node.value) === 'planar:twin-wave'
         && await tab.$('.chain-chip[data-label="warp2"]') !== null,
     `${operator} undo restores the original projection and authored planar warp`);
   }
